@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""Classify the files a pull request changes for the path filters of ci.yml.
+
+    git diff --name-only HEAD^1 HEAD | scripts/ci/changes --event <name> [--github-output <file>]
+
+Reads one path per line and prints {"rust": .., "docs": .., "editors": ..}
+(and appends `changed=<that JSON>` to --github-output). The filters:
+
+  rust     any file outside docs/ and editors/, and docs/spec.md (the Rust
+           tests read it). Runs the Rust tests, the release build and every
+           job that uses it (i, corpus, docs), and the JavaScript tests.
+  docs     a file under docs/, lib/ or std/ (the site and the generated
+           library pages). Runs the release build (the site's examples run
+           with it) and the docs job.
+  editors  a file under editors/, lib/, std/ or examples/ (the tree-sitter
+           queries parse those sources). Runs the editors job.
+
+A change to the workflow, the Devenv shell, ci/, scripts/ci/ or
+scripts/checks sets every filter. The lint job runs on every change: it also
+checks the i snippets of every .md and .mdx file. No path at all (an empty
+diff) sets every filter too, so a run never plans less than it should.
+--event is github.event_name: on any event but pull_request every filter is
+set without reading the paths (every push runs the full gate).
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+
+# The workflow, the shell and the CI scripts: a change here sets every filter.
+EVERYTHING = ('.github/', 'ci/', 'scripts/ci/', 'scripts/checks', 'devenv.nix', 'devenv.yaml', 'devenv.lock')
+
+
+def classify(paths):
+    if not paths or any(p.startswith(EVERYTHING) for p in paths):
+        return {'rust': True, 'docs': True, 'editors': True}
+    def under(path, *dirs):
+        return any(path.startswith(d + '/') for d in dirs)
+    return {
+        'rust': any(p == 'docs/spec.md' or not under(p, 'docs', 'editors') for p in paths),
+        'docs': any(under(p, 'docs', 'lib', 'std') for p in paths),
+        'editors': any(under(p, 'editors', 'lib', 'std', 'examples') for p in paths),
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--event', required=True)
+    parser.add_argument('--github-output', type=Path)
+    a = parser.parse_args()
+    if a.event == 'pull_request':
+        paths = [line.strip() for line in sys.stdin if line.strip()]
+        changed = classify(paths)
+    else:
+        paths = []
+        changed = {'rust': True, 'docs': True, 'editors': True}
+    text = json.dumps(changed, separators=(',', ':'))
+    print(f'{a.event}: {len(paths)} changed path(s): {text}')
+    if a.github_output:
+        with a.github_output.open('a') as f:
+            f.write(f'changed={text}\n')
+
+
+if __name__ == '__main__':
+    main()

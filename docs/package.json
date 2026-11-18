@@ -18,7 +18,7 @@
     "check:placeholders": "python3 scripts/check-placeholders-test && python3 scripts/check-placeholders.py",
     "check:rendering": "python3 scripts/check-example-rendering.py",
     "check:format": "python3 scripts/format-fences-test && python3 scripts/format-fences.py",
-    "check:examples": "npm run generate && npm run check:format && python3 scripts/check-examples.py && python3 scripts/run-examples.py --no-placeholders",
+    "check:examples": "npm run check:format && python3 scripts/check-examples.py && python3 scripts/run-examples.py --no-placeholders",
     "check:fonts": "python3 scripts/check-fonts-test && python3 scripts/check-fonts.py",
     "check:selector": "node --test scripts/home-selector-test.mjs",
     "check:home-layout": "node scripts/home-layout-test.mjs"

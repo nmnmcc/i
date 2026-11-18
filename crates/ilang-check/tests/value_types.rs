@@ -696,6 +696,79 @@ fn spec_case_reverse_order_and_recovery(
     }
 }
 
+/// The cases of the language corpus: each `.i` file and each directory in a
+/// section directory of `root`, sorted by path.
+fn spec_case_paths(root: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut cases = Vec::new();
+    for section in std::fs::read_dir(root).unwrap() {
+        let section = section.unwrap().path();
+        if !section.is_dir() {
+            continue;
+        }
+        for path in std::fs::read_dir(section).unwrap() {
+            let path = path.unwrap().path();
+            if path.is_dir() || path.extension().is_some_and(|x| x == "i") {
+                cases.push(path);
+            }
+        }
+    }
+    cases.sort();
+    cases
+}
+
+/// A case's key in the cost table: its path under `root`, as the spec suite
+/// names it (`<section>/<case>`).
+fn spec_case_key(root: &std::path::Path, path: &std::path::Path) -> String {
+    path.strip_prefix(root)
+        .unwrap()
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// The keys of `cases`, sorted as strings (the order of the cost table).
+fn spec_case_keys(root: &std::path::Path, cases: &[std::path::PathBuf]) -> Vec<String> {
+    let mut keys: Vec<String> = cases.iter().map(|path| spec_case_key(root, path)).collect();
+    keys.sort();
+    keys
+}
+
+/// The plan of the case keys with the costs of the set `value-type-cases` of
+/// the cost table (`CHECKS_COSTS`, or `ci/costs.json`); without the table,
+/// `fallback_shards` shards of equal cases.
+fn value_type_plan(keys: &[String], fallback_shards: usize) -> ilang_shard::CasePlan {
+    let costs = std::env::var_os("CHECKS_COSTS")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ci/costs.json")
+        });
+    ilang_shard::plan_cases(&costs, "value-type-cases", keys, fallback_shards)
+}
+
+#[test]
+fn value_type_shards_cover_every_case_once_within_the_budget() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec");
+    let keys = spec_case_keys(&root, &spec_case_paths(&root));
+    let planned = value_type_plan(&keys, 1);
+    let errors = planned.partition_errors(&keys);
+    assert!(
+        errors.is_empty(),
+        "the value type shards are not a partition of the cases:\n{}",
+        errors.join("\n")
+    );
+    let over: Vec<String> = planned
+        .plan
+        .over_budget
+        .iter()
+        .map(|unit| format!("{} costs {} s", unit.key, unit.cost))
+        .collect();
+    assert!(
+        over.is_empty(),
+        "a case alone is over the budget of {} s, so no shard can hold it within the budget:\n{}",
+        planned.budget_seconds,
+        over.join("\n")
+    );
+}
+
 #[test]
 fn spec_corpus_reverse_order_and_recovery() {
     // Checklist 9.11: compare real corpus inference, including recovery paths.
@@ -710,20 +783,37 @@ fn spec_corpus_reverse_order_and_recovery() {
         .map(|line| line.split('#').next().unwrap_or("").trim().to_owned())
         .filter(|line| !line.is_empty())
         .collect();
-    let mut cases = Vec::new();
-    for section in std::fs::read_dir(&root).unwrap() {
-        let section = section.unwrap().path();
-        if !section.is_dir() {
-            continue;
-        }
-        for path in std::fs::read_dir(section).unwrap() {
-            let path = path.unwrap().path();
-            if path.is_dir() || path.extension().is_some_and(|x| x == "i") {
-                cases.push(path);
+    let mut cases = spec_case_paths(&root);
+    // `VALUE_TYPES_SHARD=k` and `VALUE_TYPES_SHARD_OF=n` keep the cases of
+    // shard k (0-based) of the n that the cost table plans, for CI's jobs.
+    let shard = |name: &str| {
+        std::env::var(name).ok().map(|text| {
+            text.parse::<usize>()
+                .unwrap_or_else(|_| panic!("{name} must be a number, not {text:?}"))
+        })
+    };
+    match (shard("VALUE_TYPES_SHARD"), shard("VALUE_TYPES_SHARD_OF")) {
+        (None, None) => {}
+        (Some(k), Some(n)) => {
+            assert!(
+                k < n,
+                "VALUE_TYPES_SHARD must be below VALUE_TYPES_SHARD_OF, not {k} of {n}"
+            );
+            let keys = spec_case_keys(&root, &cases);
+            let planned = value_type_plan(&keys, n);
+            for note in planned.notes("value types") {
+                eprintln!("{note}");
             }
+            let kept: std::collections::BTreeSet<&str> = planned
+                .shard_keys(k, n, "VALUE_TYPES_SHARD_OF")
+                .iter()
+                .map(String::as_str)
+                .collect();
+            cases.retain(|path| kept.contains(spec_case_key(&root, path).as_str()));
+            eprintln!("value types: shard {k} of {n}, {} cases", cases.len());
         }
+        _ => panic!("VALUE_TYPES_SHARD and VALUE_TYPES_SHARD_OF are set together or not at all"),
     }
-    cases.sort();
     let discovered = cases.len();
     let workers = std::thread::available_parallelism()
         .map_or(1, |n| n.get())

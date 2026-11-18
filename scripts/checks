@@ -20,9 +20,18 @@
 #   scripts/checks editors    VS Code tests, tree-sitter tests and Zed build
 #   scripts/checks js         the JavaScript SDK and browser tests
 #
-# For CI, which builds once and runs the review corpus in shards:
+# For CI, which builds once and splits the slow sets into shards:
 #   CHECKS_I_BINARY=path      the i part uses this `i` instead of building it
 #   CHECKS_SKIP_CORPUS=1      the i part leaves out the review corpus
+#   CHECKS_SHARD=k/n          the i part runs only shard k of n of the review corpus
+#                             (scripts/review-corpus run --shard k/n); unset, the whole corpus
+#   CHECKS_TEST_GROUP=...     rust-test runs one group of the tests (see rust-test below);
+#                             `targets` runs exactly the targets in CHECKS_TEST_TARGETS
+#   CHECKS_TEST_TARGETS=...   for CHECKS_TEST_GROUP=targets: `<crate>:<target>` words,
+#                             crate ilang-check or ilang-cli; target `lib`, `bin`, `doc`,
+#                             or the name of a file of the crate's tests/
+#   CHECKS_BUDGET=seconds     the time budget of one shard, exported for the shard tooling
+#                             (i-shard --budget); default 270
 #
 # These parts are every test suite of the repository. Where each suite runs:
 #   tests/spec/**                 spec cases with their header        rust-test (ilang-cli --test spec)
@@ -38,9 +47,10 @@
 #   editors/**                                                         editors
 # Measurements and one-off comparisons, not suites: scripts/bench, scripts/checker-bench,
 # tests/perf/numeric, tests/t1/*, tests/r2-*.py. tests/syn3/services (expected.txt) is run
-# by scripts/syn3-fixtures with the default parser.
+# by `cargo test -p ilang-cli --test syn3_fixtures` with the default parser.
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+export CHECKS_BUDGET="${CHECKS_BUDGET:-270}"
 
 binaryen() {
   git submodule update --init crates/ilang-binaryen/binaryen
@@ -76,11 +86,63 @@ CLI_HEAVY_TESTS=(package_commands value_type_performance many_tests macro_budget
 #   cli-heavy    test (ilang-cli, slow)           the targets in CLI_HEAVY_TESTS
 #   cli          test (ilang-cli, other)          the other tests of ilang-cli
 #   rest         test (workspace, other crates)   every other crate
+#   targets      (planned shards)                 the targets in CHECKS_TEST_TARGETS
 # Unset: all of them.
+#
+# CHECKS_TEST_TARGETS is a list of `<crate>:<target>` words, the units of a shard that
+# i-shard planned from ci/costs.json. The crate is ilang-check or ilang-cli; the target
+# `lib` runs --lib, `bin` (or `bin:<name>`) --bins, `doc` the doc tests, and any other
+# `<name>` (or `test:<name>`) --test <name>. Each crate gets one `cargo test --no-fail-fast`
+# with its targets in the order given (and its doc tests after it, which cargo cannot run
+# in the same invocation); the crates run in the order they first appear.
+test-targets() {
+  local words=() word crate target
+  read -r -a words <<<"${CHECKS_TEST_TARGETS:-}"
+  if [[ ${#words[@]} -eq 0 ]]; then
+    echo "checks: CHECKS_TEST_GROUP=targets needs CHECKS_TEST_TARGETS, a list of <crate>:<target>" >&2
+    exit 2
+  fi
+  local crates=() check_args=() cli_args=() check_doc=0 cli_doc=0
+  for word in "${words[@]}"; do
+    crate="${word%%:*}"
+    target="${word#*:}"
+    if [[ "$word" != *:* || -z "$target" ]]; then
+      echo "checks: '$word' in CHECKS_TEST_TARGETS is not <crate>:<target>" >&2
+      exit 2
+    fi
+    case "$crate" in
+      ilang-check | ilang-cli) ;;
+      *) echo "checks: unknown crate '$crate' in CHECKS_TEST_TARGETS (ilang-check or ilang-cli)" >&2; exit 2 ;;
+    esac
+    [[ " ${crates[*]-} " == *" $crate "* ]] || crates+=("$crate")
+    local args=()
+    case "$target" in
+      lib) args=(--lib) ;;
+      bin | bin:*) args=(--bins) ;;
+      doc) if [[ "$crate" = ilang-check ]]; then check_doc=1; else cli_doc=1; fi ;;
+      test:*) args=(--test "${target#test:}") ;;
+      *) args=(--test "$target") ;;
+    esac
+    if [[ "$crate" = ilang-check ]]; then check_args+=("${args[@]}"); else cli_args+=("${args[@]}"); fi
+  done
+  local status=0
+  for crate in "${crates[@]}"; do
+    if [[ "$crate" = ilang-check ]]; then
+      [[ ${#check_args[@]} -eq 0 ]] || cargo test -p ilang-check --locked --no-fail-fast "${check_args[@]}" || status=1
+      [[ $check_doc = 0 ]] || cargo test -p ilang-check --locked --no-fail-fast --doc || status=1
+    else
+      [[ ${#cli_args[@]} -eq 0 ]] || cargo test -p ilang-cli --locked --no-fail-fast "${cli_args[@]}" || status=1
+      [[ $cli_doc = 0 ]] || cargo test -p ilang-cli --locked --no-fail-fast --doc || status=1
+    fi
+  done
+  return "$status"
+}
+
 rust-test() {
   binaryen
   case "${CHECKS_TEST_GROUP:-}" in
     "") cargo test --workspace --locked ;;
+    targets) test-targets ;;
     check-heavy) cargo test -p ilang-check --locked --test value_types ;;
     check)
       # Every target of ilang-check but value_types, which is check-heavy.
@@ -115,7 +177,16 @@ rust-test() {
 }
 
 i() {
-  local i example manifest
+  local i example manifest first=1
+  if [[ -n "${CHECKS_SHARD:-}" && ! "$CHECKS_SHARD" =~ ^[1-9][0-9]*/[1-9][0-9]*$ ]]; then
+    echo "checks: CHECKS_SHARD must be k/n, not '$CHECKS_SHARD'" >&2
+    exit 2
+  fi
+  # CHECKS_I_PROJECTS comes from the plan: keys <project>@<opt> of the set
+  # std-tests. The parts that are not a project run once, in the first shard.
+  if [[ -n "${CHECKS_I_SHARD:-}" && "${CHECKS_I_SHARD%%/*}" != 1 ]]; then
+    first=0
+  fi
   if [[ -n "${CHECKS_I_BINARY:-}" ]]; then
     i="$(realpath "$CHECKS_I_BINARY")"
   else
@@ -123,27 +194,41 @@ i() {
     cargo build --release --locked -p ilang-cli
     i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
   fi
-  "$i" fmt --check lib std bench examples
-  # Every example with an `i.toml` must type check on its own.
-  for manifest in examples/*/i.toml; do
-    example="$(dirname "$manifest")"
-    echo "checks: i check $example"
-    if ! "$i" check --project "$example"; then
-      echo "checks: i check failed for $example" >&2
-      exit 1
-    fi
-  done
-  ./scripts/dev-new-machine "$i"
-  for level in 0 2; do
-    "$i" test --project std --opt "$level"
-    "$i" test --project examples/hello --opt "$level"
-    "$i" test --project bench --opt "$level"
-  done
-  ./scripts/wasi-smoke "$i"
-  if [[ "${CHECKS_SKIP_CORPUS:-}" != 1 ]]; then
-    ./scripts/review-corpus run --binary "$i" --jobs 3
+  if (( first )); then
+    "$i" fmt --check lib std bench examples
+    # Every example with an `i.toml` must type check on its own.
+    for manifest in examples/*/i.toml; do
+      example="$(dirname "$manifest")"
+      echo "checks: i check $example"
+      if ! "$i" check --project "$example"; then
+        echo "checks: i check failed for $example" >&2
+        exit 1
+      fi
+    done
+    ./scripts/dev-new-machine "$i"
   fi
-  ./scripts/test-generation --mode short --binary "$i"
+  if [[ -n "${CHECKS_I_PROJECTS:-}" ]]; then
+    for project_opt in $CHECKS_I_PROJECTS; do
+      "$i" test --project "${project_opt%@*}" --opt "${project_opt##*@}"
+    done
+  else
+    for level in 0 2; do
+      "$i" test --project std --opt "$level"
+      "$i" test --project examples/hello --opt "$level"
+      "$i" test --project bench --opt "$level"
+    done
+  fi
+  if (( first )); then
+    ./scripts/wasi-smoke "$i"
+    if [[ "${CHECKS_SKIP_CORPUS:-}" = 1 ]]; then
+      :
+    elif [[ -n "${CHECKS_SHARD:-}" ]]; then
+      ./scripts/review-corpus run --binary "$i" --shard "$CHECKS_SHARD" --jobs 4
+    else
+      ./scripts/review-corpus run --binary "$i" --jobs 3
+    fi
+    ./scripts/test-generation --mode short --binary "$i"
+  fi
 }
 
 js() {

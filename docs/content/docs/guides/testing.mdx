@@ -67,6 +67,8 @@ pass guide_tests/count_test.adds one
 
 Each command prints this result. Filters match substrings, with no exact-name or file flag; include the module's trailing dot to select its tests. `--project` chooses the directory; `--opt` chooses the optimization level.
 
+`--shard K/N` runs shard `K` of `N` (counted from 0): the tests are sorted by qualified name and placed into shards by the shared cost-aware algorithm (heaviest first, each to the least-loaded shard), so the union of all shards is the full set; the name filter then applies within the shard.
+
 ## Suites and cases
 
 ```i test stdout=exact package=guide_tests title="test/forms_test.i"

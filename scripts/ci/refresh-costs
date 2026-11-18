@@ -1,0 +1,277 @@
+#!/usr/bin/env python3
+"""Refresh ci/costs.json, the cost table that `i-shard` plans CI shards from.
+
+    scripts/ci/refresh-costs --logs <file or directory>... [--costs ci/costs.json]
+    scripts/ci/refresh-costs --sync-keys [--logs ...]
+
+--logs reads CI logs (a directory is read recursively, every regular file)
+and replaces the costs of the units it finds a time for. Other costs, every
+key list, and every set this script does not know stay as they are.
+--sync-keys rewrites the key lists of the sets it knows from the repository
+and drops the costs of keys that no longer exist. It knows ilang-check-tests,
+ilang-cli-tests, std-tests, spec-cases, corpus-cases, docs-examples and
+value-type-cases (the spec cases again, which ilang-check's value_types walks);
+any other set of the table is left as it is.
+
+A log is either GitHub's combined run log (`job<TAB>step<TAB>timestamp text`)
+or one job's log (`timestamp text`, or bare text). Lines are grouped by job
+(the first column; one group per file when there is none). It uses:
+
+  Rust test binaries (sets ilang-check-tests, ilang-cli-tests):
+    `     Running unittests src/lib.rs (target/debug/deps/<crate>-<hash>)`  -> key `lib`
+    `     Running unittests src/main.rs (target/debug/deps/<bin>-<hash>)`   -> key `bin:<bin>`
+    `     Running tests/<name>.rs (target/debug/deps/<name>-<hash>)`        -> key `test:<name>`
+    `   Doc-tests <crate>`                                                  -> key `doc`
+    then the next `test result: ... finished in <N>s` is that binary's cost.
+    The crate of a `tests/` binary is that of the last `unittests` or
+    `Doc-tests` line of the same job; without one, the job name (`ilang-check`
+    or `check`, `ilang-cli` or `cli`); without that, the only crate of the two
+    that has `tests/<name>.rs`.
+  Projects run by `i test --project` (set std-tests, keys <project>@<opt>):
+    timestamps are required. After `dev-new-machine: ok`, each run ends at a
+    line `<N> passed, <M> failed`; its project is named by its first
+    `pass <name>/...` or `fail <name>/...` line (std, hello -> examples/hello,
+    bench); its cost is from the end of the previous run (or the
+    `dev-new-machine: ok` line) to its own end, so it includes the build. The
+    first run of a project in a job is --opt 0 and the second --opt 2, the
+    order of scripts/checks.
+
+A time seen in several logs takes the largest. Costs are written with three
+decimals (at least 0.001), keys sorted, so the same logs give the same file.
+A set of the table that is not an object with a `keys` list of strings and a
+`costs` object of positive numbers is not overwritten: the script stops
+without writing anything.
+"""
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+CRATE_SETS = {'ilang-check': 'ilang-check-tests', 'ilang-cli': 'ilang-cli-tests'}
+PROJECTS = {'std': 'std', 'hello': 'examples/hello', 'bench': 'bench'}
+LEVELS = ('0', '2')
+
+RUNNING = re.compile(r'^\s+Running (unittests )?(\S+) \((?:\S*/)?deps/([A-Za-z0-9_]+)-[0-9a-f]+(?:\.exe)?\)\s*$')
+DOC_TESTS = re.compile(r'^\s+Doc-tests (\S+)\s*$')
+RESULT = re.compile(r'^test result: .*finished in ([0-9.]+)s\s*$')
+STAMP = re.compile(r'^\ufeff?(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?)Z ?(.*)$')
+PROJECT_LINE = re.compile(r'^(?:pass|fail) ([A-Za-z0-9_-]+)/')
+SUMMARY = re.compile(r'^\d+ passed, \d+ failed\s*$')
+
+
+def fail(message):
+    print(f'refresh-costs: {message}', file=sys.stderr)
+    sys.exit(1)
+
+
+def repository_keys():
+    """The unit keys of the sets this script knows, from the repository."""
+    def stems(crate):
+        return sorted(p.stem for p in (ROOT / 'crates' / crate / 'tests').glob('*.rs'))
+    spec = []
+    for section in sorted(p for p in (ROOT / 'tests/spec').iterdir() if p.is_dir()):
+        for entry in sorted(section.iterdir()):
+            if entry.is_dir() or entry.suffix == '.i':
+                spec.append(str(entry.relative_to(ROOT / 'tests/spec')))
+    corpus = [c['id'] for c in json.loads((ROOT / 'tests/review/manifest.json').read_text())['cases']]
+    pages = subprocess.run(['git', 'ls-files', '-z', '--', 'docs/content'], cwd=ROOT, check=True,
+                           capture_output=True, text=True).stdout.split('\0')
+    docs = [str(Path(p).relative_to('docs/content')) for p in pages
+            if p.endswith(('.md', '.mdx')) and 'generated' not in Path(p).parts]
+    return {
+        'ilang-check-tests': ['doc', 'lib'] + ['test:' + s for s in stems('ilang-check')],
+        'ilang-cli-tests': ['bin:i'] + ['test:' + s for s in stems('ilang-cli') if s != 'spec'],
+        'spec-cases': spec,
+        # value_types' spec_corpus_reverse_order_and_recovery walks the same cases.
+        'value-type-cases': spec,
+        'corpus-cases': corpus,
+        'std-tests': [f'{p}@{level}' for p in sorted(PROJECTS.values()) for level in LEVELS],
+        'docs-examples': docs,
+    }
+
+
+def log_lines(path):
+    """(job, timestamp or None, text) for each line of one log file."""
+    default_job = str(path)
+    with open(path, encoding='utf-8', errors='replace') as f:
+        for raw in f:
+            raw = raw.rstrip('\n').rstrip('\r')
+            job, rest = default_job, raw
+            parts = raw.split('\t', 2)
+            if len(parts) == 3 and STAMP.match(parts[2]):
+                job, rest = parts[0], parts[2]
+            m = STAMP.match(rest)
+            if m:
+                stamp = datetime.fromisoformat(m.group(1)[:26])
+                yield job, stamp, m.group(2)
+            else:
+                yield job, None, rest.lstrip('\ufeff')
+
+
+def job_crate(job):
+    if 'ilang-check' in job or re.search(r'\bcheck\b', job):
+        return 'ilang-check'
+    if 'ilang-cli' in job or re.search(r'\bcli\b', job):
+        return 'ilang-cli'
+    return None
+
+
+def parse_log(path, observed):
+    """Adds (set, key) -> seconds observations from one log to `observed`."""
+    check_tests = {p.stem for p in (ROOT / 'crates/ilang-check/tests').glob('*.rs')}
+    cli_tests = {p.stem for p in (ROOT / 'crates/ilang-cli/tests').glob('*.rs')}
+    jobs = {}
+
+    def state(job):
+        return jobs.setdefault(job, {'crate': None, 'pending': None, 'started': None,
+                                     'project': None, 'runs': {}})
+
+    def note(set_name, key, seconds):
+        seconds = max(round(seconds, 3), 0.001)
+        observed.setdefault(set_name, {})
+        observed[set_name][key] = max(observed[set_name].get(key, 0), seconds)
+
+    for job, stamp, text in log_lines(path):
+        s = state(job)
+        m = RUNNING.match(text)
+        if m:
+            unittests, source, name = m.groups()
+            if unittests and source == 'src/lib.rs':
+                s['crate'] = name.replace('_', '-')
+                s['pending'] = (s['crate'], 'lib')
+            elif unittests and source == 'src/main.rs':
+                s['crate'] = 'ilang-cli' if name == 'i' else name.replace('_', '-')
+                s['pending'] = (s['crate'], 'bin:' + name)
+            elif unittests:
+                s['pending'] = None
+            else:
+                crate = s['crate'] or job_crate(job)
+                if crate is None:
+                    owners = [c for c, names in (('ilang-check', check_tests), ('ilang-cli', cli_tests))
+                              if name in names]
+                    crate = owners[0] if len(owners) == 1 else None
+                s['pending'] = (crate, 'test:' + name) if crate else None
+            continue
+        m = DOC_TESTS.match(text)
+        if m:
+            s['crate'] = m.group(1).replace('_', '-')
+            s['pending'] = (s['crate'], 'doc')
+            continue
+        m = RESULT.match(text)
+        if m and s['pending']:
+            crate, key = s['pending']
+            s['pending'] = None
+            if crate in CRATE_SETS:
+                note(CRATE_SETS[crate], key, float(m.group(1)))
+            continue
+        if stamp is None:
+            continue
+        if text.strip() == 'dev-new-machine: ok':
+            s['started'], s['project'], s['runs'] = stamp, None, {}
+            continue
+        if s['started'] is None:
+            continue
+        m = PROJECT_LINE.match(text)
+        if m and s['project'] is None:
+            s['project'] = m.group(1)
+            continue
+        if SUMMARY.match(text):
+            project = PROJECTS.get(s['project'])
+            if project is not None:
+                count = s['runs'].get(project, 0)
+                s['runs'][project] = count + 1
+                if count < len(LEVELS):
+                    note('std-tests', f'{project}@{LEVELS[count]}', (stamp - s['started']).total_seconds())
+            s['started'], s['project'] = stamp, None
+
+
+def check_set(name, value):
+    if not isinstance(value, dict):
+        fail(f'set {name!r} is not an object; not overwriting it')
+    keys, costs = value.get('keys'), value.get('costs', {})
+    if not isinstance(keys, list) or not all(isinstance(k, str) for k in keys):
+        fail(f'set {name!r} has no list of string keys; not overwriting it')
+    if not isinstance(costs, dict) or not all(
+            isinstance(c, (int, float)) and not isinstance(c, bool) and c > 0 for c in costs.values()):
+        fail(f'set {name!r} has costs that are not positive numbers; not overwriting it')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
+    parser.add_argument('--costs', type=Path, default=ROOT / 'ci/costs.json')
+    parser.add_argument('--logs', type=Path, nargs='+', default=[], metavar='PATH')
+    parser.add_argument('--sync-keys', action='store_true',
+                        help='rewrite the key lists of the known sets from the repository')
+    parser.add_argument('--budget', type=float, help='set budget_seconds (default: keep it, or 270)')
+    args = parser.parse_args()
+    if not args.logs and not args.sync_keys and args.budget is None:
+        parser.error('nothing to do: give --logs, --sync-keys or --budget')
+
+    if args.costs.exists():
+        try:
+            table = json.loads(args.costs.read_text())
+        except (OSError, ValueError) as e:
+            fail(f'cannot read {args.costs}: {e}')
+        if not isinstance(table, dict) or table.get('version') != 1 or not isinstance(table.get('sets'), dict):
+            fail(f'{args.costs} is not a version 1 cost table; not overwriting it')
+    else:
+        table = {'version': 1, 'budget_seconds': 270, 'sets': {}}
+    sets = table['sets']
+    for name, value in sets.items():
+        check_set(name, value)
+    if args.budget is not None:
+        if not args.budget > 0:
+            fail('--budget must be greater than 0')
+        table['budget_seconds'] = int(args.budget) if args.budget.is_integer() else args.budget
+
+    if args.sync_keys:
+        for name, keys in repository_keys().items():
+            old = sets.get(name, {'keys': [], 'costs': {}})
+            kept = set(keys)
+            sets[name] = {'keys': keys, 'costs': {k: c for k, c in old.get('costs', {}).items() if k in kept}}
+
+    observed = {}
+    files = []
+    for path in args.logs:
+        if path.is_dir():
+            files.extend(sorted(p for p in path.rglob('*') if p.is_file()))
+        elif path.is_file():
+            files.append(path)
+        else:
+            fail(f'cannot read the log {path}')
+    for path in files:
+        try:
+            parse_log(path, observed)
+        except OSError as e:
+            fail(f'cannot read the log {path}: {e}')
+
+    for name in sorted(observed):
+        if name not in sets:
+            print(f'refresh-costs: {name}: not in the table; run with --sync-keys to add it', file=sys.stderr)
+            continue
+        keys = set(sets[name]['keys'])
+        found = {k: c for k, c in observed[name].items() if k in keys}
+        unknown = sorted(set(observed[name]) - keys)
+        costs = sets[name].setdefault('costs', {})
+        costs.update(found)
+        print(f'refresh-costs: {name}: {len(found)} of {len(keys)} costs from the logs'
+              + (f'; not in its keys: {", ".join(unknown)}' if unknown else ''), file=sys.stderr)
+    if args.logs:
+        for name in sorted(set(sets) - set(observed)):
+            print(f'refresh-costs: {name}: no costs in the logs; left as it was', file=sys.stderr)
+
+    for value in sets.values():
+        value['keys'] = sorted(value['keys'])
+        value['costs'] = {k: round(float(c), 3) for k, c in sorted(value.get('costs', {}).items())}
+    text = json.dumps(table, indent=1, sort_keys=True, ensure_ascii=False) + '\n'
+    args.costs.parent.mkdir(parents=True, exist_ok=True)
+    args.costs.write_text(text)
+
+
+if __name__ == '__main__':
+    main()

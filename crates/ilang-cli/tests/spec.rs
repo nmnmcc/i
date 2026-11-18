@@ -33,7 +33,10 @@
 //!
 //! `cargo test -p ilang-cli --test spec -- <filter>` runs the cases whose
 //! path has the filter.
-//! `I_SPEC_SHARD=k/n` runs every n-th case from the k-th, for CI's shards.
+//! `I_SPEC_SHARD=k/n` (1-based k) runs the k-th of the n shards that
+//! `ilang_shard::plan_cases` makes from the set `spec-cases` of the cost table
+//! (`CHECKS_COSTS`, or `ci/costs.json`), for CI's shards; the table must plan
+//! exactly n shards. Without the table, every case costs 1 s and there are n.
 //! `I_SPEC_TRACE=1` reports each case's build, load and run progress to
 //! standard error while the summary stays ordered by case name.
 
@@ -123,7 +126,8 @@ fn header(text: &str, comment: &str) -> Result<(Expect, Option<Vec<String>>), St
     }
 }
 
-fn cases(root: &Path) -> Vec<Result<Case, String>> {
+/// Each case's name (its path under the root) and the case or its header error.
+fn cases(root: &Path) -> Vec<(String, Result<Case, String>)> {
     let mut out = Vec::new();
     let mut sections: Vec<PathBuf> = std::fs::read_dir(root)
         .expect("tests/spec")
@@ -145,21 +149,26 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                 .into_owned();
             if path.is_dir() {
                 let text = std::fs::read_to_string(path.join("i.toml")).unwrap_or_default();
-                out.push(header(&text, "#").map_err(|e| format!("{name}: {e}")).map(
-                    |(expect, output)| Case {
-                        name,
-                        header_path: path.join("i.toml"),
-                        comment: "#",
-                        project: path.clone(),
-                        expect,
-                        output,
-                        _temp: None,
-                    },
+                let key = name.clone();
+                out.push((
+                    key,
+                    header(&text, "#").map_err(|e| format!("{name}: {e}")).map(
+                        |(expect, output)| Case {
+                            name,
+                            header_path: path.join("i.toml"),
+                            comment: "#",
+                            project: path.clone(),
+                            expect,
+                            output,
+                            _temp: None,
+                        },
+                    ),
                 ));
             } else if path.extension().is_some_and(|e| e == "i") {
                 let text = std::fs::read_to_string(&path).unwrap();
                 let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
-                out.push(header(&text, "//").map_err(|e| format!("{name}: {e}")).map(
+                let key = name.clone();
+                out.push((key, header(&text, "//").map_err(|e| format!("{name}: {e}")).map(
                     |(mut expect, output)| {
                         if let Expect::Stop(_, positions) = &mut expect {
                             let old = format!("spec/{stem}:");
@@ -188,7 +197,7 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                             _temp: Some(dir),
                         }
                     },
-                ));
+                )));
             }
         }
     }
@@ -381,12 +390,57 @@ fn check(case: &Case, o: &Outcome2, expect: &Expect) -> Result<(), String> {
     }
 }
 
+/// The cost table: `CHECKS_COSTS`, or `ci/costs.json` of the repository.
+fn costs_path() -> PathBuf {
+    std::env::var_os("CHECKS_COSTS")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ci/costs.json"))
+}
+
+/// The plan of the case names `keys` with the costs of the set `spec-cases`;
+/// without the cost table, `fallback_shards` shards of equal cases.
+fn spec_plan(keys: &[String], fallback_shards: usize) -> ilang_shard::CasePlan {
+    ilang_shard::plan_cases(&costs_path(), "spec-cases", keys, fallback_shards)
+}
+
 fn main() {
     let filter: Option<String> = std::env::args().skip(1).find(|a| !a.starts_with('-'));
     let root = std::env::var_os("I_SPEC_ROOT")
         .map(PathBuf::from)
         .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/spec"));
-    let all = cases(&root);
+    let mut all = cases(&root);
+    let keys: Vec<String> = all.iter().map(|(name, _)| name.clone()).collect();
+    // `I_SPEC_SHARD=k/n` keeps the cases of the k-th (1-based) of the n shards
+    // that the cost table plans, so that CI can run the suite in n jobs.
+    let shard = std::env::var_os("I_SPEC_SHARD").map(|shard| {
+        let shard = shard.to_string_lossy().into_owned();
+        shard
+            .split_once('/')
+            .and_then(|(k, n)| Some((k.parse::<usize>().ok()?, n.parse::<usize>().ok()?)))
+            .filter(|&(k, n)| 1 <= k && k <= n)
+            .unwrap_or_else(|| panic!("I_SPEC_SHARD must be k/n with 1 <= k <= n, not {shard:?}"))
+    });
+    // The plan is checked on every run, sharded or not, so that a wrong plan
+    // fails the suite and does not drop cases silently.
+    let planned = spec_plan(&keys, shard.map_or(1, |(_, n)| n));
+    for note in planned.notes("spec") {
+        eprintln!("{note}");
+    }
+    let errors = planned.partition_errors(&keys);
+    assert!(
+        errors.is_empty(),
+        "the spec shards are not a partition of the cases:\n{}",
+        errors.join("\n")
+    );
+    if let Some((k, n)) = shard {
+        let kept: std::collections::BTreeSet<&str> = planned
+            .shard_keys(k - 1, n, "I_SPEC_SHARD")
+            .iter()
+            .map(String::as_str)
+            .collect();
+        all.retain(|(name, _)| kept.contains(name.as_str()));
+        println!("spec: shard {k} of {n}");
+    }
     // Pending cases return early so unsupported forms do not mask other failures:
     // one case name per line, `#` starts a comment. They are skipped and counted.
     let pending: Vec<String> = std::fs::read_to_string(root.join("syn3-pending.txt"))
@@ -398,7 +452,7 @@ fn main() {
     let mut skipped = 0usize;
     let mut failures: Vec<String> = Vec::new();
     let mut ready = Vec::new();
-    for c in all {
+    for (_, c) in all {
         match c {
             Ok(c) => {
                 if pending.contains(&c.name) {
@@ -413,23 +467,6 @@ fn main() {
             }
             Err(e) => failures.push(e),
         }
-    }
-    // `I_SPEC_SHARD=k/n` keeps every n-th ready case from the k-th (1-based),
-    // so that CI can run the suite in n jobs; the cases are in a stable order.
-    if let Some(shard) = std::env::var_os("I_SPEC_SHARD") {
-        let shard = shard.to_string_lossy().into_owned();
-        let (k, n) = shard
-            .split_once('/')
-            .and_then(|(k, n)| Some((k.parse::<usize>().ok()?, n.parse::<usize>().ok()?)))
-            .filter(|&(k, n)| 1 <= k && k <= n)
-            .unwrap_or_else(|| panic!("I_SPEC_SHARD must be k/n with 1 <= k <= n, not {shard:?}"));
-        ready = ready
-            .into_iter()
-            .enumerate()
-            .filter(|(i, _)| i % n == k - 1)
-            .map(|(_, c)| c)
-            .collect();
-        println!("spec: shard {k} of {n}");
     }
     let total = ready.len();
     let results = Mutex::new(Vec::new());

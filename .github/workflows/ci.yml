@@ -9,24 +9,57 @@ on:
 permissions:
   contents: read
 
+# A push to main has a group of its own and is never cancelled, so no other
+# run can cancel a main run. Every other run is grouped by repository and
+# branch: a push to a branch and the pull request of that branch share a
+# group, and the newer run cancels the older. The `ref-` prefix keeps a pull
+# request from a branch named main (of a fork, say) out of the main group.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'main' || format('ref-{0}-{1}', github.event.pull_request.head.repo.full_name || github.repository, github.head_ref || github.ref_name) }}
+  cancel-in-progress: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
 env:
   # No debug information in the dev and test builds (smaller target, faster
   # links), and no incremental state, which a fresh runner cannot reuse.
   CARGO_PROFILE_DEV_DEBUG: 0
   CARGO_INCREMENTAL: 0
-  # The number of shards of the review corpus; keep equal to the matrix below.
-  CORPUS_SHARDS: 10
 
 # Each job is named by what it runs: build, lint, test, run, corpus or docs.
-# The release `i` is built once, in `release`; the jobs `i` and `corpus`
-# download it and run the parts of `scripts/checks i` with it. The Rust
-# formatting and Clippy (`lint`), the Rust tests (`test`), the JavaScript
-# tests (`js`) and the editor checks (`editors`) each build what they need, at
-# the same time as `release`.
+#
+#   changes   which inputs a pull request changes (scripts/ci/changes): the
+#             path filters rust, docs and editors. Every other event sets all
+#             three, so a push (main included) always runs the full gate.
+#   plan      the shards of every sharded job, from the measured costs in
+#             ci/costs.json (scripts/ci/plan, which runs ilang-shard), and the
+#             list of jobs this run must have (expected.json).
+#   summary   the one required check (scripts/ci/summary): every job the plan
+#             expects left its marker, no other job did, and no job failed or
+#             was cancelled. Each job's last step uploads its marker
+#             (.github/actions/marker); a job added here needs an entry in
+#             JOBS of scripts/ci/plan and in the summary's needs.
+#
+# Path filters, on pull requests only (see scripts/ci/changes):
+#   rust     a file outside docs/ and editors/, or docs/spec.md: the release
+#            build, the Rust and JavaScript tests, i, corpus and docs.
+#   docs     docs/, lib/ or std/: the release build and docs.
+#   editors  editors/, lib/, std/ or examples/: the editor checks.
+#   A change to .github/, ci/, scripts/ci/, scripts/checks or the Devenv files
+#   sets all three. lint always runs (on a change without rust, only its
+#   snippet check, which reads every .md and .mdx file).
+#
+# The release `i` is built once, in `release`; std, corpus and docs download
+# it. The Rust tests are sharded by test binary (CHECKS_TEST_GROUP=targets
+# and CHECKS_TEST_TARGETS, words `<crate>:<key>` of the cost table), the
+# spec suite, value types, the corpus and the site examples by k/N
+# (I_SPEC_SHARD, VALUE_TYPES_SHARD and VALUE_TYPES_SHARD_OF, CHECKS_SHARD).
+# Every matrix job runs at most plan.outputs.max_parallel (18, set in
+# scripts/ci/plan) of its shards at once.
+#
+# No job frees disk space any more: the step that deleted the runner's
+# preinstalled tools (about a minute per job) is gone from every job. This
+# stands once three runs in a row are green, one of them with the release
+# build. Roll back (restore the step, in the failing job only) when a job
+# fails with "No space left on device".
 #
 # Swatinem/rust-cache keeps the built dependencies and the ccache objects of
 # Binaryen, by job and Cargo.lock. Pushes to main, redesign and ci/** write it;
@@ -34,20 +67,93 @@ env:
 # its base branch (GitHub's cache scoping).
 
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      # A pull request checks out its merge commit, whose first parent is the
+      # base branch: the diff of the two is what the pull request changes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - name: Classify the changed paths
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/paths"
+          else
+            : > "$RUNNER_TEMP/paths"
+          fi
+          python3 -I scripts/ci/changes --event "$EVENT" --github-output "$GITHUB_OUTPUT" < "$RUNNER_TEMP/paths"
+      - uses: ./.github/actions/marker
+        with:
+          name: changes
+          id: ${{ github.job }}-${{ strategy.job-index }}
+
+  plan:
+    name: plan
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      max_parallel: ${{ steps.plan.outputs.max_parallel }}
+      changed: ${{ steps.plan.outputs.changed }}
+      check_tests: ${{ steps.plan.outputs.check_tests }}
+      value_types: ${{ steps.plan.outputs.value_types }}
+      cli_tests: ${{ steps.plan.outputs.cli_tests }}
+      spec: ${{ steps.plan.outputs.spec }}
+      corpus: ${{ steps.plan.outputs.corpus }}
+      std: ${{ steps.plan.outputs.std }}
+      docs: ${{ steps.plan.outputs.docs }}
+    steps:
+      - name: Note the start
+        run: echo "PLAN_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The runner's rustup, with the toolchain of rust-toolchain.toml.
+      - name: Set up Rust
+        run: |
+          rustup toolchain install
+          cargo --version
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: plan-${{ hashFiles('Cargo.lock') }}
+          save-if: true
+      # A failing ilang-shard command fails this job, and with it the run:
+      # no matrix is ever empty.
+      - name: Plan the shards
+        id: plan
+        env:
+          CHANGED: ${{ needs.changes.outputs.changed }}
+        run: python3 -I scripts/ci/plan --changed "$CHANGED" --out "$RUNNER_TEMP/plan" --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: plan
+          path: ${{ runner.temp }}/plan/expected.json
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 3
+      - name: Record the wall time
+        run: |
+          seconds=$(( $(date +%s) - PLAN_STARTED ))
+          echo "plan: ${seconds} s from checkout to the expected list"
+          echo "plan job: ${seconds} s (checkout, toolchain, ilang-shard build, plan)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: ./.github/actions/marker
+        with:
+          name: plan
+          id: ${{ github.job }}-${{ strategy.job-index }}
+
   release:
     name: build (release i)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changed).rust || fromJSON(needs.changes.outputs.changed).docs
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 40
     steps:
-      # The Rust toolchain, Wasmtime and the Cargo builds do not fit in the
-      # free space of the runner, so take out preinstalled tools not used here.
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
-            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
-            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
-            /usr/local/share/chromium /usr/lib/jvm
-          df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
@@ -77,9 +183,11 @@ jobs:
           cache-directories: ~/.cache/ccache
           # main and the long-lived work branches write the cache; every branch
           # reads it.
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
+          save-if: true
       - name: Build the release i
-        run: devenv shell -- cargo build --release --locked -p ilang-cli
+        run: |
+          devenv shell -- cargo build --release --locked -p ilang-cli
+          df -h /
       # The binary is linked against glibc and libstdc++ of the Nix store. The
       # jobs that only run it fetch these store paths instead of the whole
       # Devenv shell.
@@ -96,20 +204,19 @@ jobs:
             target/release/i
             target/release/i.nix-paths
           if-no-files-found: error
+          overwrite: true
           retention-days: 3
+      - uses: ./.github/actions/marker
+        with:
+          name: build (release i)
+          id: ${{ github.job }}-${{ strategy.job-index }}
 
   lint:
     name: lint (rust)
+    needs: changes
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 40
     steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
-            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
-            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
-            /usr/local/share/chromium /usr/lib/jvm
-          df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
@@ -129,39 +236,28 @@ jobs:
           key: lint-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
+          save-if: true
+      # Without a rust change (docs or editors only), formatting and Clippy
+      # cannot change; the snippets of the .md and .mdx files can.
       - name: Run the Rust lint
-        run: devenv shell -- ./scripts/checks rust-lint
+        env:
+          PART: ${{ fromJSON(needs.changes.outputs.changed).rust && 'rust-lint' || 'snippets' }}
+        run: devenv shell -- ./scripts/checks "$PART"
+      - uses: ./.github/actions/marker
+        with:
+          name: lint (rust)
+          id: ${{ github.job }}-${{ strategy.job-index }}
 
-  test:
-    name: test (${{ matrix.name }})
+  # Every crate but ilang-check and ilang-cli, whose tests are sharded below.
+  rest:
+    name: test (workspace, other crates)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        # Each group is a value of CHECKS_TEST_GROUP in scripts/checks, and
-        # the job is named by the test sets it runs. The spec suite and
-        # ilang-cli's tests each took about 50 minutes in one job.
-        include:
-          - { group: check-heavy, name: 'ilang-check, value types' }
-          - { group: check, name: 'ilang-check, other' }
-          - { group: spec-1/3, name: 'spec, 1/3' }
-          - { group: spec-2/3, name: 'spec, 2/3' }
-          - { group: spec-3/3, name: 'spec, 3/3' }
-          - { group: cli-heavy, name: 'ilang-cli, slow' }
-          - { group: cli, name: 'ilang-cli, other' }
-          - { group: rest, name: 'workspace, other crates' }
+    timeout-minutes: 40
     env:
-      CHECKS_TEST_GROUP: ${{ matrix.group }}
+      CHECKS_TEST_GROUP: rest
     steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
-            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
-            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
-            /usr/local/share/chromium /usr/lib/jvm
-          df -h /
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
@@ -178,18 +274,206 @@ jobs:
         run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          # The shards of a group build the same tests, so they share its cache.
-          key: test-${{ startsWith(matrix.group, 'spec') && 'spec' || (startsWith(matrix.group, 'cli') && 'cli' || (startsWith(matrix.group, 'check') && 'check' || matrix.group)) }}-${{ hashFiles('Cargo.lock') }}
+          key: test-rest-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
+          save-if: true
       - name: Run the Rust tests
         run: devenv shell -- ./scripts/checks rust-test
+      - uses: ./.github/actions/marker
+        with:
+          name: test (workspace, other crates)
+          id: ${{ github.job }}-${{ strategy.job-index }}
+
+  # ilang-check's test binaries but value_types, in the shards of the plan
+  # (set ilang-check-tests).
+  check_tests:
+    name: ${{ matrix.display }}
+    needs: plan
+    if: fromJSON(needs.plan.outputs.changed).rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.check_tests) }}
+    env:
+      CHECKS_TEST_GROUP: targets
+      CHECKS_TEST_TARGETS: ${{ matrix.targets }}
+      CHECKS_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # The shards build the same crate, so they share one cache; the
+          # first shard writes it.
+          key: test-check-${{ hashFiles('Cargo.lock') }}
+          cmd-format: devenv shell -- {0}
+          cache-directories: ~/.cache/ccache
+          save-if: true
+      - name: Run the Rust tests
+        run: devenv shell -- ./scripts/checks rust-test
+      - uses: ./.github/actions/marker
+        with:
+          name: ${{ matrix.display }}
+          id: ${{ github.job }}-${{ strategy.job-index }}
+
+  # ilang-check's value_types, sharded by case (set value-type-cases).
+  value_types:
+    name: ${{ matrix.display }}
+    needs: plan
+    if: fromJSON(needs.plan.outputs.changed).rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.value_types) }}
+    env:
+      CHECKS_TEST_GROUP: targets
+      CHECKS_TEST_TARGETS: ${{ matrix.targets }}
+      CHECKS_SHARD: ${{ matrix.shard }}
+      # 0-based shard index of N; the test plans the cases from ci/costs.json.
+      VALUE_TYPES_SHARD: ${{ matrix.index }}
+      VALUE_TYPES_SHARD_OF: ${{ matrix.of }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: test-value-types-${{ hashFiles('Cargo.lock') }}
+          cmd-format: devenv shell -- {0}
+          cache-directories: ~/.cache/ccache
+          save-if: true
+      - name: Run the Rust tests
+        run: devenv shell -- ./scripts/checks rust-test
+      - uses: ./.github/actions/marker
+        with:
+          name: ${{ matrix.display }}
+          id: ${{ github.job }}-${{ strategy.job-index }}
+
+  # ilang-cli's test binaries but spec, in the shards of the plan (set
+  # ilang-cli-tests).
+  cli_tests:
+    name: ${{ matrix.display }}
+    needs: plan
+    if: fromJSON(needs.plan.outputs.changed).rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.cli_tests) }}
+    env:
+      CHECKS_TEST_GROUP: targets
+      CHECKS_TEST_TARGETS: ${{ matrix.targets }}
+      CHECKS_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: test-cli-${{ hashFiles('Cargo.lock') }}
+          cmd-format: devenv shell -- {0}
+          cache-directories: ~/.cache/ccache
+          save-if: true
+      - name: Run the Rust tests
+        run: devenv shell -- ./scripts/checks rust-test
+      - uses: ./.github/actions/marker
+        with:
+          name: ${{ matrix.display }}
+          id: ${{ github.job }}-${{ strategy.job-index }}
+
+  # The spec suite (ilang-cli --test spec), k/N of its cases per shard; N
+  # from the plan (set spec-cases). The group spec-K/N of scripts/checks.
+  spec:
+    name: ${{ matrix.display }}
+    needs: plan
+    if: fromJSON(needs.plan.outputs.changed).rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.spec) }}
+    env:
+      CHECKS_TEST_GROUP: spec-${{ matrix.shard }}
+      I_SPEC_SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: test-spec-${{ hashFiles('Cargo.lock') }}
+          cmd-format: devenv shell -- {0}
+          cache-directories: ~/.cache/ccache
+          save-if: true
+      - name: Run the spec suite
+        run: devenv shell -- ./scripts/checks rust-test
+      - uses: ./.github/actions/marker
+        with:
+          name: ${{ matrix.display }}
+          id: ${{ github.job }}-${{ strategy.job-index }}
 
   js:
     name: test (javascript)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
@@ -208,7 +492,7 @@ jobs:
           key: js-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
-          save-if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/redesign' || startsWith(github.ref, 'refs/heads/ci/') }}
+          save-if: true
       - name: Run the JavaScript tests
         run: devenv shell -- ./scripts/checks js
       - name: Keep the browser test results
@@ -217,7 +501,12 @@ jobs:
         with:
           name: browser-${{ github.run_id }}
           path: target/browser
+          overwrite: true
           retention-days: 14
+      - uses: ./.github/actions/marker
+        with:
+          name: test (javascript)
+          id: ${{ github.job }}-${{ strategy.job-index }}
 
   # The editor support: VS Code extension tests, the tree-sitter grammar (generate, tests, the
   # queries on every .i source) and a check of the Zed extension. Needs only what the Devenv
@@ -225,6 +514,8 @@ jobs:
   # and no release `i`. Without the wasm32-wasip1 target the Zed check runs for the host.
   editors:
     name: test (editors)
+    needs: changes
+    if: fromJSON(needs.changes.outputs.changed).editors
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -242,14 +533,29 @@ jobs:
         run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - name: Run the editor checks
         run: devenv shell -- ./scripts/checks editors
+      - uses: ./.github/actions/marker
+        with:
+          name: test (editors)
+          id: ${{ github.job }}-${{ strategy.job-index }}
 
-  # `scripts/checks i` without the build and without the review corpus,
-  # which the job `corpus` runs in shards.
-  i:
-    name: run (i end to end)
-    needs: release
+  # `scripts/checks i` with the release i and without the review corpus,
+  # which the job `corpus` runs. Each shard is meant to run the projects of
+  # its plan entry (CHECKS_I_PROJECTS: keys <project>@<opt> of set
+  # std-tests, space-separated) and shard 1 the parts of `i` that are not
+  # projects (CHECKS_I_SHARD=K/N). Until scripts/checks reads these two, each
+  # shard runs the whole `i` part. (CHECKS_SHARD is the corpus shard there,
+  # so it is not set here.)
+  std:
+    name: ${{ matrix.display }}
+    needs: [plan, release]
+    if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.std) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
@@ -274,18 +580,29 @@ jobs:
         env:
           CHECKS_I_BINARY: target/release/i
           CHECKS_SKIP_CORPUS: 1
+          CHECKS_I_PROJECTS: ${{ matrix.projects }}
+          CHECKS_I_SHARD: ${{ matrix.shard }}
         run: devenv shell -- ./scripts/checks i
+      - uses: ./.github/actions/marker
+        with:
+          name: ${{ matrix.display }}
+          id: ${{ github.job }}-${{ strategy.job-index }}
 
+  # The review corpus, k/N of its cases per shard; N from the plan (set
+  # corpus-cases).
   corpus:
-    name: corpus (${{ matrix.shard }}/10)
-    needs: release
+    name: ${{ matrix.display }}
+    needs: [plan, release]
+    if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        include: ${{ fromJSON(needs.plan.outputs.corpus) }}
     env:
+      CHECKS_SHARD: ${{ matrix.shard }}
       # One thread per i process; the runner's four cores run four cases.
       RAYON_NUM_THREADS: 1
       # The runner's cores are slower than the machine the expectations were recorded on.
@@ -313,24 +630,41 @@ jobs:
           xargs nix-store --realise < target/release/i.nix-paths > /dev/null
           target/release/i --version
           python3 --version
-      - name: Review corpus, shard ${{ matrix.shard }} of ${{ env.CORPUS_SHARDS }}
-        run: ./scripts/review-corpus run --binary target/release/i --shard ${{ matrix.shard }}/${{ env.CORPUS_SHARDS }} --jobs 4
+      - name: Review corpus, shard ${{ matrix.shard }}
+        run: ./scripts/review-corpus run --binary target/release/i --shard "$CHECKS_SHARD" --jobs 4
       - name: Keep the changed observations
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: corpus-actual-${{ matrix.shard }}-${{ github.run_id }}
+          name: corpus-actual-${{ matrix.k }}-${{ github.run_id }}
           path: tests/review/cases/**/actual.json
           if-no-files-found: ignore
+          overwrite: true
           retention-days: 14
+      - uses: ./.github/actions/marker
+        with:
+          name: ${{ matrix.display }}
+          id: ${{ github.job }}-${{ strategy.job-index }}
 
+  # The documentation site, with the release i for its examples. Shard 1
+  # builds the site (its prebuild runs `npm run generate`) and runs the site
+  # checks; every other shard runs `npm run generate` itself. Every shard runs
+  # k/N of the examples (CHECKS_SHARD; set docs-examples). On a push to main
+  # shard 1 uploads docs/dist, which docs.yml deploys after a green run.
   docs:
-    name: docs (site)
-    needs: release
+    name: ${{ matrix.display }}
+    needs: [plan, release]
+    if: fromJSON(needs.plan.outputs.changed).rust || fromJSON(needs.plan.outputs.changed).docs
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.docs) }}
     env:
       I_BIN: ${{ github.workspace }}/target/release/i
+      CHECKS_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
@@ -354,15 +688,66 @@ jobs:
           chmod +x target/release/i
           xargs nix-store --realise < target/release/i.nix-paths > /dev/null
           target/release/i --version
-      - name: Install and build the site
+      - name: Install the site's packages
+        working-directory: docs
+        run: devenv shell -- npm ci
+      - name: Build the site and run the site checks
+        if: matrix.index == 0
         working-directory: docs
         run: |
-          devenv shell -- npm ci
           devenv shell -- npm run build
-      - name: Run the documentation site checks
-        working-directory: docs
-        run: |
           devenv shell -- npm run check:placeholders
           devenv shell -- npm run check:links
           devenv shell -- npm run check:rendering
-          devenv shell -- npm run check:examples
+      - name: Generate the library pages
+        if: matrix.index != 0
+        working-directory: docs
+        run: devenv shell -- npm run generate
+      - name: Run the examples, shard ${{ matrix.shard }}
+        working-directory: docs
+        run: devenv shell -- npm run check:examples
+      - name: Keep the site for deployment
+        if: matrix.index == 0 && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-site
+          path: docs/dist
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 3
+      - uses: ./.github/actions/marker
+        with:
+          name: ${{ matrix.display }}
+          id: ${{ github.job }}-${{ strategy.job-index }}
+
+  # The one required check. See the comment at the top and scripts/ci/summary.
+  summary:
+    name: summary (required)
+    needs: [changes, plan, release, lint, rest, check_tests, value_types, cli_tests, spec, js, editors, std, corpus, docs]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/ci
+      # Missing when the plan job failed; the summary then fails and says so.
+      - name: Download the expected list
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: plan
+          path: ${{ runner.temp }}/plan
+      - name: Download the markers
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: marker-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/markers
+      - name: Compare the jobs with the plan
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          EXPECTED: ${{ runner.temp }}/plan/expected.json
+          MARKERS: ${{ runner.temp }}/markers
+        run: python3 -I scripts/ci/summary --expected "$EXPECTED" --markers "$MARKERS"

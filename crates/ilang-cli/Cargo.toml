@@ -31,6 +31,7 @@ tempfile.workspace = true
 ilang-lsp.workspace = true
 ilang-macro.workspace = true
 ilang-syntax.workspace = true
+ilang-shard = { path = "../ilang-shard" }
 libc = "0.2"
 
 [dev-dependencies]

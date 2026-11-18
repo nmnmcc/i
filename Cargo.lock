@@ -783,6 +783,7 @@ name = "ilang-check"
 version = "0.1.0"
 dependencies = [
  "ilang-package",
+ "ilang-shard",
  "ilang-syntax",
  "ilang-syntax-migration",
  "num-bigint 0.5.1",
@@ -806,6 +807,7 @@ dependencies = [
  "ilang-lsp",
  "ilang-macro",
  "ilang-package",
+ "ilang-shard",
  "ilang-syntax",
  "ilang-syntax-migration",
  "ilang-wasm",
@@ -887,6 +889,13 @@ name = "ilang-runner"
 version = "0.1.0"
 dependencies = [
  "ilang-host",
+]
+
+[[package]]
+name = "ilang-shard"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
