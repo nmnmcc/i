@@ -11,8 +11,8 @@ use crate::code;
 use crate::hir::*;
 use crate::resolve::subst;
 use ilang_package::{Diagnostic, Sources};
+use ilang_syntax::ast::{BinOp, UnOp, resolved::Ident};
 use ilang_syntax::span::{LineIndex, Span};
-use ilang_syntax::syn3::ast::{BinOp, UnOp, resolved::Ident};
 use num_traits::ToPrimitive;
 use std::collections::{HashMap, HashSet};
 
@@ -1631,7 +1631,7 @@ impl<'a> Checker<'a> {
     /// Only offer a grouping repair for written, one-position data at the
     /// diagnostic's expression span, never for call arguments or type syntax.
     fn parenthesized_data_hint(&self, span: Span) -> Option<String> {
-        use ilang_syntax::syn3::{ast, parse_expr, print_expr};
+        use ilang_syntax::{ast, parse::parse_expr, print::print_expr};
         let text = &self.sources.get(self.p.module(self.module).source).text;
         let source = text.get(span.start as usize..span.end as usize)?;
         if !source.starts_with('(') {

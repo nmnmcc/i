@@ -3,14 +3,14 @@
 //! function boundaries around a forwarded argument, and the wrappers that
 //! the driver builds.
 //!
-//! The visits are plain recursions (`syn3::walk`): the driver runs them on
+//! The visits are plain recursions (`ilang_syntax::walk`): the driver runs them on
 //! a deep stack when the tree can hold the result of a macro.
-use ilang_syntax::span::Span;
-use ilang_syntax::syn3::ast::{
+use ilang_syntax::ast::{
     Binding, Block, DItem, DPItem, Expr, ExprKind, Format, Function, Ident, Item, ItemKind, Module,
     Pattern, PatternKind, Stmt, TItem, Type, TypeKind,
 };
-use ilang_syntax::syn3::walk::{self, Visitor};
+use ilang_syntax::span::Span;
+use ilang_syntax::walk::{self, Visitor};
 use std::collections::HashMap;
 
 struct Expressions(HashMap<Span, Expr>);
@@ -294,7 +294,7 @@ mod tests {
     use super::*;
 
     fn expression(source: &str) -> Expr {
-        ilang_syntax::syn3::parse_expr(source).unwrap_or_else(|e| panic!("{source}: {e:?}"))
+        ilang_syntax::parse::parse_expr(source).unwrap_or_else(|e| panic!("{source}: {e:?}"))
     }
 
     fn span_of(source: &str, part: &str) -> Span {
@@ -341,7 +341,7 @@ mod tests {
         let module = wrapper(e.clone(), Span::new(3, 4));
         assert_eq!(module.items.len(), 1);
         assert_eq!(unwrap(module), e);
-        let ty = ilang_syntax::syn3::parse_type("List(Int)").unwrap();
+        let ty = ilang_syntax::parse::parse_type("List(Int)").unwrap();
         let function = output_type_function(ty.clone());
         let ExprKind::Chain(fs) = &function.kind else {
             panic!()

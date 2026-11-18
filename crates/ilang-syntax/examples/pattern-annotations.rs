@@ -1,8 +1,8 @@
 //! JSON-lines tree inventory and minimal annotation edits for the migration.
 //! Build against the old parser before applying the grammar change; rebuild
 //! against the new parser to check saved trees (spans aside).
-use ilang_syntax::syn3::{self, ast::*, walk};
 use ilang_syntax::token::TokenKind as T;
+use ilang_syntax::{ast::*, walk};
 use serde_json::json;
 use std::io::{self, BufRead, Write};
 
@@ -52,23 +52,23 @@ fn main() {
         };
         let mode = request["mode"].as_str().unwrap_or("auto");
         let (mut module, mut diagnostics) = if lisp {
-            syn3::lisp::from_lisp(source)
+            ilang_syntax::rows::from_lisp(source)
         } else {
-            syn3::parse_module(source)
+            ilang_syntax::parse::parse_module(source)
         };
         let mut tree = format!("{module:?}");
         let mut parsed_mode = "module";
         let mut formatted = None;
         if !lisp && mode != "module" && !diagnostics.is_empty() {
-            if let Ok(mut expr) = syn3::parse_expr(source) {
+            if let Ok(mut expr) = ilang_syntax::parse::parse_expr(source) {
                 tree = format!("{expr:?}");
-                formatted = Some(syn3::print_expr(&expr));
+                formatted = Some(ilang_syntax::print::print_expr(&expr));
                 diagnostics.clear();
                 parsed_mode = "expr";
                 walk::expr(&mut expr, &mut annotations);
-            } else if let Ok(mut pattern) = syn3::parse_pattern(source) {
+            } else if let Ok(mut pattern) = ilang_syntax::parse::parse_pattern(source) {
                 tree = format!("{pattern:?}");
-                formatted = Some(syn3::print_pattern(&pattern));
+                formatted = Some(ilang_syntax::print::print_pattern(&pattern));
                 diagnostics.clear();
                 parsed_mode = "pattern";
                 walk::pattern(&mut pattern, &mut annotations);
@@ -88,7 +88,7 @@ fn main() {
                 formatted = if lisp {
                     ilang_syntax::lisp::format(source).ok()
                 } else {
-                    syn3::format(source).ok()
+                    ilang_syntax::print::format(source).ok()
                 };
             }
             if !lisp {

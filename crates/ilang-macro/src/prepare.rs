@@ -308,7 +308,7 @@ _entry = ({parameters}) -> syntax.Syntax {{
 "#,
         binding.module, binding.name
     );
-    let (mut ast, diagnostics) = ilang_syntax::syn3::parse_module(&source);
+    let (mut ast, diagnostics) = ilang_syntax::parse::parse_module(&source);
     // Transition group names contain `%` and have no source spelling.
     struct Select<'a>(&'a str, &'a str);
     impl ilang_syntax::walk::Visitor for Select<'_> {

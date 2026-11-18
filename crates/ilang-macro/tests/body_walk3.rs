@@ -5,16 +5,16 @@
 use ilang_macro::body_walk3::{self, Hook, Local};
 use ilang_macro::{body_engine3, call3};
 use ilang_syntax::{
-    span::Span,
-    syn3::ast::{
+    ast::{
         Block, DItem, DPItem, Expr, ExprKind, Function, ItemKind, Module, Pattern, PatternKind,
         Stmt, TItem, Type, TypeKind,
     },
+    span::Span,
 };
 use migration_syntax::{macro_body_walk as body_walk, macro_call as call};
 
 fn module(source: &str) -> Module {
-    let (module, diags) = ilang_syntax::syn3::parse_module(source);
+    let (module, diags) = ilang_syntax::parse::parse_module(source);
     assert!(diags.is_empty(), "{source}: {diags:?}");
     module
 }
@@ -407,8 +407,8 @@ fn conjunction_and_key_patterns_bind_as_the_old_named_patterns() {
     assert_eq!(calls("f = (C(m = _)) { m(1) }"), Vec::<String>::new());
     assert_eq!(calls("f = (C(k = x)) { m(1) }"), ["m"]);
     let binders = |source: &str| {
-        let pattern =
-            ilang_syntax::syn3::parse_pattern(source).unwrap_or_else(|e| panic!("{source}: {e:?}"));
+        let pattern = ilang_syntax::parse::parse_pattern(source)
+            .unwrap_or_else(|e| panic!("{source}: {e:?}"));
         let mut out = Vec::new();
         body_walk3::for_each_binder(&pattern, |name, _| out.push(name.to_owned()));
         out
@@ -685,9 +685,9 @@ impl body_walk::Hook for Old {
 /// is not a program (it has syntax errors, or errors of the lowering).
 fn same_as_old_walker(name: &str, source: &str, lisp: bool) -> bool {
     let (mut new, errors) = if lisp {
-        ilang_syntax::syn3::lisp::from_lisp(source)
+        ilang_syntax::rows::from_lisp(source)
     } else {
-        ilang_syntax::syn3::parse_module(source)
+        ilang_syntax::parse::parse_module(source)
     };
     if !errors.is_empty() {
         return false;
@@ -793,7 +793,7 @@ fn snippets_walk_as_their_lowered_trees() {
             same_as_old_walker(case, case, false),
             "{case}: not a program"
         );
-        let text = ilang_syntax::syn3::lisp::to_lisp(&module(case));
+        let text = ilang_syntax::rows::to_lisp(&module(case));
         same_as_old_walker(&text, &text, true);
     }
 }

@@ -131,13 +131,12 @@ fn repository_surfaces_have_pretty_lisp_layout() {
             if !errors.is_empty() {
                 continue;
             } // Syntax-error fixtures have no core tree.
-            let lisp =
-                ilang_syntax::syn3::lisp::to_lisp(&ilang_syntax::syn3::parse_module(&source).0);
+            let lisp = ilang_syntax::rows::to_lisp(&ilang_syntax::parse::parse_module(&source).0);
             eprintln!("Converted {}", relative.display());
             let out = check(&lisp);
-            let (read, errors) = ilang_syntax::syn3::lisp::from_lisp(&out);
+            let (read, errors) = ilang_syntax::rows::from_lisp(&out);
             assert!(errors.is_empty(), "{errors:?}");
-            assert_eq!(ilang_syntax::syn3::lisp::to_lisp(&read), lisp);
+            assert_eq!(ilang_syntax::rows::to_lisp(&read), lisp);
             assert!(
                 native_shape::equivalent(&module, &read),
                 "{}",

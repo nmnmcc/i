@@ -15,7 +15,7 @@ use crate::code;
 use crate::hir::*;
 use crate::types::{Head, HostType, ShapeId, Ty};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
-use ilang_syntax::syn3::ast::resolved::Ident;
+use ilang_syntax::ast::resolved::Ident;
 
 use ilang_syntax::lisp::syntax::{Provenance, Scope as SyntaxScope, ScopeIdentity};
 use ilang_syntax::span::Span;
@@ -43,7 +43,7 @@ pub(crate) use three::source_facts;
 /// Resolve directly from the native tree. Source identity and origins are
 /// retained during resolution so later diagnostics map to written source.
 pub fn resolve(graph: &PackageGraph, parsed: &[crate::Parsed]) -> (Program, Vec<Diagnostic>) {
-    ilang_syntax::syn3::deep::deep(|| {
+    ilang_syntax::deep::deep(|| {
         let modules: Vec<_> = parsed.iter().map(|p| &p.ast).collect();
         resolve_native(graph, parsed, &modules, false)
     })
@@ -52,7 +52,7 @@ pub fn resolve(graph: &PackageGraph, parsed: &[crate::Parsed]) -> (Program, Vec<
 pub fn resolve3(
     graph: &PackageGraph,
     parsed: &[crate::Parsed],
-    modules: &[ilang_syntax::syn3::ast::Module],
+    modules: &[ilang_syntax::ast::Module],
 ) -> (Program, Vec<Diagnostic>) {
     let modules: Vec<_> = modules.iter().collect();
     resolve_native(graph, parsed, &modules, true)
@@ -60,10 +60,10 @@ pub fn resolve3(
 fn resolve_native(
     graph: &PackageGraph,
     parsed: &[crate::Parsed],
-    modules: &[&ilang_syntax::syn3::ast::Module],
+    modules: &[&ilang_syntax::ast::Module],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
-    ilang_syntax::syn3::deep::deep(|| {
+    ilang_syntax::deep::deep(|| {
         let mut transitions: Vec<_> = parsed
             .iter()
             .map(|p| {
@@ -1796,7 +1796,7 @@ impl<'a> Resolver<'a> {
             .items()
             .map(|v| {
                 if b == BuiltinType::String {
-                    ilang_syntax::syn3::ast::LitValue::Str(v.to_string()).text()
+                    ilang_syntax::ast::LitValue::Str(v.to_string()).text()
                 } else {
                     v.to_string()
                 }
@@ -2888,7 +2888,7 @@ pub fn typed_output(
     original: &Program,
     module: ModuleId,
     call: Span,
-    expression: &ilang_syntax::syn3::ast::Expr,
+    expression: &ilang_syntax::ast::Expr,
     var_count: u32,
     ty_var_count: u32,
     checked: &CheckedInputs,
@@ -2896,9 +2896,9 @@ pub fn typed_output(
     // A multi-shape chain has a synthetic one-byte root in the transition
     // tree. Keep checked inputs at that root as well as their native span.
     struct Inputs<'a>(&'a mut CheckedInputs);
-    impl ilang_syntax::syn3::walk::Visitor for Inputs<'_> {
-        fn expr(&mut self, e: &mut ilang_syntax::syn3::ast::Expr, enter: bool) {
-            use ilang_syntax::syn3::ast::ExprKind;
+    impl ilang_syntax::walk::Visitor for Inputs<'_> {
+        fn expr(&mut self, e: &mut ilang_syntax::ast::Expr, enter: bool) {
+            use ilang_syntax::ast::ExprKind;
             // Only a multi-shape chain changes its root span. Computing
             // this from its head avoids lowering every forwarded subtree.
             if enter
@@ -2925,8 +2925,8 @@ pub fn typed_output(
         expressions: checked.expressions.clone(),
         binders: checked.binders.clone(),
     };
-    ilang_syntax::syn3::deep::deep(|| {
-        ilang_syntax::syn3::walk::expr(&mut expression.clone(), &mut Inputs(&mut forwarded))
+    ilang_syntax::deep::deep(|| {
+        ilang_syntax::walk::expr(&mut expression.clone(), &mut Inputs(&mut forwarded))
     });
     three::typed_output3(
         graph,
@@ -2946,9 +2946,7 @@ pub fn typed_output(
     )
 }
 
-pub(crate) fn normalize_source(
-    module: &ilang_syntax::syn3::ast::Module,
-) -> ilang_syntax::syn3::ast::Module {
+pub(crate) fn normalize_source(module: &ilang_syntax::ast::Module) -> ilang_syntax::ast::Module {
     three::normalize_module(module, &mut Default::default())
 }
 

@@ -253,8 +253,8 @@ fn parse_lexed(lexed: crate::lexer::Lexed) -> Result<Document, Vec<Diagnostic>> 
 
 /// Parse a Lisp-surface source file into the common core tree.
 pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
-    let (module, mut errors) = crate::syn3::lisp::from_lisp(source);
-    errors.extend(crate::syn3::facts::Transition::capture_module(&module, true).1);
+    let (module, mut errors) = crate::rows::from_lisp(source);
+    errors.extend(crate::facts::Transition::capture_module(&module, true).1);
     errors.sort_by_key(|d| (d.span.start, d.span.end));
     (module, errors)
 }
@@ -263,7 +263,7 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     // The rows are checked by the source reader; the layout is the
     // source-preserving one of the Lisp convention, which keeps comments.
-    let (_, diagnostics) = crate::syn3::lisp::from_lisp(source);
+    let (_, diagnostics) = crate::rows::from_lisp(source);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
@@ -522,7 +522,7 @@ fn show_tree<T: Printable>(tree: &T) -> String {
             View::Atom(s) => out.push_str(s),
             View::Int(n) => write!(&mut out, "{n}").expect("writing to a String"),
             View::Float(n) => out.push_str(&float(n)),
-            View::String(s) => out.push_str(&crate::syn3::string_literal(s)),
+            View::String(s) => out.push_str(&crate::print::string_literal(s)),
             View::Prefix(prefix, child) => {
                 out.push_str(prefix);
                 pending.push(Task::Node(child));

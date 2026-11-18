@@ -32,7 +32,7 @@ fn deeper_than(d: &Datum, limit: usize) -> bool {
 /// the printer recurse, so a deep datum is handled on a deep stack.
 pub(super) fn show_as3(d: &Datum, position: super::syntax::Position) -> Result<String> {
     if deeper_than(d, DIRECT_DEPTH) {
-        crate::syn3::deep::deep(|| show3(d, position))
+        crate::deep::deep(|| show3(d, position))
     } else {
         show3(d, position)
     }
@@ -40,10 +40,10 @@ pub(super) fn show_as3(d: &Datum, position: super::syntax::Position) -> Result<S
 
 fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
     use super::syntax::Position::*;
-    use crate::syn3::ast::{self, ItemKind, Module};
-    use crate::syn3::group;
-    use crate::syn3::lisp::position::{self as read, PatternPart, SegmentPart};
-    use crate::syn3::print::position as print;
+    use crate::ast::{self, ItemKind, Module};
+    use crate::group;
+    use crate::print::position as print;
+    use crate::rows::position::{self as read, PatternPart, SegmentPart};
 
     // The normal surface has no quotes: the printer would write them as
     // Lisp text, which no position of the normal surface reads.
@@ -86,9 +86,8 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
             span: ast::Sp(Span::default()),
         }])
     };
-    let same = |a: &Module, b: &Module| {
-        crate::syn3::surface::ungrouped(a) == crate::syn3::surface::ungrouped(b)
-    };
+    let same =
+        |a: &Module, b: &Module| crate::surface::ungrouped(a) == crate::surface::ungrouped(b);
     let hole = || ast::Pattern::new(ast::PatternKind::Discard("_".into()), Span::default());
     let unit = || ast::Expr::new(ast::ExprKind::Data(Vec::new()), Span::default());
     match position {
@@ -107,7 +106,7 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
                 .map(print::item)
                 .collect::<Vec<_>>()
                 .join("\n");
-            let (back, errors) = crate::syn3::parse_module(&format!("{text}\n"));
+            let (back, errors) = crate::parse::parse_module(&format!("{text}\n"));
             if !errors.is_empty() || !same(&grouped, &back) {
                 return Err(unreadable("an item"));
             }
@@ -123,7 +122,7 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
         Type => {
             let ty = read::type_from_datum(d)?;
             let text = print::ty(&ty);
-            match crate::syn3::parse_type(&text) {
+            match crate::parse::parse_type(&text) {
                 Ok(back) if back == ty => Ok(text),
                 _ => Err(unreadable("a type")),
             }
@@ -134,7 +133,7 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
             let mut expr = read::expr_from_datum(d)?;
             group::group_expr(&mut expr);
             let text = print::expr(&expr);
-            let back = crate::syn3::parse_expr(&text).map_err(|_| unreadable("an expression"))?;
+            let back = crate::parse::parse_expr(&text).map_err(|_| unreadable("an expression"))?;
             if same(&wrap(hole(), expr), &wrap(hole(), back)) {
                 Ok(text)
             } else {
@@ -164,7 +163,7 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
                         unreachable!("the part is a pattern")
                     };
                     let back =
-                        crate::syn3::parse_pattern(&text).map_err(|_| unreadable("a pattern"))?;
+                        crate::parse::parse_pattern(&text).map_err(|_| unreadable("a pattern"))?;
                     if same(&wrap(pattern, unit()), &wrap(back, unit())) {
                         Ok(text)
                     } else {
@@ -212,12 +211,12 @@ fn show3(d: &Datum, position: super::syntax::Position) -> Result<String> {
 }
 
 pub fn normal_source3(document: &Document) -> Result<String> {
-    crate::syn3::deep::deep(|| {
-        let (module, errors) = crate::syn3::lisp::from_document(document);
+    crate::deep::deep(|| {
+        let (module, errors) = crate::rows::from_document(document);
         if let Some(error) = errors.into_iter().next() {
             return Err(error);
         }
-        Ok(crate::syn3::print_tree(&module, false))
+        Ok(crate::print_tree(&module, false))
     })
 }
 #[cfg(test)]

@@ -10,13 +10,13 @@ pub mod format;
 pub mod group;
 pub mod lexer;
 pub mod lisp;
-mod parse;
+#[doc(hidden)]
+pub mod parse;
 #[doc(hidden)]
 pub mod print;
 pub mod rows;
 pub mod span;
 pub mod surface;
-pub mod syn3;
 pub use print::string_literal;
 pub mod token;
 pub mod trace;
@@ -29,10 +29,44 @@ pub use lexer::{Lexed, lex};
 /// module is complete as far as the source allows; the diagnostics say what
 /// was wrong, sorted by position.
 pub fn parse_module(source: &str) -> (ast::Module, Vec<Diagnostic>) {
-    let (module, mut errors) = syn3::parse_module(source);
+    let (module, mut errors) = parse::parse_module(source);
     errors.extend(facts::Transition::capture_module(&module, false).1);
     errors.sort_by_key(|d| (d.span.start, d.span.end));
     (module, errors)
+}
+
+/// Wraps an expanded expression for the module printers used by editor tools.
+pub fn expression_module(value: ast::Expr) -> ast::Module {
+    let span = value.span;
+    ast::Module {
+        items: vec![ast::Item {
+            doc: Vec::new(),
+            attributes: Vec::new(),
+            span,
+            kind: ast::ItemKind::Bind(ast::Binding {
+                pattern: ast::Pattern {
+                    kind: ast::PatternKind::Discard("_".into()),
+                    span,
+                },
+                value,
+                span,
+            }),
+        }],
+        ..ast::Module::default()
+    }
+}
+
+/// Prints an expanded source module in either surface.
+pub fn print_tree(module: &ast::Module, lisp: bool) -> String {
+    deep::deep(|| {
+        if lisp {
+            rows::to_lisp(module)
+        } else {
+            let mut module = module.clone();
+            group::regroup(&mut module);
+            print::print_module(&module)
+        }
+    })
 }
 
 /// Token marks let parse errors in older published packages carry migration guidance.

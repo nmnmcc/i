@@ -9,6 +9,9 @@ use crate::{
     item_phase::PhaseError,
     session::Transaction,
 };
+use ilang_syntax::ast::{
+    Attribute, DItem, Export, Expr, ExprKind, Ident, Item, ItemKind, Module, Pattern, Type,
+};
 use ilang_syntax::lisp::{
     Datum, DatumKind,
     expansion::MacroArgument,
@@ -16,9 +19,6 @@ use ilang_syntax::lisp::{
     syntax::{Node, Syntax},
 };
 use ilang_syntax::span::Span;
-use ilang_syntax::syn3::ast::{
-    Attribute, DItem, Export, Expr, ExprKind, Ident, Item, ItemKind, Module, Pattern, Type,
-};
 
 pub fn builtin(attribute: &Attribute) -> bool {
     attribute.module.is_none()
@@ -309,7 +309,7 @@ mod tests {
     use super::*;
 
     fn module(source: &str) -> Module {
-        let (module, errors) = ilang_syntax::syn3::parse_module(source);
+        let (module, errors) = ilang_syntax::parse::parse_module(source);
         assert!(errors.is_empty(), "{errors:?}");
         module
     }

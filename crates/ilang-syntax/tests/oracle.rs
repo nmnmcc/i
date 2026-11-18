@@ -73,7 +73,7 @@ pub fn check_native_validation(source: &str, module: &native::ast::Module) {
         let mut projection = Project::default();
         walk::module(&mut projected, &mut projection);
         let (_, old_errors) = migration_syntax::syn3::lower::lower(&projected);
-        let (_, validation) = native::syn3::facts::Transition::capture_module(module, false);
+        let (_, validation) = native::facts::Transition::capture_module(module, false);
         let validation: Vec<_> = validation
             .into_iter()
             .filter(|d| {
@@ -106,7 +106,7 @@ pub fn check_native_validation(source: &str, module: &native::ast::Module) {
 pub fn parse_module(source: &str) -> (ast::Module, Vec<Diagnostic>) {
     let (module, mut errors) = native::parse_module(source);
     let (old, old_errors) = migration_syntax::syn3::lower::lower(&module);
-    let (_, validation) = native::syn3::facts::Transition::capture_module(&module, false);
+    let (_, validation) = native::facts::Transition::capture_module(&module, false);
     let records = |ds: &[Diagnostic]| {
         ds.iter()
             .map(|d| (d.code, d.span, d.message.clone()))

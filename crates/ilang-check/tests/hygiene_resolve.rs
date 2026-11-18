@@ -692,8 +692,8 @@ fn builtin_constructor_identity_bypasses_caller_constructor_shadow() {
     // Native sums retain their member items; locate the same f binding
     // instead of relying on the transition's absorbed member count.
     let function = module.ast.items.iter().position(|item| {
-        matches!(&item.kind, ilang_syntax::syn3::ast::ItemKind::Bind(binding)
-            if matches!(&binding.pattern.kind, ilang_syntax::syn3::ast::PatternKind::Var(name) if name == "f"))
+        matches!(&item.kind, ilang_syntax::ast::ItemKind::Bind(binding)
+            if matches!(&binding.pattern.kind, ilang_syntax::ast::PatternKind::Var(name) if name == "f"))
     }).unwrap();
     tree::set_statement(&mut module.ast, function, 0, expr);
     graph

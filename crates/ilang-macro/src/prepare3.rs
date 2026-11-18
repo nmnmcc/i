@@ -1,9 +1,9 @@
 //! The parts of `prepare` and `project` that read or write the tree, on
 //! the source tree.
-use ilang_syntax::lisp::{expansion::MacroDefinition, quote_lower3, syntax::Syntax};
-use ilang_syntax::syn3::ast::{
+use ilang_syntax::ast::{
     Attribute, Binding, Expr, ExprKind, Item, ItemKind, Module, Pattern, PatternKind,
 };
+use ilang_syntax::lisp::{expansion::MacroDefinition, quote_lower3, syntax::Syntax};
 
 fn is_macro(attribute: &Attribute) -> bool {
     attribute.module.is_none() && attribute.name.name == "macro"
@@ -137,7 +137,7 @@ mod tests {
     #[test]
     fn a_compiler_module_has_no_marker_and_no_signature() {
         let source = "(@ macro (: m (-> (, Syntax) Syntax)))\n(@ macro (= m (-> (, a) _ a)))";
-        let (mut module, errors) = ilang_syntax::syn3::lisp::from_lisp(source);
+        let (mut module, errors) = ilang_syntax::rows::from_lisp(source);
         assert!(errors.is_empty(), "{errors:?}");
         assert!(defines_macro(&module));
         let definitions = ilang_syntax::lisp::expansion3::definitions(&module, true).unwrap();

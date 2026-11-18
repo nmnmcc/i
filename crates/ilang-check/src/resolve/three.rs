@@ -16,9 +16,9 @@ mod groups;
 mod pre;
 
 use super::*;
-use ilang_syntax::syn3::ast as n;
-use ilang_syntax::syn3::ast::resolved as o;
-use ilang_syntax::syn3::walk as nwalk;
+use ilang_syntax::ast as n;
+use ilang_syntax::ast::resolved as o;
+use ilang_syntax::walk as nwalk;
 use pre::{
     AndPlan, ChainKind, Inner, Pre, addr, and_plan, attribute_call, attribute_strings, chain_kind,
     head_params, id, is_core_never, is_match, keyed_plan,
@@ -29,7 +29,7 @@ use std::ops::{Deref, DerefMut};
 /// three that this compiler cannot type yet. `lisp` is set for a module
 /// read from the Lisp surface.
 pub fn lowering_errors(module: &n::Module, lisp: bool) -> Vec<ilang_syntax::Diagnostic> {
-    ilang_syntax::syn3::deep::deep(|| {
+    ilang_syntax::deep::deep(|| {
         let mut transition = Default::default();
         let module = groups::module(module, &mut transition);
         pre::pre(&module, lisp).errors
@@ -44,20 +44,18 @@ pub fn resolve3(
     graph: &PackageGraph,
     parsed: &[Parsed],
     modules: &[n::Module],
-    transitions: &[ilang_syntax::syn3::facts::Transition],
+    transitions: &[ilang_syntax::facts::Transition],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
     assert_eq!(parsed.len(), modules.len());
-    ilang_syntax::syn3::deep::deep(|| {
-        resolve_here(graph, parsed, modules, transitions, report_errors)
-    })
+    ilang_syntax::deep::deep(|| resolve_here(graph, parsed, modules, transitions, report_errors))
 }
 
 fn pres(
     graph: &PackageGraph,
     parsed: &[Parsed],
     modules: &[n::Module],
-    transitions: &[ilang_syntax::syn3::facts::Transition],
+    transitions: &[ilang_syntax::facts::Transition],
 ) -> Vec<Pre> {
     parsed
         .iter()
@@ -78,7 +76,7 @@ fn resolve_here(
     graph: &PackageGraph,
     parsed: &[Parsed],
     modules: &[n::Module],
-    transitions: &[ilang_syntax::syn3::facts::Transition],
+    transitions: &[ilang_syntax::facts::Transition],
     report_errors: bool,
 ) -> (Program, Vec<Diagnostic>) {
     let pre = pres(graph, parsed, modules, transitions);
@@ -194,9 +192,9 @@ pub fn typed_output3(
     var_count: u32,
     ty_var_count: u32,
     checked: &CheckedInputs,
-    transition: &ilang_syntax::syn3::facts::Transition,
+    transition: &ilang_syntax::facts::Transition,
 ) -> Result<(Expr, Program), Vec<Diagnostic>> {
-    ilang_syntax::syn3::deep::deep(|| {
+    ilang_syntax::deep::deep(|| {
         let mut transition = transition.clone();
         let expression = groups::expression(expression, &mut transition);
         typed_output_here(
@@ -225,7 +223,7 @@ fn typed_output_here(
     var_count: u32,
     ty_var_count: u32,
     checked: &CheckedInputs,
-    transition: &ilang_syntax::syn3::facts::Transition,
+    transition: &ilang_syntax::facts::Transition,
 ) -> Result<(Expr, Program), Vec<Diagnostic>> {
     let names = original
         .expansion_names
@@ -419,7 +417,7 @@ struct VFn<'x> {
 fn quote_captures(
     q: &n::QuotePattern,
 ) -> Result<std::borrow::Cow<'_, [(bool, n::Pattern)]>, ilang_syntax::Diagnostic> {
-    let parsed = ilang_syntax::syn3::lisp::quote_captures(&q.datum.0, true)?;
+    let parsed = ilang_syntax::rows::quote_captures(&q.datum.0, true)?;
     Ok(if q.captures.is_empty() {
         std::borrow::Cow::Owned(parsed)
     } else {
@@ -1312,7 +1310,7 @@ impl<'a, 't> R3<'a, 't> {
             }
             let payload = args
                 .iter()
-                .map(ilang_syntax::syn3::print_type)
+                .map(ilang_syntax::print::print_type)
                 .collect::<Vec<_>>()
                 .join(", ");
             definitions.push(format!("`{} = ({payload})`", name.name));
@@ -1794,7 +1792,7 @@ impl<'a, 't> R3<'a, 't> {
     fn binding(&mut self, b: &n::Binding, top: bool) -> (Binding, Vec<Binder>) {
         let source = self.p.module(self.cur).source;
         let file = self.graph.sources.get(source);
-        for span in ilang_syntax::syn3::binding_line_traps(
+        for span in ilang_syntax::parse::binding_line_traps(
             &file.text,
             Span::new(b.pattern.span.0.start, b.value.span.0.start),
         ) {
@@ -1802,7 +1800,7 @@ impl<'a, 't> R3<'a, 't> {
                 code::ONE_LINE_BINDING,
                 Some(source),
                 span,
-                ilang_syntax::syn3::ONE_BINDING_HINT,
+                ilang_syntax::parse::ONE_BINDING_HINT,
             ));
         }
         let type_params = self
@@ -3510,7 +3508,7 @@ impl R3<'_, '_> {
 
 pub(super) fn normalize_module(
     m: &n::Module,
-    t: &mut ilang_syntax::syn3::facts::Transition,
+    t: &mut ilang_syntax::facts::Transition,
 ) -> n::Module {
     groups::module(m, t)
 }

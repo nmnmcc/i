@@ -8,18 +8,18 @@ use crate::{
     prepare::MacroPosition,
     registry::Macro,
 };
+use ilang_syntax::ast::{DItem, Expr, ExprKind, Ident, Item, Pattern, Stmt, Type};
 use ilang_syntax::lisp::{
     Datum,
     expansion::MacroArgument,
     syntax::{Scope, Syntax},
 };
 use ilang_syntax::span::Span;
-use ilang_syntax::syn3::ast::{DItem, Expr, ExprKind, Ident, Item, Pattern, Stmt, Type};
 
 /// A node that a macro can take as an argument.
 pub trait Encode {
     /// The node in the source rows, with the spans of
-    /// `syn3::lisp::*_datum`.
+    /// `ilang_syntax::rows::*_datum`.
     fn datum(&self) -> Datum;
     fn span(&self) -> Span;
     fn normalize(&self, syntax: &Syntax) -> Syntax;
@@ -29,7 +29,7 @@ impl Encode for Expr {
         ilang_syntax::lisp::source_syntax::normalize_expression(syntax)
     }
     fn datum(&self) -> Datum {
-        ilang_syntax::syn3::lisp::expr_datum(self)
+        ilang_syntax::rows::expr_datum(self)
     }
     fn span(&self) -> Span {
         self.span.0
@@ -40,7 +40,7 @@ impl Encode for Type {
         ilang_syntax::lisp::source_syntax::normalize_type(syntax)
     }
     fn datum(&self) -> Datum {
-        ilang_syntax::syn3::lisp::type_datum(self)
+        ilang_syntax::rows::type_datum(self)
     }
     fn span(&self) -> Span {
         self.span.0
@@ -51,7 +51,7 @@ impl Encode for Pattern {
         ilang_syntax::lisp::source_syntax::normalize_pattern(syntax)
     }
     fn datum(&self) -> Datum {
-        ilang_syntax::syn3::lisp::pattern_datum(self)
+        ilang_syntax::rows::pattern_datum(self)
     }
     fn span(&self) -> Span {
         self.span.0
@@ -62,7 +62,7 @@ impl Encode for Item {
         ilang_syntax::lisp::source_syntax::normalize_item(syntax)
     }
     fn datum(&self) -> Datum {
-        ilang_syntax::syn3::lisp::item_datum(self)
+        ilang_syntax::rows::item_datum(self)
     }
     fn span(&self) -> Span {
         self.span.0

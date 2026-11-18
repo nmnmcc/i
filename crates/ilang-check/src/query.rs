@@ -191,7 +191,7 @@ pub struct Query<'a> {
 pub struct Cache {
     walks: Vec<OnceLock<Arc<Occurrences>>>,
     asts: Vec<OnceLock<Arc<tree::Module>>>,
-    trees: Vec<OnceLock<Arc<ilang_syntax::syn3::ast::Module>>>,
+    trees: Vec<OnceLock<Arc<ilang_syntax::ast::Module>>>,
 }
 
 impl Cache {
@@ -303,14 +303,14 @@ impl<'a> Query<'a> {
 
     /// The syntax tree of a module, as the parser recovered it from the
     /// written text.
-    pub fn syntax(&self, m: ModuleId) -> Arc<ilang_syntax::syn3::ast::Module> {
+    pub fn syntax(&self, m: ModuleId) -> Arc<ilang_syntax::ast::Module> {
         let parse = || {
-            Arc::new(ilang_syntax::syn3::deep::deep(|| {
+            Arc::new(ilang_syntax::deep::deep(|| {
                 let text = self.written_text(m);
                 if self.is_lisp(m) {
-                    ilang_syntax::syn3::lisp::from_lisp(text).0
+                    ilang_syntax::rows::from_lisp(text).0
                 } else {
-                    ilang_syntax::syn3::parse_module(text).0
+                    ilang_syntax::parse::parse_module(text).0
                 }
             }))
         };
@@ -330,7 +330,7 @@ impl<'a> Query<'a> {
     }
 
     fn parse_ast(&self, m: ModuleId) -> tree::Module {
-        ilang_syntax::syn3::deep::deep(|| tree::from_new(&self.syntax(m), self.is_lisp(m)))
+        ilang_syntax::deep::deep(|| tree::from_new(&self.syntax(m), self.is_lisp(m)))
     }
 
     // ---- type_at ----
@@ -685,14 +685,14 @@ impl<'a> Query<'a> {
         }) && let Some(text) = self.written_text(def.module).get(item.span.start as usize..item.span.end as usize) {
             // Completion asks for definitions from many modules. Parse only
             // this item, rather than reparsing each complete source module.
-            return ilang_syntax::syn3::deep::deep(|| {
+            return ilang_syntax::deep::deep(|| {
                 let (mut module, _) = if self.is_lisp(def.module) {
-                    ilang_syntax::syn3::lisp::from_lisp(text)
+                    ilang_syntax::rows::from_lisp(text)
                 } else {
-                    ilang_syntax::syn3::parse_module(text)
+                    ilang_syntax::parse::parse_module(text)
                 };
                 for item in &mut module.items { item.doc.clear(); item.attributes.clear(); }
-                ilang_syntax::syn3::print_tree(&module, false).trim_end().to_string()
+                ilang_syntax::print_tree(&module, false).trim_end().to_string()
             });
         }
         match &def.body {
@@ -1108,7 +1108,7 @@ impl<'a> Query<'a> {
         let ast = self.ast(m);
         let p = self.program;
         for item in &ast.items {
-            let (params, from_def): (&[ilang_syntax::syn3::ast::resolved::Ident], Option<TypeId>) =
+            let (params, from_def): (&[ilang_syntax::ast::resolved::Ident], Option<TypeId>) =
                 match &item.kind {
                     tree::ItemKind::TypeDef { name, params, .. } => (
                         params,
@@ -1735,8 +1735,8 @@ fn split_first_top<'s>(s: &'s str, sep: &str) -> (&'s str, Option<&'s str>) {
 /// A displayed type becomes an annotation only at a binder. Reuse the
 /// normal printer so unions, including function results, keep their meaning.
 fn annotation_text(ty: &str) -> String {
-    ilang_syntax::syn3::parse_type(ty)
-        .map(|ty| ilang_syntax::syn3::print_annotation(&ty))
+    ilang_syntax::parse::parse_type(ty)
+        .map(|ty| ilang_syntax::print::print_annotation(&ty))
         .unwrap_or_else(|_| ty.to_string())
 }
 

@@ -11,8 +11,8 @@ use crate::{
     prepare::MacroPosition,
     session::Transaction,
 };
+use ilang_syntax::ast::{Item, ItemKind};
 use ilang_syntax::lisp::syntax::{Node, Syntax};
-use ilang_syntax::syn3::ast::{Item, ItemKind};
 
 /// A step either finishes an ordinary item or replaces it with the returned
 /// items. `retained` is the written type definition: a macro on a type
@@ -242,11 +242,11 @@ impl BodyEngine<'_> {
 }
 
 use ilang_host::syntax::{DefinitionAbort, DefinitionReply};
+use ilang_syntax::ast::Module;
 use ilang_syntax::lisp::definition_schedule::Mode;
 use ilang_syntax::lisp::scoped::ScopedSource;
 use ilang_syntax::lisp::syntax::Scope;
 use ilang_syntax::span::Span;
-use ilang_syntax::syn3::ast::Module;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
@@ -338,7 +338,7 @@ pub fn expand_items(
     module: &mut Module,
     definitions: Arc<dyn Definitions>,
 ) -> Result<Vec<Transaction>, PhaseError> {
-    ilang_syntax::syn3::deep::deep(|| expand_items_here(engine, module, definitions))
+    ilang_syntax::deep::deep(|| expand_items_here(engine, module, definitions))
 }
 
 fn expand_items_here(

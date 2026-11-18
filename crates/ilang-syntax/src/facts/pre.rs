@@ -4,9 +4,9 @@
 //! Nodes are keyed by address, so the tree must not move during resolution.
 
 use super::Transition;
+use crate::ast as n;
+use crate::ast::resolved as o;
 use crate::span::Span;
-use crate::syn3::ast as n;
-use crate::syn3::ast::resolved as o;
 use crate::{Code, Diagnostic};
 use std::collections::{HashMap, HashSet};
 
@@ -721,7 +721,7 @@ impl Cx {
         let span = e.span.0;
         match &e.kind {
             n::ExprKind::Quote(q) => {
-                if let Err(error) = crate::syn3::lisp::quote_captures(&q.0, false) {
+                if let Err(error) = crate::rows::quote_captures(&q.0, false) {
                     self.out.errors.push(error);
                 }
             }

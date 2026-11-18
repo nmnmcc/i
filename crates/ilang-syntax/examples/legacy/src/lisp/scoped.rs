@@ -571,8 +571,7 @@ impl ScopedSource {
         let datum = self.append(syntax, call_site);
         let tree = crate::syn3::deep::deep(|| crate::syn3::lisp::type_from_datum(&datum))
             .map_err(|error| self.error(error))?;
-        syntax3::syn3::facts::Transition::validate_type(&tree)
-            .map_err(|error| self.error(error))?;
+        syntax3::facts::Transition::validate_type(&tree).map_err(|error| self.error(error))?;
         self.transition.ty(tree.span.0);
         Ok(tree)
     }

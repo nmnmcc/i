@@ -51,7 +51,7 @@ fn symbol(s: &Syntax, expected: &str) -> bool {
 // ---- The rows of the source syntax ----
 
 /// What a datum is read as. The table follows the reader of the source syntax
-/// (`syn3::lisp`): a group is a Curly with one part where that reader reads
+/// (`crate::rows`): a group is a Curly with one part where that reader reads
 /// the part itself (in a type) or a block of one expression (in an
 /// expression). Every other Curly stays: a block, and the `{ }` of a name
 /// whose right side is a data type, which is part of the item form.

@@ -91,10 +91,8 @@ pub mod old {
 
 /// The tree of the source syntax.
 pub mod new {
+    use ilang_syntax::ast::{Expr, ExprKind, Ident, ItemKind, Module, PatternKind, Sp, Stmt, Type};
     use ilang_syntax::span::Span;
-    use ilang_syntax::syn3::ast::{
-        Expr, ExprKind, Ident, ItemKind, Module, PatternKind, Sp, Stmt, Type,
-    };
 
     /// The statements of the function that the binding `item` gives: a chain
     /// of one branch.

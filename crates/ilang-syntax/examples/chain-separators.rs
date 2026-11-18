@@ -128,12 +128,12 @@ fn fingerprint(module: &Module) -> u64 {
 fn run(surface: Surface, source: &str) -> (Vec<u32>, Vec<(String, String)>, u64) {
     let (module, diags, lexed) = match surface {
         Surface::Normal => {
-            let (module, diags) = ilang_syntax::syn3::parse_module(source);
+            let (module, diags) = ilang_syntax::parse::parse_module(source);
             let lexed = ilang_syntax::lex(source);
             (module, diags, lexed)
         }
         Surface::Lisp => {
-            let (module, diags) = ilang_syntax::syn3::lisp::from_lisp(source);
+            let (module, diags) = ilang_syntax::rows::from_lisp(source);
             let lexed = ilang_syntax::lexer::lex_lisp(source);
             (module, diags, lexed)
         }

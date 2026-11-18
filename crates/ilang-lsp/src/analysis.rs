@@ -310,14 +310,14 @@ mod expansion_source_tests {
         let module = parsed.iter_mut().find(|m| m.path == "app/main").unwrap();
         let id = module.source;
         let ast = &mut module.ast.items[0];
-        let ilang_syntax::syn3::ast::ItemKind::Bind(binding) = &mut ast.kind else {
+        let ilang_syntax::ast::ItemKind::Bind(binding) = &mut ast.kind else {
             panic!()
         };
-        let ilang_syntax::syn3::ast::ExprKind::Chain(functions) = &mut binding.value.kind else {
+        let ilang_syntax::ast::ExprKind::Chain(functions) = &mut binding.value.kind else {
             panic!()
         };
         let function = functions.first_mut().expect("one function branch");
-        let Some(ilang_syntax::syn3::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
+        let Some(ilang_syntax::ast::Stmt::Expr(last)) = function.body.stmts.last_mut() else {
             panic!()
         };
         let call = Syntax::from_datum(

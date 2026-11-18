@@ -4,7 +4,7 @@
 //! The candidates are those of `call` on the lowered tree: a call whose
 //! first item is a spread is a record update and never a macro call, and a
 //! pipe into a chain is a match or a pipe into a function.
-use ilang_syntax::syn3::ast::{DItem, Expr, ExprKind, Ident, Type, TypeKind};
+use ilang_syntax::ast::{DItem, Expr, ExprKind, Ident, Type, TypeKind};
 
 pub struct ExprCall<'a> {
     pub module: Option<&'a Ident>,

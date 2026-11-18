@@ -3,11 +3,11 @@
 //! their template slot. Also the reader of a quote pattern's captures.
 use std::collections::BTreeSet;
 
-use crate::span::Span;
-use crate::syn3::ast::{
+use crate::ast::{
     DItem, Expr, ExprKind, Ident, Import, Module, Pattern, PatternKind, QuotePattern, Quoted,
 };
-use crate::syn3::walk::{self, Visitor};
+use crate::span::Span;
+use crate::walk::{self, Visitor};
 use crate::{Code, Diagnostic};
 
 use super::syntax::{Scope, Syntax};
@@ -23,7 +23,7 @@ pub fn read_pattern(d: &Datum) -> Result<QuotePattern, Diagnostic> {
     Ok(QuotePattern {
         datum: Quoted(Box::new(d.clone())),
         template: None,
-        captures: crate::syn3::lisp::quote_captures(d, true)?,
+        captures: crate::rows::quote_captures(d, true)?,
     })
 }
 
@@ -37,7 +37,7 @@ pub fn read_pattern_lenient(d: &Datum) -> QuotePattern {
 /// Checks an expression quote: its shape, and that every unquote reads as
 /// an expression.
 pub fn check_expression(d: &Datum) -> Result<(), Diagnostic> {
-    crate::syn3::lisp::quote_captures(d, false).map(|_| ())
+    crate::rows::quote_captures(d, false).map(|_| ())
 }
 
 fn ident(name: &str, span: Span) -> Ident {
@@ -83,7 +83,7 @@ impl Lower<'_> {
         call("_template", vec![id], d.span)
     }
     fn unquoted(&mut self, inner: &Datum) -> Expr {
-        match crate::syn3::lisp::expr_from_datum(inner) {
+        match crate::rows::expr_from_datum(inner) {
             Ok(e) => e,
             Err(error) => {
                 self.errors.push(error);
@@ -177,9 +177,9 @@ impl Visitor for Lower<'_> {
 /// template nodes to the compiler program's table. Existing spans are kept.
 /// Pattern quotes get their template slot here and are matched by the
 /// pattern compiler. A quote that does not read is reported; a tree read by
-/// `syn3::lisp::from_lisp` with [`check_expression`] has none.
+/// `crate::rows::from_lisp` with [`check_expression`] has none.
 ///
-/// The walk is a plain recursion: run it on a deep stack (`syn3::deep`)
+/// The walk is a plain recursion: run it on a deep stack (`crate::deep`)
 /// when the module can hold the result of a macro.
 pub fn lower_expression_quotes(
     module: &mut Module,
@@ -214,10 +214,10 @@ pub fn lower_expression_quotes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syn3::ast::{ItemKind, Stmt};
+    use crate::ast::{ItemKind, Stmt};
 
     fn module(source: &str) -> Module {
-        let (module, errors) = crate::syn3::lisp::from_lisp(source);
+        let (module, errors) = crate::rows::from_lisp(source);
         assert!(errors.is_empty(), "{errors:?}");
         module
     }

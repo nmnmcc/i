@@ -1,7 +1,7 @@
 //! Typed expansion runs at the inference group barrier, through this compiler hook.
 use crate::hir::{DefId, Expr, ModuleId, Program};
 use ilang_package::Diagnostic;
-use ilang_syntax::{lisp::scoped::ScopedSource, span::Span, syn3::ast};
+use ilang_syntax::{ast, lisp::scoped::ScopedSource, span::Span};
 use std::sync::Arc;
 
 pub struct Invocation<'a> {
@@ -35,7 +35,7 @@ pub struct Output {
 
 impl Clone for Output {
     fn clone(&self) -> Self {
-        ilang_syntax::syn3::deep::deep(|| Self {
+        ilang_syntax::deep::deep(|| Self {
             expression: self.expression.clone(),
             syntax: self.syntax.clone(),
             scoped: self.scoped.clone(),
@@ -132,10 +132,10 @@ pub fn restore(program: &mut Program) {
 }
 
 impl Output {
-    pub fn syntax3(&self) -> ilang_syntax::syn3::ast::Expr {
-        ilang_syntax::syn3::deep::deep(|| self.syntax.clone())
+    pub fn syntax3(&self) -> ilang_syntax::ast::Expr {
+        ilang_syntax::deep::deep(|| self.syntax.clone())
     }
     pub fn print_syntax(&self, lisp: bool) -> String {
-        ilang_syntax::syn3::print_tree(&ilang_syntax::syn3::expression_module(self.syntax3()), lisp)
+        ilang_syntax::print_tree(&ilang_syntax::expression_module(self.syntax3()), lisp)
     }
 }

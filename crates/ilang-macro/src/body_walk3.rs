@@ -6,7 +6,7 @@
 //! spans so the hook can compare scopes rather than only written names.
 //!
 //! The scopes, the function depth and the order of the visits are those of
-//! `body_walk` on the lowered tree (`syn3::lower`), form by form:
+//! `body_walk` on the lowered tree (`migration_syntax::syn3::lower`), form by form:
 //!
 //! | Form | Old form | Rule |
 //! |---|---|---|
@@ -35,12 +35,12 @@
 //! The walk is a plain recursion. [`expressions`] and [`type_definition`]
 //! run it on a deep stack, because a tree made by a macro can be deeper than
 //! the host stack.
-use ilang_syntax::lisp::expansion3::{clause_block, plain};
-use ilang_syntax::span::Span;
-use ilang_syntax::syn3::ast::{
+use ilang_syntax::ast::{
     Binding, Block, DItem, DPItem, Expr, ExprKind, Function, Ident, ItemKind, Module, Pattern,
     PatternKind, Stmt, TItem, Type, TypeDef, TypeKind, TypeRhs,
 };
+use ilang_syntax::lisp::expansion3::{clause_block, plain};
+use ilang_syntax::span::Span;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
@@ -90,7 +90,7 @@ pub fn expressions<H: Hook + Send>(module: &mut Module, hook: &mut H) -> Result<
 where
     H::Error: Send,
 {
-    ilang_syntax::syn3::deep::deep(|| expressions_on_this_stack(module, hook))
+    ilang_syntax::deep::deep(|| expressions_on_this_stack(module, hook))
 }
 
 /// [`expressions`] for a caller that is already on a deep stack.
@@ -128,7 +128,7 @@ pub fn type_definition<H: Hook + Send>(
 where
     H::Error: Send,
 {
-    ilang_syntax::syn3::deep::deep(|| type_definition_on_this_stack(definition, hook))
+    ilang_syntax::deep::deep(|| type_definition_on_this_stack(definition, hook))
 }
 
 /// [`type_definition`] for a caller that is already on a deep stack.
@@ -219,7 +219,7 @@ impl<H: Hook> Walker<'_, H> {
             | ExprKind::Name { .. } => {}
             ExprKind::Interp(parts) => {
                 for part in parts {
-                    if let ilang_syntax::syn3::ast::InterpPart::Expr(e) = part {
+                    if let ilang_syntax::ast::InterpPart::Expr(e) = part {
                         self.expr(e, depth)?;
                     }
                 }

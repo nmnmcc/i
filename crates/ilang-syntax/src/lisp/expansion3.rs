@@ -2,7 +2,7 @@
 //! interface of the syntax macros of a module.
 //!
 //! The answers are those of `expansion::definitions` on the lowered tree
-//! (`syn3::lower`), form by form:
+//! (`migration_syntax::syn3::lower`), form by form:
 //! - an attribute with brackets is "given with arguments";
 //! - the type parameters of a binding are the `<A>` lists of its chain and
 //!   of its function type;
@@ -12,11 +12,11 @@
 //!   the lowering names the parameters itself, so they take no label.
 use super::expansion::{MacroDefinition, MacroVariant};
 use super::syntax::SyntaxError;
-use crate::syn3::ast::{
+use crate::ast::{
     Attribute, Binding, ExprKind, Function, Item, ItemKind, Module, PatternKind, TItem, Type,
     TypeKind,
 };
-use crate::syn3::walk::{self, Visitor};
+use crate::walk::{self, Visitor};
 
 fn is_macro(a: &Attribute) -> bool {
     a.module.is_none() && a.name.name == "macro"

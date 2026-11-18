@@ -2,7 +2,7 @@
 //! it is resolved directly to HIR Multi, never reparsed or lowered.
 use super::Transition;
 use crate::span::Span;
-use crate::syn3::{ast as n, walk};
+use crate::{ast as n, walk};
 
 fn shape(f: &n::Function) -> (usize, Vec<String>) {
     let mut labels: Vec<_> = f
@@ -118,7 +118,7 @@ impl walk::Visitor for Normalize<'_> {
         if enter
             && let n::PatternKind::Quote(q) = &mut p.kind
             && q.captures.is_empty()
-            && let Ok(captures) = crate::syn3::lisp::quote_captures(&q.datum.0, true)
+            && let Ok(captures) = crate::rows::quote_captures(&q.datum.0, true)
         {
             q.captures = captures;
         }
@@ -251,7 +251,7 @@ pub fn expression(e: &n::Expr, transition: &mut Transition) -> n::Expr {
 }
 
 pub fn pattern(pattern: &mut n::Pattern) {
-    crate::syn3::walk::pattern(
+    crate::walk::pattern(
         pattern,
         &mut Normalize {
             transition: &mut Default::default(),

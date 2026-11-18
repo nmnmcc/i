@@ -157,8 +157,8 @@ pub fn builtin_definition_rows(
 /// in the source rows, with fresh identities for its type parameters. This is
 /// [`source_definition`] for the new `Item`; a sum is the item
 /// `(= T (| C1 C2))` and each member is its own item.
-pub fn tree_definition(item: &crate::syn3::ast::Item, scope: &Scope, answer: u64) -> Syntax {
-    tree_definition_from_datum(&crate::syn3::lisp::item_datum(item), scope, answer)
+pub fn tree_definition(item: &crate::ast::Item, scope: &Scope, answer: u64) -> Syntax {
+    tree_definition_from_datum(&crate::rows::item_datum(item), scope, answer)
 }
 
 /// [`tree_definition`] for an item that is already a datum of the source rows:
@@ -286,7 +286,7 @@ fn is_symbol(s: &Syntax, text: &str) -> bool {
 }
 
 /// Whether `root` is a type of the source rows, without recursion: the
-/// accepted shapes are those of the type reader of `syn3::lisp`. The error is
+/// accepted shapes are those of the type reader of `crate::rows`. The error is
 /// at the first part that is not a type.
 fn check_type_new(root: &Syntax) -> Result<(), SyntaxError> {
     let fail = |at: &Syntax, message: &str| {
@@ -707,7 +707,7 @@ pub fn freshen_duplicate_heads_rows(
 
 /// Answer a written native type definition with fresh parameter identities.
 pub fn source_definition(
-    item: &crate::syn3::ast::Item,
+    item: &crate::ast::Item,
     source: &str,
     scope: &Scope,
     answer: u64,
@@ -721,7 +721,7 @@ pub fn source_definition(
     tree_definition_from_datum(&datum, scope, answer)
 }
 pub fn source_definition_from_syntax(
-    _item: &crate::syn3::ast::Item,
+    _item: &crate::ast::Item,
     syntax: &Syntax,
     answer: u64,
 ) -> Syntax {

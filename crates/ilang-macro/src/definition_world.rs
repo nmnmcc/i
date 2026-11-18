@@ -15,6 +15,7 @@ use ilang_host::{
 };
 use ilang_package::{ModuleKind, PackageGraph};
 use ilang_syntax::{
+    ast::ItemKind,
     lisp::{
         Datum, DatumKind,
         definition_schedule::Mode,
@@ -23,7 +24,6 @@ use ilang_syntax::{
         syntax::{Node, Scope, ScopeIdentity, Syntax},
     },
     span::Span,
-    syn3::ast::ItemKind,
 };
 use std::collections::HashMap;
 use std::sync::{
@@ -139,7 +139,7 @@ impl DefinitionWorld {
             .find(|p| p.source.0 == source)
             .map(AsRef::as_ref)
     }
-    fn target(&self, p: &Parsed, import: &ilang_syntax::syn3::ast::Import) -> Option<u32> {
+    fn target(&self, p: &Parsed, import: &ilang_syntax::ast::Import) -> Option<u32> {
         let package = &self.graph.packages[p.package];
         let first = &import.path.first()?.name;
         let id = if first == "i" {

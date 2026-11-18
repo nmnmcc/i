@@ -14,13 +14,13 @@ use ilang_check::{
 };
 use ilang_package::{Diagnostic, PackageGraph};
 use ilang_syntax::{
+    ast,
     lisp::{
         expansion::MacroArgument,
         scoped::ScopedSource,
         syntax::{Node, Scope, Syntax},
     },
     span::Span,
-    syn3::ast,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -123,9 +123,9 @@ fn syntax_for(p: &Parsed, graph: &PackageGraph, e: &ast::Expr) -> Syntax {
     let syntax = if file.display.ends_with(".is") {
         ilang_syntax::lisp::source_syntax::written_lisp_syntax(e.span.0, &scope, &file.text)
     } else {
-        let tokens = Arc::new(ilang_syntax::syn3::lisp::TokenIndex::new(&file.text));
-        ilang_syntax::syn3::lisp::with_tokens(&tokens, || {
-            Syntax::from_datum(&ilang_syntax::syn3::lisp::expr_datum(e), &scope)
+        let tokens = Arc::new(ilang_syntax::rows::TokenIndex::new(&file.text));
+        ilang_syntax::rows::with_tokens(&tokens, || {
+            Syntax::from_datum(&ilang_syntax::rows::expr_datum(e), &scope)
         })
     };
     ilang_syntax::lisp::source_syntax::normalize_expression(&syntax)
@@ -136,7 +136,7 @@ impl Expander for Driver {
         call: Invocation<'_>,
         query: Arc<TypedMacroQuery>,
     ) -> Result<Output, Vec<Diagnostic>> {
-        ilang_syntax::syn3::deep::deep(|| self.expand_here(call, query))
+        ilang_syntax::deep::deep(|| self.expand_here(call, query))
     }
 }
 impl Driver {

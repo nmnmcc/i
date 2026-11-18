@@ -28,7 +28,7 @@ impl Expanded {
     /// expanded tree remains available to callers such as `i expand` until
     /// this method is called.
     pub fn lower_quotes(&mut self) {
-        ilang_syntax::syn3::deep::deep(|| self.lower_quotes_here())
+        ilang_syntax::deep::deep(|| self.lower_quotes_here())
     }
     fn lower_quotes_here(&mut self) {
         for module in &mut self.parsed {
@@ -50,7 +50,7 @@ impl Expanded {
 /// Parses and expands each module after its dependencies. On failure the
 /// diagnostics are returned without publishing partial output to the checker.
 pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
-    ilang_syntax::syn3::deep::deep(|| expand_here(graph))
+    ilang_syntax::deep::deep(|| expand_here(graph))
 }
 
 fn expand_here(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {

@@ -5,7 +5,7 @@
 //! [`MAX_CALL_DEPTH`]). The tree has its groups already (`group.rs`).
 
 use super::*;
-use crate::syn3::lisp::position::{Needs, PatternItem, PatternPart, ResultPart, SegmentPart};
+use crate::rows::position::{Needs, PatternItem, PatternPart, ResultPart, SegmentPart};
 
 fn printer() -> Printer<'static> {
     Printer {

@@ -7,7 +7,7 @@
 //! own, so definition queries must retain all three items. The
 //! table of the definitions (`lisp::definition_table`) and the rows of the
 //! answers are not part of this module.
-use ilang_syntax::syn3::ast::{
+use ilang_syntax::ast::{
     Binding, ExprKind, Ident, Item, ItemKind, PatternKind, TItem, Type, TypeDef, TypeKind, TypeRhs,
 };
 
@@ -138,7 +138,7 @@ g: <A, N>(A) <- N -> A = (a) { a }
 h: <A>(A) -> A
 k = 1
 ";
-        let (module, errors) = ilang_syntax::syn3::parse_module(source);
+        let (module, errors) = ilang_syntax::parse::parse_module(source);
         assert!(errors.is_empty(), "{errors:?}");
         let (lowered, _) = migration_syntax::syn3::lower::lower(&module);
         assert_eq!(module.items.len(), lowered.items.len());

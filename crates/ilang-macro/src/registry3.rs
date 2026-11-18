@@ -2,8 +2,8 @@
 //! three: the value names that a module defines. The macro definitions are
 //! `ilang_syntax::lisp::expansion3::definitions`; imports and exports have
 //! the same fields in both trees.
+use ilang_syntax::ast::{ItemKind, Module};
 use ilang_syntax::span::Span;
-use ilang_syntax::syn3::ast::{ItemKind, Module};
 
 /// The names of the value namespace that the items of a module define,
 /// with the span of each binder: these may shadow a macro or a module alias.
@@ -35,7 +35,7 @@ mod tests {
     #[test]
     fn value_names_are_those_of_the_lowered_tree() {
         let source = "T = (Int)\nx: Int\n(a, [b, ..c]) = f()\n[C(k = d)] = g()\ne: Int = 1";
-        let (module, errors) = ilang_syntax::syn3::parse_module(source);
+        let (module, errors) = ilang_syntax::parse::parse_module(source);
         assert!(errors.is_empty(), "{errors:?}");
         let (lowered, errors) = migration_syntax::syn3::lower::lower(&module);
         assert!(errors.is_empty(), "{errors:?}");

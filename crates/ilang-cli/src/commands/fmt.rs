@@ -613,20 +613,19 @@ fn round_trip_diff(is_lisp: bool, _source: &str, rendered: &str) -> Result<(), (
     // target surface once more; the second rendering must equal the first.
     let again = if is_lisp {
         // Source is Lisp, so `rendered` is normal text. normal -> Lisp -> normal.
-        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(rendered).map_err(|diags| {
+        let (lisp, _) = ilang_syntax::surface::normal_to_lisp(rendered).map_err(|diags| {
             render_error("the converted module cannot be rendered back", &diags)
         })?;
-        let (normal, _) = ilang_syntax::syn3::surface::lisp_to_normal(&lisp).map_err(|diags| {
+        let (normal, _) = ilang_syntax::surface::lisp_to_normal(&lisp).map_err(|diags| {
             render_error("the converted module cannot be rendered back", &diags)
         })?;
         format(&normal).map_err(|diags| render_error("the round trip cannot be printed", &diags))?
     } else {
         // Source is normal, so `rendered` is Lisp text. Lisp -> normal -> Lisp.
-        let (normal, _) =
-            ilang_syntax::syn3::surface::lisp_to_normal(rendered).map_err(|diags| {
-                render_error("the converted module cannot be rendered back", &diags)
-            })?;
-        let (lisp, _) = ilang_syntax::syn3::surface::normal_to_lisp(&normal).map_err(|diags| {
+        let (normal, _) = ilang_syntax::surface::lisp_to_normal(rendered).map_err(|diags| {
+            render_error("the converted module cannot be rendered back", &diags)
+        })?;
+        let (lisp, _) = ilang_syntax::surface::normal_to_lisp(&normal).map_err(|diags| {
             render_error("the converted module cannot be rendered back", &diags)
         })?;
         ilang_syntax::lisp::format(&lisp)
@@ -788,7 +787,7 @@ fn convert_to_lisp(
     if !errors.is_empty() {
         return Err(errors);
     }
-    let (out, lost) = ilang_syntax::syn3::surface::normal_to_lisp(source)?;
+    let (out, lost) = ilang_syntax::surface::normal_to_lisp(source)?;
     Ok((ilang_syntax::lisp::format(&out)?, lost))
 }
 
@@ -799,6 +798,6 @@ fn convert_from_lisp(
     if !errors.is_empty() {
         return Err(errors);
     }
-    let (out, lost) = ilang_syntax::syn3::surface::lisp_to_normal(source)?;
+    let (out, lost) = ilang_syntax::surface::lisp_to_normal(source)?;
     Ok((format(&out)?, lost))
 }

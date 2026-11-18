@@ -18,7 +18,7 @@ pub mod types;
 mod unused;
 
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId, SourceId};
-use ilang_syntax::syn3::ast;
+use ilang_syntax::ast;
 
 /// The stable codes of the problems found by this crate.
 pub mod code {
@@ -140,7 +140,7 @@ pub struct Parsed {
     pub kind: ModuleKind,
     pub ast: ast::Module,
     /// Names and spans needed to interpret source forms during resolution.
-    pub lowering: ilang_syntax::syn3::facts::Transition,
+    pub lowering: ilang_syntax::facts::Transition,
     /// Origins of names introduced by expansion in this module.
     pub scoped: Option<ilang_syntax::lisp::scoped::ScopedSource>,
     /// This module was built by the compiler and may call compiler internals.
@@ -150,7 +150,7 @@ pub struct Parsed {
 
 impl Clone for Parsed {
     fn clone(&self) -> Self {
-        ilang_syntax::syn3::deep::deep(|| Self {
+        ilang_syntax::deep::deep(|| Self {
             package: self.package,
             path: self.path.clone(),
             source: self.source,
@@ -173,12 +173,11 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             let source = graph.sources.get(m.source);
             let lisp = source.display.ends_with(".is");
             let (ast, mut errors) = if lisp {
-                ilang_syntax::syn3::lisp::from_lisp(&source.text)
+                ilang_syntax::rows::from_lisp(&source.text)
             } else {
-                ilang_syntax::syn3::parse_module(&source.text)
+                ilang_syntax::parse::parse_module(&source.text)
             };
-            let (lowering, more) =
-                ilang_syntax::syn3::facts::Transition::capture_module(&ast, lisp);
+            let (lowering, more) = ilang_syntax::facts::Transition::capture_module(&ast, lisp);
             errors.extend(more);
             errors.sort_by_key(|d| (d.span.start, d.span.end));
             diags.extend(
