@@ -167,7 +167,7 @@ fn shape_groups() {
 
 #[test]
 fn forms_of_later_stages_are_errors() {
-    bad("f = () <- () { Nil }\n", "empty service pattern");
+    bad("f = () <- () { () }\n", "empty service pattern");
 }
 
 /// Round-tripping the library macro must retain its quotes as well as the
@@ -320,7 +320,7 @@ fn rest_service_heads_and_whole_provides_lower() {
         Stmt::Env { spread: true, .. }
     ));
     assert!(
-        syn3::parse_lowered("f = <N>() <- (..env: N, db: Db) { Nil }")
+        syn3::parse_lowered("f = <N>() <- (..env: N, db: Db) { () }")
             .1
             .iter()
             .any(|d| d.message.contains("last item"))
@@ -332,7 +332,7 @@ fn migrated_captured_row_provider_keeps_its_written_contract() {
     // Annotations participate in inference. The provided
     // value must satisfy the needed service by subtyping. Dropping the
     // old provider's S(Dependency) contract changes those constraints.
-    let old = "S(N) { S(() -> Nil ! N) }\nDependency { Dependency }\nread = (d ! Dependency) { Nil }\nuse(N) = (s ! S(N)) { S(f) = s f() }\napply(N) = () { local : () -> Nil ! N = () { use() } local() }\nmain = () { ! S(Dependency) = S(() { read() }) apply() }";
+    let old = "S(N) { S(() -> () ! N) }\nDependency { Dependency }\nread = (d ! Dependency) { () }\nuse(N) = (s ! S(N)) { S(f) = s f() }\napply(N) = () { local : () -> () ! N = () { use() } local() }\nmain = () { ! S(Dependency) = S(() { read() }) apply() }";
     let (old, diags) = legacy::parser::parse_module_legacy(old);
     assert!(diags.is_empty(), "{diags:#?}");
     let (converted, notes) =
@@ -343,7 +343,7 @@ fn migrated_captured_row_provider_keeps_its_written_contract() {
     assert_eq!(
         print_module(&lowered),
         shown(
-            "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) { S(f) = s f() }\napply = <N>() { local : () <- N -> Nil = () { use() } local() }\nmain = () {\n    _syn3_0 : S(Dependency) = S(() { read() })\n    apply() <- (_syn3_0)\n}",
+            "S(N) = (() <- N -> ())\nDependency = ()\nread = () <- (d : Dependency) { () }\nuse = <N>() <- (s : S(N)) { S(f) = s f() }\napply = <N>() { local : () <- N -> () = () { use() } local() }\nmain = () {\n    _syn3_0 : S(Dependency) = S(() { read() })\n    apply() <- (_syn3_0)\n}",
         ),
     );
 }

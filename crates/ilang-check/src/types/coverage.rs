@@ -54,7 +54,8 @@ fn affix_matches(value: &str, prefix: &str, suffix: &str) -> bool {
 pub(crate) enum Ctor {
     Custom(CtorRef),
     Shape(super::ShapeId),
-    Nil,
+    /// The empty list `[]`.
+    Empty,
     Cons,
     Lit(Lit),
 }
@@ -604,7 +605,7 @@ impl Ctor {
         match self {
             Ctor::Custom(c) => Head::Named(TypeRef::Custom(c.ty)),
             Ctor::Shape(n) => Head::Shape(*n),
-            Ctor::Nil | Ctor::Cons => Head::Named(TypeRef::Builtin(BuiltinType::List)),
+            Ctor::Empty | Ctor::Cons => Head::Named(TypeRef::Builtin(BuiltinType::List)),
             Ctor::Lit(Lit::Opaque(ty)) => Head::Named(TypeRef::Custom(*ty)),
             Ctor::Lit(l) => Head::Named(TypeRef::Builtin(match l {
                 Lit::Int(_) => BuiltinType::Int,
@@ -624,7 +625,7 @@ impl Ctor {
             },
             Ctor::Shape(n) => n.len(),
             Ctor::Cons => 2,
-            Ctor::Nil | Ctor::Lit(_) => 0,
+            Ctor::Empty | Ctor::Lit(_) => 0,
         }
     }
 
@@ -1061,7 +1062,7 @@ impl Checker<'_> {
                 let list = Ty::named(TypeRef::Builtin(BuiltinType::List), vec![e.clone()]);
                 vec![e, list]
             }
-            Ctor::Nil | Ctor::Lit(_) => Vec::new(),
+            Ctor::Empty | Ctor::Lit(_) => Vec::new(),
         };
         if parts.len() != k {
             return Some(vec![Col::Any; k]);
@@ -1103,7 +1104,7 @@ impl Checker<'_> {
                     .collect(),
                 _ => return None,
             },
-            Head::Named(TypeRef::Builtin(BuiltinType::List)) => vec![Ctor::Nil, Ctor::Cons],
+            Head::Named(TypeRef::Builtin(BuiltinType::List)) => vec![Ctor::Empty, Ctor::Cons],
             Head::Shape(n) => vec![Ctor::Shape(n)],
             _ => return None,
         };
@@ -1269,7 +1270,7 @@ impl Checker<'_> {
                 let parts: Vec<String> = args.iter().map(|a| self.show_pat(a)).collect();
                 shape.text(&parts)
             }
-            Pat::Ctor(Ctor::Nil, _) => "[]".into(),
+            Pat::Ctor(Ctor::Empty, _) => "[]".into(),
             Pat::Ctor(Ctor::Cons, _) => {
                 let mut items = Vec::new();
                 let mut cur = p;
@@ -1279,7 +1280,7 @@ impl Checker<'_> {
                             items.push(self.show_pat(&args[0]));
                             cur = &args[1];
                         }
-                        Pat::Ctor(Ctor::Nil, _) => break None,
+                        Pat::Ctor(Ctor::Empty, _) => break None,
                         _ => break Some(".."),
                     }
                 };
@@ -1402,13 +1403,13 @@ pub(crate) fn literal(q: &Pattern) -> Option<Lit> {
     })
 }
 
-/// A list pattern as constructors: `[p1, p2]` is `Cons(p1, Cons(p2, Nil))`,
+/// A list pattern as constructors: `[p1, p2]` is `Cons(p1, Cons(p2, Empty))`,
 /// and `[p1, ..r]` is `Cons(p1, _)`.
 pub(crate) fn list(items: Vec<Pat>, rest: bool) -> Pat {
     let mut tail = if rest {
         Pat::Wild(None)
     } else {
-        Pat::Ctor(Ctor::Nil, Vec::new())
+        Pat::Ctor(Ctor::Empty, Vec::new())
     };
     for x in items.into_iter().rev() {
         tail = Pat::Ctor(Ctor::Cons, vec![x, tail]);

@@ -144,7 +144,7 @@ fn syntax_crosses_the_compiler_export_without_losing_identity() {
 #[test]
 fn untrusted_external_cannot_be_supplied_to_a_macro_instance() {
     let built = build(
-        "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect : () -> Nil\nidentity = (x : syntax.Syntax) { effect() x }\n",
+        "(syntax = i/syntax)\n(identity)\n@external(\"example:outside\", \"effect\")\neffect : () -> ()\nidentity = (x : syntax.Syntax) { effect() x }\n",
     );
     let error = ilang_macro::run::invoke(&built, "app/main.identity", &[input()]).unwrap_err();
     assert!(format!("{error:#}").contains("instantiate macro program"));
@@ -778,7 +778,7 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, exported)\n(@ macro (= exported (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n(@ macro (= private (-> (, (: x (. syntax Syntax))) (. syntax Syntax) x)))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros, (exported) = app/macros)\nmain = () { Nil }\n",
+        "(m = app/macros, (exported) = app/macros)\nmain = () { () }\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -1212,7 +1212,7 @@ fn unused_macro_definitions_are_checked_for_signature_and_capabilities() {
         wrong.iter().any(|d| d.message.contains("macro `wrong`")),
         "{wrong:?}"
     );
-    let outside = check("(, (= syntax (/ i syntax)))\n(@ (external \"other\" \"effect\") (: effect (-> (,) Nil)))\n(@ macro (= unsafe (-> (, (: x (. syntax Syntax))) (. syntax Syntax) {(effect) x})))\n").unwrap_err();
+    let outside = check("(, (= syntax (/ i syntax)))\n(@ (external \"other\" \"effect\") (: effect (-> (,) (,))))\n(@ macro (= unsafe (-> (, (: x (. syntax Syntax))) (. syntax Syntax) {(effect) x})))\n").unwrap_err();
     assert!(outside.iter().any(|d| d.is_error()), "{outside:?}");
 }
 
@@ -1838,7 +1838,7 @@ fn checked_collection_validates_targets_and_duplicates() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(anchor)\nanchor = Nil\ngood = () { 42 }\nbad = (x : Int) { x }\nalias = good\n",
+        "(anchor)\nanchor = ()\ngood = () { 42 }\nbad = (x : Int) { x }\nalias = good\n",
     )
     .unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -1995,7 +1995,7 @@ fn collection_manifest_from_a_real_item_macro() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {42}))})))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\n(anchor)\nanchor = Nil\nm.emit(anchor, generated)\n",
+        "(m = app/macros)\n(anchor)\nanchor = ()\nm.emit(anchor, generated)\n",
     )
     .unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -2034,7 +2034,7 @@ fn project_check_rejects_a_private_collection_binding() {
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {42}))})))\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nanchor = Nil\nm.emit(anchor, generated)\n",
+        "(m = app/macros)\nanchor = ()\nm.emit(anchor, generated)\n",
     )
     .unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -2212,7 +2212,7 @@ fn item_collection_resolves_qualified_import() {
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {42}))})))\n").unwrap();
-    std::fs::write(dir.path().join("src/anchors.i"), "(anchor)\nanchor = Nil\n").unwrap();
+    std::fs::write(dir.path().join("src/anchors.i"), "(anchor)\nanchor = ()\n").unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
         "(m = app/macros, a = app/anchors)\nm.emit(a.anchor, generated)\n",
@@ -2280,7 +2280,7 @@ fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
             let dir = tempfile::tempdir().unwrap();
             std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
             std::fs::create_dir(dir.path().join("src")).unwrap();
-            std::fs::write(dir.path().join("src/main.i"), "main = () { Nil }\n").unwrap();
+            std::fs::write(dir.path().join("src/main.i"), "main = () { () }\n").unwrap();
             let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
             assert!(diagnostics.is_empty());
             let (parsed, diagnostics) = ilang_check::parse(&graph);
@@ -2756,7 +2756,7 @@ fn definition_query_reads_an_absorbed_generated_sum_member() {
     .unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nm.emit()\nmain = () { Nil }\n",
+        "(m = app/macros)\nm.emit()\nmain = () { () }\n",
     )
     .unwrap();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))
@@ -2818,7 +2818,7 @@ fn type_macro_does_not_reclassify_a_written_definition_head() {
     .unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(m = app/macros)\nvalue = 1\nAlias(A) = m.id(value)\nmain = () { Nil }\n",
+        "(m = app/macros)\nvalue = 1\nAlias(A) = m.id(value)\nmain = () { () }\n",
     )
     .unwrap();
     let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
@@ -2988,7 +2988,7 @@ fn unresolved_current_module_definitions_wait_for_item_expansion_to_settle() {
         std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
         std::fs::write(
             dir.path().join("src/main.i"),
-            format!("(m = probe/macros)\n{items}\nmain = () {{ Nil }}\n"),
+            format!("(m = probe/macros)\n{items}\nmain = () {{ () }}\n"),
         )
         .unwrap();
         let (mut graph, ds) = ilang_cli::load(dir.path(), false, true);

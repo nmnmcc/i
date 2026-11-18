@@ -196,7 +196,7 @@ fn test_module(name: &str, dependency: &str) -> String {
 
 test("greets", () {{
   main.greeting("i") |>
-    ("Hello, i!") {{ Nil }}
+    ("Hello, i!") {{ () }}
     & (other) {{ panic(other) }}
 }})
 "#

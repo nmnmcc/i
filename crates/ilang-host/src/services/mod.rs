@@ -67,7 +67,7 @@ pub fn standard_with_args(
                 bail!("{IO} print takes one String");
             };
             print(text);
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .expect("a new set of imports");
     clock::register(&mut imports);
@@ -108,11 +108,11 @@ pub type Log = Arc<Mutex<Vec<String>>>;
 ///
 /// | Namespace | Function | |
 /// |---|---|---|
-/// | `test:io/v1` | `print: (text: String) -> Nil` | logs `text` |
+/// | `test:io/v1` | `print: (text: String) -> ()` | logs `text` |
 /// | `test:math/v1` | external `add: (a: Int, b: Int) -> Int` | |
 /// | `test:math/v1` | external `hypot: (a: Float, b: Float) -> Float` | |
 /// | `test:kv/v1` | `get: (key: String) -> String ^ String` | `name` is `"i"`, `lang` is `"i language"`; other keys give the error `"no <key>"` |
-/// | `test:kv/v1` | `check: (n: Int) -> Int ^ Nil \| Int \| String` | `2 * n`; the error `Nil` for 0, `n` for more than 100, and `"negative"` for less than 0 |
+/// | `test:kv/v1` | `check: (n: Int) -> Int ^ () \| Int \| String` | `2 * n`; the error `()` for 0, `n` for more than 100, and `"negative"` for less than 0 |
 /// | `test:async/v1`, async | `double: (n: Int) -> Int ^ String` | `2 * n`, or the error `"negative"` for less than 0; logs `double <n>` |
 /// | `test:async/v1`, async | `echo: (text: String) -> String` | logs `echo <text>` |
 /// | `test:async/v1`, async | `nan: () -> Float` | a Float that is not finite |
@@ -127,7 +127,7 @@ pub fn testing(log: Log) -> HostImports {
                 bail!("print takes one String");
             };
             printed.lock().unwrap().push(text.clone());
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .expect(ONE);
     imports
@@ -166,7 +166,7 @@ pub fn testing(log: Log) -> HostImports {
             Ok(if *n < BigInt::from(0) {
                 Err(Value::String("negative".into()))
             } else if *n == BigInt::from(0) {
-                Err(Value::Nil)
+                Err(Value::Unit)
             } else if *n > BigInt::from(100) {
                 Err(Value::Int(n.clone()))
             } else {

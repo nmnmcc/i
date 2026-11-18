@@ -16,7 +16,7 @@
 //! number) make the encoder give up; the record then stays on its maker.
 //!
 //! Format, one marker byte then its operands (little endian):
-//! 0 Nil; 1 small Int (i32); 2 back reference (i32); 3 `$obj` (tag i32,
+//! 0 `()`; 1 small Int (i32); 2 back reference (i32); 3 `$obj` (tag i32,
 //! field 1 i32, field 2 i64, field 3 f64, bytes, limbs, values); 4 closure
 //! (code i32, flags i32, shape i64, captures); 5 non-empty list (count, items);
 //! 6 True; 7 False; 8 []. An array is its length (i32, -1 for null) and its

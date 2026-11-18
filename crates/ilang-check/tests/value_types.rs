@@ -393,7 +393,7 @@ fn query_sources_heads_binders_and_outline() {
 #[test]
 fn a_consumer_cannot_fix_the_library() {
     // adding only a consumer Of demand leaves the library interface intact.
-    let lib = "(\n\tCell\n\tr\n\treset\n)\nCell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nr = cell(1)\nput = <A>(c : Cell(A), value : A) { c.set(value) }\nreset = () { put(r, \"s\") }";
+    let lib = "(\n\tCell\n\tr\n\treset\n)\nCell(A) = (get = () -> A, set = (A) -> ())\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }\nr = cell(1)\nput = <A>(c : Cell(A), value : A) { c.set(value) }\nreset = () { put(r, \"s\") }";
     let (g, base) = checked(&[("src/lib.i", lib)]);
     assert!(
         !base.diags.iter().any(Diagnostic::is_error),
@@ -437,7 +437,7 @@ fn a_consumer_cannot_fix_the_library() {
 #[test]
 fn fixation_keeps_constraints_and_rejects_earlier_weak_parts() {
     // an ordinary generic helper avoids a narrowed known-field fact.
-    let prefix = "Cell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nput = <A>(c : Cell(A), value : A) { c.set(value) }\nr = cell(1)\n";
+    let prefix = "Cell(A) = (get = () -> A, set = (A) -> ())\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }\nput = <A>(c : Cell(A), value : A) { c.set(value) }\nr = cell(1)\n";
     good(&[prefix, "later = () {put(r,\"s\")}"].concat());
     let src = [prefix, "Read = r\nlater = () {put(r,\"s\")}"].concat();
     let (g, c) = checked(&[("src/main.i", &src)]);
@@ -508,7 +508,7 @@ fn alias_formals_and_written_holes_are_instantiated_per_use() {
     good(
         "port : Int = 1\nT = { (port, _) }\nf = () {\n\ta : T = (1, \"s\")\n\tb : T = (2, 3)\n\t(a, b)\n}",
     );
-    let prefix = "Cell(A) = (get = () -> A, set = (A) -> Nil)\nport : Int = 1\nT(A) = Cell(A) | Cell(port)\n";
+    let prefix = "Cell(A) = (get = () -> A, set = (A) -> ())\nport : Int = 1\nT(A) = Cell(A) | Cell(port)\n";
     // Invariant same-head union still requires equal arguments after substitution.
     bad(
         &[prefix, "f = (x : T(String)) {x}"].concat(),
@@ -960,9 +960,9 @@ fn skipped_quantifiers_and_constant_parts_do_not_choose_instances() {
         ),
     ]);
     assert!(c.diags.iter().any(|d| d.code == code::VALUE_TYPE_OPEN));
-    // Completion cannot discard the Nil alternative to find a convenient named head.
+    // Completion cannot discard the () alternative to find a convenient named head.
     bad(
-        "Box(A) = (A)\nv : { Box(Int) | Nil } = Box(1)\nBox(_) = v",
+        "Box(A) = (A)\nv : { Box(Int) | () } = Box(1)\nBox(_) = v",
         code::TYPE_PATTERN_MISMATCH,
     );
     // A constant part introduced by a head alias compares after closing.
@@ -1058,17 +1058,17 @@ fn normalized_shapes_preserve_skips_and_nested_heads() {
     );
     assert_eq!(alias(&c, "Item"), "Int");
     good(
-        "Cell(A) = (get = () -> A, set = (A) -> Nil)\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nput = <A>(c : Cell(A), x : A) { c.set(x) }\nPair(A, B) = { (A, B) }\npack = <A>(a : Cell(A), b : Bool) {\n\t(a, b |> (True) { (1, a) } & (False) { (2, a) })\n}\n(a, v) = pack(cell(1), True)\nPair(Item, _) = v\nlater = () { put(a, \"s\") }",
+        "Cell(A) = (get = () -> A, set = (A) -> ())\ncell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }\nput = <A>(c : Cell(A), x : A) { c.set(x) }\nPair(A, B) = { (A, B) }\npack = <A>(a : Cell(A), b : Bool) {\n\t(a, b |> (True) { (1, a) } & (False) { (2, a) })\n}\n(a, v) = pack(cell(1), True)\nPair(Item, _) = v\nlater = () { put(a, \"s\") }",
     );
 }
 
 #[test]
 fn cached_templates_preserve_hole_sharing_and_deferred_constraints() {
-    let prefix = "Cell(A) = (get = () -> A, set = (A) -> Nil)\nci : Cell(Int) = Cell(get = () { 1 }, set = (x : Int) { Nil })\ncs : Cell(String) = Cell(get = () { \"s\" }, set = (x : String) { Nil })\nport : Int = 1\nDuo(A) = { (Cell(A), Cell(A)) }\nT = { (Duo(_), port) }\n";
+    let prefix = "Cell(A) = (get = () -> A, set = (A) -> ())\nci : Cell(Int) = Cell(get = () { 1 }, set = (x : Int) { () })\ncs : Cell(String) = Cell(get = () { \"s\" }, set = (x : String) { () })\nport : Int = 1\nDuo(A) = { (Cell(A), Cell(A)) }\nT = { (Duo(_), port) }\n";
     bad(&[prefix, "a : T=((ci,cs),2)"].concat(), code::TYPE_MISMATCH);
     good(&[prefix, "a : T=((ci,ci),3)\nb : T=((cs,cs),4)"].concat());
     bad(
-        "Cell(A) = (get = () -> A, set = (A) -> Nil)\nport : Int = 1\nT(A) = Cell(A) | Cell(port)\nf = (x : T(String)) { x }",
+        "Cell(A) = (get = () -> A, set = (A) -> ())\nport : Int = 1\nT(A) = Cell(A) | Cell(port)\nf = (x : T(String)) { x }",
         code::TYPE_INVARIANT,
     );
 }

@@ -114,7 +114,7 @@ fn outer_call_sees_unexpanded_arguments_and_result_is_expanded() {
 #[test]
 fn local_parameter_and_earlier_binding_shadow_imported_macro() {
     assert_eq!(
-        calls("a = (m) { m(1) }\nb = () { m = () { Nil } m(2) }\nc = () { m(3) }"),
+        calls("a = (m) { m(1) }\nb = () { m = () { () } m(2) }\nc = () { m(3) }"),
         ["m"]
     );
 }
@@ -232,7 +232,7 @@ fn on_small_stack(test: impl FnOnce() -> Module + Send + 'static) {
 #[test]
 fn deep_mixed_bodies_patterns_and_types_do_not_use_the_host_stack() {
     on_small_stack(|| {
-        let mut module = module("f = () { Nil }\nx: Int");
+        let mut module = module("f = () { () }\nx: Int");
         let span = Span::default();
         let value = deep_expression(10_000, expression("m()"));
         let ItemKind::Bind(binding) = &mut module.items[0].kind else {

@@ -333,7 +333,12 @@ mod expansion_source_tests {
         );
         let result = Syntax::from_datum(
             &Datum {
-                kind: DatumKind::UpName("Nil".into()),
+                // `(,)`: empty data.
+                kind: DatumKind::Round(vec![Datum {
+                    kind: DatumKind::Symbol(",".into()),
+                    span: last.span.0,
+                    docs: vec![],
+                }]),
                 span: last.span.0,
                 docs: vec![],
             },

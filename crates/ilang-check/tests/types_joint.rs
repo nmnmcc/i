@@ -82,7 +82,7 @@ fn j1_j2_flow_facts_do_not_become_value_reads_through_access_or_calls() {
         "apply = <A, B>(x : A, f : (A) -> B) { f(x) }\nf = () {\n\tapply(\"a\", (x) {\n\t\ty : x = \"b\"\n\t\ty\n\t})\n}",
     );
     bad(
-        "Sink(A) = (put = (A) -> Nil)\nsink : Sink(\"GET\" | \"POST\") = Sink(put = (x : { \"GET\" | \"POST\" }) { Nil })\nbad = () { sink.put(\"DELETE\") }",
+        "Sink(A) = (put = (A) -> ())\nsink : Sink(\"GET\" | \"POST\") = Sink(put = (x : { \"GET\" | \"POST\" }) { () })\nbad = () { sink.put(\"DELETE\") }",
         code::TYPE_MISMATCH,
     );
 }
@@ -115,7 +115,7 @@ fn j1_j5_new_narrowed_binders_have_literal_types_original_subjects_do_not() {
 
 #[test]
 fn j4_literal_fixation_orders_completion_and_rejects_later_widening() {
-    let source = "Cell(A) = (get = () -> A, set = (A) -> Nil)\nmake = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }\nr=make(1)\nRead=r\nlater=(){r.set(2)}";
+    let source = "Cell(A) = (get = () -> A, set = (A) -> ())\nmake = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }\nr=make(1)\nRead=r\nlater=(){r.set(2)}";
     bad(source, code::TYPE_MISMATCH);
     good(&source.replace("r=make(1)", "r : Cell(Int)=make(1)"));
     // An annotation demand must survive completion even for a known literal.
@@ -174,7 +174,7 @@ fn j6_early_context_provenance_wins_over_literal_boundary_checks() {
     );
     bad("v = 1\nA = v\nT = (A)", code::VALUE_TYPE_PLACE);
     bad(
-        "v=1\nA=v\nf : () <- (A) -> Nil = () { Nil }",
+        "v=1\nA=v\nf : () <- (A) -> () = () { () }",
         code::VALUE_TYPE_PLACE,
     );
     // A scheme that already needs an environment can still be read normally.

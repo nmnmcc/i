@@ -394,7 +394,7 @@ pub fn wat() -> String {
           (local.set $fields (struct.get $obj 5 (local.get $obj)))
           (if (i32.eq (local.get $tag) (i32.const 5))
             (then
-              ;; A constructor without fields is only its name: `Nil`, `True`.
+              ;; A constructor without fields is only its name: `True`.
               (call $ib_string (call $constructor_name (struct.get $obj 1 (local.get $obj))))
               (if (ref.is_null (local.get $fields)) (then (br $next)))
               (br_if $next (i32.eqz (array.len (ref.as_non_null (local.get $fields)))))))
@@ -467,7 +467,7 @@ pub fn wat() -> String {
             ("fn_bar", " | "),
             ("label_eq", " = "),
             ("fn_close", ") { ... }"),
-            ("nil", "Nil"),
+            ("nil", "()"),
             ("true", "True"),
             ("false", "False"),
             ("ok", "Ok"),

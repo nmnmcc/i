@@ -1289,7 +1289,7 @@ impl<'p> Emitter<'p> {
             },
             Atom::Global(g) => format!("(global.get $g{})", g.0),
             Atom::Func(f) => format!("(global.get $c{})", f.0),
-            Atom::Nil => "(ref.null eq)".into(),
+            Atom::Unit => "(ref.null eq)".into(),
             Atom::Bool(true) => "(global.get $value_true)".into(),
             Atom::Bool(false) => "(global.get $value_false)".into(),
             Atom::Int(n) => int(n),
@@ -2082,7 +2082,7 @@ fn with_value(parts: &[AbiType], at: usize, value: &str) -> String {
     for (i, p) in parts.iter().enumerate() {
         if i == at {
             out.push(' ');
-            // For `Nil`, the value is dropped: nothing is passed.
+            // For `()`, the value is dropped: nothing is passed.
             out.push_str(&abi_out(*p, value).1);
         } else {
             for t in abi_in(*p).0 {
@@ -2098,7 +2098,7 @@ fn with_value(parts: &[AbiType], at: usize, value: &str) -> String {
 /// them.
 fn abi_in(t: AbiType) -> (&'static [&'static str], &'static str) {
     match t {
-        AbiType::Nil => (&[], ""),
+        AbiType::Unit => (&[], ""),
         AbiType::Bool => (&["i32"], "$abi_bool_in"),
         AbiType::Int => (&["i32", "i32", "i32"], "$abi_int_in"),
         AbiType::Float => (&["f64"], "$abi_float_in"),
@@ -2109,11 +2109,11 @@ fn abi_in(t: AbiType) -> (&'static [&'static str], &'static str) {
 }
 
 /// The Wasm types of a value given to the host, and the code that gives
-/// them for the value `v`. For `Nil`, `v` is worked out and dropped.
+/// them for the value `v`. For `()`, `v` is worked out and dropped.
 fn abi_out(t: AbiType, v: &str) -> (Vec<&'static str>, String) {
     let types = abi_in(t).0.to_vec();
     let out = match t {
-        AbiType::Nil => format!("(drop {v})"),
+        AbiType::Unit => format!("(drop {v})"),
         AbiType::Bool => format!("(call $abi_bool_out {v})"),
         AbiType::Int => format!("(call $abi_int_out {v})"),
         AbiType::Float => format!("(call $abi_float_out {v})"),
@@ -2171,7 +2171,7 @@ fn zero(t: &str) -> &'static str {
 /// the host can take.
 fn value_tag(t: AbiType) -> u32 {
     match t {
-        AbiType::Nil => 0,
+        AbiType::Unit => 0,
         AbiType::Bool => 1,
         AbiType::Float => 2,
         AbiType::String => 3,
@@ -2409,7 +2409,7 @@ mod deep_emit_tests {
             for _ in 0..10_000 { cond = Cond::Not(Box::new(cond)); }
             let rendered = emitter.cond(&cond);
             assert_eq!(rendered.matches("(i32.eqz ").count(), 10_000);
-            let mut stmt = Stmt::Return(Atom::Nil);
+            let mut stmt = Stmt::Return(Atom::Unit);
             for n in 0..10_000 { stmt = Stmt::Block { label:n, body:vec![stmt] }; }
             let mut rendered = String::new();
             emitter.stmts(&mut rendered, std::slice::from_ref(&stmt), false);

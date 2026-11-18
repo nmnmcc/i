@@ -781,7 +781,7 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
                 \n\
                 drop2 = (x, g, h) {\n  y = (x, h)\n  g(1)\n}\n\
                 \n\
-                effonly = (f, x) {\n  r = f(x)\n  Nil\n}\n";
+                effonly = (f, x) {\n  r = f(x)\n  ()\n}\n";
     let dir = tempfile::tempdir().unwrap();
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
@@ -807,7 +807,7 @@ fn hover_on_a_local_name_names_one_sided_variables_as_the_scheme() {
     assert_eq!(hover("x, g, h"), "x : A");
     assert_eq!(hover("h) {"), "h : C");
     assert_eq!(hover("y = (x, h)"), "y : (A, C)");
-    assert_eq!(hover("effonly"), "effonly : ((A) <- N -> B, A) <- N -> Nil");
+    assert_eq!(hover("effonly"), "effonly : ((A) <- N -> B, A) <- N -> ()");
     assert_eq!(hover("f, x) {\n  r"), "f : (A) <- N -> B");
     assert_eq!(hover("r = "), "r : B");
     c.shutdown();
@@ -3194,7 +3194,7 @@ fn formats_lisp_documents_with_the_source_formatter() {
 #[test]
 fn core_builtin_type_hover_and_definition() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "(core = i/core)\nf = (x : core.Int) -> Int { x }\nmain = () { Nil }\n";
+    let text = "(core = i/core)\nf = (x : core.Int) -> Int { x }\nmain = () { () }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();

@@ -43,7 +43,7 @@ fn keep_captures_the_rest_and_leaves_fail_at_the_call() {
 
 #[test]
 fn rest_requires_a_type_parameter() {
-    let (_, errors) = checked("Db = ()\nf = () <- (..env: Db) { Nil }");
+    let (_, errors) = checked("Db = ()\nf = () <- (..env: Db) { () }");
     assert!(
         errors
             .iter()
@@ -65,11 +65,11 @@ fn row_values_are_not_ordinary_data() {
     for body in [
         "env == env",
         "(env,)",
-        "env |> (_) { Nil }",
+        "env |> (_) { () }",
         "env.0",
         "inspect(env)",
     ] {
-        let source = format!("inspect = (x) {{ Nil }}\nf = <N>() <- (..env: N) {{ {body} }}");
+        let source = format!("inspect = (x) {{ () }}\nf = <N>() <- (..env: N) {{ {body} }}");
         let (_, errors) = checked(&source);
         assert!(
             errors
@@ -124,9 +124,9 @@ fn a_need_parameter_can_also_appear_in_a_value_type() {
     // A type parameter may occur in both value and need positions.
     // Retain the original mixed-use source as an acceptance regression;
     // known keys are still required for extracting/providing services.
-    let (_, errors) = checked("f = <N>(x: N) <- (..env: N) { Nil }");
+    let (_, errors) = checked("f = <N>(x: N) <- (..env: N) { () }");
     assert!(errors.is_empty(), "{errors:#?}");
-    let (_, errors) = checked("f = <N>(x: N) { Nil <- (x) }");
+    let (_, errors) = checked("f = <N>(x: N) { () <- (x) }");
     assert!(
         errors
             .iter()
@@ -138,7 +138,7 @@ fn a_need_parameter_can_also_appear_in_a_value_type() {
 #[test]
 fn a_rest_head_declares_its_own_row_parameter() {
     let (_, errors) = checked(
-        "outer = <N>(f: () <- N -> Nil) { inner = () <- (..env: N) { f() }; Nil }"
+        "outer = <N>(f: () <- N -> ()) { inner = () <- (..env: N) { f() }; () }"
             .replace(";", "\n")
             .as_str(),
     );
@@ -187,7 +187,7 @@ fn an_unused_fail_parameter_keeps_its_service_key() {
 #[test]
 fn a_full_function_type_supplies_the_rest_heads_callback_type() {
     let (_, errors) = checked(
-        "keep: <S, A, E, N>((S) <- (..N, Fail(E)) -> A) <- N -> (S) <- (Fail(E)) -> A = (f) <- (..env: N) { (x) { f(x) <- env } }\nName = (text = String)\nread = (_: Nil) <- (name: Name) { name.text }\nmain = () { f = keep(read) <- (Name(text = \"saved\"))\n assert(f(Nil) == \"saved\") }",
+        "keep: <S, A, E, N>((S) <- (..N, Fail(E)) -> A) <- N -> (S) <- (Fail(E)) -> A = (f) <- (..env: N) { (x) { f(x) <- env } }\nName = (text = String)\nread = (_: ()) <- (name: Name) { name.text }\nmain = () { f = keep(read) <- (Name(text = \"saved\"))\n assert(f(()) == \"saved\") }",
     );
     assert!(errors.is_empty(), "{errors:#?}");
 }
@@ -195,11 +195,11 @@ fn a_full_function_type_supplies_the_rest_heads_callback_type() {
 #[test]
 fn a_named_client_beside_a_rest_row_keeps_its_known_data_type() {
     let (_, errors) = checked(
-        "Client = (make = () -> (send = () -> Int, close = () -> Nil))\n\
+        "Client = (make = () -> (send = () -> Int, close = () -> ()))\n\
          read = <N>() <- (client: Client, ..env: N) { functions = client.make()\n functions.close()\n functions.send() }\n\
          saved = <N>() <- (client: Client, ..env: N) { value = client\n () { value.make().send() } }\n\
          forward = <A, N>(body: () <- (..N, Client) -> A) <- (client: Client, ..env: N) { body() <- (..env, client) }\n\
-         main = () { client = Client(make = () { (send = () { 42 }, close = () { Nil }) })\n\
+         main = () { client = Client(make = () { (send = () { 42 }, close = () { () }) })\n\
            assert({ forward(() { read() }) <- (client) } == 42)\n\
            callback = saved() <- (client)\n assert(callback() == 42) }",
     );

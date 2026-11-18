@@ -397,7 +397,7 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
             async move {
                 let _guard = guard;
                 std::future::pending::<()>().await;
-                Ok(Ok(Value::Nil))
+                Ok(Ok(Value::Unit))
             }
         })
         .expect(super::ONE);
@@ -429,14 +429,14 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
                                     Some(s) => s
                                         .write_all(&b.bytes)
                                         .await
-                                        .map(|()| Value::Nil)
+                                        .map(|()| Value::Unit)
                                         .map_err(error),
                                     None => Err(code("closed")),
                                 }
                             }
                             "close_stdin" => {
                                 p.stdin.lock().await.take();
-                                Ok(Value::Nil)
+                                Ok(Value::Unit)
                             }
                             _ => {
                                 let Some(Value::Int(n)) = arg else {
@@ -494,8 +494,8 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
                         if operation == "terminate" {
                             let mut c = p.child.lock().expect("process child lock");
                             return match c.try_wait() {
-                                Ok(Some(_)) => Ok(Value::Nil),
-                                Ok(None) => c.start_kill().map(|()| Value::Nil).map_err(error),
+                                Ok(Some(_)) => Ok(Value::Unit),
+                                Ok(None) => c.start_kill().map(|()| Value::Unit).map_err(error),
                                 Err(e) => Err(error(e)),
                             };
                         }
@@ -527,7 +527,7 @@ pub(super) fn register(imports: &mut HostImports, program_args: Vec<String>) {
             let receipt = ctx.close(id, KIND);
             async move {
                 receipt.await;
-                Ok(Ok(Value::Nil))
+                Ok(Ok(Value::Unit))
             }
         })
         .expect(super::ONE);

@@ -940,7 +940,7 @@ fn core_operations_follow_the_specification() {
                 int(1),
                 int(1)
             ),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!(
@@ -949,7 +949,7 @@ fn core_operations_follow_the_specification() {
                 int(2),
                 int(1)
             ),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!(
@@ -958,7 +958,7 @@ fn core_operations_follow_the_specification() {
                 int(4),
                 int(0)
             ),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!(
@@ -967,7 +967,7 @@ fn core_operations_follow_the_specification() {
                 int(-1),
                 int(1)
             ),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!(
@@ -976,7 +976,7 @@ fn core_operations_follow_the_specification() {
                 int(0),
                 int(-1)
             ),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!(
@@ -985,7 +985,7 @@ fn core_operations_follow_the_specification() {
                 int(2),
                 int(2)
             ),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!(
@@ -994,7 +994,7 @@ fn core_operations_follow_the_specification() {
                 big("18446744073709551616"),
                 int(0)
             ),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!(
@@ -1003,7 +1003,7 @@ fn core_operations_follow_the_specification() {
                 int(0),
                 big("18446744073709551619")
             ),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!("(call $core_codepoints {})", string("aé🙂")),
@@ -1030,11 +1030,11 @@ fn core_operations_follow_the_specification() {
         ),
         (
             format!("(call $core_int_to_codepoint {})", int(55296)),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!("(call $core_int_to_codepoint {})", int(57343)),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!("(call $core_int_to_codepoint {})", int(57344)),
@@ -1042,15 +1042,15 @@ fn core_operations_follow_the_specification() {
         ),
         (
             format!("(call $core_int_to_codepoint {})", int(1114112)),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!("(call $core_int_to_codepoint {})", int(-1)),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!("(call $core_int_to_codepoint {})", big("4294967361")),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!("(call $core_bit_size {})", bits(&[0xff, 0xff], 3, 11)),
@@ -1072,11 +1072,11 @@ fn core_operations_follow_the_specification() {
         ),
         (
             format!("(call $core_bit_array_to_string {})", bits(&[0xc3], 0, 8)),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!("(call $core_bit_array_to_string {})", bits(&[0x61], 0, 7)),
-            "Error(Nil)",
+            "Error(())",
         ),
         (
             format!("(call $core_bit_array_to_string {})", bits(&[], 0, 0)),

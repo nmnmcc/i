@@ -168,7 +168,7 @@ pub enum Atom {
     /// The one closure of a function that captures nothing: a top-level
     /// function, a constructor, or a library function used as a value.
     Func(FuncId),
-    Nil,
+    Unit,
     Bool(bool),
     Int(BigInt),
     Float(f64),
@@ -760,7 +760,7 @@ impl FuncKind {
 /// How an export of the binary interface gives and takes values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AbiType {
-    Nil,
+    Unit,
     Bool,
     Int,
     Float,
@@ -773,7 +773,7 @@ pub enum AbiType {
 impl AbiType {
     pub fn name(self) -> &'static str {
         match self {
-            AbiType::Nil => "nil",
+            AbiType::Unit => "nil",
             AbiType::Bool => "bool",
             AbiType::Int => "int",
             AbiType::Float => "float",

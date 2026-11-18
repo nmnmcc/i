@@ -121,7 +121,9 @@ pub const HOST_VALUE_REASON: &str = "host: value is not correct";
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AbiType {
-    Nil,
+    /// `()`, empty data. Its wire tag stays `nil`.
+    #[serde(rename = "nil")]
+    Unit,
     Bool,
     Int,
     Float,
@@ -133,7 +135,7 @@ pub enum AbiType {
 impl AbiType {
     fn wasm_types(self) -> &'static [ValType] {
         match self {
-            Self::Nil => &[],
+            Self::Unit => &[],
             Self::Bool => &[ValType::I32],
             Self::Float => &[ValType::F64],
             Self::Int => &[ValType::I32, ValType::I32, ValType::I32],
@@ -410,7 +412,7 @@ impl fmt::Debug for HostReference {
 /// A value of a type that the host can take.
 #[derive(Clone, Debug)]
 pub enum Value {
-    Nil,
+    Unit,
     Bool(bool),
     Int(BigInt),
     Float(f64),
@@ -423,7 +425,7 @@ pub enum Value {
 impl Value {
     pub fn abi_type(&self) -> AbiType {
         match self {
-            Self::Nil => AbiType::Nil,
+            Self::Unit => AbiType::Unit,
             Self::Bool(_) => AbiType::Bool,
             Self::Int(_) => AbiType::Int,
             Self::Float(_) => AbiType::Float,
@@ -1652,7 +1654,7 @@ impl Instance {
         let _invocation = self.begin_invocation();
         let function = self.export(name)?;
         match self.invoke(function, &[], &mut [])? {
-            None => Ok(Outcome::Ok(Value::Nil)),
+            None => Ok(Outcome::Ok(Value::Unit)),
             Some(stop) => Ok(Outcome::Stop(stop)),
         }
     }
@@ -1808,7 +1810,7 @@ impl Instance {
             return Ok(Outcome::Stop(stop));
         }
         match self.invoke(result, &[], &mut [])? {
-            None => Ok(Outcome::Ok(Value::Nil)),
+            None => Ok(Outcome::Ok(Value::Unit)),
             Some(stop) => Ok(Outcome::Stop(stop)),
         }
     }
@@ -2739,7 +2741,7 @@ fn lower(
     allocations: &mut Vec<Allocation>,
 ) -> Result<()> {
     match (kind, value) {
-        (AbiType::Nil, Value::Nil) => {}
+        (AbiType::Unit, Value::Unit) => {}
         (AbiType::Bool, Value::Bool(value)) => values.push(Val::I32(i32::from(*value))),
         (AbiType::Float, Value::Float(value)) => values.push(Val::F64(value.to_bits())),
         (AbiType::Int, Value::Int(value)) => {
@@ -2853,7 +2855,7 @@ fn lift(
         Ok(data)
     };
     Ok(match kind {
-        AbiType::Nil => Value::Nil,
+        AbiType::Unit => Value::Unit,
         AbiType::Bool => match integer(offset)? {
             0 => Value::Bool(false),
             1 => Value::Bool(true),

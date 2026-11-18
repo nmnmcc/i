@@ -155,7 +155,7 @@ fn typed_macro_signature_query_is_reflexive() {
 fn typed_macro_members_preserve_finite_scalar_order() {
     let m = declared(
         "m (-> (, Int) Int)",
-        "(-> (, value) _ (|> ((. syntax members) `(| 2 10 Nil)) (-> (, [a b c]) _ (|> (== ((. syntax show) a) \"10\") (& (-> (, True) _ value) (-> (, False) _ ((. fail raise) ((. syntax SyntaxError) (= message \"wrong member order\") (= at value)))))))))",
+        "(-> (, value) _ (|> ((. syntax members) `(| 2 10 (,))) (-> (, [a b c]) _ (|> (== ((. syntax show) a) \"10\") (& (-> (, True) _ value) (-> (, False) _ ((. fail raise) ((. syntax SyntaxError) (= message \"wrong member order\") (= at value)))))))))",
     );
     checked(&m, "(m = app/macros)\nmain = () { m.m(1) }").unwrap();
 }
@@ -163,7 +163,7 @@ fn typed_macro_members_preserve_finite_scalar_order() {
 fn typed_macro_rejects_type_position() {
     reject(
         ID,
-        "(m = app/macros)\nAlias = m.identity(Int)\nmain = () { Nil }",
+        "(m = app/macros)\nAlias = m.identity(Int)\nmain = () { () }",
         "cannot give a type",
     );
 }
@@ -171,7 +171,7 @@ fn typed_macro_rejects_type_position() {
 fn typed_macro_rejects_item_position() {
     reject(
         ID,
-        "(m = app/macros)\nm.identity(1)\nmain = () { Nil }",
+        "(m = app/macros)\nm.identity(1)\nmain = () { () }",
         "cannot make items",
     );
 }
@@ -179,7 +179,7 @@ fn typed_macro_rejects_item_position() {
 fn typed_macro_rejects_value_position() {
     reject(
         ID,
-        "(m = app/macros)\nf = m.identity\nmain = () { Nil }",
+        "(m = app/macros)\nf = m.identity\nmain = () { () }",
         "only as an expression call",
     );
 }
@@ -188,7 +188,7 @@ fn typed_macro_rejects_signature_holes() {
     let m = declared("m (-> (, Int) _)", "(-> (, x) _ x)");
     reject(
         &m,
-        "(m = app/macros)\nmain = () { Nil }",
+        "(m = app/macros)\nmain = () { () }",
         "fully written without _",
     );
 }
@@ -197,7 +197,7 @@ fn typed_macro_rejects_implementation_arity() {
     let m = declared("m (-> (, Int Int) Int)", "(-> (, x) _ x)");
     reject(
         &m,
-        "(m = app/macros)\nmain = () { Nil }",
+        "(m = app/macros)\nmain = () { () }",
         "one parameter for each",
     );
 }
@@ -688,7 +688,7 @@ fn typed_macro_shape_contracts_resolve_aliases_before_comparing_them() {
 #[test]
 fn uncallable_typed_macro_signatures_do_not_need_an_impossible_empty_implementation() {
     let macros = declared("m (-> Never Int)", "(-> (, value) _ `0)");
-    checked(&macros, "main = () { Nil }\n").unwrap();
+    checked(&macros, "main = () { () }\n").unwrap();
 }
 
 #[test]

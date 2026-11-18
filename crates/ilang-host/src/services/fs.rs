@@ -157,7 +157,7 @@ pub(super) fn register(imports: &mut HostImports) {
                         .await
                         .write_all(&bytes.bytes)
                         .await
-                        .map(|()| Value::Nil)
+                        .map(|()| Value::Unit)
                         .map_err(error)
                 };
                 let result = match select(Box::pin(work), Box::pin(lease.closed())).await {
@@ -193,7 +193,7 @@ pub(super) fn register(imports: &mut HostImports) {
                         .await
                         .flush()
                         .await
-                        .map(|()| Value::Nil)
+                        .map(|()| Value::Unit)
                         .map_err(error)
                 };
                 let result = match select(Box::pin(work), Box::pin(lease.closed())).await {
@@ -215,7 +215,7 @@ pub(super) fn register(imports: &mut HostImports) {
             let receipt = context.close(id, KIND);
             async move {
                 receipt.await;
-                Ok(Ok(Value::Nil))
+                Ok(Ok(Value::Unit))
             }
         })
         .expect(super::ONE);
@@ -235,7 +235,7 @@ pub(super) fn register(imports: &mut HostImports) {
                 } else {
                     tokio::fs::remove_file(path).await
                 };
-                Ok(result.map(|()| Value::Nil).map_err(error))
+                Ok(result.map(|()| Value::Unit).map_err(error))
             }
         })
         .expect(super::ONE);
@@ -248,7 +248,7 @@ pub(super) fn register(imports: &mut HostImports) {
             async move {
                 Ok(tokio::fs::rename(from, to)
                     .await
-                    .map(|()| Value::Nil)
+                    .map(|()| Value::Unit)
                     .map_err(error))
             }
         })
@@ -262,7 +262,7 @@ pub(super) fn register(imports: &mut HostImports) {
             async move {
                 Ok(tokio::fs::create_dir(path)
                     .await
-                    .map(|()| Value::Nil)
+                    .map(|()| Value::Unit)
                     .map_err(error))
             }
         })

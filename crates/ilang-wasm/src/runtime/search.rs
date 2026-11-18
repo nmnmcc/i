@@ -14,7 +14,7 @@ pub fn wat() -> String {
 const WAT: &str = r#"
 (type $search_table (array (mut i32)))
 
-;; Error(Nil) when `from` is negative, after the end, or inside a character,
+;; Error(()) when `from` is negative, after the end, or inside a character,
 ;; and when `find` is not there. An empty `find` is at `from`.
 (func $core_index_of (param $s eqref) (param $find eqref) (param $from eqref) (result eqref)
   (local $text (ref $bytes)) (local $pattern (ref $bytes))

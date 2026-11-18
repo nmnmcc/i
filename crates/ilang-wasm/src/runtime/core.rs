@@ -63,7 +63,7 @@ const WAT: &str = r#"
 (func $core_byte_size (param $s eqref) (result eqref)
   (call $string_byte_size (local.get $s)))
 
-;; Error(Nil) when a byte is not in the string, or when the start or the end
+;; Error(()) when a byte is not in the string, or when the start or the end
 ;; is inside a character. Any Int may come in, also negative and huge ones.
 (func $core_byte_slice (param $s eqref) (param $start eqref) (param $length eqref) (result eqref)
   (local $b (ref $bytes)) (local $size i64) (local $from i64) (local $count i64)
@@ -93,7 +93,7 @@ const WAT: &str = r#"
   (call $string_from_codepoints (local.get $list)))
 (func $core_codepoint_to_int (param $c eqref) (result eqref)
   (call $int_from_i64 (i64.extend_i32_u (call $codepoint_get (local.get $c)))))
-;; Error(Nil) unless the number is a Unicode scalar value.
+;; Error(()) unless the number is a Unicode scalar value.
 (func $core_int_to_codepoint (param $n eqref) (result eqref)
   (local $value i32)
   (if (i32.eqz (ref.test (ref i31) (local.get $n))) (then (return (call $result_error (ref.null eq)))))
@@ -106,7 +106,7 @@ const WAT: &str = r#"
   (call $result_ok (call $codepoint_new (local.get $value))))
 (func $core_bit_size (param $b eqref) (result eqref)
   (call $bits_size (local.get $b)))
-;; Error(Nil) unless the bits are whole bytes of correct UTF-8.
+;; Error(()) unless the bits are whole bytes of correct UTF-8.
 (func $core_bit_array_to_string (param $value eqref) (result eqref)
   (local $length i64) (local $data (ref $bytes)) (local $count i32) (local $index i32)
   (local.set $length (call $bits_len64 (local.get $value)))

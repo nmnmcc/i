@@ -56,7 +56,7 @@ fn fixture() -> tempfile::TempDir {
 fn ordinary_roots_and_initializers_cannot_reach_compile_time_bindings() {
     let dir = fixture();
     let root = dir.path();
-    write(root, "src/main.i", "main = () { Nil }\n");
+    write(root, "src/main.i", "main = () { () }\n");
     let built = build(root, false, ilang_cli::Level::O0).unwrap();
     let program = built.host_program().unwrap();
     assert!(
@@ -74,7 +74,7 @@ fn ordinary_roots_and_initializers_cannot_reach_compile_time_bindings() {
     write(
         root,
         "src/main.i",
-        "(app/forward)\nmain = () { forward.forward() Nil }\n",
+        "(app/forward)\nmain = () { forward.forward()\n() }\n",
     );
     let error = build(root, false, ilang_cli::Level::O0)
         .err()
@@ -84,7 +84,7 @@ fn ordinary_roots_and_initializers_cannot_reach_compile_time_bindings() {
     write(
         root,
         "src/main.i",
-        "(app/forward)\nvalue = forward.forward()\nmain = () { Nil }\n",
+        "(app/forward)\nvalue = forward.forward()\nmain = () { () }\n",
     );
     let error = build(root, false, ilang_cli::Level::O0)
         .err()
@@ -101,7 +101,7 @@ fn ordinary_roots_and_initializers_cannot_reach_compile_time_bindings() {
     write(
         root,
         "src/main.i",
-        "(app/syntax_helper)\nmain = () { syntax_helper.helper() Nil }\n",
+        "(app/syntax_helper)\nmain = () { syntax_helper.helper()\n() }\n",
     );
     let error = build(root, false, ilang_cli::Level::O0)
         .err()
@@ -116,7 +116,7 @@ fn ordinary_roots_and_initializers_cannot_reach_compile_time_bindings() {
     write(
         root,
         "src/main.i",
-        "(app/forward)\n(entry)\nentry = () { forward.forward() Nil }\n",
+        "(app/forward)\n(entry)\nentry = () { forward.forward()\n() }\n",
     );
     let error = build(root, false, ilang_cli::Level::O0)
         .err()
@@ -135,17 +135,17 @@ fn tests_use_each_builds_unmarked_quote_templates() {
         write(
             root,
             "src/main.i",
-            "(app/forward)\nmain = () { forward.forward() Nil }\n",
+            "(app/forward)\nmain = () { forward.forward()\n() }\n",
         );
         write(
             root,
             "test/check.i",
-            "(\n\ttestlib = (test) = std/test\n\tapp/forward, syntax = i/syntax)\n\ntest(\"check\", () { assert(syntax.show(forward.forward()) == \"(f x)\") Nil })\n",
+            "(\n\ttestlib = (test) = std/test\n\tapp/forward, syntax = i/syntax)\n\ntest(\"check\", () { assert(syntax.show(forward.forward()) == \"(f x)\")\n() })\n",
         );
         write(
             root,
             "test/quote.is",
-            "(, (= syntax (/ i syntax)) (= testlib (, test) (/ std test)))\n(= quoted `(a b))\n(test \"quote_test\" (-> (,) _ {(assert (== ((. syntax show) quoted) \"(a b)\")) Nil}))\n",
+            "(, (= syntax (/ i syntax)) (= testlib (, test) (/ std test)))\n(= quoted `(a b))\n(test \"quote_test\" (-> (,) _ {(assert (== ((. syntax show) quoted) \"(a b)\")) (,)}))\n",
         );
         let built = build(root, true, opt).unwrap();
         let templates = built
@@ -197,7 +197,7 @@ fn selected_test_collection_installs_its_quote_templates() {
     write(
         root,
         "src/main.i",
-        "(m = app/macros)\n(anchor)\nanchor = Nil\n",
+        "(m = app/macros)\n(anchor)\nanchor = ()\n",
     );
     write(
         root,
@@ -222,7 +222,7 @@ fn selected_test_collection_installs_its_quote_templates() {
             root,
             options,
             &manifest.entries[0].handle,
-            ilang_cli::CollectionResult::Nil,
+            ilang_cli::CollectionResult::Unit,
         )
         .unwrap();
         assert!(matches!(

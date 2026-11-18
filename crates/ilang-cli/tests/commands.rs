@@ -75,7 +75,7 @@ fn build_named_entries_write_distinct_wasm_artifacts() {
             "i.toml",
             "name = \"app\"\n\n[entries]\nother = \"main.other\"\n",
         ),
-        ("src/main.i", "main = () { Nil }\n\nother = () { Nil }\n"),
+        ("src/main.i", "main = () { () }\n\nother = () { () }\n"),
     ]);
     for target in ["host", "nodejs"] {
         let build = |entry: Option<&str>| {
@@ -197,7 +197,7 @@ fn wasi_build_removes_a_stale_bindings_plan() {
     // build of another target would describe a module that was replaced.
     let dir = package(&[
         ("i.toml", "name = \"app\"\n"),
-        ("src/main.i", "main = () { Nil }\n"),
+        ("src/main.i", "main = () { () }\n"),
     ]);
     let wasm = dir.path().join("build/app.wasm");
     let plan = dir.path().join("build/app.bindings.json");
@@ -261,7 +261,7 @@ fn run_prints_the_stop_message() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            "f = (x) {\n  panic(x)\n}\n\n\nmain = () {\n  f(\"boom\")\n  Nil\n}\n",
+            "f = (x) {\n  panic(x)\n}\n\n\nmain = () {\n  f(\"boom\")\n  ()\n}\n",
         ),
     ]);
     for opt in ["0", "2"] {
@@ -281,7 +281,7 @@ fn test_runs_each_test() {
         ("src/lib.i", " (twice)\n\ntwice = (n : Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { Nil } & (_) { panic(\"no\") } })\n\ntest(\"bad\", () { panic(\"bad\") })\n",
+            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { () } & (_) { panic(\"no\") } })\n\ntest(\"bad\", () { panic(\"bad\") })\n",
         ),
     ]);
     let out = i(&["test"], dir.path());
@@ -322,7 +322,7 @@ describe = (name : String, n : Int) { name <> "=" <> core.inspect(n) }
 flip = (b : Bool) { core.not(b) }
 half = (x : Float) { x /. 2.0 }
 bits = (b : BitArray) -> BitArray { <<b:bits, 1:u1>> }
-unit = (n : Nil) { n }
+unit = (n : ()) { n }
 alias = add
 "#,
         ),
@@ -393,8 +393,8 @@ alias = add
             )
         );
         assert_eq!(
-            call(&mut instance, "app/math.unit", &[Value::Nil]),
-            format!("{:?}", Value::Nil)
+            call(&mut instance, "app/math.unit", &[Value::Unit]),
+            format!("{:?}", Value::Unit)
         );
     }
 }
@@ -428,9 +428,9 @@ divide = (a : Int, b : Int) {
 		& (_) { a / b }
 }
 
-// `Nil` and `Bool` errors have their own tags.
+// `()` and `Bool` errors have their own tags.
 check = (n : Int) -> Float {
-	n |> (0) { fail.raise(Nil) } & (1) { fail.raise(True) } & (_) { 1.5 }
+	n |> (0) { fail.raise(()) } & (1) { fail.raise(True) } & (_) { 1.5 }
 }
 
 // The `Assert` of a host export stops the program (§9.6).
@@ -440,8 +440,8 @@ positive = (n : Int) {
 }
 
 // A `BitArray` error.
-bits = (b : Bool) -> Nil {
-	b |> (True) { fail.raise(<<1, 2>>) } & (False) { Nil }
+bits = (b : Bool) -> () {
+	b |> (True) { fail.raise(<<1, 2>>) } & (False) { () }
 }
 "#,
         ),
@@ -466,7 +466,7 @@ bits = (b : Bool) -> Nil {
         let check = &program.abi().exports["app/math.check"];
         assert_eq!(
             check.errors,
-            [ilang_host::AbiType::Nil, ilang_host::AbiType::Bool]
+            [ilang_host::AbiType::Unit, ilang_host::AbiType::Bool]
         );
         let mut instance = program.instantiate(HostOptions::default()).unwrap();
         let mut call =
@@ -491,7 +491,7 @@ bits = (b : Bool) -> Nil {
         );
         assert_eq!(
             call("app/math.check", &[int(0)]),
-            format!("{:?}", Outcome::Err(ilang_host::GuestError(Value::Nil)))
+            format!("{:?}", Outcome::Err(ilang_host::GuestError(Value::Unit)))
         );
         assert_eq!(
             call("app/math.check", &[int(1)]),
@@ -506,7 +506,7 @@ bits = (b : Bool) -> Nil {
         );
         assert_eq!(
             call("app/math.bits", &[Value::Bool(false)]),
-            format!("{:?}", Outcome::Ok(Value::Nil))
+            format!("{:?}", Outcome::Ok(Value::Unit))
         );
         assert_eq!(
             call("app/math.bits", &[Value::Bool(true)]),
@@ -673,7 +673,7 @@ fn async_entry_points_and_needed_services() {
         ("test/fake_service.i", &text),
         (
             "src/main.i",
-            "@host(\"test:unused/v1\")\nUnused = (f = () -> Nil)\n\nmain = () { Nil }\n",
+            "@host(\"test:unused/v1\")\nUnused = (f = () -> ())\n\nmain = () { () }\n",
         ),
     ]);
     let (built, _) = ilang_cli::build_tests(
@@ -766,7 +766,7 @@ fn an_error_stops_a_test() {
         ("i.toml", "name = \"app\"\n"),
         (
             "test/app_test.i",
-            " (\n\ttestlib = (test) = std/test\n\ti/fail)\n\nf = (n) { fail.raise(n) }\n\n\ntest(\"raises\", () {\n  f(\"oops\")\n  Nil\n})\n",
+            " (\n\ttestlib = (test) = std/test\n\ti/fail)\n\nf = (n) { fail.raise(n) }\n\n\ntest(\"raises\", () {\n  f(\"oops\")\n  ()\n})\n",
         ),
     ]);
     for opt in [Level::O0, Level::O2] {
@@ -850,7 +850,7 @@ fn located_packages() {
         ),
         (
             "src/main.i",
-            " (lib/lib)\n\n\nmain = () {\n  lib.boom(\"x\")\n  Nil\n}\n",
+            " (lib/lib)\n\n\nmain = () {\n  lib.boom(\"x\")\n  ()\n}\n",
         ),
     ]);
     let run = |cache: &str, args: &[&str]| {
@@ -904,7 +904,7 @@ fn incorrect_host_answers_stop_in_the_module() {
         ("i.toml", "name = \"app\"\n"),
         (
             "src/main.i",
-            "@host(\"test:bad/v1\")\nBad = (nan = () -> Float)\n\nhalf = () <- (bad : Bad) {\n\tx = bad.nan()\n\tx /. 2.0\n}\n\nmain = () {\n\thalf()\n\tNil\n}\n",
+            "@host(\"test:bad/v1\")\nBad = (nan = () -> Float)\n\nhalf = () <- (bad : Bad) {\n\tx = bad.nan()\n\tx /. 2.0\n}\n\nmain = () {\n\thalf()\n\t()\n}\n",
         ),
     ]);
     let built = build(

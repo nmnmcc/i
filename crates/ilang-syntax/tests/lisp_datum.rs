@@ -104,13 +104,13 @@ fn macro_quotes_are_core_nodes_and_can_be_formatted() {
 fn quote_splices_are_checked_in_their_written_position() {
     for source in [
         "(= f (-> (,) _ `~..xs))",
-        "(= f (-> (, `(~..xs x)) _ Nil))",
+        "(= f (-> (, `(~..xs x)) _ (,)))",
         "(= f (-> (,) _ `(~(+) x)))",
     ] {
         let (_, errors) = ilang_syntax::lisp::parse_source(source);
         assert!(!errors.is_empty(), "{source}");
     }
-    let (_, errors) = ilang_syntax::lisp::parse_source("(= f (-> (, `(f ~..xs)) _ Nil))");
+    let (_, errors) = ilang_syntax::lisp::parse_source("(= f (-> (, `(f ~..xs)) _ (,)))");
     assert!(errors.is_empty(), "{errors:?}");
 }
 
@@ -334,7 +334,7 @@ fn comment_anchors_do_not_match_text_inside_documentation() {
 
 #[test]
 fn comments_remain_with_repeated_statements() {
-    let source = "f = () {\n// first\nlog(1)\n// second\nlog(1)\nNil\n}\n";
+    let source = "f = () {\n// first\nlog(1)\n// second\nlog(1)\n()\n}\n";
     let (out, lost) = ilang_syntax::syn3::surface::normal_to_lisp(source).unwrap();
     assert!(lost.is_empty(), "{lost:?}");
     assert!(out.contains("// first\n(log 1)"), "{out}");

@@ -70,11 +70,11 @@ fn entries_tests_and_ordinary_exports_retain_their_helpers() {
     // No warning on public API, entries, tests, or their uses.
     assert!(
         names(&[
-            ("src/main.i", " main = () { helper() }\nhelper = () { Nil }"),
+            ("src/main.i", " main = () { helper() }\nhelper = () { () }"),
             ("src/api.i", "(api)\napi = () { hidden }\nhidden = 1"),
             (
                 "test/check.i",
-                "(app/api)\nhelper = () { api.api() }\n_check = () { helper()\nNil }"
+                "(app/api)\nhelper = () { api.api() }\n_check = () { helper()\n() }"
             ),
         ])
         .is_empty()
@@ -89,7 +89,7 @@ fn test_exports_need_reachable_package_uses() {
         names(&[
             (
                 "test/helpers.i",
-                "(used, dead, imported_only)\nused = () { private() }\nprivate = () { Nil }\ndead = () { Nil }\nimported_only = 1"
+                "(used, dead, imported_only)\nused = () { private() }\nprivate = () { () }\ndead = () { () }\nimported_only = 1"
             ),
             (
                 "test/check.i",
@@ -128,16 +128,16 @@ fn each_pattern_name_is_checked_without_retaining_its_siblings() {
 fn hint_requires_test_module_no_value_parameters_and_exact_nil() {
     // Only a function that could be passed to the test macro gets the hint.
     let ws = warnings(&[
-        ("src/main.i", "ordinary = () { Nil }"),
+        ("src/main.i", "ordinary = () { () }"),
         (
             "test/check.i",
             r#"forgotten = () { assert(True) }
-explicit = () -> Nil { Nil }
+explicit = () -> () { () }
 alias = forgotten
 has_argument = (n : Int) { assert(n > 0) }
 returns_int = () { 1 }
 never_returns = () { panic("stop") }
-union_result = (b : Bool) { b |> (True) { Nil } & (False) { 1 } }
+union_result = (b : Bool) { b |> (True) { () } & (False) { 1 } }
 with_environment = () <- (a : Assert) { assert(True) }
 "#,
         ),
@@ -172,10 +172,10 @@ with_environment = () <- (a : Assert) { assert(True) }
 }
 
 #[test]
-fn a_type_spelled_nil_is_not_the_prelude_nil() {
-    // The test hint requires Nil, the nominal prelude type, rather than its spelling.
+fn a_named_empty_type_is_not_unit() {
+    // The test hint requires `()`, empty data, rather than a named type with no fields.
     assert_eq!(
-        warnings(&[("test/check.i", "Local = ()\nNil = Local\nf = () { Local }")]),
+        warnings(&[("test/check.i", "Local = ()\nf = () { Local }")]),
         [("f".into(), "top-level binding `f` is not used".into())]
     );
 }
@@ -188,7 +188,7 @@ fn types_services_constructors_and_external_declarations_are_exempt() {
             "src/main.i",
             r#"Private = (Int)
 Alias = String
-Service = (run = () -> Nil)
+Service = (run = () -> ())
 @external("env", "f")
 foreign : () -> Int
 "#

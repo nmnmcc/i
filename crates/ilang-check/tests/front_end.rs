@@ -193,11 +193,11 @@ fn kept_form_messages_are_independent_checks() {
         ("f = (x : p.name) { x }", "E0201", "not defined"),
         ("f = (x : m(Int)) { x }", "E0234", "kept for macros"),
         (
-            /* old-syntax-check: E0301 */ "@main()\nf = () { Nil }",
+            /* old-syntax-check: E0301 */ "@main()\nf = () { () }",
             "E0301",
             "kept for macros",
         ),
-        ("@a.main\nf = () { Nil }", "E0301", "kept for macros"),
+        ("@a.main\nf = () { () }", "E0301", "kept for macros"),
         // Type parameters belong on function values, so a binding head cannot carry them.
         ("f(A): (A) -> String", "E0101", "written on the function"),
     ] {

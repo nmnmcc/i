@@ -81,10 +81,10 @@ fn original_model_programs_get_actionable_repairs() {
 fn import_candidates_are_sorted_limited_and_respect_existing_imports() {
     let diagnostics = check(&[
         ("src/main.i", "(app/z)\nmain = () { missing() }\n"),
-        ("src/z.i", "(missing)\nmissing = () { Nil }\n"),
-        ("src/c.i", "(missing)\nmissing = () { Nil }\n"),
-        ("src/b.i", "(missing)\nmissing = () { Nil }\n"),
-        ("src/a.i", "(missing)\nmissing = () { Nil }\n"),
+        ("src/z.i", "(missing)\nmissing = () { () }\n"),
+        ("src/c.i", "(missing)\nmissing = () { () }\n"),
+        ("src/b.i", "(missing)\nmissing = () { () }\n"),
+        ("src/a.i", "(missing)\nmissing = () { () }\n"),
     ]);
     assert!(diagnostics.contains("`missing` is not defined. Import `(missing) = app/a` to use `missing`. Import `(missing) = app/b` to use `missing`. Import `(missing) = app/c` to use `missing`.\n"), "{diagnostics}");
     assert!(
@@ -105,7 +105,7 @@ fn same_named_service_advice_works_for_user_modules() {
     let diagnostics = check(&[
         (
             "src/main.i",
-            "((Channel) = app/settings\napp/service)\nmain = () <- (stream : Channel) { Nil }\n",
+            "((Channel) = app/settings\napp/service)\nmain = () <- (stream : Channel) { () }\n",
         ),
         (
             "src/settings.i",
@@ -113,7 +113,7 @@ fn same_named_service_advice_works_for_user_modules() {
         ),
         (
             "src/service.i",
-            "(Channel(..))\nChannel = (write = (String) -> Nil)\n",
+            "(Channel(..))\nChannel = (write = (String) -> ())\n",
         ),
     ]);
     assert!(diagnostics.contains("`Channel` here comes from `app/settings`. `app/service` also exports a type named `Channel`. Use `service.Channel` if that is the type you intended."), "{diagnostics}");
@@ -121,7 +121,7 @@ fn same_named_service_advice_works_for_user_modules() {
 
 #[test]
 fn wrong_standard_namespace_is_suggested_in_both_directions() {
-    let diagnostics = check(&[("src/main.i", "(std/process)\nmain = () { Nil }\n")]);
+    let diagnostics = check(&[("src/main.i", "(std/process)\nmain = () { () }\n")]);
     assert!(
         diagnostics.contains(
             "there is no module `std/process`. Import `i/process` instead; that module exists."

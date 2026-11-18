@@ -261,7 +261,7 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     ]));
     s.body.push(Stmt::SetGlobal(GlobalId(7), m7));
     s.body.push(Stmt::SetGlobal(GlobalId(8), c_lab));
-    let FuncKind::Code(start) = s.done("start", Some(Atom::Nil)) else {
+    let FuncKind::Code(start) = s.done("start", Some(Atom::Unit)) else {
         unreachable!()
     };
 

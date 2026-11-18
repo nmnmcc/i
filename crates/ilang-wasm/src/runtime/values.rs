@@ -98,7 +98,9 @@ const CORE: &str = r#"
 (func $record (param $ctor i32) (param $type i64) (param $fields (ref $values)) (result eqref)
   (struct.new $obj (i32.const 5) (local.get $ctor) (local.get $type) (f64.const 0)
     (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
+;; `()`, empty data, is the null reference.
 (func $tuple (param $fields (ref $values)) (result eqref)
+  (if (i32.eqz (array.len (local.get $fields))) (then (return (ref.null eq))))
   (struct.new $obj (i32.const 4) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
 ;; Data with labels (syntax-3 §6.4): field 1 is the index of its label set.

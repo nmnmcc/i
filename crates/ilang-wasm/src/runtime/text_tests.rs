@@ -178,33 +178,33 @@ fn index_of_finds_bytes_at_character_boundaries() {
     };
     found("hello", "l", int(0), "Ok(2)", &mut checks);
     found("hello", "l", int(3), "Ok(3)", &mut checks);
-    found("hello", "l", int(4), "Error(Nil)", &mut checks);
+    found("hello", "l", int(4), "Error(())", &mut checks);
     found("hello", "lo", int(0), "Ok(3)", &mut checks);
     found("hello", "hello", int(0), "Ok(0)", &mut checks);
-    found("hello", "hello!", int(0), "Error(Nil)", &mut checks);
+    found("hello", "hello!", int(0), "Error(())", &mut checks);
     found("hello", "", int(0), "Ok(0)", &mut checks);
     found("hello", "", int(5), "Ok(5)", &mut checks);
-    found("hello", "", int(6), "Error(Nil)", &mut checks);
-    found("hello", "o", int(5), "Error(Nil)", &mut checks);
-    found("hello", "l", int(-1), "Error(Nil)", &mut checks);
+    found("hello", "", int(6), "Error(())", &mut checks);
+    found("hello", "o", int(5), "Error(())", &mut checks);
+    found("hello", "l", int(-1), "Error(())", &mut checks);
     found(
         "hello",
         "l",
         "(call $int_from_i64 (i64.const 4294967297))".into(),
-        "Error(Nil)",
+        "Error(())",
         &mut checks,
     );
     found("", "", int(0), "Ok(0)", &mut checks);
-    found("", "a", int(0), "Error(Nil)", &mut checks);
+    found("", "a", int(0), "Error(())", &mut checks);
     found("héé", "é", int(0), "Ok(1)", &mut checks);
-    found("héé", "é", int(2), "Error(Nil)", &mut checks);
-    found("héé", "", int(2), "Error(Nil)", &mut checks);
+    found("héé", "é", int(2), "Error(())", &mut checks);
+    found("héé", "", int(2), "Error(())", &mut checks);
     found("héé", "é", int(3), "Ok(3)", &mut checks);
     found("aaaaaaab", "aaab", int(0), "Ok(4)", &mut checks);
     found("abababca", "ababc", int(0), "Ok(2)", &mut checks);
     found("abcabcabd", "abcabd", int(0), "Ok(3)", &mut checks);
     found("aabaabaaab", "aabaaab", int(1), "Ok(3)", &mut checks);
-    found("😀😁😀", "😀", int(1), "Error(Nil)", &mut checks);
+    found("😀😁😀", "😀", int(1), "Error(())", &mut checks);
     found("😀😁😀", "😀", int(4), "Ok(8)", &mut checks);
     checks.run();
 }
@@ -234,7 +234,7 @@ fn index_of_agrees_with_a_plain_search() {
                 }
                 let want = match text[from..].find(pattern.as_str()) {
                     Some(i) => format!("Ok({})", i + from),
-                    None => "Error(Nil)".into(),
+                    None => "Error(())".into(),
                 };
                 checks.string(
                     format!("index_of({text:?}, {pattern:?}, {from})"),

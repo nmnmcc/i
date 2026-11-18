@@ -72,18 +72,18 @@ fn deep_statement_clone_equality_and_drop() {
 fn child_order_and_scalar_equality_are_preserved() {
     let a = Stmt::If {
         cond: Cond::And(Box::new(Cond::I32(1)), Box::new(Cond::I32(2))),
-        then: vec![Stmt::Break(1), Stmt::Return(Atom::Nil)],
+        then: vec![Stmt::Break(1), Stmt::Return(Atom::Unit)],
         otherwise: vec![Stmt::Unreachable],
     };
     assert!(a == a.clone());
     let b = Stmt::If {
         cond: Cond::And(Box::new(Cond::I32(2)), Box::new(Cond::I32(1))),
-        then: vec![Stmt::Break(1), Stmt::Return(Atom::Nil)],
+        then: vec![Stmt::Break(1), Stmt::Return(Atom::Unit)],
         otherwise: vec![Stmt::Unreachable],
     };
     assert!(a != b);
-    assert!(Cond::IsFloat(Atom::Nil, f64::NAN) != Cond::IsFloat(Atom::Nil, f64::NAN));
-    assert!(Cond::IsFloat(Atom::Nil, -0.0) == Cond::IsFloat(Atom::Nil, 0.0));
+    assert!(Cond::IsFloat(Atom::Unit, f64::NAN) != Cond::IsFloat(Atom::Unit, f64::NAN));
+    assert!(Cond::IsFloat(Atom::Unit, -0.0) == Cond::IsFloat(Atom::Unit, 0.0));
     let values = vec![
         Stmt::Let {
             dst: 4,
@@ -106,7 +106,7 @@ fn child_order_and_scalar_equality_are_preserved() {
         },
         Stmt::TailCall {
             callee: Callee::Direct(FuncId(7)),
-            args: vec![Atom::Nil],
+            args: vec![Atom::Unit],
             env: Env::Local(8),
             site: Some(9),
         },
@@ -120,12 +120,12 @@ fn child_order_and_scalar_equality_are_preserved() {
         Stmt::SetCapture {
             closure: 1,
             index: 2,
-            value: Atom::Nil,
+            value: Atom::Unit,
         },
         Stmt::SetGlobal(GlobalId(3), Atom::String("value".into())),
         Stmt::Suspendable {
             dst: 2,
-            value: Value::Atom(Atom::Nil),
+            value: Value::Atom(Atom::Unit),
             site: Some(1),
             point: 7,
         },

@@ -15,7 +15,7 @@ fn project(path: &Path) {
     std::fs::write(path.join("i.toml"), "name = \"app\"\n").unwrap();
     std::fs::create_dir(path.join("src")).unwrap();
     std::fs::write(path.join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x body) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {~body}))})))\n").unwrap();
-    std::fs::write(path.join("src/main.i"), "(m = app/macros\nsyntax = i/syntax\ntask = i/task)\n(anchor)\n@external(\"test:unselected\", \"missing\")\nmissing : () -> Nil\nanchor = Nil\nm.emit(anchor, good, assert(True))\nm.emit(anchor, bad, assert(False))\nm.emit(anchor, number, 42)\nm.emit(anchor, compiler_only, syntax.show)\nm.emit(anchor, needs_foreign, missing())\nm.emit(anchor, concurrent, assert(task.both(() { 1 }, () { 2 }) == (1, 2)))\n").unwrap();
+    std::fs::write(path.join("src/main.i"), "(m = app/macros\nsyntax = i/syntax\ntask = i/task)\n(anchor)\n@external(\"test:unselected\", \"missing\")\nmissing : () -> ()\nanchor = ()\nm.emit(anchor, good, assert(True))\nm.emit(anchor, bad, assert(False))\nm.emit(anchor, number, 42)\nm.emit(anchor, compiler_only, syntax.show)\nm.emit(anchor, needs_foreign, missing())\nm.emit(anchor, concurrent, assert(task.both(() { 1 }, () { 2 }) == (1, 2)))\n").unwrap();
 }
 
 fn run_javascript(dir: &Path, built: &ilang_cli::BuiltCollection) {
@@ -58,7 +58,7 @@ fn generated_contributions_are_selected_independently() {
             dir.path(),
             options(level),
             &manifest.entries[0].handle,
-            CollectionResult::Nil,
+            CollectionResult::Unit,
         )
         .unwrap();
         run_javascript(dir.path(), &good);
@@ -88,7 +88,7 @@ fn generated_contributions_are_selected_independently() {
             dir.path(),
             options(level),
             &manifest.entries[5].handle,
-            CollectionResult::Nil,
+            CollectionResult::Unit,
         )
         .unwrap();
         run_javascript(dir.path(), &concurrent);
@@ -103,7 +103,7 @@ fn generated_contributions_are_selected_independently() {
             dir.path(),
             options(level),
             &manifest.entries[1].handle,
-            CollectionResult::Nil,
+            CollectionResult::Unit,
         )
         .unwrap();
         assert!(matches!(
@@ -116,7 +116,7 @@ fn generated_contributions_are_selected_independently() {
             dir.path(),
             options(Level::O0),
             &manifest.entries[2].handle,
-            CollectionResult::Nil
+            CollectionResult::Unit
         )
         .is_err()
     );
@@ -155,7 +155,7 @@ fn generated_contributions_are_selected_independently() {
         dir.path(),
         options(Level::O0),
         &manifest.entries[4].handle,
-        CollectionResult::Nil,
+        CollectionResult::Unit,
     )
     .unwrap();
     assert!(
@@ -167,7 +167,7 @@ fn generated_contributions_are_selected_independently() {
             .externals
             .is_empty()
     );
-    std::fs::write(dir.path().join("src/main.i"), "(anchor)\nanchor = Nil\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(anchor)\nanchor = ()\n").unwrap();
     assert!(matches!(
         ilang_cli::build_collection(
             dir.path(),
@@ -214,7 +214,7 @@ m.emit(anchor, unconfigured, read())
             dir.path(),
             options(level),
             &added[0].handle,
-            CollectionResult::Nil,
+            CollectionResult::Unit,
         )
         .unwrap_or_else(|error| panic!("{error}"));
         assert!(
@@ -240,7 +240,7 @@ m.emit(anchor, unconfigured, read())
             ..options(Level::O0)
         },
         &added[1].handle,
-        CollectionResult::Nil,
+        CollectionResult::Unit,
     )
     .unwrap_or_else(|error| panic!("{error}"));
     assert!(!node.is_async);
@@ -255,7 +255,7 @@ m.emit(anchor, unconfigured, read())
             ..options(Level::O0)
         },
         &added[2].handle,
-        CollectionResult::Nil,
+        CollectionResult::Unit,
     )
     .err()
     .expect("an unprovided service must fail the build")
@@ -316,7 +316,7 @@ fn generated_private_collection_target_shares_the_output_transaction_scope() {
             &project,
             options(level),
             &manifest.entries[0].handle,
-            CollectionResult::Nil,
+            CollectionResult::Unit,
         )
         .unwrap();
         assert!(matches!(
@@ -334,7 +334,7 @@ fn collections_call_aliases_and_computed_function_values() {
         std::fs::create_dir(dir.path().join("src")).unwrap();
         std::fs::write(dir.path().join("i.toml"), "name = \"probe\"\n").unwrap();
         std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
-        std::fs::write(dir.path().join("src/main.i"), format!("(m = probe/macros)\nworker = () {{ panic(\"target invoked\") }}\nmake = (n) {{ () {{ assert(n == 42) }} }}\ntarget = {value}\nm.register(target)\nmain = () {{ Nil }}\n")).unwrap();
+        std::fs::write(dir.path().join("src/main.i"), format!("(m = probe/macros)\nworker = () {{ panic(\"target invoked\") }}\nmake = (n) {{ () {{ assert(n == 42) }} }}\ntarget = {value}\nm.register(target)\nmain = () {{ () }}\n")).unwrap();
         let manifest = ilang_cli::collections(dir.path(), false, true).unwrap();
         assert_eq!(manifest.entries.len(), 1);
         for opt in [Level::O0, Level::O2] {
@@ -342,7 +342,7 @@ fn collections_call_aliases_and_computed_function_values() {
                 dir.path(),
                 options(opt),
                 &manifest.entries[0].handle,
-                CollectionResult::Nil,
+                CollectionResult::Unit,
             )
             .unwrap();
             let outcome = built.run_with(built.built.host_options()).unwrap();

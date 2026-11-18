@@ -113,7 +113,7 @@ fn default_output_and_named_entries() {
     assert_eq!(run(&project.join("build/other"), &[]).stdout, b"other\n");
     // Host still emits raw Wasm for a service-free entry. The hello example
     // needs Io, which the nodejs target supplies after E5.
-    let host_project = package(&dir.path().join("host"), "main = () { Nil }\n");
+    let host_project = package(&dir.path().join("host"), "main = () { () }\n");
     for (target, source) in [("host", host_project), ("nodejs", example("hello"))] {
         let wasm = dir.path().join(format!("hello-{target}.wasm"));
         let out = i(
@@ -491,7 +491,7 @@ fn imports_the_runner_cannot_supply_are_rejected() {
     let dir = tempfile::tempdir().unwrap();
     let project = package(
         dir.path(),
-        "@external(\"plugin:raw/v1\", \"number\")\nnumber : (Float) -> Float\n\nmain = () {\n  number(1.0)\n  Nil\n}\n",
+        "@external(\"plugin:raw/v1\", \"number\")\nnumber : (Float) -> Float\n\nmain = () {\n  number(1.0)\n  ()\n}\n",
     );
     let out = i(&["build"], &project);
     assert!(!out.status.success());
@@ -512,7 +512,7 @@ fn imports_the_runner_cannot_supply_are_rejected() {
 
 greet = () <- (io : Io) { io.print("quiet") }
 
-main = () { greet() <- (Io(print = (text) { Nil })) }
+main = () { greet() <- (Io(print = (text) { () })) }
 "#,
     );
     let exe = build(&project, dir.path(), "quiet");

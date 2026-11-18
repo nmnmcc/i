@@ -141,7 +141,7 @@ fn gate_imports(built: &ilang_cli::Built, state: Arc<Mutex<GateState>>) -> HostI
                     }
                 }
             }
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     imports
@@ -168,7 +168,7 @@ fn gate_imports(built: &ilang_cli::Built, state: Arc<Mutex<GateState>>) -> HostI
                 ),
                 phase => panic!("unknown phase {phase}"),
             }
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     imports
@@ -256,7 +256,7 @@ fn completion_gates_and_root_accounting_on_the_rust_host() {
                         );
                     }
                     _ => assert!(
-                        matches!(outcome, Outcome::Ok(Value::Nil)),
+                        matches!(outcome, Outcome::Ok(Value::Unit)),
                         "{name}: {outcome:?}"
                     ),
                 }
@@ -337,8 +337,8 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     // a source copy; the IO and continuation queries are unused by this pure unit probe.
     let source = include_str!("../../../lib/i/task.i");
     let source = source.replace(
-        "@external(\"ilang:request\", \"observe_change\")\nobserve_change : (Key(Nil)) -> Request(Nil)",
-        "observe_change = (_root : Key(Nil)) -> Request(Nil) { request.ready(Nil) }",
+        "@external(\"ilang:request\", \"observe_change\")\nobserve_change : (Key(())) -> Request(())",
+        "observe_change = (_root : Key(())) -> Request(()) { request.ready(()) }",
     ).replace(
         "@external(\"ilang:request\", \"has_work\")\nhas_work : (Ticket) -> Bool",
         "has_work = (_ticket : Ticket) -> Bool { False }",
@@ -358,17 +358,17 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         + "worker_enabled = () -> Bool { False }\n\
            worker_publish = (_job: Job) -> Int { 0 }\n\
            worker_claim = (_ticket: Int) -> Bool { True }\n\
-           worker_adopt = (_ticket: Int, _task: Int) -> Nil { Nil }\n\
+           worker_adopt = (_ticket: Int, _task: Int) -> () { () }\n\
            worker_placeholder = () -> Continuation(StepAnswer, Turn, Never) { panic(\"no workers\") }\n\
            worker_away = (_k: Continuation(StepAnswer, Turn, Never)) -> Bool { False }\n\
-           worker_send = (_task: Int, _resume: Resume) -> Nil { Nil }\n\
+           worker_send = (_task: Int, _resume: Resume) -> () { () }\n\
            worker_inbox = () -> Int { 0 }\n\
            worker_message = () -> Remote { panic(\"no workers\") }\n\
            worker_pending = () -> Bool { False }\n\
-           worker_wait = () -> Nil { Nil }\n\
-           worker_share_put = (_run: Key(Nil), _address: Address, _value: Keyed) -> Nil { Nil }\n\
-           worker_share_get = (_run: Key(Nil), _address: Address) -> List(Keyed) { [] }\n\
-           worker_share_drop = (_run: Key(Nil), _address: Address) -> Nil { Nil }\n"
+           worker_wait = () -> () { () }\n\
+           worker_share_put = (_run: Key(()), _address: Address, _value: Keyed) -> () { () }\n\
+           worker_share_get = (_run: Key(()), _address: Address) -> List(Keyed) { [] }\n\
+           worker_share_drop = (_run: Key(()), _address: Address) -> () { () }\n"
         + &source[end..];
     assert!(!source.contains("@external(\"ilang:request\""));
     assert!(!source.contains("@external(\"ilang:worker\""));
@@ -390,7 +390,7 @@ main = () {
         let outcome = program(&source, opt)
             .run_entry(HostOptions::default())
             .unwrap();
-        assert!(matches!(outcome, Outcome::Ok(Value::Nil)), "{outcome:?}");
+        assert!(matches!(outcome, Outcome::Ok(Value::Unit)), "{outcome:?}");
     }
 }
 
@@ -517,7 +517,7 @@ fn task_run_discharges_scheduler_in_the_printed_entry_need() {
     assert!(
         shown
             .lines()
-            .any(|line| line == "app/main.main : () <- (Assert, Fail(Never), task.Runner) -> Nil"),
+            .any(|line| line == "app/main.main : () <- (Assert, Fail(Never), task.Runner) -> ()"),
         "{shown}"
     );
 }

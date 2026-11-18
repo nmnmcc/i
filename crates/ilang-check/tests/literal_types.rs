@@ -225,12 +225,12 @@ fn guarded_list_heads_leave_tail_items_unrestricted() {
     // Match inference must pass catch-all slack to every
     // homogeneous list item, including items reached through the rest.
     let (ds, _) = check(
-        r#"probe = (xs : List(Int)) -> Nil {
+        r#"probe = (xs : List(Int)) -> () {
 	xs |>
-		([]) { Nil }
-		& ([37, a, b, ..tail] ? a >= 0 && b >= 0) { Nil }
-		& ([37, .._]) { Nil }
-		& ([x, ..tail]) { Nil }
+		([]) { () }
+		& ([37, a, b, ..tail] ? a >= 0 && b >= 0) { () }
+		& ([37, .._]) { () }
+		& ([x, ..tail]) { () }
 }
 "#,
     );
@@ -277,11 +277,11 @@ fn nested_missing_values_are_one_coverage_error() {
     // One E0516 is required rather than E0501 for immediate Values.
     for (source, witness) in [
         (
-            "f = (r : Result(Int, Nil)) { r |> (Ok(0)) { 1 } & (Error(_)) { 2 } }",
+            "f = (r : Result(Int, ())) { r |> (Ok(0)) { 1 } & (Error(_)) { 2 } }",
             "Ok(1)",
         ),
         (
-            "f = (n : { Int | Nil }) { n |> (0) { 1 } & (Nil) { 2 } }",
+            "f = (n : { Int | () }) { n |> (0) { 1 } & (()) { 2 } }",
             "1",
         ),
     ] {
@@ -354,7 +354,7 @@ fn narrowing_checks_the_entire_row_and_ignores_guards() {
         ("\"a\"", "t", "String", true),
         ("\"a\" ? c", "t", "String", false),
         ("\"a\" | \"b\"", "t", "String", true),
-        ("Ok(\"a\")", "Ok(t)", "Result(String, Nil)", true),
+        ("Ok(\"a\")", "Ok(t)", "Result(String, ())", true),
         ("(\"a\", True)", "(t, _)", "(String, Bool)", false),
         ("(\"a\", _)", "(t, _)", "(String, Bool)", true),
         (
@@ -404,7 +404,7 @@ fn prefix_after_complement_does_not_erase_other_columns() {
 fn host_directions_expand_aliases_and_same_scalar_unions() {
     // i may send literal sets; host values must be whole.
     let (ds, _) = check(
-        "Level = \"info\" | \"warn\"\n@external(\"test\", \"log\")\nlog : (Level | \"error\") -> Nil\n",
+        "Level = \"info\" | \"warn\"\n@external(\"test\", \"log\")\nlog : (Level | \"error\") -> ()\n",
     );
     assert!(ds.is_empty(), "{ds:?}");
     for ty in [
@@ -431,8 +431,8 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
     // members must have all values. Union, intersection and difference define the sets.
     // These four programs are the independent review's reproductions.
     for source in [
-        "One = {1 | 2} - 2\n@external(\"app\", \"write\")\nwrite : (One) -> Nil\n",
-        "One = Int & 1\n@external(\"app\", \"write\")\nwrite : (One) -> Nil\n",
+        "One = {1 | 2} - 2\n@external(\"app\", \"write\")\nwrite : (One) -> ()\n",
+        "One = Int & 1\n@external(\"app\", \"write\")\nwrite : (One) -> ()\n",
         "Whole = {Int - 0} | 0\n@external(\"app\", \"read\")\nread : () -> Whole\n",
         "@host(\"app\")\nSvc = (get = () <- (Fail(String | \"error\")) -> String)\n",
     ] {
@@ -450,7 +450,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
         "{\"a\" | \"b\"} - \"b\"",
         "String & \"a\"",
     ] {
-        let (ds, _) = check(&"Part = BoundaryType\nAlias = Part\n@external(\"app\", \"write\")\nwrite : (Alias) -> Nil\n".replace("BoundaryType", ty));
+        let (ds, _) = check(&"Part = BoundaryType\nAlias = Part\n@external(\"app\", \"write\")\nwrite : (Alias) -> ()\n".replace("BoundaryType", ty));
         assert!(ds.is_empty(), "{ty}: {ds:?}");
         let (ds, _) = check(
             &"Part = BoundaryType\n@external(\"app\", \"read\")\nread : () -> Part\n"
@@ -474,13 +474,13 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
     for ty in [
         "Int & {Int | List(Int)}",
         "Int & {Int | (Int, String)}",
-        "Int & {Int | {() -> Nil}}",
+        "Int & {Int | {() -> ()}}",
         "{Int - 0} | 0",
         "Int - {1 - 1}",
         "{String - \"a\"} | \"a\"",
         "String | \"error\"",
     ] {
-        let (ds, _) = check(&"Whole = BoundaryType\n@external(\"app\", \"read\")\nread : () -> Whole\n@host(\"app\")\nSvc = (get = () <- (Fail(Whole | Nil)) -> Whole)\n".replace("BoundaryType", ty));
+        let (ds, _) = check(&"Whole = BoundaryType\n@external(\"app\", \"read\")\nread : () -> Whole\n@host(\"app\")\nSvc = (get = () <- (Fail(Whole | ())) -> Whole)\n".replace("BoundaryType", ty));
         assert!(ds.is_empty(), "{ty}: {ds:?}");
     }
     // The old environments `! Int - Int` and `! String - String` cannot be
@@ -489,7 +489,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
     assert!(ds.is_empty(), "Never: {ds:?}");
     for empty in ["1 - 1", "Int & String"] {
         let (ds, _) = check(
-            &"Empty = BoundaryType\n@external(\"app\", \"write\")\nwrite : (Empty) -> Nil\n"
+            &"Empty = BoundaryType\n@external(\"app\", \"write\")\nwrite : (Empty) -> ()\n"
                 .replace("BoundaryType", empty),
         );
         assert_eq!(
@@ -500,7 +500,7 @@ fn host_boundaries_depend_on_scalar_sets_not_written_forms() {
     }
     // Each scalar head in an incoming error row is checked after merging.
     for err in [
-        "String | \"error\" | Nil",
+        "String | \"error\" | ()",
         "{{Int - 0} | 0} | String | \"error\"",
         "Int - Int",
     ] {
@@ -565,13 +565,13 @@ fn shared_parameters_require_all_combinations_of_a_written_finite_set() {
 fn whole_known_bounds_keep_non_covariant_literal_parts_as_holes() {
     // Copying a known function, invariant cell or
     // contravariant sink must not impose whole String in the wrong direction.
-    let source = r#"Sink(A) = (put = (A) -> Nil)
-Cell(A) = (get = () -> A, set = (A) -> Nil)
+    let source = r#"Sink(A) = (put = (A) -> ())
+Cell(A) = (get = () -> A, set = (A) -> ())
 State(A) = (get = () -> A)
 g = (s : String - "a") { 1 }
 p = (g, 0).1
 read = (c : Cell("a")) { c.get() }
-s = Sink(put = (m : { "GET" | "POST" }) { Nil })
+s = Sink(put = (m : { "GET" | "POST" }) { () })
 use = () { s.put("GET") }
 stored = () <- (st : State("a")) { st.get() }
 e = (stored, 0).1
@@ -602,7 +602,7 @@ fn one_clause_choices_are_fitted_and_never_constructor_flow() {
     assert!(ds.iter().any(|d| d.0 == "E0512"), "{ds:?}");
     // Opaque tests still constrain all values of that head.
     let (ds, _) = check(
-        "Box(A) = (A)\nf = (r : { Box(Int | String) | Int }) { r |> (0 | _ : Box(Int)) { Nil } }\n",
+        "Box(A) = (A)\nf = (r : { Box(Int | String) | Int }) { r |> (0 | _ : Box(Int)) { () } }\n",
     );
     assert!(ds.iter().any(|d| d.0 == "E0501"), "{ds:?}");
     // Fitting binds a monotype, without the binding's generalization.

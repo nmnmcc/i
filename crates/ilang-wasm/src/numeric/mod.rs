@@ -204,7 +204,7 @@ fn callbacks(p: &mut Program) -> (usize, BTreeMap<FuncId, FuncId>, BTreeMap<Func
                     if let Stmt::Let { dst, value, .. } = s {
                         copies.entry(*dst).or_default().push(match value {
                             Value::Atom(a) => a.clone(),
-                            _ => Atom::Nil,
+                            _ => Atom::Unit,
                         });
                     }
                 });

@@ -195,9 +195,9 @@ fn show_as_only_breaks_lines_where_the_layout_always_does() {
 
 #[test]
 fn show_as_attribute_item_uses_only_required_line_breaks() {
-    let item = root("(@ custom (= f (-> (,) _ Nil)))");
+    let item = root("(@ custom (= f (-> (,) _ (,))))");
     let text = item.show_as(Position::Item).unwrap();
-    assert_eq!(text, "@custom\nf = () { Nil }");
+    assert_eq!(text, "@custom\nf = () { () }");
     let (module, errors) = ilang_syntax::syn3::parse_module(&format!("{text}\n"));
     assert!(errors.is_empty(), "{errors:?}");
     assert_eq!(module.items.len(), 1);
@@ -327,8 +327,8 @@ fn show_as_writes_every_row_in_its_position() {
         (Item, "(= x 1)", "x = 1"),
         (
             Item,
-            "(test \"name\" (-> (,) _ Nil))",
-            "test(\"name\", () { Nil })",
+            "(test \"name\" (-> (,) _ (,)))",
+            "test(\"name\", () { () })",
         ),
         (Item, "((. t test) \"name\")", "t.test(\"name\")"),
         (Item, "{ (= x 1) (= y 2) }", "x = 1\ny = 2"),

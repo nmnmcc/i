@@ -679,7 +679,7 @@ impl<'p> Emitter<'p> {
         let take = |t: AbiType, k: usize| -> String {
             let g = |j: usize| format!("(global.get $hr{i}_{})", k + j);
             match t {
-                AbiType::Nil => "(ref.null eq)".to_string(),
+                AbiType::Unit => "(ref.null eq)".to_string(),
                 AbiType::Bool => format!("(call $abi_bool_in {})", g(0)),
                 AbiType::Float => format!("(call $abi_float_in {})", g(0)),
                 AbiType::Int => format!("(call $abi_int_take {} {} {})", g(0), g(1), g(2)),
@@ -723,7 +723,7 @@ impl<'p> Emitter<'p> {
         let decode = |t: AbiType, k: usize| -> String {
             let g = |j: usize| format!("(global.get $hr{i}_{})", k + j);
             match t {
-                AbiType::Nil => "(ref.null eq)".to_string(),
+                AbiType::Unit => "(ref.null eq)".to_string(),
                 AbiType::Bool => format!("(call $abi_bool_in {})", g(0)),
                 AbiType::Float => format!("(call $abi_float_in {})", g(0)),
                 AbiType::Int => format!("(call $abi_int_in {} {} {})", g(0), g(1), g(2)),

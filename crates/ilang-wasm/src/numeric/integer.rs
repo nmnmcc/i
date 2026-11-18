@@ -12,7 +12,7 @@ pub fn parameters(f: &Func) -> Vec<bool> {
         if let Stmt::Let { dst, value, .. } = s {
             defs.entry(*dst).or_default().push(match value {
                 Value::Atom(a) => a.clone(),
-                _ => Atom::Nil,
+                _ => Atom::Unit,
             });
         }
     });

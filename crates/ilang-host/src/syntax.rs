@@ -693,7 +693,7 @@ fn install_inner(
             .lock()
             .expect("diagnostic buffer lock poisoned")
             .push(text(message)?.to_owned());
-        Ok(Value::Nil)
+        Ok(Value::Unit)
     })?;
     let report_context = definition.clone();
     let report_budget = budget.clone();

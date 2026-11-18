@@ -76,7 +76,8 @@ pub(super) struct Builtins {
     pub false_: TypeRef,
     /// `Bool` as the checker writes it.
     pub bool_: Ty,
-    pub nil: TypeRef,
+    /// `()`, empty data: the unit type.
+    pub unit: Ty,
     pub assert: TypeRef,
     pub fail: TypeRef,
 }
@@ -196,7 +197,7 @@ impl<'a> Checker<'a> {
                 Ty::named(true_, Vec::new()),
                 Ty::named(false_, Vec::new()),
             ]),
-            nil: find("Nil"),
+            unit: Ty::record(Vec::new()),
             assert: find("Assert"),
             fail: find("Fail"),
         };
@@ -390,7 +391,7 @@ impl<'a> Checker<'a> {
                     }
                     if let super::ShownType::Fn(f) = &shown
                         && f.params.is_empty()
-                        && f.ret == super::ShownType::Named(self.b.nil, Vec::new())
+                        && f.ret == super::ShownType::Tuple(Vec::new())
                     {
                         test_shaped.insert(id);
                     }
@@ -973,12 +974,12 @@ impl<'a> Checker<'a> {
             }
         }
         entries.extend(p.host_exports.iter().map(|d| (*d, false, true)));
-        entries.extend(selected.iter().map(|(d, nil)| (*d, *nil, false)));
-        for (d, require_nil, export) in entries {
+        entries.extend(selected.iter().map(|(d, unit)| (*d, *unit, false)));
+        for (d, require_unit, export) in entries {
             if !invalid.contains(&d)
                 && (export || p.declared_entries.contains(&d) || self.entry_value(d))
             {
-                self.entry_point(d, require_nil, export);
+                self.entry_point(d, require_unit, export);
             }
         }
     }
@@ -1019,9 +1020,9 @@ impl<'a> Checker<'a> {
     }
 
     /// Entry checks use the inferred type: a test
-    /// gives `Nil`; a host export takes and gives types that the host can
+    /// gives `()`; a host export takes and gives types that the host can
     /// take. The platform check of the target (`platform.rs`) reads its need.
-    fn entry_point(&mut self, d: DefId, require_nil: bool, export: bool) {
+    fn entry_point(&mut self, d: DefId, require_unit: bool, export: bool) {
         self.set_module(d.module);
         let def = self.p.def(d);
         let (name, span) = (def.name.clone(), def.span);
@@ -1068,13 +1069,13 @@ impl<'a> Checker<'a> {
         services.sort();
         services.dedup();
         self.out.entry_services.insert(d, services);
-        let nil = Ty::named(self.b.nil, Vec::new());
-        if require_nil && f.ret != nil && f.ret != Ty::Never {
+        let unit = matches!(&f.ret, Ty::Con(Head::Shape(shape), _, _) if shape.is_empty());
+        if require_unit && !unit && f.ret != Ty::Never {
             let r = show(self, &f.ret);
             self.error(
                 code::ENTRY_TYPE,
                 span,
-                format!("the selected entry `{name}` must give `Nil` for this consumer, but it gives `{r}`"),
+                format!("the selected entry `{name}` must give `()` for this consumer, but it gives `{r}`"),
             );
         }
         if !export {
@@ -1105,7 +1106,7 @@ impl<'a> Checker<'a> {
                     code::ENTRY_TYPE,
                     span,
                     format!(
-                        "`{name}` is a host export, so {what} must be a type that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors, but it is `{t}`{suffix}"
+                        "`{name}` is a host export, so {what} must be a type that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors, but it is `{t}`{suffix}"
                     ),
                 );
             }
@@ -1121,7 +1122,7 @@ impl<'a> Checker<'a> {
         let fail = fail.unwrap_or(Ty::Never);
         let error_members = known::members(&fail);
         let errors_ok = error_members.iter().all(|m| {
-            matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.nil || *r == self.b.true_ || *r == self.b.false_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
+            matches!(m, Ty::Con(Head::Shape(shape), _, _) if shape.is_empty()) || matches!(m, Ty::Con(Head::Named(r), _, xs) if xs.is_empty() && (*r == self.b.true_ || *r == self.b.false_ || matches!(r, TypeRef::Builtin(b) if host_builtin(*b))))
         });
         // The emitter needs the canonical wire signature rather than the source type.
         let params: Option<Vec<HostType>> = f
@@ -1155,7 +1156,7 @@ impl<'a> Checker<'a> {
                 code::ENTRY_TYPE,
                 span,
                 format!(
-                    "`{name}` is a host export, so its errors must be a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, but they are `{e}`"
+                    "`{name}` is a host export, so its errors must be a union of `()`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, but they are `{e}`"
                 ),
             );
         }
@@ -1166,6 +1167,7 @@ impl<'a> Checker<'a> {
     fn host_part(&self, t: &Ty) -> Option<HostType> {
         Some(match t {
             Ty::Union(_) if *t == self.b.bool_ => HostType::Bool,
+            Ty::Con(Head::Shape(shape), _, _) if shape.is_empty() => HostType::Unit,
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, _) => match b {
                 BuiltinType::Int => HostType::Int,
                 BuiltinType::Float => HostType::Float,
@@ -1174,9 +1176,7 @@ impl<'a> Checker<'a> {
                 _ => return None,
             },
             Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _, _) => {
-                if *r == self.b.nil {
-                    HostType::Nil
-                } else if *r == self.b.true_ || *r == self.b.false_ {
+                if *r == self.b.true_ || *r == self.b.false_ {
                     HostType::Bool
                 } else if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()) {
                     HostType::Opaque(*id)
@@ -1193,10 +1193,10 @@ impl<'a> Checker<'a> {
     fn host_type(&self, t: &Ty) -> bool {
         match t {
             Ty::Union(_) => *t == self.b.bool_,
+            Ty::Con(Head::Shape(shape), _, _) => shape.is_empty(),
             Ty::Con(Head::Named(TypeRef::Builtin(b)), _, _) => host_builtin(*b),
             Ty::Con(Head::Named(r @ TypeRef::Custom(id)), _, _) => {
-                *r == self.b.nil
-                    || *r == self.b.true_
+                *r == self.b.true_
                     || *r == self.b.false_
                     || matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty())
             }
@@ -3509,8 +3509,8 @@ impl<'a> Checker<'a> {
         }
         // The last statement is not an expression: reported by the parser.
         let _ = span;
-        let nil = Ty::named(self.b.nil, Vec::new());
-        (nil.clone(), Knowledge::certain(nil))
+        let unit = self.b.unit.clone();
+        (unit.clone(), Knowledge::certain(unit))
     }
 
     /// Handling: a row excludes every key written beside it. Keep this

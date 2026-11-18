@@ -105,8 +105,8 @@ fn types() {
         "A - B - C",
         "A | B & C - D",
         "{ A | B } & C",
-        "{ (Int) -> Int } | Nil",
-        "Nil | (Int) -> Int",
+        "{ (Int) -> Int } | ()",
+        "() | (Int) -> Int",
         "(Int) -> (Int) -> Int",
         "((Int) -> Int) -> Int",
     ] {
@@ -127,7 +127,7 @@ fn service_types() {
         "<A>(A) -> A",
         "<A, B, N>(List(A), (A) <- N -> B) <- N -> List(B)",
         "<A>{ (A) | (A, A) } <- (Log) -> A",
-        "(write = <A>(A) -> Nil)",
+        "(write = <A>(A) -> ())",
     ] {
         assert_eq!(ty(t), t);
     }
@@ -178,7 +178,7 @@ fn type_errors() {
 #[test]
 fn type_definitions() {
     let m = ok(
-        "Some(A) = (A)\nNone = ()\nUser = (name = String, age = Int)\nOption(A) = Some(A) | None\nMeters = Int\nPoint = { (Int, Int) }\nWrap = (Int) | Nil\nHandler = (Request) -> Response\nElement = Opaque\nHandle(A) = Opaque\nCodec(Size, _) = size\n",
+        "Some(A) = (A)\nNone = ()\nUser = (name = String, age = Int)\nOption(A) = Some(A) | None\nMeters = Int\nPoint = { (Int, Int) }\nWrap = (Int) | ()\nHandler = (Request) -> Response\nElement = Opaque\nHandle(A) = Opaque\nCodec(Size, _) = size\n",
     );
     let kinds: Vec<&TypeRhs> = m
         .items
@@ -204,7 +204,7 @@ fn type_definitions() {
     assert!(matches!(kinds[10], TypeRhs::Type(t) if matches!(t.kind, TypeKind::ValueOf { .. })));
     assert_eq!(
         syn3::print_module(&m),
-        "Some(A) = (A)\n\nNone = ()\n\nUser = (name = String, age = Int)\n\nOption(A) = Some(A) | None\n\nMeters = Int\n\nPoint = { (Int, Int) }\n\nWrap = (Int) | Nil\n\nHandler = (Request) -> Response\n\nElement = Opaque\n\nHandle(A) = Opaque\n\nCodec(Size, _) = size\n"
+        "Some(A) = (A)\n\nNone = ()\n\nUser = (name = String, age = Int)\n\nOption(A) = Some(A) | None\n\nMeters = Int\n\nPoint = { (Int, Int) }\n\nWrap = (Int) | ()\n\nHandler = (Request) -> Response\n\nElement = Opaque\n\nHandle(A) = Opaque\n\nCodec(Size, _) = size\n"
     );
     bad(
         "Tree(A) { Leaf  Node(A) }",
@@ -1263,13 +1263,13 @@ fn nested_calls_break() {
 fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     // Aliases keep nominal identity. The parser reserves
     // bare Fail(E) for ^ E; an ordinary ! Fail(E) remains a service.
-    let text = converted("Use(E) = () -> Nil ! Fail(E)\n");
+    let text = converted("Use(E) = () -> () ! Fail(E)\n");
     let (lowered, diags) = syn3::parse_lowered(&text);
     assert!(diags.is_empty(), "{text}\n{diags:#?}");
     let shown = ilang_syntax::print::print_module(&lowered);
     assert!(shown.contains("! Fail(E)"), "{shown}");
     assert!(!shown.contains("^ E"), "{shown}");
-    let collision = converted("T { Syn3ServiceFail }\nUse(E) = () -> Nil ! Fail(E)\n");
+    let collision = converted("T { Syn3ServiceFail }\nUse(E) = () -> () ! Fail(E)\n");
     assert!(collision.contains("Fail(E)"), "{collision}");
     let row = converted(
         "wrap(A, E, N) = (body : () -> A ! Fail(E) | N, cap : Fail(E)) -> A ! N { ! Fail(E) = cap body() }\n",
@@ -1281,7 +1281,7 @@ fn conversion_keeps_ordinary_fail_services_out_of_the_legacy_error_channel() {
     assert!(!shown.contains(carrier.as_str()), "{shown}");
 
     let row = converted(
-        "wrap(E, N) = (body : () -> Nil ^ E ! Fail(Int) | N, cap : Fail(Int)) -> Nil ^ E ! N { ! Fail(Int) = cap body() }\n",
+        "wrap(E, N) = (body : () -> () ^ E ! Fail(Int) | N, cap : Fail(Int)) -> () ^ E ! N { ! Fail(Int) = cap body() }\n",
     );
     let (lowered, diags) = syn3::parse_lowered(&row);
     assert!(diags.is_empty(), "{row}\n{diags:#?}");
@@ -1294,7 +1294,7 @@ fn specialized_and_renamed_members_remain_type_aliases() {
     // An RHS naming another type is a transparent alias. Moving
     // S's fields into Alias would lose N or A's declaration scope.
     for source in [
-        "S(N) = (() <- N -> Nil)\nAlias = S(Never)\n",
+        "S(N) = (() <- N -> ())\nAlias = S(Never)\n",
         "S(A) = (value = A)\nAlias(B) = S(B)\n",
     ] {
         let (module, diags) = syn3::parse_lowered(source);
@@ -1336,7 +1336,7 @@ fn converted_bound_fail_remains_a_service_parameter() {
 
 #[test]
 fn specialized_alias_keeps_the_constructors_type_parameter_scope() {
-    let (module, diags) = syn3::parse_lowered("S(N) = (() <- N -> Nil)\nBad = S(Never)\n");
+    let (module, diags) = syn3::parse_lowered("S(N) = (() <- N -> ())\nBad = S(Never)\n");
     assert!(diags.is_empty(), "{diags:#?}");
     let definitions: Vec<_> = module
         .items

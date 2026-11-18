@@ -1156,7 +1156,7 @@ fn located_source_links_cannot_escape_the_hashed_tree() {
                     "i.toml",
                     "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
                 ),
-                ("src/main.i", "main = () { Nil }\n"),
+                ("src/main.i", "main = () { () }\n"),
             ],
         );
         let (g, ds) = w.load(&app, false);
@@ -1186,7 +1186,7 @@ fn cached_package_files_are_checked_on_every_load() {
                     "i.toml",
                     "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\npeer = \"example.com/peer@1.0.0\"\n",
                 ),
-                ("src/main.i", "main = () { Nil }\n"),
+                ("src/main.i", "main = () { () }\n"),
             ],
         );
         let (g, ds) = w.load(&app, false);

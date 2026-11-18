@@ -53,7 +53,7 @@ fn imports_with(
                 bail!("print takes one String")
             };
             print(text);
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     imports
@@ -128,7 +128,7 @@ fn metadata_is_read_from_the_custom_section() {
     assert_eq!(
         abi.exports["choose"],
         Signature::new([AbiType::Float], AbiType::String).with_errors([
-            AbiType::Nil,
+            AbiType::Unit,
             AbiType::Bool,
             AbiType::Int,
             AbiType::Float,
@@ -228,7 +228,7 @@ fn values_round_trip_and_every_buffer_is_freed() {
     ));
     assert!(matches!(
         ok(instance.call("nil_roundtrip", &[]).unwrap()),
-        Value::Nil
+        Value::Unit
     ));
     assert!(matches!(
         ok(instance
@@ -250,7 +250,7 @@ fn errors_use_the_tag_and_the_canonical_order() {
     let (mut instance, _) = fixture();
     let expected = [
         "Ok(String(\"ok\"))",
-        "Err(Nil)",
+        "Err(Unit)",
         "Err(Bool(true))",
         "Err(Int(-7))",
         "Err(Float(2.5))",
@@ -381,7 +381,7 @@ fn entry_and_tests_run_by_name_each_test_in_a_new_instance() {
     let options = HostOptions::new(imports(&log));
     assert!(matches!(
         program.run_entry(options.clone()).unwrap(),
-        Outcome::Ok(Value::Nil)
+        Outcome::Ok(Value::Unit)
     ));
     assert_eq!(*log.lock().unwrap(), ["start\n", "fixture main\n"]);
     let reports = program.run_tests(&options);
@@ -424,7 +424,7 @@ fn block_on_gives_services_tokio_io() {
     let mut instance = program()
         .instantiate(HostOptions::new(imports_with(
             |_| {},
-            |_| Ok(Ok(Value::Nil)),
+            |_| Ok(Ok(Value::Unit)),
             later,
         )))
         .unwrap();
@@ -543,11 +543,11 @@ fn custom_abi() -> Abi {
         externals.insert(name.to_owned(), unary(kind));
     }
     abi.exports
-        .insert("echo_nil".into(), Signature::new([], AbiType::Nil));
-    externals.insert("echo_nil".into(), Signature::new([], AbiType::Nil));
+        .insert("echo_nil".into(), Signature::new([], AbiType::Unit));
+    externals.insert("echo_nil".into(), Signature::new([], AbiType::Unit));
     abi.externals.insert("custom".into(), externals);
     let fallible = Signature::new([AbiType::Float], AbiType::String).with_errors([
-        AbiType::Nil,
+        AbiType::Unit,
         AbiType::Bool,
         AbiType::Int,
         AbiType::Float,
@@ -579,7 +579,7 @@ fn custom_version(version: u32) -> Instance {
     ] {
         imports
             .external("custom", name, |arguments| {
-                Ok(arguments.first().cloned().unwrap_or(Value::Nil))
+                Ok(arguments.first().cloned().unwrap_or(Value::Unit))
             })
             .unwrap();
     }
@@ -590,7 +590,7 @@ fn custom_version(version: u32) -> Instance {
             };
             Ok(match *selector as i32 {
                 0 => Ok(Value::String("fine".into())),
-                1 => Err(Value::Nil),
+                1 => Err(Value::Unit),
                 2 => Err(Value::Bool(false)),
                 3 => Err(Value::Int(BigInt::from(1) << 100)),
                 4 => Err(Value::Float(-0.5)),
@@ -622,7 +622,7 @@ fn externals_and_service_errors_round_trip_without_leaks() {
         Value::BitArray(BitArray::new(vec![0xc0], 2).unwrap()),
         Value::Bool(true),
         Value::Float(0.25),
-        Value::Nil,
+        Value::Unit,
     ] {
         let name = match value.abi_type() {
             AbiType::String => "echo_string",
@@ -651,7 +651,7 @@ fn externals_and_service_errors_round_trip_without_leaks() {
     assert!(returned.ptr_eq(&reference));
     let expected = [
         "Ok(String(\"fine\"))",
-        "Err(Nil)",
+        "Err(Unit)",
         "Err(Bool(false))",
         "Err(Int(1267650600228229401496703205376))",
         "Err(Float(-0.5))",
@@ -796,7 +796,7 @@ fn block_on_works_inside_a_tokio_runtime() {
     let mut instance = program()
         .instantiate(HostOptions::new(imports_with(
             |_| {},
-            |_| Ok(Ok(Value::Nil)),
+            |_| Ok(Ok(Value::Unit)),
             timer_later,
         )))
         .unwrap();
@@ -812,7 +812,7 @@ fn block_on_works_inside_a_tokio_runtime() {
     let mut instance = program()
         .instantiate(HostOptions::new(imports_with(
             |_| {},
-            |_| Ok(Ok(Value::Nil)),
+            |_| Ok(Ok(Value::Unit)),
             timers(4, &order),
         )))
         .unwrap();
@@ -838,7 +838,7 @@ fn thread_imports(threads: &Threads) -> HostImports {
                 .lock()
                 .unwrap()
                 .push(("print", std::thread::current().id()));
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     let started = Arc::clone(threads);
@@ -870,7 +870,7 @@ fn run_entry_uses_one_thread() {
     };
     assert!(matches!(
         program.run_entry(options.clone()).unwrap(),
-        Outcome::Ok(Value::Nil)
+        Outcome::Ok(Value::Unit)
     ));
     check(&threads);
     assert!(matches!(
@@ -919,8 +919,8 @@ fn a_nested_store_gets_its_own_thread() {
                     .unwrap()
                     .push(("print", std::thread::current().id()));
             },
-            |_| Ok(Ok(Value::Nil)),
-            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+            |_| Ok(Ok(Value::Unit)),
+            |_| Box::pin(async { Ok(Ok(Value::Unit)) }),
         )))
         .unwrap();
     inner_threads.lock().unwrap().clear();
@@ -943,7 +943,7 @@ fn a_nested_store_gets_its_own_thread() {
                 *trap_seen.lock().unwrap() = Some(stop);
                 Ok(Ok(Value::String("i".into())))
             },
-            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+            |_| Box::pin(async { Ok(Ok(Value::Unit)) }),
         )))
         .unwrap();
     let value = ok(
@@ -1214,7 +1214,7 @@ fn timers_answer_through_the_reactor() {
         let mut instance = program
             .instantiate(HostOptions::new(imports_with(
                 |_| {},
-                |_| Ok(Ok(Value::Nil)),
+                |_| Ok(Ok(Value::Unit)),
                 timers(n, &order),
             )))
             .unwrap();
@@ -1543,7 +1543,7 @@ fn a_sync_service_may_block_on_its_own_thread() {
                     work()
                 };
                 ensure!(value == 1);
-                Ok(Ok(Value::Nil))
+                Ok(Ok(Value::Unit))
             })
             .unwrap();
         imports
@@ -1556,7 +1556,7 @@ fn a_sync_service_may_block_on_its_own_thread() {
     };
     assert!(matches!(
         program.run_entry(options(true)).unwrap(),
-        Outcome::Ok(Value::Nil)
+        Outcome::Ok(Value::Unit)
     ));
     let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         program.run_entry(options(false))
@@ -1642,7 +1642,7 @@ fn status_two_gives_ready_answers() {
     let mut instance = program
         .instantiate(HostOptions::new(imports_with(
             |_| {},
-            |_| Ok(Ok(Value::Nil)),
+            |_| Ok(Ok(Value::Unit)),
             timers(1, &order),
         )))
         .unwrap();
@@ -1716,7 +1716,7 @@ fn requests_from_ilang_continue() {
 fn fault_imports(gates: &Gates) -> HostImports {
     let mut imports = gate_imports(gates);
     imports
-        .async_service("app:clock/v1", "ready", |_| async { Ok(Ok(Value::Nil)) })
+        .async_service("app:clock/v1", "ready", |_| async { Ok(Ok(Value::Unit)) })
         .unwrap();
     imports
 }
@@ -1852,11 +1852,11 @@ fn a_finished_program_does_not_wait_for_blocking_work() {
         let (seen, counted) = (Arc::clone(&running), Arc::clone(&starts));
         let options = HostOptions::new(imports_with(
             |_| {},
-            |_| Ok(Ok(Value::Nil)),
+            |_| Ok(Ok(Value::Unit)),
             move |arguments| {
                 let answer = match arguments {
                     [Value::Float(x)] => Value::Float(2.0 * x),
-                    _ => Value::Nil,
+                    _ => Value::Unit,
                 };
                 let running = Arc::clone(&seen);
                 if counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
@@ -1919,7 +1919,7 @@ mod self_waking_work {
         Request {
             namespace: "test".into(),
             label: label.into(),
-            signature: Signature::new([], AbiType::Nil),
+            signature: Signature::new([], AbiType::Unit),
         }
     }
 
@@ -1933,11 +1933,11 @@ mod self_waking_work {
         Box::pin(std::future::poll_fn(move |context| {
             let n = polls.fetch_add(1, Ordering::SeqCst) + 1;
             if flag.load(Ordering::SeqCst) {
-                return Poll::Ready(Ok(Ok(Value::Nil)));
+                return Poll::Ready(Ok(Ok(Value::Unit)));
             }
             if n >= LIMIT {
                 gave_up.store(true, Ordering::SeqCst);
-                return Poll::Ready(Ok(Ok(Value::Nil)));
+                return Poll::Ready(Ok(Ok(Value::Unit)));
             }
             context.waker().wake_by_ref();
             Poll::Pending
@@ -1992,7 +1992,7 @@ mod self_waking_work {
             Box::pin(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(1)).await;
                 setter.store(true, Ordering::SeqCst);
-                Ok(Ok(Value::Nil))
+                Ok(Ok(Value::Unit))
             }),
         );
         let mut order = Vec::new();
@@ -2039,11 +2039,11 @@ fn allocation_fault_program(allocation: &str) -> Program {
     let mut abi = Abi::default();
     abi.exports.insert(
         "app/reply".into(),
-        Signature::new([], AbiType::Nil).asynchronous(),
+        Signature::new([], AbiType::Unit).asynchronous(),
     );
     abi.exports.insert(
         "app/params".into(),
-        Signature::new([AbiType::String], AbiType::Nil).asynchronous(),
+        Signature::new([AbiType::String], AbiType::Unit).asynchronous(),
     );
     abi.services.insert(
         "test:work/v1".into(),
@@ -2148,7 +2148,7 @@ fn countdown_requests_match_the_observed_answer_order() {
         let mut instance = program
             .instantiate(HostOptions::new(imports_with(
                 |_| {},
-                |_| Ok(Ok(Value::Nil)),
+                |_| Ok(Ok(Value::Unit)),
                 countdown,
             )))
             .unwrap();
@@ -2177,8 +2177,8 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
                     .unwrap()
                     .push(("print", std::thread::current().id()));
             },
-            |_| Ok(Ok(Value::Nil)),
-            |_| Box::pin(async { Ok(Ok(Value::Nil)) }),
+            |_| Ok(Ok(Value::Unit)),
+            |_| Box::pin(async { Ok(Ok(Value::Unit)) }),
         )))
         .unwrap();
     threads.lock().unwrap().clear();
@@ -2198,11 +2198,11 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
     let mut abi = Abi::default();
     abi.exports.insert(
         "app/buffer".into(),
-        Signature::new([AbiType::String], AbiType::Nil).asynchronous(),
+        Signature::new([AbiType::String], AbiType::Unit).asynchronous(),
     );
     abi.services.insert(
         "test:allocation/v1".into(),
-        BTreeMap::from([("touch".into(), Signature::new([], AbiType::Nil))]),
+        BTreeMap::from([("touch".into(), Signature::new([], AbiType::Unit))]),
     );
     let mut imports = HostImports::default();
     imports
@@ -2211,7 +2211,7 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
                 inner.lock().unwrap().run("app/main.main")?,
                 Outcome::Ok(_)
             ));
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     let mut instance = Program::from_bytes(&bytes)
@@ -2226,7 +2226,7 @@ fn a_nested_store_in_the_allocator_gets_its_own_thread() {
                 .call_async("app/buffer", &[Value::String("input".into())])
                 .await
                 .unwrap(),
-            Outcome::Ok(Value::Nil)
+            Outcome::Ok(Value::Unit)
         ));
         std::thread::current().id()
     });
@@ -2397,7 +2397,7 @@ fn bg_context_imports(
                 disposed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             })?;
             contexts.lock().unwrap().push((context, id));
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     imports
@@ -2521,7 +2521,7 @@ fn bg_two_concurrent_runs_in_one_host_are_independent() {
     imports
         .context_service("app:console/v1", "print", move |context, args| {
             if !matches!(args, [Value::String(s)] if s == "run") {
-                return Ok(Ok(Value::Nil));
+                return Ok(Ok(Value::Unit));
             }
             let id = context.insert("fixture", (), |_, _| {})?;
             ids.lock().unwrap().push(id.clone());
@@ -2535,7 +2535,7 @@ fn bg_two_concurrent_runs_in_one_host_are_independent() {
                 }
             }
             barrier.wait();
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     imports.grant_package(&plan, "fixture-content");
@@ -2845,7 +2845,7 @@ fn bg_review_opaque_shape_is_not_an_async_protocol_on_rust() {
 
 fn bg_lifecycle_program() -> Program {
     let bytes = include_bytes!("../../../tests/browser/fixtures/bg-lifecycle.wasm");
-    let point = Signature::new([], AbiType::Nil).asynchronous();
+    let point = Signature::new([], AbiType::Unit).asynchronous();
     Program::from_bytes(bytes)
         .unwrap()
         .with_abi(Abi {
@@ -2857,10 +2857,10 @@ fn bg_lifecycle_program() -> Program {
                 ("runnable".into(), point.clone()),
                 ("immediate".into(), point.clone()),
                 ("leftover".into(), point),
-                ("sync".into(), Signature::new([], AbiType::Nil)),
+                ("sync".into(), Signature::new([], AbiType::Unit)),
                 (
                     "buffers".into(),
-                    Signature::new([AbiType::String, AbiType::String], AbiType::Nil),
+                    Signature::new([AbiType::String, AbiType::String], AbiType::Unit),
                 ),
             ]
             .into(),
@@ -2868,8 +2868,8 @@ fn bg_lifecycle_program() -> Program {
                 (
                     "bg:control/v1".into(),
                     [
-                        ("capture".into(), Signature::new([], AbiType::Nil)),
-                        ("end".into(), Signature::new([], AbiType::Nil)),
+                        ("capture".into(), Signature::new([], AbiType::Unit)),
+                        ("end".into(), Signature::new([], AbiType::Unit)),
                     ]
                     .into(),
                 ),
@@ -2877,7 +2877,7 @@ fn bg_lifecycle_program() -> Program {
                     "bg:work/v1".into(),
                     [(
                         "wait".into(),
-                        Signature::new([], AbiType::Nil).asynchronous(),
+                        Signature::new([], AbiType::Unit).asynchronous(),
                     )]
                     .into(),
                 ),
@@ -2907,13 +2907,13 @@ fn bg_lifecycle_imports(
     imports
         .context_service("bg:control/v1", "capture", move |context, _| {
             capture(context);
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     imports
         .context_service("bg:control/v1", "end", |context, _| {
             context.teardown();
-            Ok(Ok(Value::Nil))
+            Ok(Ok(Value::Unit))
         })
         .unwrap();
     imports
@@ -3057,7 +3057,7 @@ fn bg_review_cleanup_failure_is_reported_without_replacing_a_success() {
         .unwrap();
     assert!(matches!(
         block_on(guest.call_async("leftover", &[])).unwrap(),
-        Outcome::Ok(Value::Nil)
+        Outcome::Ok(Value::Unit)
     ));
     assert_eq!(bg_lifecycle_counter(&mut guest, 4), 1);
     let errors = guest.take_cleanup_errors();
