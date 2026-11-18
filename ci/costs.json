@@ -1,5 +1,6 @@
 {
  "budget_seconds": 270,
+ "measured_at": "2026-11-18",
  "sets": {
   "corpus-cases": {
    "costs": {},

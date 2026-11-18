@@ -65,12 +65,36 @@ fn every_shard_is_within_budget_unless_the_unit_is_reported() {
 }
 
 #[test]
-fn a_tight_set_gets_one_more_shard_rather_than_an_overfull_one() {
-    // ceil(3 * 0.6 / 1) = 2, but no 2 shards hold these within 1 s.
+fn the_shard_count_is_ceiling_total_over_budget() {
     let units: Vec<Unit> = ["a", "b", "c"].iter().map(|k| Unit { key: k.to_string(), cost: 0.6 }).collect();
-    let planned = plan(&units, 1.0);
-    assert_eq!(planned.shards.len(), 3);
+    assert_eq!(plan(&units, 1.0).shards.len(), 2);
+    assert_eq!(plan(&units, 0.5).shards.len(), 3);
+    assert_eq!(plan(&units, 10.0).shards.len(), 1);
+}
+
+#[test]
+fn every_shard_fits_the_budget_when_no_unit_is_over() {
+    let units: Vec<Unit> = (0..100)
+        .map(|i| Unit { key: format!("u{i:03}"), cost: 1.0 })
+        .collect();
+    let planned = plan(&units, 10.0);
+    assert_eq!(planned.shards.len(), 10);
+    for shard in &planned.shards {
+        assert!(shard.seconds <= 10.0, "shard {} has {} s", shard.index, shard.seconds);
+    }
     assert!(planned.over_budget.is_empty());
+}
+
+#[test]
+fn over_budget_units_are_reported_with_the_plan() {
+    let mut units = units();
+    units.push(Unit { key: "over".into(), cost: 300.0 });
+    let planned = plan(&units, 270.0);
+    let reported: Vec<&str> = planned.over_budget.iter().map(|u| u.key.as_str()).collect();
+    assert!(reported.contains(&"over"), "{reported:?}");
+    assert!(planned.shards.iter().any(|s| s.keys.iter().any(|k| k == "over")));
+    let json = plan_json(&planned, 270.0);
+    assert!(json.contains("{\"key\":\"over\",\"cost\":300}"), "{json}");
 }
 
 #[test]
@@ -149,7 +173,7 @@ fn the_cli_prints_the_plan_keys_and_matrix() {
     assert_eq!(
         out,
         "{\"budget_seconds\":3,\"shards\":[{\"index\":0,\"seconds\":3,\"keys\":[\"a\",\"c\"]},\
-         {\"index\":1,\"seconds\":2,\"keys\":[\"b\"]},{\"index\":2,\"seconds\":2,\"keys\":[\"d\"]}],\"over_budget\":[]}\n"
+         {\"index\":1,\"seconds\":2,\"keys\":[\"b\"]},{\"index\":2,\"seconds\":2,\"keys\":[\"d\"]}],\"over_budget\":[],\"missing_costs\":[\"d\"]}\n"
     );
     let (code, out, _) = shard(&["keys", "--costs", &costs, "--set", "s", "--shard", "0", "--budget", "3"]);
     assert_eq!((code, out.as_str()), (0, "a\nc\n"));

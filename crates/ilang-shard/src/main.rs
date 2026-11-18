@@ -86,7 +86,18 @@ fn run(args: &[String]) -> Result<String, Failure> {
     if !(budget.is_finite() && budget > 0.0) {
         return Err(error(format!("the budget must be greater than 0 seconds, not {budget}")));
     }
-    let planned = plan(&set.units(), budget);
+    let mut planned = plan(&set.units(), budget);
+    planned.missing_costs = set.missing();
+    if !planned.missing_costs.is_empty() {
+        eprintln!(
+            "i-shard: {} unit(s) have no measured cost and use the set median: {}",
+            planned.missing_costs.len(),
+            planned.missing_costs.iter().take(5).cloned().collect::<Vec<_>>().join(", ")
+        );
+    }
+    if table.measured_at.is_none() {
+        eprintln!("i-shard: {} has no measured_at; the costs may be stale, which affects balance only", o.costs);
+    }
     Ok(match o.command.as_str() {
         "plan" => plan_json(&planned, budget) + "\n",
         "keys" => {

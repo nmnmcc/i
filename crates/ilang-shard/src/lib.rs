@@ -35,6 +35,8 @@ pub struct Shard {
 pub struct Plan {
     pub shards: Vec<Shard>,
     pub over_budget: Vec<Unit>,
+    /// Units that had no measured cost and took the set median.
+    pub missing_costs: Vec<String>,
 }
 
 /// Plans the shards of `units` for `budget_seconds` per shard.
@@ -67,16 +69,12 @@ pub fn plan(units: &[Unit], budget_seconds: f64) -> Plan {
     over_budget.sort_by(|a, b| a.key.cmp(&b.key));
 
     let most = units.len().max(1);
-    let mut count = ((total / budget_seconds).ceil() as usize).clamp(1, most);
-    loop {
-        let shards = assign(&order, count);
-        let fits = shards
-            .iter()
-            .all(|s| s.seconds <= budget_seconds || s.keys.len() == 1);
-        if fits || count == most {
-            return Plan { shards, over_budget };
-        }
-        count += 1;
+    let count = ((total / budget_seconds).ceil() as usize).clamp(1, most);
+    let shards = assign(&order, count);
+    Plan {
+        shards,
+        over_budget,
+        missing_costs: Vec::new(),
     }
 }
 
@@ -129,7 +127,7 @@ fn string_json(text: &str) -> String {
 }
 
 /// The plan as one line of JSON:
-/// `{"budget_seconds":N,"shards":[{"index":0,"seconds":S,"keys":[...]}],"over_budget":[{"key":K,"cost":C}]}`.
+/// `{"budget_seconds":N,"shards":[{"index":0,"seconds":S,"keys":[...]}],"over_budget":[{"key":K,"cost":C}],"missing_costs":[K]}`.
 pub fn plan_json(plan: &Plan, budget_seconds: f64) -> String {
     let mut out = format!("{{\"budget_seconds\":{},\"shards\":[", seconds_json(budget_seconds));
     for (i, shard) in plan.shards.iter().enumerate() {
@@ -151,6 +149,13 @@ pub fn plan_json(plan: &Plan, budget_seconds: f64) -> String {
             out.push(',');
         }
         let _ = write!(out, "{{\"key\":{},\"cost\":{}}}", string_json(&unit.key), seconds_json(unit.cost));
+    }
+    out.push_str("],\"missing_costs\":[");
+    for (i, key) in plan.missing_costs.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(&string_json(key));
     }
     out.push_str("]}");
     out
@@ -183,6 +188,18 @@ pub struct CostSet {
 
 impl CostSet {
     /// The units of the set; a key without a cost takes the set's median.
+    /// The keys with no measured cost, sorted.
+    pub fn missing(&self) -> Vec<String> {
+        let mut missing: Vec<String> = self
+            .keys
+            .iter()
+            .filter(|key| !self.costs.contains_key(*key))
+            .cloned()
+            .collect();
+        missing.sort();
+        missing
+    }
+
     pub fn units(&self) -> Vec<Unit> {
         let pairs: Vec<(String, Option<f64>)> = self
             .keys
@@ -206,6 +223,8 @@ impl CostSet {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CostTable {
     pub budget_seconds: Option<f64>,
+    /// The date the costs were measured, if recorded.
+    pub measured_at: Option<String>,
     pub sets: BTreeMap<String, CostSet>,
 }
 
@@ -221,6 +240,10 @@ impl CostTable {
         let budget_seconds = match root.get("budget_seconds") {
             None => None,
             Some(v) => Some(v.as_f64().ok_or("budget_seconds is not a number")?),
+        };
+        let measured_at = match root.get("measured_at") {
+            None => None,
+            Some(v) => Some(v.as_str().ok_or("measured_at is not a string")?.to_string()),
         };
         let raw_sets = root
             .get("sets")
@@ -259,6 +282,6 @@ impl CostTable {
             }
             sets.insert(name.clone(), CostSet { keys, costs });
         }
-        Ok(CostTable { budget_seconds, sets })
+        Ok(CostTable { budget_seconds, measured_at, sets })
     }
 }
