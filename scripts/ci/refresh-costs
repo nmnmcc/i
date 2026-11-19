@@ -208,8 +208,10 @@ def main():
     parser.add_argument('--sync-keys', action='store_true',
                         help='rewrite the key lists of the known sets from the repository')
     parser.add_argument('--budget', type=float, help='set budget_seconds (default: keep it, or 270)')
+    parser.add_argument('--timings', type=Path, nargs='+', default=[], metavar='FILE',
+                        help='JSON-lines files written when CHECKS_TIMINGS is set; one line per case')
     args = parser.parse_args()
-    if not args.logs and not args.sync_keys and args.budget is None:
+    if not args.logs and not args.sync_keys and args.budget is None and not args.timings:
         parser.error('nothing to do: give --logs, --sync-keys or --budget')
 
     if args.costs.exists():
@@ -261,6 +263,26 @@ def main():
         costs.update(found)
         print(f'refresh-costs: {name}: {len(found)} of {len(keys)} costs from the logs'
               + (f'; not in its keys: {", ".join(unknown)}' if unknown else ''), file=sys.stderr)
+    timed = {}
+    for path in args.timings:
+        if not path.is_file():
+            fail(f'cannot read the timings {path}')
+        for number, line in enumerate(path.read_text().splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+                name, key, seconds = row['set'], row['key'], float(row['seconds'])
+            except (ValueError, KeyError, TypeError) as e:
+                fail(f'{path}:{number}: not a timing line: {e}')
+            if name not in sets:
+                fail(f'{path}:{number}: set {name!r} is not in the table')
+            if key not in set(sets[name]['keys']):
+                fail(f'{path}:{number}: {key!r} is not a key of {name}')
+            timed.setdefault(name, {})[key] = seconds
+    for name, found in timed.items():
+        sets[name].setdefault('costs', {}).update(found)
+        print(f'refresh-costs: {name}: {len(found)} costs from the timings', file=sys.stderr)
     if args.logs:
         for name in sorted(set(sets) - set(observed)):
             print(f'refresh-costs: {name}: no costs in the logs; left as it was', file=sys.stderr)

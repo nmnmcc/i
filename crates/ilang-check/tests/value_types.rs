@@ -820,6 +820,7 @@ fn spec_corpus_reverse_order_and_recovery() {
         .map_or(1, |n| n.get())
         .min(discovered.max(1));
     let next = std::sync::atomic::AtomicUsize::new(0);
+    let timings = std::sync::Mutex::new(Vec::new());
     let results = std::thread::scope(|scope| {
         let handles = (0..workers)
             .map(|_| {
@@ -829,6 +830,7 @@ fn spec_corpus_reverse_order_and_recovery() {
                         let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         let Some(path) = cases.get(i) else { break };
                         let is_pending = pending.iter().any(|name| path == &root.join(name));
+                        let started = std::time::Instant::now();
                         let result = std::panic::catch_unwind(|| {
                             spec_case_reverse_order_and_recovery(path, is_pending)
                         })
@@ -840,6 +842,7 @@ fn spec_corpus_reverse_order_and_recovery() {
                                 .unwrap_or_else(|| "non-string panic".into());
                             Err(format!("panicked: {message}"))
                         });
+                        timings.lock().unwrap().push((spec_case_key(&root, path), started.elapsed().as_secs_f64()));
                         out.push((path, result));
                     }
                     out
@@ -851,6 +854,17 @@ fn spec_corpus_reverse_order_and_recovery() {
             .flat_map(|h| h.join().unwrap())
             .collect::<Vec<_>>()
     });
+    if let Some(path) = std::env::var_os("CHECKS_TIMINGS") {
+        use std::io::Write;
+        let path = std::path::PathBuf::from(path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path).unwrap();
+        for (key, seconds) in timings.into_inner().unwrap() {
+            writeln!(file, "{{\"set\":\"value-type-recovery-cases\",\"key\":{key:?},\"seconds\":{seconds:.3}}}").unwrap();
+        }
+    }
     let mut count = 0;
     let mut rejected = 0;
     let mut failures = Vec::new();

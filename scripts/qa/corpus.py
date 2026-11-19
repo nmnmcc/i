@@ -387,9 +387,13 @@ def run_corpus(args):
         saved = ROOT / case['project'] / 'expected.json'
         if (not update or args.keep_bounds) and saved.exists():
             bound = json.loads(saved.read_text()).get('bound_seconds', 3)
-        return case, observe(args.binary, case, bound)[0], bound
+        started = time.monotonic()
+        outcome = observe(args.binary, case, bound)[0]
+        return case, outcome, bound, time.monotonic() - started
     pool = ThreadPoolExecutor(max_workers=args.jobs)
-    for n, (case, result, bound) in enumerate(pool.map(observe_case, cases)):
+    timings = []
+    for n, (case, result, bound, seconds) in enumerate(pool.map(observe_case, cases)):
+        timings.append((case['id'], seconds))
         applicable = [r for r in requirements['requirements'] if re.search(r['pattern'], case['id'])]
         expected_cycle = any('E0505' in r.get('diagnostic_codes', []) and r.get('phase') != 'entry' for r in applicable)
         expected_path = ROOT / case['project'] / 'expected.json'
@@ -454,6 +458,10 @@ def run_corpus(args):
             summary['checker-crash-or-timeout'] += 1
         if (n + 1) % 50 == 0:
             print(f'{n+1}/{len(cases)} {dict(summary)}', flush=True)
+    if os.environ.get('CHECKS_TIMINGS'):
+        with open(os.environ['CHECKS_TIMINGS'], 'a') as stream:
+            for key, seconds in timings:
+                stream.write(json.dumps({'set': 'corpus-cases', 'key': key, 'seconds': round(seconds, 3)}) + '\n')
     print(json.dumps({**({'shard': '%d/%d' % args.shard} if args.shard else {}), 'selected': len(cases), 'checks': dict(summary), 'failures': failures}, indent=2))
     pool.shutdown()
     if failures:
