@@ -2428,10 +2428,7 @@ fn publish_a_package_in_a_directory_of_the_repository() {
         &[
             (
                 "i.toml",
-                &format!(
-                    "name = \"app\"\n[dependencies]\npub = \"example.com/mono//stdlib@0.1.0\"\n{}",
-                    stdlib_dependency()
-                ),
+                "name = \"app\"\n[dependencies]\npub = \"example.com/mono//stdlib@0.1.0\"\ni = \"github.com/nmnmcc/i//stdlib@0.1.0\"\n",
             ),
             ("src/main.i", " (pub/api)\n (x)\n\nx = api.one\n"),
         ],

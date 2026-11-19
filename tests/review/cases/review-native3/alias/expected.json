@@ -1,6 +1,6 @@
 {
-  "compiler": "a9fca5fe778734d2d9084ce7b6532fe5da369f42",
-  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
+  "compiler": "46a4e532081f102fc0cc59415798d8dfa25d6c1a",
+  "binary_sha256": "7ce07318fbd1c3f26778cc5f4344044034db392b695a04d6d10563d9ec31cf0a",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {
@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:1:1: error[E0234]: an item call must name a macro\n1 error\n"
+      "stderr": "src/main.i:1:1: error[E0234]: a call at the top level is kept for macros; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\nsrc/main.i:2:5: error[E0201]: there is no module `r`; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\nsrc/main.i:3:5: error[E0201]: `S` is not defined; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\nsrc/resource.i:1:1: error[E0234]: a call at the top level is kept for macros; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\n4 errors\n"
     }
   }
 }

@@ -1,6 +1,6 @@
 {
-  "compiler": "a9fca5fe778734d2d9084ce7b6532fe5da369f42",
-  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
+  "compiler": "46a4e532081f102fc0cc59415798d8dfa25d6c1a",
+  "binary_sha256": "7ce07318fbd1c3f26778cc5f4344044034db392b695a04d6d10563d9ec31cf0a",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {
@@ -9,9 +9,29 @@
         "check",
         "--types"
       ],
-      "exit": 1,
-      "stdout": "",
-      "stderr": "../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
+      "exit": 0,
+      "stdout": "review/fixed.scale : 340282366920938463463374607431768211456\nreview/fixed.floor : (Int, Int) -> Int\nreview/fixed.ceil : (Int, Int) -> Int\nreview/fixed.min : (Int, Int) -> Int\nreview/fixed.max : (Int, Int) -> Int\nreview/fixed.add : (I, I) -> I\nreview/fixed.neg : (I) -> I\nreview/fixed.mul : (I, I) -> I\nreview/fixed.div : (I, Int) -> I\nreview/fixed.cosine : (I) -> I\nreview/pbt.make : ((Int, random.Generator) -> Option(Tree(A))) -> Gen(A)\nreview/pbt.sample : (Gen(A), Int, random.Generator) -> Option(Tree(A))\nreview/pbt.constant : (A) -> Gen(A)\nreview/pbt.map_tree : (Tree(A), (A) -> B) -> Tree(B)\nreview/pbt.map : (Gen(A), (A) -> B) -> Gen(B)\nreview/pbt.bind_node : (Tree(A), Tree(B), (A) -> Gen(B), Int, random.Generator) -> Tree(B)\nreview/pbt.bind_outer : (Tree(A), (A) -> Gen(B), Int, random.Generator) -> Option(Tree(B))\nreview/pbt.flat_map : (Gen(A), (A) -> Gen(B)) -> Gen(B)\nreview/pbt.int_tree : (Int, Int) -> Tree(Int)\nreview/pbt.int : (Int, Int) -> Gen(Int)\nreview/pbt.shrink : (Tree(A), Int, (A) -> Bool) -> (A, List(Int), Int)\nreview/pbt.descend : (Tree(A), Int, List(Int), Int, (A) -> Bool) -> (A, List(Int), Int)\nreview/pbt.scan : (Tree(A), List(Tree(A)), Int, List(Int), Int, Int, (A) -> Bool) -> (A, List(Int), Int)\nreview/rat.abs : (Int) -> Int\nreview/rat.gcd : (Int, Int) -> Int\nreview/rat.make : (Int, Int) -> R\nreview/rat.add : (R, R) -> R\nreview/rat.sub : (R, R) -> R\nreview/rat.mul : (R, R) -> R\nreview/rat.div : (R, R) -> R\nreview/rat.atan_terms : (R, Int) -> R\nreview/rat.sin_terms : (R, Int) -> R\nreview/fixed_test.generated_test : () <- (Assert) -> ()\nreview/math_test.generated_test : () <- (Assert) -> ()\nreview/math_test.generated_test : () <- (Assert) -> ()\nreview/math_test.generated_test : () <- (Assert) -> ()\nreview/math_test.generated_test : () <- (Assert) -> ()\nreview/pbt_test.walk : (pbt.Tree((Int, Int)), Int) <- (Assert) -> ()\nreview/pbt_test.generated_test : () <- (Assert) -> ()\nreview/pbt_test.generated_test : () <- (Assert) -> ()\nreview/pbt_test.generated_test : () <- (Assert) -> ()\nreview/pbt_test.generated_test : () <- (Assert) -> ()\nreview/pbt_test.generated_test : () <- (Assert) -> ()\nreview/reduced_huge_test.generated_test : () <- (Assert) -> ()\nreview/reduced_ordinary_test.generated_test : () <- (Assert) -> ()\n",
+      "stderr": ""
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": "timeout",
+      "stdout": "pass review/fixed_test.cosine_reduced_one\npass review/math_test.atan_fifth_29\npass review/math_test.atan_fifth_250\npass review/math_test.atan_half_65\npass review/math_test.sine_one_20\npass review/pbt_test.dependent\npass review/pbt_test.greedy\npass review/pbt_test.zero_budget\npass review/pbt_test.cyclic_budget\npass review/pbt_test.map_has_no_numeric_smaller_law\npass review/qa_corpus_runtime_test.qa_startup\n",
+      "stderr": ""
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": "timeout",
+      "stdout": "pass review/fixed_test.cosine_reduced_one\npass review/math_test.atan_fifth_29\npass review/math_test.atan_fifth_250\npass review/math_test.atan_half_65\npass review/math_test.sine_one_20\npass review/pbt_test.dependent\npass review/pbt_test.greedy\npass review/pbt_test.zero_budget\npass review/pbt_test.cyclic_budget\npass review/pbt_test.map_has_no_numeric_smaller_law\npass review/qa_corpus_runtime_test.qa_startup\n",
+      "stderr": ""
     }
   }
 }

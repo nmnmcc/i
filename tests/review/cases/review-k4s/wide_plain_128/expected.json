@@ -1,6 +1,6 @@
 {
-  "compiler": "a9fca5fe778734d2d9084ce7b6532fe5da369f42",
-  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
+  "compiler": "46a4e532081f102fc0cc59415798d8dfa25d6c1a",
+  "binary_sha256": "7ce07318fbd1c3f26778cc5f4344044034db392b695a04d6d10563d9ec31cf0a",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {
@@ -9,9 +9,29 @@
         "check",
         "--types"
       ],
-      "exit": 1,
-      "stdout": "",
-      "stderr": "../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
+      "exit": 0,
+      "stdout": "app/main.u0 : () <- (S0(Int)) -> ()\napp/main.u1 : () <- (S1(Int)) -> ()\napp/main.u2 : () <- (S2(Int)) -> ()\napp/main.u3 : () <- (S3(Int)) -> ()\napp/main.u4 : () <- (S4(Int)) -> ()\napp/main.u5 : () <- (S5(Int)) -> ()\napp/main.u6 : () <- (S6(Int)) -> ()\napp/main.u7 : () <- (S7(Int)) -> ()\napp/main.u8 : () <- (S8(Int)) -> ()\napp/main.u9 : () <- (S9(Int)) -> ()\napp/main.u10 : () <- (S10(Int)) -> ()\napp/main.u11 : () <- (S11(Int)) -> ()\napp/main.u12 : () <- (S12(Int)) -> ()\napp/main.u13 : () <- (S13(Int)) -> ()\napp/main.u14 : () <- (S14(Int)) -> ()\napp/main.u15 : () <- (S15(Int)) -> ()\napp/main.u16 : () <- (S16(Int)) -> ()\napp/main.u17 : () <- (S17(Int)) -> ()\napp/main.u18 : () <- (S18(Int)) -> ()\napp/main.u19 : () <- (S19(Int)) -> ()\napp/main.u20 : () <- (S20(Int)) -> ()\napp/main.u21 : () <- (S21(Int)) -> ()\napp/main.u22 : () <- (S22(Int)) -> ()\napp/main.u23 : () <- (S23(Int)) -> ()\napp/main.u24 : () <- (S24(Int)) -> ()\napp/main.u25 : () <- (S25(Int)) -> ()\napp/main.u26 : () <- (S26(Int)) -> ()\napp/main.u27 : () <- (S27(Int)) -> ()\napp/main.u28 : () <- (S28(Int)) -> ()\napp/main.u29 : () <- (S29(Int)) -> ()\napp/main.u30 : () <- (S30(Int)) -> ()\napp/main.u31 : () <- (S31(Int)) -> ()\napp/main.u32 : () <- (S32(Int)) -> ()\napp/main.u33 : () <- (S33(Int)) -> ()\napp/main.u34 : () <- (S34(Int)) -> ()\napp/main.u35 : () <- (S35(Int)) -> ()\napp/main.u36 : () <- (S36(Int)) -> ()\napp/main.u37 : () <- (S37(Int)) -> ()\napp/main.u38 : () <- (S38(Int)) -> ()\napp/main.u39 : () <- (S39(Int)) -> ()\napp/main.u40 : () <- (S40(Int)) -> ()\napp/main.u41 : () <- (S41(Int)) -> ()\napp/main.u42 : () <- (S42(Int)) -> ()\napp/main.u43 : () <- (S43(Int)) -> ()\napp/main.u44 : () <- (S44(Int)) -> ()\napp/main.u45 : () <- (S45(Int)) -> ()\napp/main.u46 : () <- (S46(Int)) -> ()\napp/main.u47 : () <- (S47(Int)) -> ()\napp/main.u48 : () <- (S48(Int)) -> ()\napp/main.u49 : () <- (S49(Int)) -> ()\napp/main.u50 : () <- (S50(Int)) -> ()\napp/main.u51 : () <- (S51(Int)) -> ()\napp/main.u52 : () <- (S52(Int)) -> ()\napp/main.u53 : () <- (S53(Int)) -> ()\napp/main.u54 : () <- (S54(Int)) -> ()\napp/main.u55 : () <- (S55(Int)) -> ()\napp/main.u56 : () <- (S56(Int)) -> ()\napp/main.u57 : () <- (S57(Int)) -> ()\napp/main.u58 : () <- (S58(Int)) -> ()\napp/main.u59 : () <- (S59(Int)) -> ()\napp/main.u60 : () <- (S60(Int)) -> ()\napp/main.u61 : () <- (S61(Int)) -> ()\napp/main.u62 : () <- (S62(Int)) -> ()\napp/main.u63 : () <- (S63(Int)) -> ()\napp/main.u64 : () <- (S64(Int)) -> ()\napp/main.u65 : () <- (S65(Int)) -> ()\napp/main.u66 : () <- (S66(Int)) -> ()\napp/main.u67 : () <- (S67(Int)) -> ()\napp/main.u68 : () <- (S68(Int)) -> ()\napp/main.u69 : () <- (S69(Int)) -> ()\napp/main.u70 : () <- (S70(Int)) -> ()\napp/main.u71 : () <- (S71(Int)) -> ()\napp/main.u72 : () <- (S72(Int)) -> ()\napp/main.u73 : () <- (S73(Int)) -> ()\napp/main.u74 : () <- (S74(Int)) -> ()\napp/main.u75 : () <- (S75(Int)) -> ()\napp/main.u76 : () <- (S76(Int)) -> ()\napp/main.u77 : () <- (S77(Int)) -> ()\napp/main.u78 : () <- (S78(Int)) -> ()\napp/main.u79 : () <- (S79(Int)) -> ()\napp/main.u80 : () <- (S80(Int)) -> ()\napp/main.u81 : () <- (S81(Int)) -> ()\napp/main.u82 : () <- (S82(Int)) -> ()\napp/main.u83 : () <- (S83(Int)) -> ()\napp/main.u84 : () <- (S84(Int)) -> ()\napp/main.u85 : () <- (S85(Int)) -> ()\napp/main.u86 : () <- (S86(Int)) -> ()\napp/main.u87 : () <- (S87(Int)) -> ()\napp/main.u88 : () <- (S88(Int)) -> ()\napp/main.u89 : () <- (S89(Int)) -> ()\napp/main.u90 : () <- (S90(Int)) -> ()\napp/main.u91 : () <- (S91(Int)) -> ()\napp/main.u92 : () <- (S92(Int)) -> ()\napp/main.u93 : () <- (S93(Int)) -> ()\napp/main.u94 : () <- (S94(Int)) -> ()\napp/main.u95 : () <- (S95(Int)) -> ()\napp/main.u96 : () <- (S96(Int)) -> ()\napp/main.u97 : () <- (S97(Int)) -> ()\napp/main.u98 : () <- (S98(Int)) -> ()\napp/main.u99 : () <- (S99(Int)) -> ()\napp/main.u100 : () <- (S100(Int)) -> ()\napp/main.u101 : () <- (S101(Int)) -> ()\napp/main.u102 : () <- (S102(Int)) -> ()\napp/main.u103 : () <- (S103(Int)) -> ()\napp/main.u104 : () <- (S104(Int)) -> ()\napp/main.u105 : () <- (S105(Int)) -> ()\napp/main.u106 : () <- (S106(Int)) -> ()\napp/main.u107 : () <- (S107(Int)) -> ()\napp/main.u108 : () <- (S108(Int)) -> ()\napp/main.u109 : () <- (S109(Int)) -> ()\napp/main.u110 : () <- (S110(Int)) -> ()\napp/main.u111 : () <- (S111(Int)) -> ()\napp/main.u112 : () <- (S112(Int)) -> ()\napp/main.u113 : () <- (S113(Int)) -> ()\napp/main.u114 : () <- (S114(Int)) -> ()\napp/main.u115 : () <- (S115(Int)) -> ()\napp/main.u116 : () <- (S116(Int)) -> ()\napp/main.u117 : () <- (S117(Int)) -> ()\napp/main.u118 : () <- (S118(Int)) -> ()\napp/main.u119 : () <- (S119(Int)) -> ()\napp/main.u120 : () <- (S120(Int)) -> ()\napp/main.u121 : () <- (S121(Int)) -> ()\napp/main.u122 : () <- (S122(Int)) -> ()\napp/main.u123 : () <- (S123(Int)) -> ()\napp/main.u124 : () <- (S124(Int)) -> ()\napp/main.u125 : () <- (S125(Int)) -> ()\napp/main.u126 : () <- (S126(Int)) -> ()\napp/main.u127 : () <- (S127(Int)) -> ()\napp/main.run : (() <- N -> A) <- N -> A\napp/main.wide : () <- (S0(Int), S1(Int), S10(Int), S100(Int), S101(Int), S102(Int), S103(Int), S104(Int), S105(Int), S106(Int), S107(Int), S108(Int), S109(Int), S11(Int), S110(Int), S111(Int), S112(Int), S113(Int), S114(Int), S115(Int), S116(Int), S117(Int), S118(Int), S119(Int), S12(Int), S120(Int), S121(Int), S122(Int), S123(Int), S124(Int), S125(Int), S126(Int), S127(Int), S13(Int), S14(Int), S15(Int), S16(Int), S17(Int), S18(Int), S19(Int), S2(Int), S20(Int), S21(Int), S22(Int), S23(Int), S24(Int), S25(Int), S26(Int), S27(Int), S28(Int), S29(Int), S3(Int), S30(Int), S31(Int), S32(Int), S33(Int), S34(Int), S35(Int), S36(Int), S37(Int), S38(Int), S39(Int), S4(Int), S40(Int), S41(Int), S42(Int), S43(Int), S44(Int), S45(Int), S46(Int), S47(Int), S48(Int), S49(Int), S5(Int), S50(Int), S51(Int), S52(Int), S53(Int), S54(Int), S55(Int), S56(Int), S57(Int), S58(Int), S59(Int), S6(Int), S60(Int), S61(Int), S62(Int), S63(Int), S64(Int), S65(Int), S66(Int), S67(Int), S68(Int), S69(Int), S7(Int), S70(Int), S71(Int), S72(Int), S73(Int), S74(Int), S75(Int), S76(Int), S77(Int), S78(Int), S79(Int), S8(Int), S80(Int), S81(Int), S82(Int), S83(Int), S84(Int), S85(Int), S86(Int), S87(Int), S88(Int), S89(Int), S9(Int), S90(Int), S91(Int), S92(Int), S93(Int), S94(Int), S95(Int), S96(Int), S97(Int), S98(Int), S99(Int)) -> ()\n",
+      "stderr": "src/main.i:258:1: warning[W0504]: top-level binding `wide` is not used\n"
+    },
+    "test0": {
+      "command": [
+        "test",
+        "--opt",
+        "0"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:258:1: warning[W0504]: top-level binding `wide` is not used\n"
+    },
+    "test2": {
+      "command": [
+        "test",
+        "--opt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
+      "stderr": "src/main.i:258:1: warning[W0504]: top-level binding `wide` is not used\n"
     }
   }
 }
