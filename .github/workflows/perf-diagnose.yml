@@ -1,0 +1,212 @@
+# Diagnostics for the compiler/runtime performance lane. It uses the release
+# `i` built by a Perf baseline run and the extra bench sources on this branch;
+# nothing is merged from here.
+#
+# Started by a push to this file (workflow_dispatch is only offered for
+# workflows on the default branch).
+name: Perf diagnose
+
+on:
+  push:
+    branches: [ci/perf-baseline]
+    paths:
+      - .github/workflows/perf-diagnose.yml
+      - bench/test/diag_test.i
+      - diag/**
+
+permissions:
+  contents: read
+
+env:
+  # The run that built i-release-current; override when re-running.
+  BASELINE_RUN: "44503007673"
+  RAYON_NUM_THREADS: 1
+  REPEATS: "3"
+
+jobs:
+  cases:
+    name: case (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: bench-o2
+            project: bench
+            opt: 2
+            filter: ""
+            gc: copying
+            heap: ""
+          - name: sort-o2-copying-1g
+            project: bench
+            opt: 2
+            filter: list_sort
+            gc: copying
+            heap: "1024"
+          - name: sort-o2-null
+            project: bench
+            opt: 2
+            filter: list_sort
+            gc: null
+            heap: ""
+          - name: sort-o2-drc
+            project: bench
+            opt: 2
+            filter: list_sort
+            gc: drc
+            heap: ""
+          - name: map-o2-null
+            project: bench
+            opt: 2
+            filter: list_map
+            gc: null
+            heap: ""
+          - name: svc4-o2
+            project: diag/svc4
+            opt: 2
+            filter: ""
+            gc: copying
+            heap: ""
+          - name: svc32-o2
+            project: diag/svc32
+            opt: 2
+            filter: ""
+            gc: copying
+            heap: ""
+          - name: svc32-o0
+            project: diag/svc32
+            opt: 0
+            filter: ""
+            gc: copying
+            heap: ""
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c84b7
+      - name: Wait for the baseline binary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for i in $(seq 1 80); do
+            if gh api "repos/${{ github.repository }}/actions/runs/$BASELINE_RUN/artifacts" \
+              --jq '.artifacts[].name' | grep -qx i-release-current; then
+              echo "i-release-current is ready"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "i-release-current did not appear" >&2
+          exit 1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-current
+          path: target/release
+          run-id: ${{ env.BASELINE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of i
+        run: |
+          chmod +x target/release/i
+          xargs nix-store --realise < target/release/i.nix-paths > /dev/null
+          target/release/i --version
+      - name: Machine
+        run: |
+          mkdir -p out
+          { uname -a; nproc; lscpu | head -20; free -h; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+      - name: Run the case
+        env:
+          PROJECT: ${{ matrix.project }}
+          OPT: ${{ matrix.opt }}
+          FILTER: ${{ matrix.filter }}
+          GC: ${{ matrix.gc }}
+          HEAP: ${{ matrix.heap }}
+        run: |
+          set -x
+          for r in $(seq 1 "$REPEATS"); do
+            args=(test --project "$PROJECT" --opt "$OPT" --time)
+            if [ -n "$FILTER" ]; then args+=("$FILTER"); fi
+            env_args=(ILANG_GC="$GC")
+            if [ -n "$HEAP" ]; then env_args+=(ILANG_GC_HEAP="$HEAP"); fi
+            /usr/bin/time -v -o "out/time-$r.txt" env "${env_args[@]}" \
+              target/release/i "${args[@]}" > "out/run-$r.log" 2> "out/stderr-$r.log"
+            cat /proc/loadavg > "out/load-$r.txt"
+            tail -5 "out/run-$r.log"
+            grep -E "Maximum resident set size|User time|System time|Elapsed" "out/time-$r.txt"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diag-${{ matrix.name }}-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+
+  wasm:
+    name: wasm stats
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c84b7
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - name: Wait for the baseline binary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for i in $(seq 1 80); do
+            if gh api "repos/${{ github.repository }}/actions/runs/$BASELINE_RUN/artifacts" \
+              --jq '.artifacts[].name' | grep -qx i-release-current; then
+              echo "i-release-current is ready"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "i-release-current did not appear" >&2
+          exit 1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-current
+          path: target/release
+          run-id: ${{ env.BASELINE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of i
+        run: |
+          chmod +x target/release/i
+          xargs nix-store --realise < target/release/i.nix-paths > /dev/null
+      - name: Build the probe and count the module
+        run: |
+          mkdir -p out
+          for o in 0 2 3; do
+            devenv shell -- target/release/i build --project diag/wat --opt "$o" \
+              --target wasi --out "out/wat-o$o.wasm"
+            devenv shell -- wasm-tools validate "out/wat-o$o.wasm"
+            devenv shell -- wasm-tools print "out/wat-o$o.wasm" > "out/wat-o$o.wat"
+            {
+              echo "opt $o bytes $(stat -c %s "out/wat-o$o.wasm")"
+              for op in call_ref call_indirect ref.cast ref.test struct.new array.new array.copy struct.get call; do
+                echo "$op $(grep -o "($op " "out/wat-o$o.wat" | wc -l)"
+              done
+            } | tee "out/count-o$o.txt"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wasm-stats-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
