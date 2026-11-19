@@ -4,12 +4,12 @@ use super::*;
 
 pub(super) fn box_float(raw: &str) -> String {
     format!(
-        "(struct.new $obj (i32.const 2) (i32.const 0) (i64.const 0) {raw} (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call))"
+        "(struct.new $plain (i32.const 2) (i32.const 0) (i64.const 0) {raw} (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call))"
     )
 }
 
 pub(super) fn unbox_float(value: &str) -> String {
-    format!("(struct.get $obj 3 (ref.cast (ref $obj) {value}))")
+    format!("(struct.get $plain 3 (ref.cast (ref $plain) {value}))")
 }
 
 pub(super) fn checked(raw: &str) -> String {

@@ -31,7 +31,7 @@ const BASE_WAT: &str = r#"
       (local.set $x (i31.get_s (ref.cast (ref i31) (local.get $v))))
       (i32.sub (i32.gt_s (local.get $x) (i32.const 0))
                (i32.lt_s (local.get $x) (i32.const 0))))
-    (else (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))))
+    (else (struct.get $plain 1 (ref.cast (ref $plain) (local.get $v))))))
 
 (func $int_limbs (param $v eqref) (result (ref $limbs))
   (local $x i32)
@@ -47,7 +47,7 @@ const BASE_WAT: &str = r#"
               (else (local.get $x)))))))
     (else
       (ref.as_non_null
-        (struct.get $obj 6 (ref.cast (ref $obj) (local.get $v)))))))
+        (struct.get $plain 6 (ref.cast (ref $plain) (local.get $v)))))))
 
 (func $mag_len (param $a (ref $limbs)) (result i32)
   (local $n i32)
@@ -87,7 +87,7 @@ const BASE_WAT: &str = r#"
       (array.copy $limbs $limbs
         (local.get $trimmed) (i32.const 0)
         (local.get $a) (i32.const 0) (local.get $n))))
-  (struct.new $obj
+  (struct.new $plain
     (i32.const 8) (local.get $sign) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (local.get $trimmed) (ref.null $call)))
 
@@ -144,7 +144,7 @@ const BASE_WAT: &str = r#"
 (func $int_fits62 (param $v eqref) (result i32)
   (local $a (ref $limbs))
   (if (ref.test (ref i31) (local.get $v)) (then (return (i32.const 1))))
-  (local.set $a (ref.as_non_null (struct.get $obj 6 (ref.cast (ref $obj) (local.get $v)))))
+  (local.set $a (ref.as_non_null (struct.get $plain 6 (ref.cast (ref $plain) (local.get $v)))))
   (if (i32.eq (array.len (local.get $a)) (i32.const 1)) (then (return (i32.const 1))))
   (i32.and (i32.eq (array.len (local.get $a)) (i32.const 2))
     (i32.lt_u (array.get $limbs (local.get $a) (i32.const 1)) (i32.const 1073741824))))
@@ -361,7 +361,7 @@ const BASE_WAT: &str = r#"
       (if (i64.ge_u (local.get $position) (i64.const 60)) (then (return (ref.i31 (i32.const 0)))))
       (return (ref.i31 (i32.wrap_i64 (i64.and (i64.shr_u (local.get $x) (local.get $position))
         (i64.const 1073741823)))))))
-  (local.set $a (struct.get $obj 6 (ref.cast (ref $obj) (local.get $v))))
+  (local.set $a (struct.get $plain 6 (ref.cast (ref $plain) (local.get $v))))
   (local.set $n (array.len (local.get $a)))
   (local.set $word (i32.wrap_i64 (i64.shr_u (local.get $position) (i64.const 5))))
   (if (i32.ge_u (local.get $word) (local.get $n)) (then (return (ref.i31 (i32.const 0)))))

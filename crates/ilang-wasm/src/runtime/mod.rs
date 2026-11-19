@@ -248,6 +248,10 @@ pub const TYPES: &str = r#"
  (field (mut i32)) (field i32) (field i64) (field f64)
  (field (ref null $bytes)) (field (ref null $values))
  (field (ref null $limbs)) (field (ref null $call)))))
+(type $plain (sub final $obj (struct
+ (field (mut i32)) (field i32) (field i64) (field f64)
+ (field (ref null $bytes)) (field (ref null $values))
+ (field (ref null $limbs)) (field (ref null $call)))))
 (type $shapes (array (mut i64)))
 (type $cons (sub final $val (struct (field (mut i32)) (field eqref) (field eqref))))
 ;; A function value: `$obj`, then its id (multicore D6, given when it is first

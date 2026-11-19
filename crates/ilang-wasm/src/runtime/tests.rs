@@ -377,7 +377,7 @@ const HELPERS: &str = r#"
   (struct.new $obj (i32.const 7) (i32.const 0) (local.get $arity) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (func $tagged (param $tag i32) (result eqref)
-  (struct.new $obj (local.get $tag) (i32.const 0) (i64.const 0) (f64.const 0)
+  (struct.new $plain (local.get $tag) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (func $same_hash (param $a eqref) (param $b eqref) (result i32)
   (call $equal (call $core_hash (local.get $a)) (call $core_hash (local.get $b))))

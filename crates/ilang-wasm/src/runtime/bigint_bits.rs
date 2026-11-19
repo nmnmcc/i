@@ -118,7 +118,7 @@ pub fn wat() -> String {
       (then (return (i31.get_s (ref.cast (ref i31) (local.get $v))))))
     (local.set $word
       (array.get $limbs
-        (struct.get $obj 6 (ref.cast (ref $obj) (local.get $v))) (i32.const 0)))
+        (struct.get $plain 6 (ref.cast (ref $plain) (local.get $v))) (i32.const 0)))
     (if (result i32) (i32.lt_s (call $int_sign (local.get $v)) (i32.const 0))
       (then (i32.sub (i32.const 0) (local.get $word)))
       (else (local.get $word))))
@@ -210,7 +210,7 @@ pub fn wat() -> String {
         ;; Positive 32-bit hashes and signed one-limb integers fit in i64.
         (if
           (i32.eq
-            (array.len (struct.get $obj 6 (ref.cast (ref $obj) (local.get $v))))
+            (array.len (struct.get $plain 6 (ref.cast (ref $plain) (local.get $v))))
             (i32.const 1))
           (then
             (if (i32.ge_u (local.get $word_shift) (i32.const 32))

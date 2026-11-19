@@ -217,7 +217,9 @@ pub(super) const WAT: &str = r#"
       (local.set $w (call $list_tail (local.get $w)))
       (br $item)))
     (return)))
-  (local.set $o (ref.cast (ref $obj) (local.get $v)))
+  (if (ref.test (ref $plain) (local.get $v))
+    (then (local.set $o (ref.cast (ref $plain) (local.get $v))))
+    (else (local.set $o (ref.cast (ref $obj) (local.get $v)))))
   (local.set $xs (struct.get $obj 5 (local.get $o)))
   (if (ref.test (ref $multi) (local.get $v)) (then
     (call $enc_mark (local.get $v) (local.get $tag))
@@ -397,7 +399,7 @@ pub(super) const WAT: &str = r#"
     (local.set $index (call $dec_i32))
     (if (i32.eq (local.get $flags) (global.get $mc_worker))
       (then (return (array.get $values (ref.as_non_null (global.get $mc_locals)) (local.get $index)))))
-    (return (struct.new $obj (i32.const 20) (local.get $flags) (i64.extend_i32_u (local.get $index))
+    (return (struct.new $plain (i32.const 20) (local.get $flags) (i64.extend_i32_u (local.get $index))
       (f64.const 0) (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))))
   (if (i32.eq (local.get $m) (i32.const 5)) (then
     (local.set $index (call $dec_register (ref.null eq)))
@@ -482,7 +484,7 @@ pub(super) const WAT: &str = r#"
   (local.set $n (call $dec_i32))
   (if (i32.ge_s (local.get $n) (i32.const 0))
     (then (local.set $xs (array.new_default $values (local.get $n)))))
-  (local.set $v (struct.new $obj (local.get $tag) (local.get $f1) (local.get $f2) (local.get $f3)
+  (local.set $v (struct.new $plain (local.get $tag) (local.get $f1) (local.get $f2) (local.get $f3)
     (local.get $b) (local.get $xs) (local.get $l) (ref.null $call)))
   (drop (call $dec_register (local.get $v)))
   (local.set $i (i32.const 0))
@@ -551,7 +553,7 @@ pub(super) const WAT: &str = r#"
 ;; `scope.share` keeps the encoded value once in the host transport, under
 ;; (run key id, task, index) of its address, until its scope ends.
 (func $worker_key_id (param $k eqref) (result i64)
-  (struct.get $obj 2 (ref.cast (ref $obj) (local.get $k))))
+  (struct.get $plain 2 (ref.cast (ref $plain) (local.get $k))))
 (func $worker_share_put (param $run eqref) (param $address eqref) (param $value eqref) (result eqref)
   (if (i32.eqz (global.get $mc_enabled)) (then (return (ref.null eq))))
   (if (i32.eqz (call $codec_encode (local.get $value))) (then (return (ref.null eq))))

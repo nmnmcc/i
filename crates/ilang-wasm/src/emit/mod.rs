@@ -19,21 +19,21 @@ const SUPPORT: &str = r#"
 (func $is_data (param $v eqref) (param $set i32) (param $n i32) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 4))
     (then (i32.and
-      (i32.eq (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))) (local.get $set))
-      (i32.eq (array.len (ref.as_non_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v)))))
+      (i32.eq (struct.get $plain 1 (ref.cast (ref $plain) (local.get $v))) (local.get $set))
+      (i32.eq (array.len (ref.as_non_null (struct.get $plain 5 (ref.cast (ref $plain) (local.get $v)))))
         (local.get $n))))
     (else (i32.const 0))))
 (func $is_ctor (param $v eqref) (param $c i32) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 5))
-    (then (i32.eq (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))) (local.get $c)))
+    (then (i32.eq (struct.get $plain 1 (ref.cast (ref $plain) (local.get $v))) (local.get $c)))
     (else (i32.const 0))))
 (func $is_type (param $v eqref) (param $t i64) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 5))
-    (then (i64.eq (struct.get $obj 2 (ref.cast (ref $obj) (local.get $v))) (local.get $t)))
+    (then (i64.eq (struct.get $plain 2 (ref.cast (ref $plain) (local.get $v))) (local.get $t)))
     (else (i32.const 0))))
 (func $is_bool (param $v eqref) (param $b i32) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 1))
-    (then (i32.eq (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))) (local.get $b)))
+    (then (i32.eq (struct.get $plain 1 (ref.cast (ref $plain) (local.get $v))) (local.get $b)))
     (else (i32.const 0))))
 (func $is_int (param $v eqref) (param $n eqref) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 8))
@@ -41,7 +41,7 @@ const SUPPORT: &str = r#"
     (else (i32.const 0))))
 (func $is_float (param $v eqref) (param $x f64) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 2))
-    (then (f64.eq (struct.get $obj 3 (ref.cast (ref $obj) (local.get $v))) (local.get $x)))
+    (then (f64.eq (struct.get $plain 3 (ref.cast (ref $plain) (local.get $v))) (local.get $x)))
     (else (i32.const 0))))
 (func $is_string (param $v eqref) (param $s eqref) (result i32)
   (if (result i32) (i32.eq (call $value_tag (local.get $v)) (i32.const 3))
@@ -286,7 +286,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     for (ctor, ty) in &e.ctors {
         let _ = writeln!(
             m,
-            "(global $k{ctor}_{ty} eqref (struct.new $obj (i32.const 5) (i32.const {ctor}) \
+            "(global $k{ctor}_{ty} eqref (struct.new $plain (i32.const 5) (i32.const {ctor}) \
              (i64.const {ty}) (f64.const 0) (ref.null $bytes) (ref.null $values) (ref.null $limbs) \
              (ref.null $call)))"
         );
@@ -1294,7 +1294,7 @@ impl<'p> Emitter<'p> {
             Atom::Bool(false) => "(global.get $value_false)".into(),
             Atom::Int(n) => int(n),
             Atom::Float(x) => format!(
-                "(struct.new $obj (i32.const 2) (i32.const 0) (i64.const 0) (f64.reinterpret_i64 (i64.const {})) \
+                "(struct.new $plain (i32.const 2) (i32.const 0) (i64.const 0) (f64.reinterpret_i64 (i64.const {})) \
                  (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call))",
                 x.to_bits() as i64
             ),

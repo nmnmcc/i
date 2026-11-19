@@ -12,18 +12,18 @@ pub fn wat() -> String {
 
 const WAT: &str = r#"
   (func $bits_new (param $data (ref $bytes)) (param $offset i32) (param $length i64) (result eqref)
-    (struct.new $obj
+    (struct.new $plain
       (i32.const 9) (local.get $offset) (local.get $length) (f64.const 0)
       (local.get $data) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 
   (func $bits_data (param $value eqref) (result (ref $bytes))
-    (ref.as_non_null (struct.get $obj 4 (ref.cast (ref $obj) (local.get $value)))))
+    (ref.as_non_null (struct.get $plain 4 (ref.cast (ref $plain) (local.get $value)))))
 
   (func $bits_len64 (param $value eqref) (result i64)
-    (struct.get $obj 2 (ref.cast (ref $obj) (local.get $value))))
+    (struct.get $plain 2 (ref.cast (ref $plain) (local.get $value))))
 
   (func $bits_offset (param $value eqref) (result i64)
-    (i64.extend_i32_u (struct.get $obj 1 (ref.cast (ref $obj) (local.get $value)))))
+    (i64.extend_i32_u (struct.get $plain 1 (ref.cast (ref $plain) (local.get $value)))))
 
   (func $bits_has (param $value eqref) (param $start i64) (param $length i64) (result i32)
     (local $total i64)
@@ -410,7 +410,7 @@ const WAT: &str = r#"
 
   (func $bits_from_string (param $value eqref) (result eqref)
     (local $data (ref null $bytes))
-    (local.set $data (struct.get $obj 4 (ref.cast (ref $obj) (local.get $value))))
+    (local.set $data (struct.get $plain 4 (ref.cast (ref $plain) (local.get $value))))
     (call $bits_new (ref.as_non_null (local.get $data)) (i32.const 0)
       (i64.mul (i64.extend_i32_u (array.len (local.get $data))) (i64.const 8))))
 
@@ -464,7 +464,7 @@ const WAT: &str = r#"
     (call $codepoint_new (local.get $codepoint)))
 
   (func $bits_codepoint_get (param $value eqref) (result i32)
-    (struct.get $obj 1 (ref.cast (ref $obj) (local.get $value))))
+    (struct.get $plain 1 (ref.cast (ref $plain) (local.get $value))))
 
   (func $bits_read_utf8 (param $value eqref) (param $start i64) (result eqref)
     (local $count i32) (local $codepoint i32) (local $i i32) (local $mask i32)

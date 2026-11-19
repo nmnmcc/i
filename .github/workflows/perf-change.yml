@@ -1,0 +1,145 @@
+# Measures the after state of the performance change on its own branch.
+#
+# A push to ci/perf-obj-final runs this and the repository's Verify workflow.
+# It is a measurement, not a gate: docs/performance.md is updated from the
+# artifacts it leaves.
+name: Perf change
+
+on:
+  push:
+    branches: [ci/perf-obj-final]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-change-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_INCREMENTAL: 0
+  RAYON_NUM_THREADS: 1
+  REPEATS: "3"
+
+jobs:
+  build:
+    name: build (change)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
+            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
+            /usr/local/share/chromium /usr/lib/jvm
+          df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c84b7
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - name: Build the release i
+        run: devenv shell -- cargo build --release --locked -p ilang-cli
+      - name: List the Nix store paths that i loads
+        run: |
+          devenv shell -- ldd target/release/i \
+            | grep -o '/nix/store/[a-z0-9]\{32\}-[^/ ]*' | sort -u > target/release/i.nix-paths
+          test -s target/release/i.nix-paths
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: i-release-change
+          path: |
+            target/release/i
+            target/release/i.nix-paths
+          if-no-files-found: error
+          retention-days: 7
+
+  test:
+    name: wasm tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c84b7
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - name: Test ilang-wasm
+        run: devenv shell -- cargo test --release --locked -p ilang-wasm
+
+  measure:
+    name: measure (opt ${{ matrix.opt }})
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        opt: [0, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c84b7
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-change
+          path: target/release
+      - name: Fetch the libraries of i
+        run: |
+          chmod +x target/release/i
+          xargs nix-store --realise < target/release/i.nix-paths > /dev/null
+          target/release/i --version
+      - name: Machine
+        run: |
+          mkdir -p out
+          { echo "commit: $(git rev-parse HEAD)"; uname -a; nproc; lscpu; free -h; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+      - name: Run the benchmarks
+        env:
+          OPT: ${{ matrix.opt }}
+        run: |
+          set -x
+          for r in $(seq 1 "$REPEATS"); do
+            cat /proc/loadavg > "out/load-$r.txt"
+            /usr/bin/time -v -o "out/time-$r.txt" \
+              target/release/i test --project bench --opt "$OPT" --time \
+              > "out/run-$r.log" 2> "out/stderr-$r.log"
+            cat /proc/loadavg > "out/load-after-$r.txt"
+            tail -5 "out/run-$r.log"
+            grep -E "Maximum resident set size|User time|System time|Elapsed" "out/time-$r.txt"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-change-o${{ matrix.opt }}-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14

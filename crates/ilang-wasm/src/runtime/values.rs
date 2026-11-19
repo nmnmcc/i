@@ -34,14 +34,14 @@ pub(crate) fn portable_macro_hash(text: &str) -> String {
         "(local.set $kind (call $value_tag (local.get $v)))\n    (if (i32.or (call $value_identity_kind (local.get $kind)) (i32.eq (local.get $kind) (i32.const 10))) (then (local.set $kind (i32.const 7))))",
     );
     hash = hash.replace(
-        "(struct.get $obj 1 (local.get $o))",
-        "(if (result i32) (i32.or (i32.eq (local.get $kind) (i32.const 4)) (i32.eq (local.get $kind) (i32.const 5))) (then (i32.const 0)) (else (struct.get $obj 1 (local.get $o))))",
+        "(struct.get $plain 1 (local.get $o))",
+        "(if (result i32) (i32.or (i32.eq (local.get $kind) (i32.const 4)) (i32.eq (local.get $kind) (i32.const 5))) (then (i32.const 0)) (else (struct.get $plain 1 (local.get $o))))",
     );
     // Nullary constructors may use either no field array or an empty array.
     hash = hash.replace("(br_if $walk (ref.is_null (local.get $xs)))",
         "(if (ref.is_null (local.get $xs)) (then (if (i32.eq (local.get $kind) (i32.const 5)) (then (local.set $h (call $hash_mix (local.get $h) (i32.const 0))))) (br $walk)))");
     // Only the final object metadata word is nominal; Bits keep their length.
-    let metadata = "(local.set $word (struct.get $obj 2 (local.get $o)))";
+    let metadata = "(local.set $word (struct.get $plain 2 (local.get $o)))";
     let at = hash.rfind(metadata).expect("nominal hash metadata");
     hash.replace_range(at..at + metadata.len(), "(local.set $word (i64.const 0))");
     format!("{}{}{}", &text[..start], hash, &text[end..])
@@ -49,18 +49,26 @@ pub(crate) fn portable_macro_hash(text: &str) -> String {
 
 const CORE: &str = r#"
 (global $value_false eqref
-  (struct.new $obj (i32.const 1) (i32.const 0) (i64.const 0) (f64.const 0)
+  (struct.new $plain (i32.const 1) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (global $value_true eqref
-  (struct.new $obj (i32.const 1) (i32.const 1) (i64.const 0) (f64.const 0)
+  (struct.new $plain (i32.const 1) (i32.const 1) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (global $value_empty_list eqref
-  (struct.new $obj (i32.const 6) (i32.const 0) (i64.const 0) (f64.const 0)
+  (struct.new $plain (i32.const 6) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (func $value_tag (param $v eqref) (result i32)
   (if (ref.is_null (local.get $v)) (then (return (i32.const 0))))
   (if (ref.test (ref i31) (local.get $v)) (then (return (i32.const 8))))
   (if (ref.test (ref $hostref) (local.get $v)) (then (return (i32.const 10))))
+  ;; A list cell, then an ordinary value: both tests are against final types,
+  ;; so Wasmtime checks an exact type index instead of calling `is_subtype`
+  ;; for a non-final one. Everything else (closures and the private runtime
+  ;; cells) keeps the general cast.
+  (if (ref.test (ref $cons) (local.get $v))
+    (then (return (struct.get $cons 0 (ref.cast (ref $cons) (local.get $v))))))
+  (if (ref.test (ref $plain) (local.get $v))
+    (then (return (struct.get $plain 0 (ref.cast (ref $plain) (local.get $v))))))
   (struct.get $val 0 (ref.cast (ref $val) (local.get $v))))
 ;; A host reference keeps its reference_id, which never changes (spec B.4).
 (func $host_ref_new (param $r externref) (result eqref)
@@ -70,42 +78,42 @@ const CORE: &str = r#"
 (func $host_id (param $v eqref) (result i64)
   (struct.get $hostref 1 (ref.cast (ref $hostref) (local.get $v))))
 (func $codepoint_new (param $c i32) (result eqref)
-  (struct.new $obj (i32.const 13) (local.get $c) (i64.const 0) (f64.const 0)
+  (struct.new $plain (i32.const 13) (local.get $c) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (func $codepoint_get (param $v eqref) (result i32)
-  (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))
+  (struct.get $plain 1 (ref.cast (ref $plain) (local.get $v))))
 (func $bool_new (param $v i32) (result eqref)
   (if (result eqref) (local.get $v)
     (then (global.get $value_true)) (else (global.get $value_false))))
 (func $bool_get (param $v eqref) (result i32)
-  (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))
+  (struct.get $plain 1 (ref.cast (ref $plain) (local.get $v))))
 (func $float_new (param $v f64) (result eqref)
   ;; NaN fails the comparison as well (spec §11.3).
   (if (i32.eqz (f64.le (f64.abs (local.get $v)) (f64.const 0x1.fffffffffffffp+1023)))
     (then (call $stop_float) unreachable))
-  (struct.new $obj (i32.const 2) (i32.const 0) (i64.const 0) (local.get $v)
+  (struct.new $plain (i32.const 2) (i32.const 0) (i64.const 0) (local.get $v)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (func $float_get (param $v eqref) (result f64)
-  (struct.get $obj 3 (ref.cast (ref $obj) (local.get $v))))
+  (struct.get $plain 3 (ref.cast (ref $plain) (local.get $v))))
 (func $list_nil (result eqref)
   (global.get $value_empty_list))
 (func $list_cons (param $head eqref) (param $tail eqref) (result eqref)
   (struct.new $cons (i32.const 6) (local.get $head) (local.get $tail)))
 (func $field (param $v eqref) (param $index i32) (result eqref)
   (array.get $values
-    (ref.as_non_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v))))
+    (ref.as_non_null (struct.get $plain 5 (ref.cast (ref $plain) (local.get $v))))
     (local.get $index)))
 (func $record (param $ctor i32) (param $type i64) (param $fields (ref $values)) (result eqref)
-  (struct.new $obj (i32.const 5) (local.get $ctor) (local.get $type) (f64.const 0)
+  (struct.new $plain (i32.const 5) (local.get $ctor) (local.get $type) (f64.const 0)
     (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
 ;; `()`, empty data, is the null reference.
 (func $tuple (param $fields (ref $values)) (result eqref)
   (if (i32.eqz (array.len (local.get $fields))) (then (return (ref.null eq))))
-  (struct.new $obj (i32.const 4) (i32.const 0) (i64.const 0) (f64.const 0)
+  (struct.new $plain (i32.const 4) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
 ;; Data with labels (syntax-3 §6.4): field 1 is the index of its label set.
 (func $data (param $set i32) (param $fields (ref $values)) (result eqref)
-  (struct.new $obj (i32.const 4) (local.get $set) (i64.const 0) (f64.const 0)
+  (struct.new $plain (i32.const 4) (local.get $set) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (local.get $fields) (ref.null $limbs) (ref.null $call)))
 ;; The label sets of data, installed by `ilang_start`: set `i` is entry `i - 1`.
 (global $shape_labels (mut (ref null $values)) (ref.null $values))
@@ -114,7 +122,7 @@ const CORE: &str = r#"
 ;; The labels of a data value, or null for a tuple.
 (func $data_labels (param $v eqref) (result (ref null $values))
   (local $set i32)
-  (local.set $set (struct.get $obj 1 (ref.cast (ref $obj) (local.get $v))))
+  (local.set $set (struct.get $plain 1 (ref.cast (ref $plain) (local.get $v))))
   (if (i32.eqz (local.get $set)) (then (return (ref.null $values))))
   (ref.cast (ref $values) (array.get $values (ref.as_non_null (global.get $shape_labels))
     (i32.sub (local.get $set) (i32.const 1)))))
@@ -138,12 +146,12 @@ const CORE: &str = r#"
     (local.set $v (call $list_tail (local.get $v))) (br $each)))
   (local.get $out))
 (func $value_bit (param $v eqref) (param $at i64) (result i32)
-  (local $o (ref null $obj)) (local $p i64)
-  (local.set $o (ref.cast (ref $obj) (local.get $v)))
-  (local.set $p (i64.add (local.get $at) (i64.extend_i32_u (struct.get $obj 1 (local.get $o)))))
+  (local $o (ref null $plain)) (local $p i64)
+  (local.set $o (ref.cast (ref $plain) (local.get $v)))
+  (local.set $p (i64.add (local.get $at) (i64.extend_i32_u (struct.get $plain 1 (local.get $o)))))
   (i32.and
     (i32.shr_u
-      (array.get_u $bytes (struct.get $obj 4 (local.get $o))
+      (array.get_u $bytes (struct.get $plain 4 (local.get $o))
         (i32.wrap_i64 (i64.shr_u (local.get $p) (i64.const 3))))
       (i32.sub (i32.const 7) (i32.wrap_i64 (i64.and (local.get $p) (i64.const 7)))))
     (i32.const 1)))
@@ -178,7 +186,7 @@ const CORE: &str = r#"
                      (i31.get_s (ref.cast (ref i31) (local.get $b)))))
 (func $value_compare_i32 (param $a eqref) (param $b eqref) (result i32)
   (local $ka i32) (local $kb i32) (local $c i32)
-  (local $oa (ref null $obj)) (local $ob (ref null $obj))
+  (local $oa (ref null $plain)) (local $ob (ref null $plain))
   (local $xa (ref null $values)) (local $xb (ref null $values))
   (local $pending (ref null $compare_frame))
   (local $ca (ref null $cons)) (local $cb (ref null $cons)) (local $ha eqref) (local $hb eqref)
@@ -230,19 +238,19 @@ const CORE: &str = r#"
         (local.set $a (local.get $ha))
         (local.set $b (local.get $hb))
         (br $again)))
-      (local.set $oa (ref.cast (ref $obj) (local.get $a)))
-      (local.set $ob (ref.cast (ref $obj) (local.get $b)))
+      (local.set $oa (ref.cast (ref $plain) (local.get $a)))
+      (local.set $ob (ref.cast (ref $plain) (local.get $b)))
       (if (i32.eq (local.get $ka) (i32.const 2)) (then
         (local.set $c (i32.sub
-          (f64.gt (struct.get $obj 3 (local.get $oa)) (struct.get $obj 3 (local.get $ob)))
-          (f64.lt (struct.get $obj 3 (local.get $oa)) (struct.get $obj 3 (local.get $ob)))))
+          (f64.gt (struct.get $plain 3 (local.get $oa)) (struct.get $plain 3 (local.get $ob)))
+          (f64.lt (struct.get $plain 3 (local.get $oa)) (struct.get $plain 3 (local.get $ob)))))
         (br $compared)))
       (if (i32.eq (local.get $ka) (i32.const 3)) (then
         (local.set $c (call $string_compare (local.get $a) (local.get $b)))
         (br $compared)))
       (if (i32.eq (local.get $ka) (i32.const 9)) (then
-        (local.set $ba (struct.get $obj 2 (local.get $oa)))
-        (local.set $bb (struct.get $obj 2 (local.get $ob)))
+        (local.set $ba (struct.get $plain 2 (local.get $oa)))
+        (local.set $bb (struct.get $plain 2 (local.get $ob)))
         (local.set $bit (i64.const 0))
         (block $bits_done (loop $bits_each
           (br_if $bits_done (i32.or (i64.ge_u (local.get $bit) (local.get $ba))
@@ -253,12 +261,12 @@ const CORE: &str = r#"
           (local.set $bit (i64.add (local.get $bit) (i64.const 1))) (br $bits_each)))
         (local.set $c (call $compare_i64 (local.get $ba) (local.get $bb)))
         (br $compared)))
-      (local.set $c (call $compare_i64 (struct.get $obj 2 (local.get $oa)) (struct.get $obj 2 (local.get $ob))))
+      (local.set $c (call $compare_i64 (struct.get $plain 2 (local.get $oa)) (struct.get $plain 2 (local.get $ob))))
       (if (local.get $c) (then (return (local.get $c))))
-      (local.set $c (call $compare_i32 (struct.get $obj 1 (local.get $oa)) (struct.get $obj 1 (local.get $ob))))
+      (local.set $c (call $compare_i32 (struct.get $plain 1 (local.get $oa)) (struct.get $plain 1 (local.get $ob))))
       (if (local.get $c) (then (return (local.get $c))))
-      (local.set $xa (struct.get $obj 5 (local.get $oa)))
-      (local.set $xb (struct.get $obj 5 (local.get $ob)))
+      (local.set $xa (struct.get $plain 5 (local.get $oa)))
+      (local.set $xb (struct.get $plain 5 (local.get $ob)))
       (if (i32.or (ref.is_null (local.get $xa)) (ref.is_null (local.get $xb))) (then
         (local.set $c (i32.sub (ref.is_null (local.get $xb)) (ref.is_null (local.get $xa))))
         (br $compared)))
@@ -327,7 +335,7 @@ const CORE: &str = r#"
   (i32.mul (i32.xor (local.get $hash) (local.get $word)) (i32.const 16777619)))
 (func $value_hash_u32 (param $v eqref) (result i32)
   (local $kind i32) (local $h i32) (local $i i32)
-  (local $o (ref null $obj)) (local $xs (ref null $values))
+  (local $o (ref null $plain)) (local $xs (ref null $values))
   (local $bs (ref null $bytes)) (local $ls (ref null $limbs))
   (local $n i32) (local $word i64) (local $bit i64)
   ;; The parts still to hash, on a growable stack: linear in the size.
@@ -390,16 +398,16 @@ const CORE: &str = r#"
       (array.set $values (local.get $stack) (i32.add (local.get $sp) (i32.const 1)) (call $list_head (local.get $v)))
       (local.set $sp (i32.add (local.get $sp) (i32.const 2)))
       (br $walk)))
-    (local.set $o (ref.cast (ref $obj) (local.get $v)))
+    (local.set $o (ref.cast (ref $plain) (local.get $v)))
     (if (i32.eq (local.get $kind) (i32.const 2)) (then
       (local.set $word (i64.const 0))
-      (if (f64.ne (struct.get $obj 3 (local.get $o)) (f64.const 0))
-        (then (local.set $word (i64.reinterpret_f64 (struct.get $obj 3 (local.get $o))))))
+      (if (f64.ne (struct.get $plain 3 (local.get $o)) (f64.const 0))
+        (then (local.set $word (i64.reinterpret_f64 (struct.get $plain 3 (local.get $o))))))
       (local.set $h (call $hash_mix (call $hash_mix (local.get $h) (i32.wrap_i64 (local.get $word)))
         (i32.wrap_i64 (i64.shr_u (local.get $word) (i64.const 32)))))
       (br $walk)))
     (if (i32.eq (local.get $kind) (i32.const 3)) (then
-      (local.set $bs (struct.get $obj 4 (local.get $o)))
+      (local.set $bs (struct.get $plain 4 (local.get $o)))
       (local.set $n (array.len (local.get $bs)))
       (block $string_done (loop $string_each
         (br_if $string_done (i32.ge_u (local.get $i) (local.get $n)))
@@ -407,7 +415,7 @@ const CORE: &str = r#"
         (local.set $i (i32.add (local.get $i) (i32.const 1))) (br $string_each)))
       (br $walk)))
     (if (i32.eq (local.get $kind) (i32.const 9)) (then
-      (local.set $word (struct.get $obj 2 (local.get $o)))
+      (local.set $word (struct.get $plain 2 (local.get $o)))
       (local.set $h (call $hash_mix (call $hash_mix (local.get $h) (i32.wrap_i64 (local.get $word)))
         (i32.wrap_i64 (i64.shr_u (local.get $word) (i64.const 32)))))
       (local.set $bit (i64.const 0))
@@ -416,11 +424,11 @@ const CORE: &str = r#"
         (local.set $h (call $hash_mix (local.get $h) (call $value_bit (local.get $v) (local.get $bit))))
         (local.set $bit (i64.add (local.get $bit) (i64.const 1))) (br $bits_each)))
       (br $walk)))
-    (local.set $h (call $hash_mix (local.get $h) (struct.get $obj 1 (local.get $o))))
-    (local.set $word (struct.get $obj 2 (local.get $o)))
+    (local.set $h (call $hash_mix (local.get $h) (struct.get $plain 1 (local.get $o))))
+    (local.set $word (struct.get $plain 2 (local.get $o)))
     (local.set $h (call $hash_mix (call $hash_mix (local.get $h) (i32.wrap_i64 (local.get $word)))
       (i32.wrap_i64 (i64.shr_u (local.get $word) (i64.const 32)))))
-    (local.set $xs (struct.get $obj 5 (local.get $o)))
+    (local.set $xs (struct.get $plain 5 (local.get $o)))
     (br_if $walk (ref.is_null (local.get $xs)))
     (local.set $n (array.len (local.get $xs)))
     (local.set $h (call $hash_mix (local.get $h) (local.get $n)))
@@ -452,7 +460,7 @@ const CORE: &str = r#"
 (global $id_next (mut i64) (i64.const 0))
 (func $key_new (result eqref)
   (global.set $id_next (i64.add (global.get $id_next) (i64.const 1)))
-  (struct.new $obj (i32.const 15) (i32.const 0) (i64.or (global.get $id_prefix) (global.get $id_next)) (f64.const 0)
+  (struct.new $plain (i32.const 15) (i32.const 0) (i64.or (global.get $id_prefix) (global.get $id_next)) (f64.const 0)
     (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (func $closure_same (param $a eqref) (param $b eqref) (result i32)
   (if (i32.eqz (i32.and (ref.test (ref $clo) (local.get $a)) (ref.test (ref $clo) (local.get $b))))
@@ -463,14 +471,14 @@ const CORE: &str = r#"
             (struct.get $clo 8 (ref.cast (ref $clo) (local.get $b))))))
 (func $key_same (param $a eqref) (param $b eqref) (result i32)
   (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))
-  (if (i32.eqz (i32.and (ref.test (ref $obj) (local.get $a)) (ref.test (ref $obj) (local.get $b))))
+  (if (i32.eqz (i32.and (ref.test (ref $plain) (local.get $a)) (ref.test (ref $plain) (local.get $b))))
     (then (return (i32.const 0))))
   (i32.and
-    (i64.ne (struct.get $obj 2 (ref.cast (ref $obj) (local.get $a))) (i64.const 0))
-    (i64.eq (struct.get $obj 2 (ref.cast (ref $obj) (local.get $a)))
-            (struct.get $obj 2 (ref.cast (ref $obj) (local.get $b))))))
+    (i64.ne (struct.get $plain 2 (ref.cast (ref $plain) (local.get $a))) (i64.const 0))
+    (i64.eq (struct.get $plain 2 (ref.cast (ref $plain) (local.get $a)))
+            (struct.get $plain 2 (ref.cast (ref $plain) (local.get $b))))))
 (func $key_wrap (param $key eqref) (param $value eqref) (result eqref)
-  (struct.new $obj (i32.const 16) (i32.const 0) (i64.const 0) (f64.const 0)
+  (struct.new $plain (i32.const 16) (i32.const 0) (i64.const 0) (f64.const 0)
     (ref.null $bytes) (array.new_fixed $values 2 (local.get $key) (local.get $value))
     (ref.null $limbs) (ref.null $call)))
 (func $key_read (param $key eqref) (param $value eqref) (result eqref)
@@ -486,7 +494,7 @@ const CORE: &str = r#"
 (func $core_portable (param $v eqref) (result eqref)
   (local $stack (ref $values)) (local $grown (ref $values))
   (local $sp i32) (local $tag i32) (local $n i32)
-  (local $xs (ref null $values)) (local $o (ref $obj))
+  (local $xs (ref null $values)) (local $o (ref $plain))
   (local $seen (ref $values)) (local $count i32) (local $bad i32)
   ;; A light boundary is its environment array. `$env` has the same Wasm
   ;; array type as `$values`; no other i value is a bare array. Its handle
@@ -507,7 +515,7 @@ const CORE: &str = r#"
   (if (i32.eq (local.get $tag) (i32.const 6))
     (then (if (call $list_is_empty (local.get $v)) (then (return (global.get $value_true)))))
     (else
-      (local.set $xs (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v))))
+      (local.set $xs (struct.get $plain 5 (ref.cast (ref $plain) (local.get $v))))
       (if (ref.is_null (local.get $xs)) (then (return (global.get $value_true))))
       (if (i32.eqz (array.len (local.get $xs))) (then (return (global.get $value_true))))))
   (local.set $seen (array.new_default $values (i32.const 16)))
@@ -537,12 +545,12 @@ const CORE: &str = r#"
           (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
           (i32.or (i32.eq (local.get $tag) (i32.const 7))
             (i32.or (i32.eq (local.get $tag) (i32.const 14)) (i32.eq (local.get $tag) (i32.const 16)))))))
-        (local.set $o (ref.cast (ref $obj) (local.get $v)))
-        (local.set $xs (struct.get $obj 5 (local.get $o)))
+        (local.set $o (ref.cast (ref $plain) (local.get $v)))
+        (local.set $xs (struct.get $plain 5 (local.get $o)))
         (br_if $walk (ref.is_null (local.get $xs)))
         (local.set $n (array.len (local.get $xs)))
         (if (i32.and (i32.eq (local.get $tag) (i32.const 7))
-                    (i32.and (struct.get $obj 1 (local.get $o)) (i32.const 1)))
+                    (i32.and (struct.get $plain 1 (local.get $o)) (i32.const 1)))
           (then
             (local.set $n (i32.sub (local.get $n) (i32.const 1)))))))
     (br_if $walk (i32.eqz (local.get $n)))
@@ -622,7 +630,7 @@ mod portable_hash_tests {
             .next()
             .unwrap();
         assert_eq!(
-            hash.matches("(local.set $word (struct.get $obj 2 (local.get $o)))")
+            hash.matches("(local.set $word (struct.get $plain 2 (local.get $o)))")
                 .count(),
             1
         );

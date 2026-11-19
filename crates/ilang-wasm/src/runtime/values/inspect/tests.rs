@@ -38,7 +38,7 @@ fn list(values: &[String]) -> String {
 
 fn object(tag: i32, aux: i32, extra: i64, bytes: &str) -> String {
     format!(
-        "(struct.new $obj (i32.const {tag}) (i32.const {aux}) (i64.const {extra}) \
+        "(struct.new $plain (i32.const {tag}) (i32.const {aux}) (i64.const {extra}) \
          (f64.const 0) {bytes} (ref.null $values) (ref.null $limbs) (ref.null $call))"
     )
 }
@@ -83,7 +83,7 @@ fn cases() -> Vec<(String, String)> {
         (tuple(&[tuple(&[integer(1)])]), "((1))".into()),
         ("(ref.null eq)".into(), "()".into()),
         (
-            "(struct.new $obj (i32.const 5) (i32.const 16) (i64.const 40) (f64.const 0) \
+            "(struct.new $plain (i32.const 5) (i32.const 16) (i64.const 40) (f64.const 0) \
              (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call))"
                 .into(),
             "Pair".into(),

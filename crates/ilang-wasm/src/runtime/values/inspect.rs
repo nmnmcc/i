@@ -143,12 +143,12 @@ pub fn wat() -> String {
       (then (i32.const 48)) (else (i32.const 55)))))
 
   (func $inspect_bits (param $value eqref) (result eqref)
-    (local $obj (ref $obj)) (local $bytes (ref $bytes)) (local $length i64)
+    (local $obj (ref $plain)) (local $bytes (ref $bytes)) (local $length i64)
     (local $offset i64) (local $i i64) (local $pos i64) (local $j i32) (local $v i32) (local $out eqref)
-    (local.set $obj (ref.cast (ref $obj) (local.get $value)))
-    (local.set $bytes (ref.as_non_null (struct.get $obj 4 (local.get $obj))))
-    (local.set $length (struct.get $obj 2 (local.get $obj)))
-    (local.set $offset (i64.extend_i32_u (struct.get $obj 1 (local.get $obj))))
+    (local.set $obj (ref.cast (ref $plain) (local.get $value)))
+    (local.set $bytes (ref.as_non_null (struct.get $plain 4 (local.get $obj))))
+    (local.set $length (struct.get $plain 2 (local.get $obj)))
+    (local.set $offset (i64.extend_i32_u (struct.get $plain 1 (local.get $obj))))
     (local.set $out (call $list_cons {{bits_open}} (call $list_nil)))
     (block $done
       (loop $next
@@ -300,7 +300,6 @@ pub fn wat() -> String {
   ;; Values with no parts that are inspected; not Ints and Strings, which
   ;; `$ib_atom` writes itself.
   (func $inspect_atom (param $value eqref) (param $tag i32) (result eqref)
-    (local $obj (ref $obj))
     (if (i32.eqz (local.get $tag)) (then (return {{nil}})))
     (if (i32.eq (local.get $tag) (i32.const 8)) (then (return_call $int_to_string (local.get $value))))
     (if (i32.eq (local.get $tag) (i32.const 1))
@@ -314,9 +313,8 @@ pub fn wat() -> String {
     (if (i32.eq (local.get $tag) (i32.const 16)) (then (return {{keyed}})))
     (if (i32.eq (local.get $tag) (i32.const 17)) (then (return {{request}})))
     (if (i32.eq (local.get $tag) (i32.const 18)) (then (return {{ticket}})))
-    (local.set $obj (ref.cast (ref $obj) (local.get $value)))
     (if (i32.eq (local.get $tag) (i32.const 7))
-      (then (return_call $inspect_function (local.get $obj))))
+      (then (return_call $inspect_function (ref.cast (ref $obj) (local.get $value)))))
     (if (i32.eq (local.get $tag) (i32.const 13))
       (then (return (call $string_append (call $string_append {{codepoint_open}}
         (call $string_from_codepoints (call $list_cons (local.get $value) (call $list_nil)))) {{paren_close}}))))
@@ -329,7 +327,7 @@ pub fn wat() -> String {
     (return_call $ib_string (call $inspect_atom (local.get $value) (local.get $tag))))
 
   (func $inspect (param $value eqref) (result eqref)
-    (local $obj (ref $obj)) (local $fields (ref null $values)) (local $out (ref $bytes))
+    (local $obj (ref $plain)) (local $fields (ref null $values)) (local $out (ref $bytes))
     (local $kind i32) (local $index i32) (local $tag i32) (local $sp i32) (local $meta i32)
     (local $parts (ref null $values)) (local $field_index i32)
     (global.set $ib (array.new_default $bytes (i32.const 64)))
@@ -356,7 +354,7 @@ pub fn wat() -> String {
       ;; 2: the parts of a tuple or a custom value, from `index` on.
       (if (i32.eq (local.get $kind) (i32.const 2))
         (then
-          (local.set $fields (struct.get $obj 5 (ref.cast (ref $obj) (local.get $value))))
+          (local.set $fields (struct.get $plain 5 (ref.cast (ref $plain) (local.get $value))))
           (if (ref.is_null (local.get $fields)) (then (br $next)))
           (br_if $next (i32.ge_u (local.get $index) (array.len (ref.as_non_null (local.get $fields)))))
           (if (local.get $index) (then (call $ib_comma)))
@@ -366,7 +364,7 @@ pub fn wat() -> String {
           (if (i32.eq (call $value_tag (local.get $value)) (i32.const 5))
             (then
               (local.set $parts (call $constructor_parts_for
-                (struct.get $obj 1 (ref.cast (ref $obj) (local.get $value)))))
+                (struct.get $plain 1 (ref.cast (ref $plain) (local.get $value)))))
               (if (i32.eqz (ref.is_null (local.get $parts)))
                 (then (local.set $field_index (i31.get_u (ref.cast (ref i31)
                   (array.get $values (ref.as_non_null (local.get $parts))
@@ -390,12 +388,12 @@ pub fn wat() -> String {
       (local.set $tag (call $value_tag (local.get $value)))
       (if (i32.or (i32.eq (local.get $tag) (i32.const 4)) (i32.eq (local.get $tag) (i32.const 5)))
         (then
-          (local.set $obj (ref.cast (ref $obj) (local.get $value)))
-          (local.set $fields (struct.get $obj 5 (local.get $obj)))
+          (local.set $obj (ref.cast (ref $plain) (local.get $value)))
+          (local.set $fields (struct.get $plain 5 (local.get $obj)))
           (if (i32.eq (local.get $tag) (i32.const 5))
             (then
               ;; A constructor without fields is only its name: `True`.
-              (call $ib_string (call $constructor_name (struct.get $obj 1 (local.get $obj))))
+              (call $ib_string (call $constructor_name (struct.get $plain 1 (local.get $obj))))
               (if (ref.is_null (local.get $fields)) (then (br $next)))
               (br_if $next (i32.eqz (array.len (ref.as_non_null (local.get $fields)))))))
           (call $ib_byte (i32.const 40))
@@ -429,7 +427,7 @@ pub fn wat() -> String {
         (if (i32.lt_s (local.get $at) (i32.const 0)) (then (return)))
         (local.set $label (array.get $values (ref.as_non_null (local.get $labels)) (local.get $at))))
       (else
-        (local.set $ctor (struct.get $obj 1 (ref.cast (ref $obj) (local.get $value))))
+        (local.set $ctor (struct.get $plain 1 (ref.cast (ref $plain) (local.get $value))))
         ;; The runtime's own labelled types have one field each.
         (if (i32.eq (local.get $ctor) (i32.const 4))
           (then

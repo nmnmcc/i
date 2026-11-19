@@ -13,7 +13,7 @@ pub fn wat() -> String {
     (i32.const 1)))
 
 (func $conv_string (param $bytes (ref $bytes)) (result eqref)
-  (struct.new $obj
+  (struct.new $plain
     (i32.const 3) (i32.const 0) (i64.const 0) (f64.const 0)
     (local.get $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 

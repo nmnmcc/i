@@ -4,9 +4,9 @@
 pub fn wat() -> String {
     r#"
 (func $string_bytes (param $s eqref) (result (ref $bytes))
-  (ref.as_non_null (struct.get $obj 4 (ref.cast (ref $obj) (local.get $s)))))
+  (ref.as_non_null (struct.get $plain 4 (ref.cast (ref $plain) (local.get $s)))))
 (func $string_from_bytes (param $b (ref $bytes)) (result eqref)
-  (struct.new $obj (i32.const 3) (i32.const 0) (i64.const 0) (f64.const 0)
+  (struct.new $plain (i32.const 3) (i32.const 0) (i64.const 0) (f64.const 0)
     (local.get $b) (ref.null $values) (ref.null $limbs) (ref.null $call)))
 (func $string_length_bytes (param $s eqref) (result i32)
   (array.len (call $string_bytes (local.get $s))))
