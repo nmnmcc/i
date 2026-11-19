@@ -167,11 +167,7 @@ fn specialize(
     param: u32,
     known: FuncId,
 ) -> Option<FuncId> {
-    let key = Key {
-        func,
-        param,
-        known,
-    };
+    let key = Key { func, param, known };
     if let Some(found) = st.memo.get(&key) {
         return *found;
     }
