@@ -265,7 +265,7 @@ node bindings/javascript/run.mjs path/to/program.wasm -- arg1 arg2
 ## Fetch HTTP and WASI preview 1
 
 Build `i build --project examples/http-get --target js` and instantiate with
-`{standardServices: true}`. The ordinary `std/http.Client` provider uses host
+`{standardServices: true}`. The ordinary `i/http.Client` provider uses host
 fetch; `i deps --project examples/http-get --target js` shows Fetch and no
 Net/Tls dependency. NodeJS keeps the native-style Net/Tls client by default.
 Fetch supports request headers/body, response status/visible headers, buffered

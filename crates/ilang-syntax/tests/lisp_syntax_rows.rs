@@ -300,16 +300,16 @@ fn show_as_writes_every_row_in_its_position() {
     let cases: &[(Position, &str, &str)] = &[
         // Files and items.
         (ImportItem, "(/ std list)", "i/list"),
-        (ImportItem, "(= l (/ std list))", "l = std/list"),
+        (ImportItem, "(= l (/ std list))", "l = i/list"),
         (
             ImportItem,
             "(= (, Map get) (/ std map))",
-            "(Map, get) = std/map",
+            "(Map, get) = i/map",
         ),
         (
             ImportItem,
             "(= m (, Map get) (/ std map))",
-            "m = (Map, get) = std/map",
+            "m = (Map, get) = i/map",
         ),
         (ExportItem, "name", "name"),
         (ExportItem, "Type", "Type"),

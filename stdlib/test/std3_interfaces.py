@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare all 35 landable public bindings with the corrected accepted inventory.
 
-direnv exec /home/agent/Programming/i python3 std/test/std3_interfaces.py
+direnv exec /home/agent/Programming/i python3 stdlib/test/std3_interfaces.py
 
 Expected signatures come from the note, independently of implementation bodies.
 """
@@ -19,7 +19,7 @@ for section, module in [('3.2', 'property'), ('5.2', 'string')]:
     part = note.split('### ' + section + ' ', 1)[1].split('\n### ', 1)[0]
     part = part.split('```text\n', 1)[1].split('```', 1)[0]
     for name, signature in re.findall(r'^([a-z_][a-z_0-9]*)(?:\([A-Z][A-Za-z, ]*\))?: (.+)$', part, re.M):
-        expected[f'std/{module}.{name}'] = signature
+        expected[f'i/{module}.{name}'] = signature
 assert len(expected) == 35, len(expected)
 for name, signature in expected.items():
     assert actual[name] == signature, (name, signature, actual[name])

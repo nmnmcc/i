@@ -42,9 +42,9 @@ test(`fetch provider at O${opt}: GET POST headers status timeout cancel refused 
 	i/core
 	i/clock
 	i/task
-	std/http
-	std/bit_array
-	(Some, None) = std/option
+	i/http
+	i/bit_array
+	(Some, None) = i/option
 )
 
 (

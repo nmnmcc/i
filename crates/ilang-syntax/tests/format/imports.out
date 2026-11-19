@@ -3,7 +3,7 @@
 (
 	i/core
 	decode = json/decode
-	opt = (Option, Some) = std/option
+	opt = (Option, Some) = i/option
 )
 
 (

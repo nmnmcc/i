@@ -222,7 +222,7 @@ fn node_of_i_syntax() {
 #[test]
 fn header_items_declarations_attributes() {
     let m = ok(
-        "//// A module.\n(\n\ti/fail\n\treq = i/request\n\t(Option, Some, None) = std/option\n)\n\n(\n\tUser(..)\n\tOption\n\tfind\n)\n\n/// Reads.\n@external(\"i:fs/v1\", \"read\")\nread : (String) <- (Fail(String)) -> String\n\n@host(\"app:storage/v1\", \"async\")\nStorage = (read = (String) <- (Fail(String)) -> String)\n\n@macro\nid = (x) { x }\n\ntest.suite(\"name\", () { 1 })\n",
+        "//// A module.\n(\n\ti/fail\n\treq = i/request\n\t(Option, Some, None) = i/option\n)\n\n(\n\tUser(..)\n\tOption\n\tfind\n)\n\n/// Reads.\n@external(\"i:fs/v1\", \"read\")\nread : (String) <- (Fail(String)) -> String\n\n@host(\"app:storage/v1\", \"async\")\nStorage = (read = (String) <- (Fail(String)) -> String)\n\n@macro\nid = (x) { x }\n\ntest.suite(\"name\", () { 1 })\n",
     );
     assert_eq!(m.doc, [" A module."]);
     assert_eq!(m.imports.len(), 3);
