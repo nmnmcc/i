@@ -15,7 +15,7 @@ fn library_resolves_cleanly() {
     assert_eq!(
         paths,
         [
-            "i/prelude",
+            "$prelude",
             "i/fail",
             "i/control",
             "i/resource",
@@ -139,7 +139,7 @@ fn library_names() {
                 "portable",
             ],
         ),
-        ("i/prelude", &["panic", "assert"]),
+        ("$prelude", &["panic", "assert"]),
         ("i/float_text", &["to_string"]),
         ("i/bits", &["read_int", "from_int"]),
         (
@@ -319,7 +319,7 @@ fn library_names() {
         ("i/resource", "acquire"),
         ("i/fail", "from_result"),
         ("i/fail", "map_error"),
-        ("i/prelude", "assert"),
+        ("$prelude", "assert"),
         ("i/random", "from_seed"),
         ("i/random", "word"),
         ("i/random", "int"),
@@ -375,7 +375,7 @@ fn library_labels() {
     assert_eq!(labels("i/resource", "ensure"), ["_", "_"]);
     assert_eq!(labels("i/core", "byte_slice"), ["_", "_", "_"]);
     assert_eq!(labels("i/core", "index_of"), ["_", "_", "_"]);
-    assert_eq!(labels("i/prelude", "panic"), ["_"]);
+    assert_eq!(labels("$prelude", "panic"), ["_"]);
 }
 
 /// The built-in custom types are in the prelude.
@@ -489,6 +489,42 @@ fn missing_library_names_are_reported() {
 /// Only the registered paths are modules of `i`. Any other path in `i` is
 /// still a missing module, so the reserved modules do not
 /// open the whole of `i` to user imports.
+/// The prelude is built in: no import names it, and its names are in every
+/// module without one.
+#[test]
+fn the_prelude_is_not_importable() {
+    for main in ["(i/prelude)\n\nx = 1\n", "(prelude = i/prelude)\n\nx = 1\n"] {
+        assert!(ilang_syntax::parse_module(main).1.is_empty());
+        let (graph, _, diags) = common::check_files(&[("src/main.i", main)]);
+        let found: Vec<_> = diags
+            .iter()
+            .filter(|d| d.code == ilang_check::code::NO_MODULE)
+            .cloned()
+            .collect();
+        assert_eq!(
+            graph.sources.render_all(&found),
+            [
+                "src/main.i:1:2: error[E0210]: there is no module `i/prelude`: \
+                 the prelude is built in; its names need no import"
+            ],
+            "{main}"
+        );
+    }
+    // The built-in names need no import.
+    let main = "check = (x : Result(Int, Nil)) -> Bool {\n\tx |>\n\t\t(Ok(_)) { True }\n\t\t& (Error(_)) { panic(\"no\") }\n}\n";
+    let (graph, program, diags) = common::check_files(&[("src/main.i", main)]);
+    let errors: Vec<_> = diags
+        .iter()
+        .filter(|d| d.is_error() && d.code != ilang_package::code::NO_LIBRARY)
+        .cloned()
+        .collect();
+    let rendered = graph.sources.render_all(&errors);
+    assert!(rendered.is_empty(), "{rendered:#?}");
+    let program = program.unwrap();
+    let prelude = program.prelude.unwrap();
+    assert_eq!(program.module(prelude).path, "$prelude");
+}
+
 #[test]
 fn unknown_library_path_is_missing() {
     // The removed `i/record` module must remain unavailable. Keep the corpus probe

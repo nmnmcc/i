@@ -33,7 +33,11 @@ pub const MODULES: &[(&str, &str)] = &[
 /// compiler program that selects only an import closure.
 pub const RUNTIME: &[&str] = &["i/float_text", "i/big", "i/bits"];
 
-pub const PRELUDE: (&str, &str) = ("i/prelude", include_str!("../../../lib/prelude.i"));
+/// The module path of the prelude. No import can name it: `$` is not in a
+/// name, so the prelude is only ever reached as the built-in names.
+pub const PRELUDE_PATH: &str = "$prelude";
+
+pub const PRELUDE: (&str, &str) = (PRELUDE_PATH, include_str!("../../../lib/prelude.i"));
 
 /// Adds the package `i` to an empty graph, as package 0.
 pub(crate) fn add(graph: &mut PackageGraph) {
@@ -42,7 +46,10 @@ pub(crate) fn add(graph: &mut PackageGraph) {
     let all = std::iter::once((PRELUDE, ModuleKind::Prelude))
         .chain(MODULES.iter().map(|&m| (m, ModuleKind::Src)));
     for ((path, text), kind) in all {
-        let file = path.strip_prefix("i/").unwrap_or(path);
+        let file = match kind {
+            ModuleKind::Prelude => "prelude",
+            _ => path.strip_prefix("i/").unwrap_or(path),
+        };
         let source = graph.sources.add(format!("<i>/{file}.i"), text.to_string());
         modules.push(ModuleSource {
             path: path.to_string(),

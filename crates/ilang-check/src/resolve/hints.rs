@@ -3,6 +3,14 @@
 
 use super::*;
 
+/// The prelude is not a module that an import can name; its names are in
+/// every module. Gives the message for an import of `i/prelude`.
+pub(super) fn prelude_import_message(written: &str) -> Option<String> {
+    (written == "i/prelude").then(|| {
+        format!("there is no module `{written}`: the prelude is built in; its names need no import")
+    })
+}
+
 /// Shared by ordinary resolution and the macro import-closure diagnostic.
 /// Only consult loaded modules; do not resolve or load any additional imports.
 pub fn missing_module_message(
@@ -11,6 +19,9 @@ pub fn missing_module_message(
     kind: ModuleKind,
     written: &str,
 ) -> String {
+    if let Some(message) = prelude_import_message(written) {
+        return message;
+    }
     let mut message = format!("there is no module `{written}`");
     let other = if let Some(rest) = written.strip_prefix("i/") {
         format!("std/{rest}")

@@ -8,7 +8,7 @@ fn checked(source: &str) -> (Vec<String>, Vec<String>) {
     graph.packages[graph.library].modules.retain(|m| {
         matches!(
             m.path.as_str(),
-            "i/prelude" | "i/control" | "i/resource" | "i/core"
+            "$prelude" | "i/control" | "i/resource" | "i/core"
         )
     });
     let checked = ilang_check::check(&graph);

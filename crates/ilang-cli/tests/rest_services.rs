@@ -14,7 +14,7 @@ fn run(source: &str) {
         needs_task
             || matches!(
                 m.path.as_str(),
-                "i/prelude" | "i/control" | "i/fail" | "i/resource" | "i/core"
+                "$prelude" | "i/control" | "i/fail" | "i/resource" | "i/core"
             )
             || ilang_package::library::RUNTIME.contains(&m.path.as_str())
     });

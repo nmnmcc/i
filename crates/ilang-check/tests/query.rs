@@ -274,7 +274,7 @@ fn definitions() {
     let f = Fixture::new(&[("src/main.i", "main = () { panic(\"no\") }\n")]);
     assert_eq!(
         f.definition("app/main", "panic", 0),
-        ("i/prelude".into(), "panic".into())
+        ("$prelude".into(), "panic".into())
     );
 }
 
