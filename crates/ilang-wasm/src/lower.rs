@@ -4314,12 +4314,7 @@ impl<'a> Lowerer<'a> {
                     codepoint: false,
                 }) => {
                     let PatternKind::String(text) = &s.value.kind else {
-                        self.error(
-                            fx.module,
-                            s.value.span,
-                            "a string format in a pattern needs a string literal",
-                        );
-                        continue;
+                        unreachable!("checked by check_bit_pattern")
                     };
                     let lit = let_value(
                         fx,

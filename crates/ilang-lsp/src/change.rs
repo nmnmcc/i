@@ -33,7 +33,7 @@ impl Change {
             .take_while(|(a, b)| a == b)
             .count();
         Change {
-            same: prefix as usize == o.len() && o.len() == n.len(),
+            same: prefix == o.len() && o.len() == n.len(),
             prefix: prefix as u32,
             suffix: suffix as u32,
             old_len: o.len() as u32,

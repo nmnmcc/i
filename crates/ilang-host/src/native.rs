@@ -16,9 +16,9 @@
 //! contract ([`contract`]) that the code was compiled for, which must be the
 //! runner's own. Only then does it give the code to Wasmtime's unsafe
 //! `Module::deserialize`, which checks the compiler settings once more. The
-//! manifest binds the binding plan to the exact module (its artifact digest)
-//! and the code to its digest. The digest detects a damaged or truncated
-//! file; it is not a signature (signing is not provided).
+//! manifest binds the binding plan to the exact module (its artifact digest).
+//! The trailer digest detects a damaged or truncated file; it is not a
+//! signature (signing is not provided).
 //!
 //! The metadata module is a Wasm module with only the `ilang.*` custom
 //! sections of the program, read exactly as [`Program::from_bytes`] reads

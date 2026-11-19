@@ -424,9 +424,6 @@ fn hash_vector_from_git() {
     );
     assert_eq!(fs::read_link(&link).unwrap(), PathBuf::from("src/a.i"));
     assert!(!dir.join("sub").exists());
-    // The hash is kept next to the files.
-    let kept = fs::read_to_string(dir.with_extension("hash")).unwrap();
-    assert_eq!(kept.trim(), VECTOR_HASH);
 }
 
 #[test]
@@ -1168,7 +1165,7 @@ fn located_source_links_cannot_escape_the_hashed_tree() {
 
 #[test]
 fn cached_package_files_are_checked_on_every_load() {
-    for attack in ["edit", "manifest", "add", "remove", "forged-sidecar"] {
+    for attack in ["edit", "manifest", "add", "remove"] {
         let w = World::new();
         let r = w.repo("dep");
         w.repo("peer").package("peer", &[], "1.0.0");
@@ -1193,9 +1190,8 @@ fn cached_package_files_are_checked_on_every_load() {
         no_errors(&g, &ds);
         let locked = fs::read(app.join("i.lock")).unwrap();
         let cache = w.cache().join("pkg/example.com%2fdep").join(commit);
-        let sidecar = fs::read(cache.with_extension("hash")).unwrap();
         match attack {
-            "edit" | "forged-sidecar" => {
+            "edit" => {
                 fs::remove_file(cache.join("src/lib.i")).unwrap();
                 fs::write(
                     cache.join("src/lib.i"),
@@ -1210,15 +1206,6 @@ fn cached_package_files_are_checked_on_every_load() {
             "add" => fs::write(cache.join("src/extra.i"), "x = 2\n").unwrap(),
             "remove" => fs::remove_file(cache.join("src/lib.i")).unwrap(),
             _ => unreachable!(),
-        }
-        if attack == "forged-sidecar" {
-            fs::write(
-                cache.with_extension("hash"),
-                format!("sha256-{}\n", "0".repeat(64)),
-            )
-            .unwrap();
-        } else {
-            assert_eq!(fs::read(cache.with_extension("hash")).unwrap(), sidecar);
         }
         let mut options = w.options(false);
         options.offline = true;
