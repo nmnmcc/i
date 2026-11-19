@@ -135,13 +135,19 @@ impl World {
 
     /// Adds a version to the repository of `example.com/<name>`.
     fn tag(&self, name: &str, version: &str, files: &[(&str, &str)]) {
+        self.tag_as(name, &format!("v{version}"), files);
+    }
+
+    /// Commits exactly `files` in the repository of `example.com/<name>`,
+    /// tags the commit `tag`, and pushes both.
+    fn tag_as(&self, name: &str, tag: &str, files: &[(&str, &str)]) {
         let work = self.path().join("work").join(name);
         let bare = self.path().join("remotes").join(name);
         git(&work, &["rm", "-rq", "--ignore-unmatch", "."]);
         write(&work, files);
         git(&work, &["add", "-A"]);
-        git(&work, &["commit", "-q", "--allow-empty", "-m", version]);
-        git(&work, &["tag", &format!("v{version}")]);
+        git(&work, &["commit", "-q", "--allow-empty", "-m", tag]);
+        git(&work, &["tag", tag]);
         let bare = bare.display().to_string();
         git(&work, &["push", "-q", "-f", &bare, "HEAD:refs/heads/main"]);
         git(&work, &["push", "-q", "-f", &bare, "--tags"]);

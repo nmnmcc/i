@@ -8,10 +8,18 @@
 //! `$XDG_CACHE_HOME/ilang`, `$HOME/.cache/ilang`, or `%LOCALAPPDATA%\ilang`.
 //! In it:
 //!
-//! - `git/<escaped repository>/` is a bare repository with the tags
-//!   `vX.Y.Z` of the repository. It is fetched with
-//!   `+refs/tags/v*:refs/tags/v*`, so a tag that is moved or taken out there
-//!   is moved or taken out here.
+//! - `git/<escaped repository>/` is a bare repository with the version tags
+//!   of the repository. The tags of a location are `<prefix>vX.Y.Z`, where
+//!   the prefix comes from the `//dir` of the location (see [`tag_prefix`]):
+//!   none for the root package, `stdlib-` for `//stdlib`, `tools-text-` for
+//!   `//tools/text`. A location is fetched with only its own tags,
+//!   `+refs/tags/<prefix>v*:refs/tags/<prefix>v*`, so a tag that is moved or
+//!   taken out there is moved or taken out here, and the tags of other
+//!   packages of the repository (and the history only they reach) are not
+//!   fetched for it.
+//! - `git/<escaped repository>.lock` is an advisory file lock, held while
+//!   the bare repository is made and fetched into, so that two processes
+//!   that fetch the same repository do not get in each other's way.
 //! - `pkg/<escaped location>/<commit>/` is the files of the package at a
 //!   commit: the tree under the `//dir` of the location, written from the git
 //!   objects without a checkout, so their bytes are as git keeps them. The
@@ -38,7 +46,7 @@
 //!
 //! # The network
 //!
-//! A repository is fetched at most once by one [`Git`], and only when a tag
+//! The tags of a location are fetched at most once by one [`Git`], and only when a tag
 //! that is needed is not in the cache, or when its commit there is not the
 //! one in `i.lock`. When everything is in the cache, nothing is fetched.
 //! When offline, nothing is ever fetched, and a tag that is not in the cache
@@ -129,14 +137,40 @@ pub fn escape(s: &str) -> String {
     out
 }
 
+/// The repository and the directory of a location (`repository//dir`).
+pub fn split_place(place: &str) -> (&str, Option<&str>) {
+    match place.split_once("//") {
+        Some((r, d)) => (r, Some(d)),
+        None => (place, None),
+    }
+}
+
+/// The prefix of the version tags of the package in `dir` of a repository:
+/// `""` for the root package (tags `vX.Y.Z`), and otherwise the directory
+/// with `/` written as `-`, and a `-` after it, so `stdlib` has the tags
+/// `stdlib-vX.Y.Z` and `tools/text` has `tools-text-vX.Y.Z`.
+pub fn tag_prefix(dir: Option<&str>) -> String {
+    match dir.map(|d| d.trim_matches('/')).filter(|d| !d.is_empty()) {
+        Some(d) => format!("{}-", d.replace('/', "-")),
+        None => String::new(),
+    }
+}
+
+/// The tag of `version` of the package at `place` (a location with its
+/// `//dir`): `<prefix>v<version>`.
+pub fn tag_name(place: &str, version: Version) -> String {
+    format!("{}v{version}", tag_prefix(split_place(place).1))
+}
+
 /// Gets packages from git into a cache.
 #[derive(Debug)]
 pub struct Git {
     cache: PathBuf,
     offline: bool,
     urls: Vec<(String, String)>,
-    /// The repositories fetched by this value, and how it went.
-    fetched: HashMap<String, Result<()>>,
+    /// The repositories and tag prefixes fetched by this value, and how it
+    /// went. One bare repository may hold the tags of several packages.
+    fetched: HashMap<(String, String), Result<()>>,
 }
 
 impl Git {
@@ -239,30 +273,37 @@ impl Git {
         Ok(out.stdout)
     }
 
-    /// Fetches the tags `v*` of `repository` into the cache, at most once.
-    pub fn fetch(&mut self, repository: &str) -> Result<()> {
-        if let Some(r) = self.fetched.get(repository) {
+    /// Fetches the tags `<prefix>v*` of the package at `place` (a location,
+    /// with or without its `//dir`) into the cache, at most once.
+    pub fn fetch(&mut self, place: &str) -> Result<()> {
+        let (repository, dir) = split_place(place);
+        let key = (repository.to_string(), tag_prefix(dir));
+        if let Some(r) = self.fetched.get(&key) {
             return r.clone();
         }
-        let r = self.fetch_now(repository);
-        self.fetched.insert(repository.to_string(), r.clone());
+        let r = self.fetch_now(repository, &key.1);
+        self.fetched.insert(key, r.clone());
         r
     }
 
-    fn fetch_now(&mut self, repository: &str) -> Result<()> {
+    fn fetch_now(&mut self, repository: &str, prefix: &str) -> Result<()> {
         let url = self.url(repository);
         if self.offline {
             return Err(GitError::new(
                 code::OFFLINE,
                 format!(
-                    "`{repository}` would have to be fetched from `{url}`, but the network may not be used (offline)"
+                    "the tags `{prefix}v*` of `{repository}` would have to be fetched from `{url}`, but the network may not be used (offline)"
                 ),
             ));
         }
         let dir = self.repo_dir(repository);
+        // Held across making the bare repository and fetching into it only;
+        // it is let go when this function returns.
+        let _lock = self.lock_repo(repository)?;
         if !dir.join("HEAD").is_file() {
             self.init_bare(&dir)?;
         }
+        let refspec = format!("+refs/tags/{prefix}v*:refs/tags/{prefix}v*");
         let mut cmd = self.command(Some(&dir));
         cmd.args([
             "fetch",
@@ -272,19 +313,44 @@ impl Git {
             "--force",
             "--",
             &url,
-            "+refs/tags/v*:refs/tags/v*",
+            &refspec,
         ]);
         let out = self.run(cmd, None)?;
         if !out.status.success() {
             return Err(GitError::new(
                 code::GIT,
                 format!(
-                    "`{repository}` could not be fetched from `{url}`: {}",
+                    "the tags `{prefix}v*` of `{repository}` could not be fetched from `{url}`: {}",
                     String::from_utf8_lossy(&out.stderr).trim()
                 ),
             ));
         }
         Ok(())
+    }
+
+    /// Takes the advisory lock `git/<escaped repository>.lock` of the cache,
+    /// waiting for another process (or another [`Git`]) that has it.
+    fn lock_repo(&self, repository: &str) -> Result<std::fs::File> {
+        let parent = self.cache.join("git");
+        let path = parent.join(format!("{}.lock", escape(repository)));
+        let cache_err = |e: std::io::Error| {
+            GitError::new(
+                code::CACHE,
+                format!(
+                    "the cache lock `{}` could not be taken: {e}",
+                    path.display()
+                ),
+            )
+        };
+        std::fs::create_dir_all(&parent).map_err(cache_err)?;
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&path)
+            .map_err(cache_err)?;
+        file.lock().map_err(cache_err)?;
+        Ok(file)
     }
 
     fn init_bare(&self, dir: &Path) -> Result<()> {
@@ -322,31 +388,45 @@ impl Git {
         Ok(())
     }
 
-    /// The versions that the tags `vX.Y.Z` of `repository` give, from the
-    /// cache, fetched first when the repository is not in the cache.
-    pub fn tags(&mut self, repository: &str) -> Result<Vec<Version>> {
+    /// The versions that the tags `<prefix>vX.Y.Z` of the package at
+    /// `place` give, from the cache. They are fetched first when the cache
+    /// has none of them and this value has not fetched them yet.
+    pub fn tags(&mut self, place: &str) -> Result<Vec<Version>> {
+        let (repository, dir) = split_place(place);
+        let key = (repository.to_string(), tag_prefix(dir));
         if !self.repo_dir(repository).join("HEAD").is_file() {
-            self.fetch(repository)?;
+            self.fetch(place)?;
         }
+        let mut versions = self.cached_tags(repository, &key.1)?;
+        if versions.is_empty() && !self.offline && !self.fetched.contains_key(&key) {
+            self.fetch(place)?;
+            versions = self.cached_tags(repository, &key.1)?;
+        }
+        Ok(versions)
+    }
+
+    fn cached_tags(&self, repository: &str, prefix: &str) -> Result<Vec<Version>> {
+        let pattern = format!("refs/tags/{prefix}v*");
         let out = self.run_ok(
             repository,
-            &[
-                "for-each-ref",
-                "--format=%(refname:strip=2)",
-                "refs/tags/v*",
-            ],
+            &["for-each-ref", "--format=%(refname:strip=2)", &pattern],
             None,
         )?;
         let mut versions: Vec<Version> = String::from_utf8_lossy(&out)
             .lines()
-            .filter_map(|l| l.strip_prefix('v').and_then(parse_version))
+            .filter_map(|l| {
+                l.strip_prefix(prefix)
+                    .and_then(|l| l.strip_prefix('v'))
+                    .and_then(parse_version)
+            })
             .collect();
         versions.sort();
         Ok(versions)
     }
 
-    /// The commit of the tag of `version` in the cache, if there is one.
-    fn peel(&self, repository: &str, version: Version) -> Result<Option<String>> {
+    /// The commit of the tag `<prefix>v<version>` in the cache, if there is
+    /// one.
+    fn peel(&self, repository: &str, prefix: &str, version: Version) -> Result<Option<String>> {
         let dir = self.repo_dir(repository);
         if !dir.join("HEAD").is_file() {
             return Ok(None);
@@ -357,14 +437,15 @@ impl Git {
             // This is git's own option name, not a name of this project.
             "--verify",
             "--quiet",
-            &format!("refs/tags/v{version}^{{commit}}"),
+            &format!("refs/tags/{prefix}v{version}^{{commit}}"),
         ]);
         let out = self.run(cmd, None)?;
         let commit = String::from_utf8_lossy(&out.stdout).trim().to_string();
         Ok((out.status.success() && !commit.is_empty()).then_some(commit))
     }
 
-    /// Returns the commit of the tag `v<version>` of `repository`.
+    /// Returns the commit of the tag `<prefix>v<version>` of the package at
+    /// `place` (a location, with or without its `//dir`).
     ///
     /// The cache is used when it has the tag, and, when `expected` is given,
     /// when the tag is at that commit there. Otherwise the repository is
@@ -372,11 +453,13 @@ impl Git {
     /// given as it is, and the caller finds that it is not `expected`.
     pub fn commit(
         &mut self,
-        repository: &str,
+        place: &str,
         version: Version,
         expected: Option<&str>,
     ) -> Result<String> {
-        let mut commit = self.peel(repository, version)?;
+        let (repository, dir) = split_place(place);
+        let prefix = tag_prefix(dir);
+        let mut commit = self.peel(repository, &prefix, version)?;
         let stale = match (&commit, expected) {
             (None, _) => true,
             (Some(c), Some(e)) => c != e,
@@ -386,13 +469,13 @@ impl Git {
             if self.offline && commit.is_some() {
                 return Ok(commit.unwrap_or_default());
             }
-            self.fetch(repository)?;
-            commit = self.peel(repository, version)?;
+            self.fetch(place)?;
+            commit = self.peel(repository, &prefix, version)?;
         }
         match commit {
             Some(c) => Ok(c),
             None => {
-                let there = self.tags(repository).unwrap_or_default();
+                let there = self.tags(place).unwrap_or_default();
                 let list: Vec<String> = there.iter().map(|v| v.to_string()).collect();
                 let there = if list.is_empty() {
                     "it has no versions".to_string()
@@ -401,7 +484,7 @@ impl Git {
                 };
                 Err(GitError::new(
                     code::NO_VERSION,
-                    format!("`{repository}` has no tag `v{version}` ({there})"),
+                    format!("`{place}` has no tag `{prefix}v{version}` ({there})"),
                 ))
             }
         }
