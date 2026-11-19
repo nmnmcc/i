@@ -26,17 +26,8 @@
   "crates/ilang-check/src/types/display.rs:e790f23ba7dd9bcd": {
     "not_source": "Rendered type variable name"
   },
-  "crates/ilang-check/tests/codegen.rs:92052762dba09d34": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
   "crates/ilang-check/tests/resolve_deep.rs:30b0fe37fff13e45": {
     "not_source": "Rust format string that builds a 20,000-deep i value"
-  },
-  "crates/ilang-check/tests/common/mod.rs:dbceb65de7aa8500": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-check/tests/query.rs:dbceb65de7aa8500": {
-    "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-check/tests/query.rs:3b0f2db9bb2e0f9b": {
     "not_source": "Position/search substring inside a complete source fixture"
@@ -92,13 +83,7 @@
   "crates/ilang-check/tests/query.rs:fe26932c41ca33d2": {
     "not_source": "Position/search substring inside a complete source fixture"
   },
-  "crates/ilang-check/tests/types.rs:dbceb65de7aa8500": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
   "crates/ilang-check/tests/types.rs:720334f508f898b3": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-check/tests/types.rs:41a8b6c35fcc6353": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/src/main.rs:c6d9f1c6871f9ba9": {
@@ -146,9 +131,6 @@
   "crates/ilang-cli/tests/package_commands.rs:049f2db9520b1318": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-cli/tests/package_commands.rs:d245d0e92715694f": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
   "crates/ilang-cli/tests/package_commands.rs:fb41c1629043bb04": {
     "not_source": "TOML manifest or manifest fragment"
   },
@@ -159,12 +141,6 @@
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/package_commands.rs:6a8cac732fbde621": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:b26053bb0e5de537": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:5855072d744cd0c3": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/package_commands.rs:d95a9ea255310e79": {
@@ -182,25 +158,7 @@
   "crates/ilang-cli/tests/package_commands.rs:6bed22ddcd883aa5": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-cli/tests/package_commands.rs:cbc370722e5adb60": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:b13ea96c01d22a50": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:4dbe118e617afaae": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:242a219f5ab5a1ed": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
   "crates/ilang-cli/tests/package_commands.rs:05e973f7590e3896": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:9a8fd31d0d3086b0": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-cli/tests/spec.rs:85ab6ac1cb862bc6": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-cli/tests/spec.rs:9072ee0af7b301bf": {
@@ -209,20 +167,11 @@
   "crates/ilang-cli/tests/spec_update.rs:bf4dcb36efa1f115": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-cli/tests/wasi.rs:dbceb65de7aa8500": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
   "crates/ilang-cli/tests/wat_dump.rs:99b2c0ce278771f3": {
     "not_source": "Host or test-runner diagnostic text"
   },
-  "crates/ilang-cli/tests/wat_dump.rs:85ab6ac1cb862bc6": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
   "crates/ilang-host/src/lib.rs:8f09b9284d2a927f": {
     "not_source": "Host or test-runner diagnostic text"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:dbceb65de7aa8500": {
-    "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-lsp/tests/protocol.rs:5344872dfc4f3031": {
     "not_source": "Position/search substring inside a complete source fixture"
@@ -232,9 +181,6 @@
   },
   "crates/ilang-lsp/tests/protocol.rs:bbfcd4160a1e8674": {
     "not_source": "Position/search substring inside a complete source fixture"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:18976f65d2574689": {
-    "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-lsp/tests/protocol.rs:0cebcafa0fc465f0": {
     "not_source": "Position/search substring inside a complete source fixture"
@@ -323,16 +269,10 @@
   "crates/ilang-package/tests/git.rs:2ca81f5681258a40": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-package/tests/load.rs:5613d4fce1fd20f9": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
   "crates/ilang-package/tests/load.rs:a35a809dfa18c69d": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-package/tests/load.rs:12714f6674d03eff": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-package/tests/load.rs:f0266e93c1013427": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-package/tests/load.rs:da998960cd3ee38a": {
@@ -401,13 +341,7 @@
   "crates/ilang-package/tests/manifest.rs:38c2c508f63eea99": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-package/tests/manifest.rs:a8c6266211681333": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
   "crates/ilang-package/tests/manifest.rs:9eb686f7a1cb68e0": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-package/tests/manifest.rs:96da09ff2b4759f1": {
     "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-package/tests/manifest.rs:d9884b98c49565c3": {
@@ -418,9 +352,6 @@
   },
   "crates/ilang-wasm/src/runtime/tests.rs:7f2d1ce4723df80a": {
     "not_source": "Host or test-runner diagnostic text"
-  },
-  "crates/ilang-wasm/tests/codegen.rs:dbceb65de7aa8500": {
-    "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-check/tests/library.rs:a55d3ed17385f8dd": {
     "substitutions": [
@@ -671,9 +602,6 @@
   },
   "crates/ilang-lsp/tests/protocol.rs:36a9e7f1c95b82ff": {
     "reason": "Source replacement that removes the header in the LSP fixture"
-  },
-  "crates/ilang-check/tests/literal_types.rs:74282c580560b9e5": {
-    "not_source": "Generated temporary Cargo-style i.toml dependency manifest"
   },
   "crates/ilang-check/tests/literal_types.rs:58bbc7c45c65d2e4": {
     "not_source": "Generated i.toml wasm export configuration"
@@ -949,77 +877,8 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-std1/stream/.invalid/src/stream.i:1d8d57936a119a04": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
-      "E0102: expected the function body, a `{` on the same line, found `?`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
-      "E0101: expected an expression, found `->`",
-      "E0101: expected an expression, found `->`",
-      "E0101: expected an expression, found `->`",
-      "E0101: expected an expression, found `->`",
-      "E0101: expected an expression, found `->`",
-      "E0101: `:` is not written in a type: a label is `label = Type`, and a function type has no parameter names",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `?`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `?`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
-    ]
-  },
-  "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:1d8d57936a119a04": {
-    "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
-    "diagnostics": [
-      "E0101: expected an expression, found `)`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
-      "E0102: expected the function body, a `{` on the same line, found `?`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `!`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
-      "E0101: expected an expression, found `->`",
-      "E0101: expected an expression, found `->`",
-      "E0101: expected an expression, found `->`",
-      "E0101: expected an expression, found `->`",
-      "E0101: expected an expression, found `->`",
-      "E0101: `:` is not written in a type: a label is `label = Type`, and a function type has no parameter names",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `?`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
-      "E0102: expected the function body, a `{` on the same line, found `?`",
-      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
-    ]
-  },
   "tests/browser/r2-laws.mjs:e3c0158bcdafc3f6": {
     "not_source": "JavaScript diagnostic text about case/export coverage, not an i case expression"
-  },
-  "crates/ilang-cli/tests/r2_fixtures.rs:7d393432eb121ee8": {
-    "not_source": "TOML manifest assembled for the R2 conformance bundle, not i code"
-  },
-  "crates/ilang-cli/tests/r2_performance.rs:2dbd953bfd83802f": {
-    "not_source": true,
-    "reason": "Generated TOML manifest for the isolated interval measurement package; this is not i source."
   },
   "crates/ilang-wasm/tests/codegen.rs:7f62a28b86ea4a86": {
     "prefix": "(i/control)\nf = (b, x) { a1 = x\n",
@@ -1051,19 +910,7 @@
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
-  "crates/ilang-cli/tests/entries.rs:41a8b6c35fcc6353": {
-    "not_source": true,
-    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
   "crates/ilang-cli/tests/r2_runtime.rs:e545c6b927783df9": {
-    "not_source": true,
-    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
-  "crates/ilang-package/tests/load.rs:29b81ce310a5da19": {
-    "not_source": true,
-    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
-  "crates/ilang-package/tests/load.rs:df2134b9528390ec": {
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
@@ -1200,14 +1047,6 @@
   "crates/ilang-wasm/tests/control_lazy.rs:49ab064948281b07": {
     "not_source": "Rust diagnostic format string"
   },
-  "crates/ilang-cli/tests/http.rs:3597d8fd08de24af": {
-    "not_source": true,
-    "reason": "Rust format string generates a TOML manifest."
-  },
-  "crates/ilang-cli/tests/http.rs:8e812e356e161441": {
-    "not_source": true,
-    "reason": "Rust format string generates a TOML manifest."
-  },
   "tests/spec/3/syn2_old_empty_record_type.i:8e197a393e555c9d": {
     "reason": "Intentional legacy migration or rejection fixture.",
     "diagnostics": [
@@ -1276,15 +1115,6 @@
   "crates/ilang-cli/tests/macro_budget.rs:080eb357b7982bd5": {
     "not_source": "TOML manifest"
   },
-  "crates/ilang-cli/tests/macro_run.rs:7f5fb3e68a8a2beb": {
-    "not_source": "TOML manifest"
-  },
-  "crates/ilang-cli/tests/macro_run.rs:18b880a4cf8d992c": {
-    "not_source": "TOML manifest"
-  },
-  "crates/ilang-cli/tests/macro_run.rs:0a257ca4f66ad2b4": {
-    "not_source": "TOML manifest"
-  },
   "crates/ilang-cli/tests/macro_run.rs:86cfdeed213d03b2": {
     "substitutions": [
       [
@@ -1308,12 +1138,6 @@
         ""
       ]
     ]
-  },
-  "crates/ilang-cli/tests/many_tests.rs:a7153630dd023a42": {
-    "not_source": "TOML manifest template"
-  },
-  "crates/ilang-cli/tests/spec.rs:7372e79824e15040": {
-    "not_source": "TOML manifest template"
   },
   "crates/ilang-cli/tests/syntax_runtime.rs:7f5fb3e68a8a2beb": {
     "not_source": "TOML manifest"
@@ -1356,15 +1180,6 @@
   },
   "crates/ilang-cli/src/commands/package.rs:c687707332c8e3e8": {
     "not_source": "Publish test-runner diagnostic text."
-  },
-  "crates/ilang-cli/src/commands/package.rs:ac7dd3c38c3ce759": {
-    "not_source": "TOML manifest template that `i new` writes: `std` is an ordinary dependency copied next to the program, so this is not i source."
-  },
-  "crates/ilang-cli/tests/common/test_project.rs:ac7dd3c38c3ce759": {
-    "not_source": "TOML manifest template that `i new` writes: `std` is an ordinary dependency copied next to the program, so this is not i source."
-  },
-  "crates/ilang-cli/tests/common/test_project.rs:df747cb87930f0f2": {
-    "not_source": "TOML test-collection manifest template; exercised by i new and CLI integration tests."
   },
   "crates/ilang-syntax/tests/string_forms.rs:5c703ec833151f17": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
@@ -1458,10 +1273,6 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "crates/ilang-cli/tests/numeric_lowering.rs:49d6c886ab6b1ef2": {
-    "not_source": true,
-    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
-  },
   "crates/ilang-cli/tests/numeric_lowering.rs:eb3a7ab90f5fd1b0": {
     "not_source": true,
     "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
@@ -1498,17 +1309,6 @@
     "not_source": true,
     "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
   },
-  "crates/ilang-cli/tests/numeric_lowering.rs:5e8b102ca5395f9d": {
-    "not_source": true,
-    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
-  },
-  "crates/ilang-cli/tests/numeric_lowering.rs:874c51753cec23be": {
-    "not_source": true,
-    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
-  },
-  "bindings/javascript/test/fetch.test.mjs:8d24f3efc70550e7": {
-    "not_source": "TOML provider manifest or manifest template; i source is checked separately"
-  },
   "crates/ilang-check/src/types/typed_macro.rs:fe904007a1a28013": {
     "not_source": "Rust formatting template for a compiler-owned opaque type-variable name; it generates an identifier, not an i module."
   },
@@ -1526,9 +1326,6 @@
   },
   "crates/ilang-lsp/tests/protocol.rs:d942f64886578d87": {
     "not_source": "Code action fix tag, not i source"
-  },
-  "crates/ilang-lsp/tests/protocol.rs:d2ca964c413f21c8": {
-    "not_source": "TOML manifest or manifest fragment"
   },
   "crates/ilang-lsp/tests/protocol.rs:40ccea3ebc617547": {
     "not_source": "Position/search substring inside a complete source fixture"
@@ -1559,27 +1356,6 @@
   },
   "crates/ilang-cli/tests/value_type_performance.rs:217fe1a139ac8e12": {
     "not_source": "Rust format string for a type name"
-  },
-  "crates/ilang-cli/src/commands/package.rs:d9aec12e3badd478": {
-    "substitutions": [
-      [
-        "{name}",
-        "app"
-      ],
-      [
-        "{dependency}",
-        "std"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template; runtime tests still exercise the full generator"
   },
   "tests/spec/1.7/a1_same_line_tuple.i:8c75136def717f74": {
     "reason": "Intentional negative syntax example.",
@@ -1631,17 +1407,9 @@
   "crates/ilang-cli/examples/migrate-syntax3-labels.rs:7372e79824e15040": {
     "not_source": "TOML manifest or manifest fragment"
   },
-  "crates/ilang-cli/tests/native.rs:0ec7fda8361d6c0d": {
-    "not_source": true,
-    "reason": "i.toml manifest text in a test, not an i module."
-  },
   "crates/ilang-cli/build.rs:1c713f59c8bfc4d7": {
     "not_source": true,
     "reason": "Cargo build-script directive, not an i module."
-  },
-  "crates/ilang-cli/tests/native.rs:76df5d4e33397944": {
-    "not_source": true,
-    "reason": "i.toml manifest text in a test, not an i module."
   },
   "crates/ilang-cli/tests/native.rs:b7dd204f0b7730c0": {
     "not_source": true,
@@ -1697,9 +1465,6 @@
       "E0101: expected `,`, `?` or `)`, found `<>`"
     ]
   },
-  "crates/ilang-cli/tests/multicore.rs:32586dd5d3cd919b": {
-    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
-  },
   "crates/ilang-cli/tests/multicore.rs:8a7d445a9741b557": {
     "substitutions": [
       [
@@ -1740,105 +1505,8 @@
   "crates/ilang-cli/tests/r2_runtime.rs:070b6af6019524ce": {
     "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
   },
-  "crates/ilang-cli/tests/http.rs:72601bfd90ecbc03": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
-  "crates/ilang-cli/tests/http.rs:4b11ef07a2bf54d9": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
-  "crates/ilang-cli/tests/http.rs:f7eff0a37bf28534": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
-  "crates/ilang-cli/tests/http.rs:0284547aae203ebc": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
-  "crates/ilang-cli/tests/http.rs:5108534ec7f720fb": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{first_port}",
-        "1234"
-      ],
-      [
-        "{second_port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
   "crates/ilang-wasm/tests/codegen.rs:fc3b7cf6d9e48c43": {
     "not_source": "module path of a generated metadata test, not an i source"
-  },
-  "crates/ilang-cli/tests/big_int.rs:16b691ee8beb299b": {
-    "not_source": true,
-    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
-  },
-  "crates/ilang-cli/tests/float_text.rs:cca1ac99a7986d4f": {
-    "not_source": true,
-    "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
   },
   "crates/ilang-wasm/tests/multi_shape.rs:4414029af964b61f": {
     "not_source": "Wasmtime preload argument, not i source."
@@ -1898,10 +1566,6 @@
   "crates/ilang-wasm/tests/codegen.rs:6694c492172dacaf": {
     "suffix": "\n  a0\n}\n",
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "crates/ilang-package/tests/load.rs:7c1fba0b38ce9b71": {
-    "not_source": true,
-    "reason": "TOML root/dependency manifests for the entry-default fixture, not i code."
   },
   "crates/ilang-package/tests/load.rs:484dbf1ace20d2a2": {
     "not_source": true,
@@ -2020,9 +1684,6 @@
   "crates/ilang-check/tests/diagnostic_traps.rs:1c54e7195033f60e": {
     "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
   },
-  "crates/ilang-check/tests/known_facts.rs:74282c580560b9e5": {
-    "not_source": "TOML package manifest format used by the regression helper"
-  },
   "crates/ilang-check/tests/literal_types.rs:b469df68067e6c5d": {
     "not_source": "Expected inferred scheme display, not a source annotation; Typed::lines keeps the full Type grammar."
   },
@@ -2080,10 +1741,6 @@
     "prefix": "Svc(A) = (f = () -> A)\n",
     "suffix": " {\n provided: Svc(Int) = svc\n body() <- (provided)\n}\n",
     "reason": "Function header selected by the witness test; render it with the exact body appended by its format template."
-  },
-  "crates/ilang-cli/tests/commands.rs:108375a4abe87ac4": {
-    "not_source": true,
-    "reason": "Runtime stop output with source locations; colons are message punctuation and line/column separators, not annotations."
   },
   "crates/ilang-cli/tests/compile_cache.rs:817df942588a36b5": {
     "not_source": "cache status prose checked with contains(), not an i annotation"
@@ -2207,12 +1864,6 @@
     "reason": "Manifest text, assertion message or format template in a Rust test, not an i module."
   },
   "crates/ilang-cli/tests/package_commands.rs:07c284cd8f2a26a7": {
-    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:2571ce03d469bbde": {
-    "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
-  },
-  "crates/ilang-cli/tests/package_commands.rs:7c70477f5fb1c039": {
     "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
   },
   "crates/ilang-cli/tests/package_commands.rs:9015630e06ad4e25": {
@@ -2495,10 +2146,6 @@
   "crates/ilang-check/src/types/display.rs:a81e88c3ce345716": {
     "not_source": "Rust format string for the synthetic solver type names in the 2048-entry operation-count regression"
   },
-  "crates/ilang-cli/tests/diagnostic_repairs.rs:74282c580560b9e5": {
-    "reason": "TOML manifest for the archived-program CLI tests, not i source.",
-    "not_source": true
-  },
   "crates/ilang-cli/tests/docfix_diagnostics.rs:ca9ae7acf074ff80": {
     "not_source": "Diagnostic-message assertion containing a filename and line/column; not i source."
   },
@@ -2686,57 +2333,6 @@
     ],
     "reason": "Render the source template of the Lisp-branch helper"
   },
-  "crates/ilang-cli/tests/http.rs:bc362bb8e4220dc0": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
-  "crates/ilang-cli/tests/http.rs:da0061ddcca4da4d": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
-  "crates/ilang-cli/tests/http.rs:d2d5ea2b6b89454f": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{port}",
-        "1234"
-      ]
-    ],
-    "reason": "Render the Rust format string with a representative port; check the full resulting program."
-  },
   "crates/ilang-check/tests/literal_types.rs:195ae1c8d289fddb": {
     "substitutions": [
       [
@@ -2857,15 +2453,6 @@
       ]
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
-  "editors/vscode/test/sample.i:8b19a349c1d6f0fe": {
-    "reason": "Intentional negative syntax example.",
-    "diagnostics": [
-      "E0101: a function type with type parameters must be the type of a binding",
-      "E0003: unknown escape",
-      "E0106: a discard binds nothing, so it may not be used as a value",
-      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
-    ]
   },
   "crates/ilang-syntax/src/lisp/expansion.rs:5400e87bb5b8b130": {
     "reason": "Intentional invalid mixed signature data: compare macro shape metadata with main even while the separate stage-6 data diagnostic remains unchanged.",
@@ -3188,12 +2775,6 @@
     ],
     "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
   },
-  "crates/ilang-cli/tests/package_commands.rs:9a401754e36c5860": {
-    "not_source": "TOML manifest or manifest fragment"
-  },
-  "crates/ilang-check/tests/lazy_parse.rs:41a8b6c35fcc6353": {
-    "not_source": "deliberately invalid fixture text"
-  },
   "crates/ilang-package/tests/git.rs:34e755e209bee761": {
     "not_source": "manifest or repository fragment"
   },
@@ -3205,5 +2786,433 @@
   },
   "crates/ilang-package/tests/git.rs:261dc05ed93edc52": {
     "not_source": "manifest or repository fragment"
+  },
+  "crates/ilang-check/src/types/coverage.rs:a7950d32ca849f59": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-check/src/types/pattern.rs:a7950d32ca849f59": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-check/tests/codegen.rs:aea1c6e8f46b8603": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-check/tests/common/mod.rs:088505c8d4ab1454": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-check/tests/common/mod.rs:c7465340e7d38d04": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-check/tests/lazy_parse.rs:88ee848e8ee4692c": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-check/tests/lazy_parse.rs:c20a535243b7e315": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-check/tests/types.rs:29f9630d5e448beb": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/src/commands/package.rs:70716d150c7de178": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/src/commands/package.rs:a7950d32ca849f59": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/src/commands/package.rs:b3de2259500380c2": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/big_int.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/big_int.rs:b0a0bbcc287a9b11": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/collections.rs:2dfd312d59121e84": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/collections.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/collections.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/common/test_project.rs:050923d06170793f": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/common/test_project.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/common/test_project.rs:87bd4b3d43f065d9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/diagnostic_repairs.rs:a7950d32ca849f59": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/entries.rs:29f9630d5e448beb": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/entries.rs:c7465340e7d38d04": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/expansion_sites.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/expansion_sites.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/float_text.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/float_text.rs:b36f8a143331c2c8": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/http.rs:2b42a9b9cd920678": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/http.rs:ef1cbe74cb112517": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/lisp.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/lisp.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/macro_facts_boundary.rs:ffe5dd0f2352f2d1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:2dfd312d59121e84": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:37bccbcd73fde2e0": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:53c7321253cafedb": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:96e558c9febc5a48": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/macro_run.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/many_tests.rs:2df0b22640976374": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/multicore.rs:f63921b461fb9905": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/native.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/native.rs:72a860d8d6282d6f": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/native.rs:7da0a093648ba9e8": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/native.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:2ab6ea65b276b93f": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:5d39ca95945ef91e": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:6210b2045ddbb3b2": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:c9bdee2374e76c23": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:05ebbab891ecf28f": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:10762a4c2b447002": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:11d7d48b73b4afb3": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:219177a82c8e8098": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:352bc23bcfaf9315": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:3751508ff9352153": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:42d709199738c172": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:43727b5d2ed63933": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:5ec42dd1ae2d0117": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:6643ca49d54e876e": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:78763c4e7ba51922": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:811569d3018d7a31": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:9af1b34eb9ac432f": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:c7465340e7d38d04": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:d28586a4b8bd1ba5": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/package_commands.rs:d926f10e96be524b": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/r2_fixtures.rs:5d769bbd6d7d1b29": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/r2_fixtures.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/r2_performance.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/r2_performance.rs:741e4130ed9b18bf": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/rest_services.rs:f63921b461fb9905": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/run_pipe.rs:24af1b560303813d": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/spec.rs:2049d22ae4be1c4e": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/spec.rs:99f4a407f84ab47d": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/syn3_roundtrip_run.rs:07c820321ea00495": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/syn3_roundtrip_run.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/tls.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/tls.rs:cfe88da86bb6a53e": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/typed_macros.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/typed_macros.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/unused.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/unused.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/value_type_performance.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/value_type_performance.rs:c955069ccaa8bc0e": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/value_types.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/value_types.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/wasi.rs:633a329ba7614ad9": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/wasi.rs:ddcecc24fc1307f1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-cli/tests/wat_dump.rs:f9db5511104a6161": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-lsp/src/analysis.rs:a7950d32ca849f59": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:5d1726ef748c6abf": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:642f44c505d1a68a": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:8180b6e40990aa21": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:a1aa5d7b73740d06": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:ab17a0e5b471d912": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-lsp/tests/protocol.rs:c7465340e7d38d04": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/src/lib.rs:39bb80fb75e81651": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/git.rs:2dae3a7fba43f7ad": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/git.rs:48f26812a5ba07ea": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/git.rs:c7465340e7d38d04": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:39bb80fb75e81651": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:44998d2316c0321a": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:4c77dfb1bbaaeead": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:6b22fcde3acd7e79": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:6e996e2710873e7c": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:9a2c3684ec52da24": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:ae2c8c65e8630fce": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:bbb6f6dece195b3e": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:c1b2e0b4c68e3ac7": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:f966cea66ee6320a": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/load.rs:ff2768e6ba973600": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/manifest.rs:60aa9dba0fbc54d1": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-package/tests/manifest.rs:b6234770385edc38": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-wasm/tests/binding_packages.rs:f2cbfb4eef1dc140": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-wasm/tests/codegen.rs:a7950d32ca849f59": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-wasm/tests/control_lazy.rs:a7950d32ca849f59": {
+    "not_source": "test source fragment or expectation"
+  },
+  "crates/ilang-wasm/tests/expansion_sites.rs:a7950d32ca849f59": {
+    "not_source": "test source fragment or expectation"
+  },
+  "bindings/javascript/test/fetch.test.mjs:cede5b76faccf642": {
+    "not_source": "test source fragment or template"
+  },
+  "bindings/javascript/test/providers.test.mjs:4f37ad713716b72e": {
+    "not_source": "test source fragment or template"
+  },
+  "bindings/javascript/test/wasi.test.mjs:4f37ad713716b72e": {
+    "not_source": "test source fragment or template"
+  },
+  "editors/vscode/test/sample.i:629145b68f699f30": {
+    "diagnostics": [
+      "E0101: a function type with type parameters must be the type of a binding",
+      "E0003: unknown escape",
+      "E0106: a discard binds nothing, so it may not be used as a value",
+      "E0101: type parameters are written on the function, not on the name: `id = <A>(x: A) -> A { x }`, or in a written type, `id: <A>(A) -> A`"
+    ]
+  },
+  "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:0653cdf628f7c589": {
+    "diagnostics": [
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: `:` is not written in a type: a label is `label = Type`, and a function type has no parameter names",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
+    ]
+  },
+  "tests/review/cases/review-std1/stream/.invalid/src/stream.i:0653cdf628f7c589": {
+    "diagnostics": [
+      "E0101: expected an expression, found `)`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `!`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0101: expected `)` after the guard, which is the last part of a parameter group, found `!`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: expected an expression, found `->`",
+      "E0101: `:` is not written in a type: a label is `label = Type`, and a function type has no parameter names",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`",
+      "E0102: expected the function body, a `{` on the same line, found `?`",
+      "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
+    ]
   }
 }

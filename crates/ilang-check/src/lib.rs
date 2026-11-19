@@ -293,7 +293,7 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 
 /// Library modules that code generation and macro expansion call by path,
 /// whether or not the program imports them.
-pub const CODEGEN_LIBRARY: &[&str] = &["i/fail", "i/request", "i/task", "i/syntax"];
+pub const CODEGEN_LIBRARY: &[&str] = &["i/fail", "i/request", "i/task", "i/syntax", "i/io"];
 
 /// Parses every module of the graph, also those that no import reaches.
 pub fn parse_all(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
