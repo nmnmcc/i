@@ -891,7 +891,9 @@ mod tests {
         };
         let may = may_suspend(&p);
         split_with_may(&mut p, &may);
-        assert_eq!(p.points.len(), 1);
+        // The tail call to a value with a provided environment is demoted to
+        // a frame (see `demote_suspending_tail_calls`), so it is a point too.
+        assert_eq!(p.points.len(), 2);
         let point = &p.points[0];
         assert_eq!(point.params, vec![1, 2]);
         assert_eq!(
