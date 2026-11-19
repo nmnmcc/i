@@ -195,6 +195,10 @@ jobs:
         run: |
           devenv shell -- cargo build --release --locked -p ilang-cli
           df -h /
+      # The first step that reads types, so a library type error is reported
+      # about four minutes into the run, not after the long i job.
+      - name: Type check the standard library
+        run: devenv shell -- ./target/release/i check --project std
       # The binary is linked against glibc and libstdc++ of the Nix store. The
       # jobs that only run it fetch these store paths instead of the whole
       # Devenv shell.
