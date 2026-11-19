@@ -61,7 +61,26 @@ pub fn expand_all(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>>
 
 fn expand_here(graph: &mut PackageGraph, all: bool) -> Result<Expanded, Vec<Diagnostic>> {
     let (mut parsed, mut diagnostics) = if all {
-        ilang_check::parse_all(graph)
+        // Tools see every module outside the library plus the library's usual
+        // closure; the library's test macro module is expanded only when a
+        // project imports it.
+        let (closure, _) = ilang_check::parse(graph);
+        let kept: std::collections::HashSet<_> = closure
+            .iter()
+            .map(|p| (p.package, p.path.clone()))
+            .collect();
+        let (parsed, diagnostics) = ilang_check::parse_all(graph);
+        (
+            parsed
+                .into_iter()
+                .filter(|p| {
+                    p.path != "i/test"
+                        && (graph.packages[p.package].name != ilang_package::LIBRARY_NAME
+                            || kept.contains(&(p.package, p.path.clone())))
+                })
+                .collect(),
+            diagnostics,
+        )
     } else {
         ilang_check::parse(graph)
     };
