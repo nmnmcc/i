@@ -216,10 +216,11 @@ jobs:
               /usr/bin/time -v -o "out/time-$f-$r.txt" \
                 target/release/i test --project bench --opt 2 --time "$f" \
                 > "out/run-$f-$r.log" 2> "out/stderr-$f-$r.log"
-              grep -hE "^pass bench/(bench|diag2)_test" "out/run-$f-$r.log"
+              grep -hE "^pass bench/(bench|diag2|diag3)_test" "out/run-$f-$r.log" || true
             done
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: diag-three-${{ github.run_id }}
           path: out/
