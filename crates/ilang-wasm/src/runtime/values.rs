@@ -150,9 +150,9 @@ const CORE: &str = r#"
 ;; The siblings still to compare: the parts of two `$values` arrays from
 ;; index `i`, or, when the arrays are null, the tails of two lists.
 (type $compare_frame (struct
-  (field (ref null $compare_frame))
-  (field (ref null $values)) (field (ref null $values)) (field (mut i32))
-  (field eqref) (field eqref)))
+  (field (mut (ref null $compare_frame)))
+  (field (mut (ref null $values))) (field (mut (ref null $values))) (field (mut i32))
+  (field (mut eqref)) (field (mut eqref))))
 (func $value_eq (param $a eqref) (param $b eqref) (result i32)
   (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))
   ;; Two small Ints are equal only when they are the same `i31ref`.
@@ -181,6 +181,11 @@ const CORE: &str = r#"
   (local $oa (ref null $obj)) (local $ob (ref null $obj))
   (local $xa (ref null $values)) (local $xb (ref null $values))
   (local $pending (ref null $compare_frame))
+  ;; A list continuation frame, kept after it is popped and reused for the
+  ;; next list cell. Without this each cell of a compared list allocates one
+  ;; frame, which dominated equality of lists of tuples.
+  (local $spare (ref null $compare_frame))
+  (local $swap (ref null $compare_frame))
   (local $ca (ref null $cons)) (local $cb (ref null $cons)) (local $ha eqref) (local $hb eqref)
   (local $i i32) (local $na i32) (local $nb i32) (local $bit i64) (local $ba i64) (local $bb i64)
   ;; A frame records siblings still to compare, never a native call frame.
@@ -225,8 +230,19 @@ const CORE: &str = r#"
         (br_if $again (ref.eq (local.get $ha) (local.get $hb)))
         (if (call $both_small (local.get $ha) (local.get $hb)) (then
           (return (call $compare_small (local.get $ha) (local.get $hb)))))
-        (local.set $pending (struct.new $compare_frame (local.get $pending)
-          (ref.null $values) (ref.null $values) (i32.const 0) (local.get $a) (local.get $b)))
+        (if (ref.is_null (local.get $spare))
+          (then (local.set $pending (struct.new $compare_frame (local.get $pending)
+            (ref.null $values) (ref.null $values) (i32.const 0) (local.get $a) (local.get $b))))
+          (else
+            (local.set $swap (local.get $pending))
+            (local.set $pending (local.get $spare))
+            (struct.set $compare_frame 0 (local.get $pending) (local.get $swap))
+            (struct.set $compare_frame 1 (local.get $pending) (ref.null $values))
+            (struct.set $compare_frame 2 (local.get $pending) (ref.null $values))
+            (struct.set $compare_frame 3 (local.get $pending) (i32.const 0))
+            (struct.set $compare_frame 4 (local.get $pending) (local.get $a))
+            (struct.set $compare_frame 5 (local.get $pending) (local.get $b))
+            (local.set $spare (ref.null $compare_frame))))
         (local.set $a (local.get $ha))
         (local.set $b (local.get $hb))
         (br $again)))
@@ -289,6 +305,8 @@ const CORE: &str = r#"
     (loop $resume
       (if (ref.is_null (local.get $pending)) (then (return (i32.const 0))))
       (if (ref.is_null (struct.get $compare_frame 1 (local.get $pending))) (then
+        (if (ref.is_null (local.get $spare))
+          (then (local.set $spare (local.get $pending))))
         (local.set $a (struct.get $compare_frame 4 (local.get $pending)))
         (local.set $b (struct.get $compare_frame 5 (local.get $pending)))
         (local.set $pending (struct.get $compare_frame 0 (local.get $pending)))
