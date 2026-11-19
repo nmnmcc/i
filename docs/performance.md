@@ -1157,3 +1157,63 @@ threshold was larger and had no regression. The branch and the numbers stay in
 
 Verification: the PR's `CI` workflow runs the spec suite, the `ilang-check` and
 `ilang-cli` groups, the review corpus and the `i` group on the change commit.
+
+### Devirtualizing a known function argument (2026-11-19)
+
+`list.sort(xs, int.compare)` calls the comparator through the `by` parameter
+in every merge step. A function value is called with `call_ref`; the
+measurement above puts that at about 30 ns more than a direct call, and the
+sort compares about 20M times.
+
+The compiler now specializes a callee for a passed `Atom::Func(g)` — the one
+closure of a top-level function, a constructor, or a library function used as
+a value. The callee is cloned with that parameter bound to `g`, calls through
+the parameter become direct calls, and direct calls that forward the parameter
+are specialized recursively. It runs after lowering and before
+`control::split`, so the existing `may_suspend` fixpoint decides whether a
+clone still needs suspension points; a known function that may suspend is left
+indirect. `--opt 0` never runs the pass, so the reference lowering stays
+independent.
+
+**Generated-code evidence.** On a probe with only `list.sort(randoms(1000),
+int.compare)` at `--opt 2`:
+
+| Probe | `call_ref` sites | sort-chain functions with a comparator `call_ref` | bytes |
+|---|---:|---:|---:|
+| current | 25 | 7 functions, 10 sites | 275,986 |
+| specialized | 17 | 0 in each of the 7 clones | 276,963 |
+
+The clones are reached from `main`; the original functions remain in the
+module only because their constant closures are still referenced, which is why
+the module-wide count falls by 8 rather than 10.
+
+| Benchmark | current (inline 40) | specialized | change |
+|---|---:|---:|---:|
+| `list_build` | 0.086 | 0.068 | -20.9% |
+| `list_map` | 0.131 | 0.108 | -17.6% |
+| `list_reverse` | 0.191 | 0.163 | -14.7% |
+| `list_sort` | 1.990 | 1.226 | -38.4% |
+| `list_merge` | 0.586 | 0.570 | -2.7% |
+| `closures` | 0.069 | 0.064 | -7.2% |
+| `inspect` | 0.117 | 0.111 | -5.1% |
+| `dict_insert` | 0.466 | 0.440 | -5.6% |
+| `equality` | 0.255 | 0.246 | -3.5% |
+
+Median of five alternating rounds in one job on an Intel Xeon 6975P-C; process
+CPU time is within 0.02 s of the wall time, so only the wall time is shown.
+No benchmark got slower. `list_sort` falls by 38%; the extra beyond the
+comparator-call estimate is that the direct call no longer needs the
+`suspendable` handler around an unknown function value. `list_map` and
+`list_build` gain because the non-capturing callbacks they pass are specialized
+too.
+
+Rejected shapes are tested as well, each asserting that `call_ref` remains: a
+capturing closure, a parameter that escapes into another closure, a known
+function that may suspend (directly or through an indirect call of its own),
+and a function whose parameter is only forwarded indirectly. Accepted shapes
+are tested too: a plain direct call, recursion through the parameter, and the
+same callee passed two different known functions (two clones).
+
+The cost is code size: clones duplicate a function body. The pass caps them at
+eight times the program's function count; the probe grew 0.35%. Exports, the
+ABI metadata, source positions and the inspection threshold do not change.
