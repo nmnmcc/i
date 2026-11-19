@@ -303,11 +303,22 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
     })
 }
 
-/// A tail call with an environment statement between the caller's
-/// environment and the call leaves no frame, so a callee that suspends would
-/// be rebuilt without that environment (§9.4 rule 3). Such a call is kept as
-/// an ordinary call, so it becomes a `Suspendable` point with a delta. Tail
-/// calls without such a statement stay tail calls.
+/// Invariant: a call in tail position that provides an environment (§9.4
+/// rule 3) **and whose callee may suspend** must not stay a tail call.
+///
+/// A tail call leaves no frame, so it is not a `Suspendable` point and has no
+/// `Point` record. The provided environment is then not in any `Point` delta,
+/// so a capture inside the callee carries no record for it; the next
+/// trampoline rebuilds the re-entered frames from the resume caller's
+/// environment, the provided services are missing, and a later nested call
+/// reads a wrong value (`ref.cast` trap). Demoting the call to `Let` +
+/// `Return` gives it a point, a delta, and a frame record.
+///
+/// A tail call without a provided environment (`Env::Param`) has no delta to
+/// lose and stays a tail call; this keeps the tail recursion in
+/// `tests/spec/9/environment.i` and ordinary loops on the tail-call path.
+/// Do not widen the demotion: demoting every tail call would turn recursive
+/// loops into stack growth.
 fn demote_suspending_tail_calls(
     stmts: &mut Vec<Stmt>,
     may: &[bool],
