@@ -305,3 +305,47 @@ test("set_map_filter_test", () {
 	assert(set.filter(s, int.is_even) == set.from_list([2, 4]))
 	assert(set.fold(s, 0, int.add) == 10)
 })
+
+test("same_elements_test", () {
+	one_two = set.from_list([1, 2])
+	assert(
+		set.same_elements(set.new(), set.new()),
+	)
+	assert(
+		set.same_elements(one_two, set.from_list([2, 1])),
+	)
+	assert(
+		set.same_elements(one_two, set.insert(one_two, 1)),
+	)
+	assert(
+		core.not(
+			set.same_elements(one_two, set.from_list([1, 3])),
+		),
+	)
+	assert(
+		core.not(
+			set.same_elements(one_two, set.from_list([1])),
+		),
+	)
+	assert(
+		core.not(
+			set.same_elements(set.from_list([1]), one_two),
+		),
+	)
+	assert(
+		core.not(
+			set.same_elements(set.new(), one_two),
+		),
+	)
+})
+
+// "f3zx" and "0pad" have the same 32-bit `core.hash`; the set keeps them in
+// the order they were put in, so `==` differs while `same_elements` does not.
+test("same_elements_colliding_members_test", () {
+	assert(core.hash("f3zx") == core.hash("0pad"))
+	a = set.new() |> set.insert("f3zx") |> set.insert("0pad")
+	b = set.new() |> set.insert("0pad") |> set.insert("f3zx")
+	assert(a != b)
+	assert(set.same_elements(a, b))
+	assert(set.contains(a, "0pad") && set.contains(b, "f3zx"))
+})

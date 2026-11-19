@@ -62,12 +62,12 @@ flatten = <A>(option : Option(Option(A))) -> Option(A) {
 	option |> (Some(inner)) { inner } & (None) { None }
 }
 
-/// The value in a `Some`, or `default` for `None`.
+/// The value in a `Some`, or `or` for `None`.
 unwrap = <A>(option : Option(A), or : A) -> A {
 	option |> (Some(value)) { value } & (None) { or }
 }
 
-/// The value in a `Some`, or the value of `default()` for `None`.
+/// The value in a `Some`, or the value of `or()` for `None`.
 lazy_unwrap = <A, N>(option : Option(A), or : () <- N -> A) -> A {
 	option |> (Some(value)) { value } & (None) { or() }
 }

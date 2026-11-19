@@ -185,12 +185,11 @@ The callback delays work until `fail.catch` has installed `Fail(E)`; error value
 	i/fail
 	i/core
 	(Io) = i/io
-	std/result
 )
 
 main = () <- (io : Io) {
 	stored : Result(Int, String) = Error("bad input")
-	answer = fail.catch(() { result.to_error(stored) })
+	answer = fail.catch(() { fail.from_result(stored) })
 	io.print(core.inspect(answer))
 }
 ```
@@ -199,7 +198,7 @@ main = () <- (io : Io) {
 Error("bad input")
 ```
 
-`result.to_error` unwraps a stored `Result`, raising its `Error` value through `Fail`.
+`fail.from_result` unwraps a stored `Result`, raising its `Error` value through `Fail`. A `Result` is a stored outcome; `fail.catch` and `fail.from_result` are the only bridges between it and `Fail`.
 
 ## A fixed clock
 
