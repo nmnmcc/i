@@ -50,6 +50,21 @@ ran on the 4-vCPU CI runners (load was 0-1 throughout).
 - **Cost/risk**: medium-high. Body cloning exists; inlining must not cross a
   real suspension point, must keep frames/sites, and needs a size budget.
 
+**Probe (2026-11-20, no code).** A probe package calls `list.sort`,
+`list.map`, the benchmark's `merge` and `dict.insert`; it was compiled with
+`--opt 2` and the pre-Binaryen WAT was counted (call sites, callee body size in
+instruction lines as a proxy for Binaryen expressions). Of 6331 direct call
+sites, 4729 (74.7%) target bodies of at most 20 instruction lines and 942
+(14.9%) 21-40 lines; 241 (3.8%) are 41-100 and 179 (2.8%) over 100. That is,
+89.5% of sites are already within `ALWAYS_INLINE = 40`. The sort/merge chain
+is typical: every callee there is 8-18 lines. After Binaryen, 3427 calls
+remain and only 10.5% of them target a body of at most 40 lines; 89.5% target
+larger bodies. Binaryen has therefore already inlined the small callees an ANF
+inliner with a similar threshold would target, and the direct gain from pass 2
+is small. It would matter only as an enabler (exposing known calls and types
+before specialization) or with a threshold well above Binaryen's. Ranked below
+pass 3 on current evidence.
+
 ### 3. Aggregate returns / escape (trie results and `Option`)
 
 - **What**: return result tuples and `Option` payloads as multiple Wasm values
