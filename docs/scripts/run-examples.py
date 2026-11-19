@@ -187,18 +187,13 @@ def prepare(example, project):
     for table in ('dependencies', 'dev-dependencies', 'test'):
         if table in manifest and not isinstance(manifest[table], dict):
             raise ValueError(f'manifest {table} must be a table')
-    if any(re.search(r'\bi/', source) for path, source in sources.items()
-           if Path(path).suffix in ('.i', '.is') and (not testing or path.startswith('src/'))):
-        manifest.setdefault('dependencies', {})['i'] = library
+    # Every package resolves the standard library, whether or not this page
+    # imports one of its modules: the runtime modules are part of every
+    # program (E0641 otherwise).
+    manifest.setdefault('dependencies', {})['i'] = library
+    manifest.get('dev-dependencies', {}).pop('i', None)
     if testing:
         manifest.setdefault('test', {})['collection'] = 'i/test.tests'
-        # The manifest forbids repeating a name across dependency tables.
-        # Source modules need a regular dependency; test-only imports use dev.
-        if 'i' in manifest.get('dependencies', {}):
-            manifest['dependencies']['i'] = library
-            manifest.get('dev-dependencies', {}).pop('i', None)
-        else:
-            manifest.setdefault('dev-dependencies', {})['i'] = library
     # Inline TOML tables preserve any supplementary manifest configuration.
     (project / 'i.toml').write_text(''.join(json.dumps(key) + ' = ' + toml_value(value) + '\n'
                                          for key, value in manifest.items()))
