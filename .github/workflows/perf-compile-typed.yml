@@ -1,0 +1,74 @@
+# Paired compile-time comparison for type-directed equality.
+name: Perf compile typed
+
+on:
+  push:
+    branches: [ci/perf-baseline]
+    paths: [.github/workflows/perf-compile-typed.yml]
+
+permissions:
+  contents: read
+
+env:
+  BASE_RUN: "44538926082"
+  TYPED_RUN: "44564332020"
+  RAYON_NUM_THREADS: 1
+  ROUNDS: "3"
+
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/perf-baseline
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-eq
+          path: bin/base
+          run-id: ${{ env.BASE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-typed
+          path: bin/typed
+          run-id: ${{ env.TYPED_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of both binaries
+        run: |
+          for b in base typed; do
+            chmod +x "bin/$b/i"
+            xargs nix-store --realise < "bin/$b/i.nix-paths" > /dev/null
+            "bin/$b/i" --version
+          done
+          mkdir -p out
+          { uname -a; nproc; lscpu; free -g; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+      - name: Alternate the two binaries
+        run: |
+          set -x
+          for r in $(seq 1 "$ROUNDS"); do
+            if [ $((r % 2)) -eq 1 ]; then order="base typed"; else order="typed base"; fi
+            for b in $order; do
+              /usr/bin/time -v -o "out/std-$r-$b.txt" \
+                "bin/$b/i" test --project std --opt 2 --time no_such_test \
+                > "out/std-$r-$b.log" 2> "out/std-$r-$b.err"
+              grep -E "Elapsed|User time|System time" "out/std-$r-$b.txt"
+              /usr/bin/time -v -o "out/probe-$r-$b.txt" \
+                "bin/$b/i" build --project diag/wat --opt 2 --target wasi \
+                --out "out/wat-$r-$b.wasm" > /dev/null 2> "out/probe-$r-$b.err"
+              grep -E "Elapsed|User time|System time" "out/probe-$r-$b.txt"
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: perf-compile-typed-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
