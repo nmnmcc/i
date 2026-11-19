@@ -89,3 +89,24 @@ test("diag_dict_200k", () {
 	})
 	check(dict.size(d) > 0, "size")
 })
+
+// Equality of two 100k Int lists, 20 times: no aggregate fields, so the
+// generic comparison needs no frame.
+test("diag_equal_ints_20x", () {
+	xs = list.range(1, 100_000)
+	ys = list.range(1, 100_000)
+	n = list.fold(list.range(1, 20), 0, (acc, _) {
+		{ xs == ys } |> (True) { acc + 1 } & (False) { acc }
+	})
+	check(n == 20, "equal")
+})
+
+// The same with two-Int tuples: an aggregate field pair per element.
+test("diag_equal_tuples_20x", () {
+	xs = list.map(list.range(1, 100_000), (x) { (x, x) })
+	ys = list.map(list.range(1, 100_000), (x) { (x, x) })
+	n = list.fold(list.range(1, 20), 0, (acc, _) {
+		{ xs == ys } |> (True) { acc + 1 } & (False) { acc }
+	})
+	check(n == 20, "equal")
+})

@@ -1,0 +1,76 @@
+# Paired compile-time comparison of the compiler before and after the
+# known-function-argument specialization, on one runner.
+name: Perf compile pair
+
+on:
+  push:
+    branches: [ci/perf-baseline]
+    paths: [.github/workflows/perf-compile.yml]
+
+permissions:
+  contents: read
+
+env:
+  PRE_RUN: "0"
+  SPEC_RUN: "44524349990"
+  RAYON_NUM_THREADS: 1
+  ROUNDS: "3"
+
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci/perf-baseline
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-pre
+          path: bin/pre
+          run-id: ${{ env.PRE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-spec
+          path: bin/spec
+          run-id: ${{ env.SPEC_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of both binaries
+        run: |
+          for b in pre spec; do
+            chmod +x "bin/$b/i"
+            xargs nix-store --realise < "bin/$b/i.nix-paths" > /dev/null
+            "bin/$b/i" --version
+          done
+          mkdir -p out
+          { uname -a; nproc; lscpu; free -h; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+      - name: Alternate the two binaries
+        run: |
+          set -x
+          for r in $(seq 1 "$ROUNDS"); do
+            if [ $((r % 2)) -eq 1 ]; then order="pre spec"; else order="spec pre"; fi
+            for b in $order; do
+              # The std test collection: the compile cost the old measurement used.
+              /usr/bin/time -v -o "out/std-$r-$b.txt" \
+                "bin/$b/i" test --project std --opt 2 --time no_such_test \
+                > "out/std-$r-$b.log" 2> "out/std-$r-$b.err"
+              grep -E "Maximum resident|Elapsed|User time|System time" "out/std-$r-$b.txt"
+              # A small package: the clone pass on a short compile.
+              /usr/bin/time -v -o "out/probe-$r-$b.txt" \
+                "bin/$b/i" build --project diag/wat --opt 2 --target wasi \
+                --out "out/wat-$r-$b.wasm" > /dev/null 2> "out/probe-$r-$b.err"
+              grep -E "Elapsed|User time|System time" "out/probe-$r-$b.txt"
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-compile-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
