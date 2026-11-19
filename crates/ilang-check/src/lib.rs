@@ -164,42 +164,199 @@ impl Clone for Parsed {
     }
 }
 
-/// Parses every module of the graph. Syntax errors keep their codes.
+/// Parses the modules of the program. Syntax errors keep their codes.
+///
+/// Every module of the compiled package is parsed, and so are the prelude,
+/// the runtime modules ([`ilang_package::library::RUNTIME`] and `i/fail`,
+/// which every entry calls), and the
+/// modules named by the compiled package's manifest (`[wasm]` exports and
+/// entries). A module of another package (the library `i` or a dependency)
+/// is parsed only when one of those reaches it through imports; an
+/// unreached module is not read, so its problems are not reported. Without
+/// a compiled package every module of the graph is parsed.
+///
+/// The modules keep the order of the graph, whatever order they are
+/// reached in, so module ids and diagnostics are deterministic.
 pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
+    let Some(root) = graph.root else {
+        return parse_all(graph);
+    };
+    // (package, path) -> index in the package's module list; no text is read.
+    let mut index: std::collections::HashMap<(PackageId, &str), usize> =
+        std::collections::HashMap::new();
+    for (package, p) in graph.packages.iter().enumerate() {
+        for (i, m) in p.modules.iter().enumerate() {
+            index.insert((package, m.path.as_str()), i);
+        }
+    }
+    let mut queue = std::collections::VecDeque::new();
+    for i in 0..graph.packages[root].modules.len() {
+        queue.push_back((root, i));
+    }
+    let library = &graph.packages[graph.library];
+    for (i, m) in library.modules.iter().enumerate() {
+        if m.kind == ModuleKind::Prelude {
+            queue.push_back((graph.library, i));
+        }
+    }
+    for path in ilang_package::library::RUNTIME.iter().chain(ENTRY_RUNTIME) {
+        if let Some(&i) = index.get(&(graph.library, *path)) {
+            queue.push_back((graph.library, i));
+        }
+    }
+    let pkg = &graph.packages[root];
+    for e in pkg
+        .wasm_exports
+        .iter()
+        .chain(&pkg.wasm_synchronous)
+        .chain(pkg.entries.iter().map(|(_, e)| e))
+    {
+        let (first, rest) = e.module.split_once('/').unwrap_or((&e.module, ""));
+        let package = if first == pkg.name {
+            Some(root)
+        } else {
+            pkg.dependencies
+                .iter()
+                .find(|(n, _)| n == first)
+                .and_then(|(_, id)| *id)
+        };
+        if let Some(p) = package {
+            let path = format!("{}/{rest}", graph.packages[p].name);
+            if let Some(&i) = index.get(&(p, path.as_str())) {
+                queue.push_back((p, i));
+            }
+        }
+    }
+    let mut done: std::collections::HashMap<(PackageId, usize), (Parsed, Vec<Diagnostic>)> =
+        std::collections::HashMap::new();
+    while let Some((package, i)) = queue.pop_front() {
+        if done.contains_key(&(package, i)) {
+            continue;
+        }
+        let m = &graph.packages[package].modules[i];
+        let (parsed, errors) = parse_one(graph, package, m);
+        let mut targets = Vec::new();
+        for import in &parsed.ast.imports {
+            let Some(first) = import.path.first() else {
+                continue;
+            };
+            let first = first.name.as_str();
+            if let Some(target) = import_package(graph, package, m.kind, first) {
+                let rest: Vec<&str> = import.path[1..].iter().map(|s| s.name.as_str()).collect();
+                let path = format!("{}/{}", graph.packages[target].name, rest.join("/"));
+                targets.push((target, path));
+            }
+        }
+        // Quote lowering imports `i/syntax` into a module with a Lisp
+        // template, and a macro may put templates into any module.
+        if graph.sources.get(m.source).display.ends_with(".is") || has_macro(&parsed.ast) {
+            targets.push((graph.library, "i/syntax".to_string()));
+        }
+        for (target, path) in targets {
+            if let Some(&j) = index.get(&(target, path.as_str()))
+                && !done.contains_key(&(target, j))
+            {
+                queue.push_back((target, j));
+            }
+        }
+        done.insert((package, i), (parsed, errors));
+    }
+    let mut out = Vec::new();
+    let mut diags = Vec::new();
+    for (package, p) in graph.packages.iter().enumerate() {
+        for i in 0..p.modules.len() {
+            if let Some((parsed, errors)) = done.remove(&(package, i)) {
+                out.push(parsed);
+                diags.extend(errors);
+            }
+        }
+    }
+    (out, diags)
+}
+
+/// Library modules that code generation calls for every entry, whether or
+/// not the program imports them: the entry wrapper ends with `fail.catch`
+/// and `fail.from_result` (`ilang_wasm::lower`, `provider_finish`).
+const ENTRY_RUNTIME: &[&str] = &["i/fail"];
+
+/// Parses every module of the graph, also those that no import reaches.
+pub fn parse_all(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     let mut out = Vec::new();
     let mut diags = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
-            let source = graph.sources.get(m.source);
-            let lisp = source.display.ends_with(".is");
-            let (ast, mut errors) = if lisp {
-                ilang_syntax::syn3::lisp::from_lisp(&source.text)
-            } else {
-                ilang_syntax::syn3::parse_module(&source.text)
-            };
-            let (lowering, more) =
-                ilang_syntax::syn3::facts::Transition::capture_module(&ast, lisp);
-            errors.extend(more);
-            errors.sort_by_key(|d| (d.span.start, d.span.end));
-            diags.extend(
-                errors
-                    .into_iter()
-                    .map(|d| Diagnostic::error(d.code.as_str(), Some(m.source), d.span, d.message)),
-            );
-            out.push(Parsed {
-                package,
-                path: m.path.clone(),
-                source: m.source,
-                kind: m.kind,
-                ast,
-                lowering,
-                scoped: None,
-                compiler_generated: false,
-                typed_macros: None,
-            });
+            let (parsed, errors) = parse_one(graph, package, m);
+            out.push(parsed);
+            diags.extend(errors);
         }
     }
     (out, diags)
+}
+
+/// The package that the first segment of an import names from a module of
+/// `from`, as the resolver finds it.
+fn import_package(
+    graph: &PackageGraph,
+    from: PackageId,
+    kind: ModuleKind,
+    first: &str,
+) -> Option<PackageId> {
+    let pkg = &graph.packages[from];
+    if first == "i" {
+        Some(graph.library)
+    } else if first == pkg.name {
+        Some(from)
+    } else if let Some((_, id)) = pkg.dependencies.iter().find(|(n, _)| n == first) {
+        *id
+    } else if kind == ModuleKind::Test {
+        pkg.dev_dependencies
+            .iter()
+            .find(|(n, _)| n == first)
+            .and_then(|(_, id)| *id)
+    } else {
+        None
+    }
+}
+
+fn has_macro(ast: &ast::Module) -> bool {
+    ast.items.iter().any(|item| {
+        item.attributes
+            .iter()
+            .any(|a| a.module.is_none() && a.name.name == "macro")
+    })
+}
+
+pub(crate) fn parse_one(
+    graph: &PackageGraph,
+    package: PackageId,
+    m: &ilang_package::ModuleSource,
+) -> (Parsed, Vec<Diagnostic>) {
+    let source = graph.sources.get(m.source);
+    let lisp = source.display.ends_with(".is");
+    let (ast, mut errors) = if lisp {
+        ilang_syntax::syn3::lisp::from_lisp(&source.text)
+    } else {
+        ilang_syntax::syn3::parse_module(&source.text)
+    };
+    let (lowering, more) = ilang_syntax::syn3::facts::Transition::capture_module(&ast, lisp);
+    errors.extend(more);
+    errors.sort_by_key(|d| (d.span.start, d.span.end));
+    let diags = errors
+        .into_iter()
+        .map(|d| Diagnostic::error(d.code.as_str(), Some(m.source), d.span, d.message))
+        .collect();
+    let parsed = Parsed {
+        package,
+        path: m.path.clone(),
+        source: m.source,
+        kind: m.kind,
+        ast,
+        lowering,
+        scoped: None,
+        compiler_generated: false,
+        typed_macros: None,
+    };
+    (parsed, diags)
 }
 
 /// Parses, resolves, and orders the whole program. Resolution is skipped
@@ -251,7 +408,7 @@ pub fn check_compiler_exports(
     parsed: &[Parsed],
     entries: &[(&str, &str)],
 ) -> Checked {
-    let (mut program, mut diags) = resolve::resolve(graph, parsed);
+    let (mut program, mut diags) = resolve::resolve_closure(graph, parsed);
     order::order(&mut program, &mut diags);
     for module in &mut program.modules {
         for binding in &mut module.bindings {

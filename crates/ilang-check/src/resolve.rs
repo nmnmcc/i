@@ -50,7 +50,19 @@ pub(crate) use three::source_facts;
 pub fn resolve(graph: &PackageGraph, parsed: &[crate::Parsed]) -> (Program, Vec<Diagnostic>) {
     ilang_syntax::syn3::deep::deep(|| {
         let modules: Vec<_> = parsed.iter().map(|p| &p.ast).collect();
-        resolve_native(graph, parsed, &modules, false)
+        resolve_native(graph, parsed, &modules, false, true)
+    })
+}
+
+/// [`resolve`] for a selected import closure, such as a compiler program:
+/// repair advice names only the selected modules.
+pub fn resolve_closure(
+    graph: &PackageGraph,
+    parsed: &[crate::Parsed],
+) -> (Program, Vec<Diagnostic>) {
+    ilang_syntax::syn3::deep::deep(|| {
+        let modules: Vec<_> = parsed.iter().map(|p| &p.ast).collect();
+        resolve_native(graph, parsed, &modules, false, false)
     })
 }
 
@@ -60,13 +72,14 @@ pub fn resolve3(
     modules: &[ilang_syntax::syn3::ast::Module],
 ) -> (Program, Vec<Diagnostic>) {
     let modules: Vec<_> = modules.iter().collect();
-    resolve_native(graph, parsed, &modules, true)
+    resolve_native(graph, parsed, &modules, true, false)
 }
 fn resolve_native(
     graph: &PackageGraph,
     parsed: &[crate::Parsed],
     modules: &[&ilang_syntax::syn3::ast::Module],
     report_errors: bool,
+    hint_unparsed: bool,
 ) -> (Program, Vec<Diagnostic>) {
     ilang_syntax::syn3::deep::deep(|| {
         let mut transitions: Vec<_> = parsed
@@ -84,7 +97,27 @@ fn resolve_native(
             .zip(&mut transitions)
             .map(|(m, t)| three::normalize_module(m, t))
             .collect();
-        three::resolve3(graph, parsed, &modules, &transitions, report_errors)
+        three::resolve3(
+            graph,
+            parsed,
+            &modules,
+            &transitions,
+            report_errors,
+            hint_unparsed,
+        )
+    })
+}
+
+/// Normalizes parsed modules as [`resolve`] does and collects their exports.
+fn export_index(graph: &PackageGraph, parsed: &[crate::Parsed]) -> Vec<hints::HintModule> {
+    ilang_syntax::syn3::deep::deep(|| {
+        let mut transitions: Vec<_> = parsed.iter().map(|p| p.lowering.clone()).collect();
+        let modules: Vec<_> = parsed
+            .iter()
+            .zip(&mut transitions)
+            .map(|(p, t)| three::normalize_module(&p.ast, t))
+            .collect();
+        three::export_index(graph, parsed, &modules, &transitions)
     })
 }
 
@@ -198,6 +231,11 @@ struct Resolver<'a> {
     /// and of the local names in scope: for each shape group, its function.
     def_tables: HashMap<DefId, Table>,
     local_tables: HashMap<VarId, Table>,
+    /// Repair advice also names the graph's modules that were not parsed
+    /// because nothing imports them (see [`crate::parse`]).
+    hint_unparsed: bool,
+    /// The exports of those modules, found when advice first needs them.
+    hint_index: std::cell::OnceCell<Vec<hints::HintModule>>,
 }
 
 /// The shape groups of a named chain and the binding of each group.
