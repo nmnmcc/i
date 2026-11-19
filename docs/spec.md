@@ -316,7 +316,7 @@ The imports and the exports are each a parenthesised group of items. In each gro
 (
 	i/fail
 	decode = json/decode
-	opt = (Option, Some) = std/option
+	opt = (Option, Some) = i/option
 )
 
 (
@@ -330,7 +330,7 @@ Every item gives a name to a module:
 - With no `=`, the name is the last part of the path.
 - `alias = path` gives the name `alias`.
 - `(A, b) = path` also puts the exported names `A` and `b` into this module. They may then be used with no module name before them.
-- Both may be used together: `opt = (Option, Some) = std/option`.
+- Both may be used together: `opt = (Option, Some) = i/option`.
 
 Importing an `UpName` puts in the type and the constructor with that name, if they are there. Only exported names may be imported. Two imports may not put in the same name. An imported name may not be the same as a top-level name of this module.
 
@@ -2489,7 +2489,7 @@ The generated artifact and loader metadata are specified in §B.6.1. Host export
 These functions are **entry points**:
 
 - **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. Its parameter is of type `()`, and its result is unused. The binding may be an alias or an expression that computes a function value; its inferred function type determines the parameter group. After ordinary module initialization, the entry invokes that initialized value through the ordinary call rules (§6.6). A missing default means no program entry.
-- **Tests**: the entries of the collection named by `[test] collection` in `i.toml` (§14.5). `std/test` provides ordinary imported item macros `test`, `skip`, `only`, `fails`, `suite`, and `each`, which contribute private functions and display metadata to `std/test.tests`. For example, `(testlib = (test) = std/test)` makes `test("addition", () { assert(1 + 1 == 2) })` available. These names have no special language meaning. Each selected function has one parameter of type `()` and gives `()` or `Never`. A test **passes** when it gives `()`. It **fails** on a stop (§11.7) or an error that reaches the platform's `Fail`. `fails` reverses that expectation; `skip` reports an entry without running it, and `only` selects focused entries. `suite` prefixes names and provides the services written in it to its test bodies; `each` contributes one test for each written case. The runner compiles the collection once and runs each selected test in a fresh started instance (§B.1). With no configured collection, no tests run.
+- **Tests**: the entries of the collection named by `[test] collection` in `i.toml` (§14.5). `i/test` provides ordinary imported item macros `test`, `skip`, `only`, `fails`, `suite`, and `each`, which contribute private functions and display metadata to `i/test.tests`. For example, `(testlib = (test) = i/test)` makes `test("addition", () { assert(1 + 1 == 2) })` available. These names have no special language meaning. Each selected function has one parameter of type `()` and gives `()` or `Never`. A test **passes** when it gives `()`. It **fails** on a stop (§11.7) or an error that reaches the platform's `Fail`. `fails` reverses that expectation; `skip` reports an entry without running it, and `only` selects focused entries. `suite` prefixes names and provides the services written in it to its test bodies; `each` contributes one test for each written case. The runner compiles the collection once and runs each selected test in a fresh started instance (§B.1). With no configured collection, no tests run.
 - **Host exports**: the functions named in `[wasm].exports` (§2.6) of the package that is compiled. The `[wasm]` of other packages is not used. They must be in the exports of their module. A host export has one shape, its parameter data has positions only, and its parameters and value must be types that the host can take (§10.3).
 
 **Platform services.** At an entry the platform of the target provides its services (§9.7): the host services of its table, `Assert`, `Scope`, `Root`, `Owner`, `Await`, `Runner`, `Scheduler`, `Target`, and a top-level `Fail`. For the program entry and tests, that `Fail` takes any error, and an error that reaches it stops the program or fails the test. For a host export, it takes only an error type that the host can take, and the error is given to the host (Appendix B).

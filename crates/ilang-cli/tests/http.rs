@@ -90,7 +90,7 @@ fn http_server() {
 fn run_http_program(source: &str) {
     let project = tempfile::tempdir().unwrap();
     std::fs::create_dir(project.path().join("src")).unwrap();
-    let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib");
     std::fs::write(
         project.path().join("i.toml"),
         format!(
@@ -437,7 +437,7 @@ main = () {{
 fn http_stream_request_body() {
     let project = tempfile::tempdir().unwrap();
     std::fs::create_dir(project.path().join("src")).unwrap();
-    let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib");
     std::fs::write(
         project.path().join("i.toml"),
         format!(

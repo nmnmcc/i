@@ -3,10 +3,10 @@
 
 // literal-types decision 7: hidden inputs make literal facts whole at every depth.
 (
-	testlib = (test) = std/test
-	list = std/list
-	option = (Option, Some, None) = std/option
-	result = std/result
+	testlib = (test) = i/test
+	list = i/list
+	option = (Option, Some, None) = i/option
+	result = i/result
 	control = i/control
 )
 

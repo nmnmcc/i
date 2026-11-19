@@ -13,7 +13,7 @@ fn package(files: &[(&str, &str)]) -> tempfile::TempDir {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
     }
-    if files.iter().any(|(_, source)| source.contains("std/test")) {
+    if files.iter().any(|(_, source)| source.contains("i/test")) {
         test_project::configure(dir.path());
     }
     dir
@@ -28,7 +28,7 @@ fn i(args: &[&str], project: &Path) -> std::process::Output {
         .unwrap()
 }
 
-/// A package with one passing test in `std/test.tests`.
+/// A package with one passing test in `i/test.tests`.
 fn tested() -> tempfile::TempDir {
     package(&[
         ("i.toml", "name = \"app\"\n"),
@@ -52,13 +52,13 @@ fn set_collection(project: &Path, value: toml_edit::Item) {
 #[test]
 fn a_missing_collection_is_an_error_not_zero_tests() {
     let dir = tested();
-    set_collection(dir.path(), toml_edit::value("std/test.nothing"));
+    set_collection(dir.path(), toml_edit::value("i/test.nothing"));
     let out = i(&["test"], dir.path());
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{stdout}{stderr}");
     assert!(
-        stderr.contains("there is no test collection \"std/test.nothing\""),
+        stderr.contains("there is no test collection \"i/test.nothing\""),
         "{stderr}"
     );
     assert!(!stdout.contains("passed"), "{stdout}");
@@ -70,7 +70,7 @@ fn a_non_string_collection_is_rejected() {
     for (value, kind) in [
         (toml_edit::value(1), "integer"),
         (
-            toml_edit::value(toml_edit::Array::from_iter(["std/test.tests"])),
+            toml_edit::value(toml_edit::Array::from_iter(["i/test.tests"])),
             "array",
         ),
     ] {

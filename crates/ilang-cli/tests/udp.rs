@@ -17,7 +17,7 @@ fn udp_datagrams_and_cancellation_on_rust_and_node() {
                 offline: true,
                 target: Target::Native,
             },
-            Some("std/test.tests"),
+            Some("i/test.tests"),
         )
         .unwrap();
         assert_eq!(entries.len(), 5);

@@ -3,7 +3,7 @@
 
 // Decisions 4/5: singleton values are usable where their whole scalar is needed.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 need_int = (n : Int) { n + 1 }

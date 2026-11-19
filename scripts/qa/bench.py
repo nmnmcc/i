@@ -166,7 +166,7 @@ def main():
     binaries = [('baseline', args.binary.resolve())]
     if args.candidate:
         binaries.append(('candidate', args.candidate.resolve()))
-    bundle = {'compiler': git('rev-parse', 'HEAD'), 'compiler_tree': git('rev-parse', 'HEAD:crates'), 'source_dirty': bool(git('status', '--porcelain', '--', 'crates', 'lib', 'std')),
+    bundle = {'compiler': git('rev-parse', 'HEAD'), 'compiler_tree': git('rev-parse', 'HEAD:crates'), 'source_dirty': bool(git('status', '--porcelain', '--', 'crates', 'lib' , "stdlib")),
               'platform': platform.platform(), 'machine': platform.machine(), 'cpu_count': os.cpu_count(),
               'cpu_model': next((l.split(':', 1)[1].strip() for l in Path('/proc/cpuinfo').read_text().splitlines() if l.startswith('model name')), None),
               'binaries': {name: {'path': str(path), 'sha256': sha(path.read_bytes())} for name, path in binaries},
@@ -189,8 +189,8 @@ def main():
             entries.append((name, path))
             bundle['catalogue'].append({'name': name, 'source': source, 'source_sha256': sha(source.encode())})
         if args.filter in 'std':
-            entries.append(('std', ROOT / 'std'))
-            std_sources = [(str(p.relative_to(ROOT)), sha(p.read_bytes())) for p in sorted((ROOT / 'std').rglob('*.i'))]
+            entries.append(('std', ROOT / "stdlib"))
+            std_sources = [(str(p.relative_to(ROOT)), sha(p.read_bytes())) for p in sorted((ROOT / "stdlib").rglob('*.i'))]
             bundle['catalogue'].append({'name': 'std', 'sources': std_sources})
         if not entries:
             raise SystemExit('no workloads selected')

@@ -1,9 +1,9 @@
 // spec: 11.4
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
-	list = std/list
+	list = i/list
 )
 
 // Long lists, so the comparison's continuation for each cell is exercised

@@ -1,5 +1,5 @@
 (
-	testlib = (test, suite, skip, fails, each) = std/test
+	testlib = (test, suite, skip, fails, each) = i/test
 	fail = i/fail
 	typed = macro_tests/typed
 )

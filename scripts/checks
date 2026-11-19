@@ -198,8 +198,8 @@ i() {
   # prints, so a type error in lib/ or std/ would otherwise show up after
   # minutes of tests; this keeps it to the file, line and column it is.
   if (( first )); then
-    echo "checks: i check --project std"
-    "$i" check --project std
+    echo "checks: i check --project stdlib"
+    "$i" check --project stdlib
   fi
   if (( first )); then
     "$i" fmt --check lib std bench examples
@@ -220,7 +220,7 @@ i() {
     done
   else
     for level in 0 2; do
-      "$i" test --project std --opt "$level"
+      "$i" test --project stdlib --opt "$level"
       "$i" test --project examples/hello --opt "$level"
       "$i" test --project bench --opt "$level"
     done
@@ -261,7 +261,7 @@ editors() {
     done
     while IFS= read -r -d '' source; do
       npx tree-sitter parse -q "$source"
-    done < <(find ../../lib ../../std ../../examples -name '*.i' -print0)
+    done < <(find ../../lib ../stdlib ../../examples -name '*.i' -print0)
   )
   (
     cd editors/zed

@@ -56,9 +56,9 @@ else
   else
     fail "its manifest does not name the copy stdlib: $(cat "$work/std/i.toml")"
   fi
-  expect_ok "the std package checks" check --offline --project std
-  expect_ok "the std package runs" run --offline --project std
-  run test --offline --project std
+  expect_ok "the std package checks" check --offline --project stdlib
+  expect_ok "the std package runs" run --offline --project stdlib
+  run test --offline --project stdlib
   [[ $CODE -eq 0 ]] && grep -qxE '[0-9]+ passed, 0 failed' <<<"$OUT" &&
     ok "the std package tests pass" ||
     fail "the std package: exit $CODE; $ERR$OUT"

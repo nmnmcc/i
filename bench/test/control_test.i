@@ -2,7 +2,7 @@
 //// runs these with `i test --time` at `--opt 2`. A resume and the next
 //// suspend should take the same time at every depth (docs/performance.md).
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/control
 	i/core
 )

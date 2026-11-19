@@ -4,10 +4,10 @@
 	i/task
 	i/stdio
 	i/core
-	std/http
-	std/json
-	std/schema
-	std/bit_array
+	i/http
+	i/json
+	i/schema
+	i/bit_array
 )
 
 User = (name = String, age = Int)

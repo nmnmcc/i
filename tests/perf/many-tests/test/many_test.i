@@ -1,5 +1,5 @@
 (
-	testlib = (test, each) = std/test
+	testlib = (test, each) = i/test
 )
 
 test("single", () { assert(True) })

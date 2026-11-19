@@ -15,7 +15,7 @@ fn package(files: &[(&str, &str)]) -> tempfile::TempDir {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
     }
-    if files.iter().any(|(_, source)| source.contains("std/test")) {
+    if files.iter().any(|(_, source)| source.contains("i/test")) {
         test_project::configure(dir.path());
     }
     dir
@@ -684,7 +684,7 @@ fn async_entry_points_and_needed_services() {
             offline: false,
             target: Default::default(),
         },
-        Some("std/test.tests"),
+        Some("i/test.tests"),
     )
     .unwrap();
     let program = Program::from_bytes(&built.wasm).unwrap();
@@ -778,7 +778,7 @@ fn an_error_stops_a_test() {
                 offline: false,
                 target: Default::default(),
             },
-            Some("std/test.tests"),
+            Some("i/test.tests"),
         )
         .unwrap();
         let program = Program::from_bytes(&built.wasm).unwrap();

@@ -5,7 +5,7 @@
 // output: no x
 // output: Error(()) Error(200) Error("negative") Ok(42)
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
 	i/fail
 )

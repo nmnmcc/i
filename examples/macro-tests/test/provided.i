@@ -1,5 +1,5 @@
 (
-	testlib = (test, suite, each) = std/test
+	testlib = (test, suite, each) = i/test
 )
 
 First = (value = Int)

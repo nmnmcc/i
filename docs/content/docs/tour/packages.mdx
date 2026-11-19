@@ -164,10 +164,10 @@ A location dependency such as `"github.com/alice/json@1.4.0"` uses Git, omits `h
 name = "tour"
 
 [dev-dependencies]
-std = { path = "../std" }
+std = { path = "../stdlib" }
 
 [test]
-collection = "std/test.tests"
+collection = "i/test.tests"
 ```
 
 ```i file=src/greeting.i title="src/greeting.i"
@@ -180,7 +180,7 @@ message = (name : String) -> String { "hello, " <> name }
 
 ```i test stdout=exact package=tour title="test/greeting_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	(message) = tour/greeting
 )
 
@@ -192,7 +192,7 @@ pass tour/greeting_test.greeting
 1 passed, 0 failed
 ```
 
-Here `../std` points to the standard library's directory. Tests can import source modules; source cannot import tests, and another package cannot import them. `[dependencies]` serves source and tests; `[dev-dependencies]` serves only tests.
+Here `../stdlib` points to the standard library's directory. Tests can import source modules; source cannot import tests, and another package cannot import them. `[dependencies]` serves source and tests; `[dev-dependencies]` serves only tests.
 
 ## Entries and exports
 

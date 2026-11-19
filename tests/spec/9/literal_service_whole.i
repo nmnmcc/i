@@ -3,7 +3,7 @@
 
 // Ordinary provider fitting permits 0 <: Int; the environment itself stays Counter(Int).
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 Counter(A) = (get = () -> A)

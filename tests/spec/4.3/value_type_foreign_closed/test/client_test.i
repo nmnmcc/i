@@ -1,5 +1,5 @@
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	(Alias) = spec/privacy
 	(RemoteSize) = spec/main
 )

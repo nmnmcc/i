@@ -23,7 +23,7 @@ The workspace is built and tested with Cargo:
 ```sh
 cargo build
 cargo test -p ilang-wasm
-cargo run --bin i -- test --project std
+cargo run --bin i -- test --project stdlib
 ```
 
 The workspace builds the `i` command, the code generator, the Wasmtime host,

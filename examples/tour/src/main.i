@@ -1,6 +1,6 @@
 (
 	i/stdio
-	std/int
+	i/int
 )
 
 Num = (Int)

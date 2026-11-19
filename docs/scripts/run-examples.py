@@ -183,7 +183,7 @@ def prepare(example, project):
     sources = {**example.shared_files, **example.files, main: example.source}
     manifest = tomllib.loads(sources.pop('i.toml', ''))
     manifest['name'] = name
-    std = {'path': str(ROOT / 'std')}
+    std = {'path': str(ROOT / "stdlib")}
     for table in ('dependencies', 'dev-dependencies', 'test'):
         if table in manifest and not isinstance(manifest[table], dict):
             raise ValueError(f'manifest {table} must be a table')
@@ -191,7 +191,7 @@ def prepare(example, project):
            if Path(path).suffix in ('.i', '.is') and (not testing or path.startswith('src/'))):
         manifest.setdefault('dependencies', {})['std'] = std
     if testing:
-        manifest.setdefault('test', {})['collection'] = 'std/test.tests'
+        manifest.setdefault('test', {})['collection'] = 'i/test.tests'
         # The manifest forbids repeating a name across dependency tables.
         # Source modules need a regular dependency; test-only imports use dev.
         if 'std' in manifest.get('dependencies', {}):

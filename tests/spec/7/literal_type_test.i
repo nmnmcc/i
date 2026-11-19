@@ -3,7 +3,7 @@
 
 // §5.6: Only tests use value equality; Except tests also retain their scalar tag.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 strings = (v : { Int | String }) {

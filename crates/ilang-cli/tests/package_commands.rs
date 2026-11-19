@@ -319,8 +319,8 @@ fn new_package_is_portable_and_runs_the_readme_program() {
     // No machine path; `std` is an ordinary dependency copied with the package.
     assert_eq!(manifest, test_project::new_manifest("demo"));
     assert!(!manifest.contains(env!("CARGO_MANIFEST_DIR")), "{manifest}");
-    assert!(dir.join("std/i.toml").is_file());
-    assert!(dir.join("std/src/int.i").is_file());
+    assert!(dir.join("i/i.toml").is_file());
+    assert!(dir.join("i/src/int.i").is_file());
 
     // The first README example imports `std/int` from a program, which now
     // resolves as an ordinary dependency.
@@ -349,15 +349,15 @@ fn new_package_tests_the_readme_service_example() {
 fn new_package_named_std_uses_another_dependency_key() {
     let w = World::new();
     w.ok(&["new", "std"]);
-    let dir = w.path().join("std");
+    let dir = w.path().join( "stdlib");
     let manifest = read(&dir.join("i.toml"));
-    assert_eq!(manifest, test_project::new_manifest("std"));
+    assert_eq!(manifest, test_project::new_manifest( "stdlib"));
     assert!(!manifest.contains(env!("CARGO_MANIFEST_DIR")), "{manifest}");
     assert!(
         manifest.contains("stdlib = { path = \"std\" }"),
         "{manifest}"
     );
-    assert!(dir.join("std/src/int.i").is_file());
+    assert!(dir.join("i/src/int.i").is_file());
     assert!(read(&dir.join("test/main_test.i")).contains("stdlib/test"));
 
     let project = dir.display().to_string();
@@ -376,17 +376,17 @@ fn new_package_copies_the_std_licenses_and_notices() {
     // The Unicode licence lives beside `src/`, not inside it.
     assert_eq!(
         read(&dir.join("std/UNICODE-LICENSE")),
-        include_str!("../../../std/UNICODE-LICENSE")
+        include_str!("../stdlib/UNICODE-LICENSE")
     );
     // Notices inside the sources must survive the copy unchanged.
     for (path, expected) in [
-        ("std/src/float.i", include_str!("../../../std/src/float.i")),
-        ("std/src/regex.i", include_str!("../../../std/src/regex.i")),
+        ("i/src/float.i", include_str!("../stdlib/src/float.i")),
+        ("i/src/regex.i", include_str!("../stdlib/src/regex.i")),
     ] {
         assert_eq!(read(&dir.join(path)), expected, "{path}");
     }
-    assert!(read(&dir.join("std/src/float.i")).contains("BSD-style license"));
-    assert!(read(&dir.join("std/src/regex.i")).contains("Unicode license"));
+    assert!(read(&dir.join("i/src/float.i")).contains("BSD-style license"));
+    assert!(read(&dir.join("i/src/regex.i")).contains("Unicode license"));
 }
 
 /// Every regular file under `dir`, as paths relative to `dir`.
@@ -406,7 +406,7 @@ fn files_under(dir: &std::path::Path, prefix: &std::path::Path, out: &mut Vec<Pa
 fn new_package_copies_every_std_source_file() {
     let w = World::new();
     w.ok(&["new", "demo"]);
-    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib");
     let copy = w.path().join("demo/std");
     let mut files = Vec::new();
     files_under(&source.join("src"), Path::new("src"), &mut files);
@@ -1858,11 +1858,11 @@ fn with_collection(dir: &Path, value: toml_edit::Item) -> String {
 fn publish_a_missing_collection_is_an_error_not_zero_tests() {
     let w = World::new();
     let dir = published(&w, API_1);
-    let manifest = with_collection(&dir, toml_edit::value("std/test.nothing"));
+    let manifest = with_collection(&dir, toml_edit::value("i/test.nothing"));
     let (ok, out) = try_publish(&w, &dir, &[("i.toml", &manifest)], "1.0.0");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("there is no test collection \"std/test.nothing\""),
+        out.contains("there is no test collection \"i/test.nothing\""),
         "{out}"
     );
     assert!(!out.contains("tests passed"), "{out}");

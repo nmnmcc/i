@@ -186,9 +186,9 @@ inner() {
     echo "  std/i.toml is missing  <-- FAILED"
     status=1
   fi
-  step "$work/bin/i" check --offline --project std
-  step "$work/bin/i" run --offline --project std
-  step "$work/bin/i" test --offline --project std
+  step "$work/bin/i" check --offline --project stdlib
+  step "$work/bin/i" run --offline --project stdlib
+  step "$work/bin/i" test --offline --project stdlib
 
   echo
   echo "== the copied std carries the Unicode licence, as the repository's =="
@@ -557,7 +557,7 @@ cp -- "$binary" "$work/bin/i"
 cp -- "$script" "$work/new-machine"
 cp -- "$here/manifest-paths" "$work/manifest-paths"
 cp -- "$here/../README.md" "$work/README.md"
-cp -- "$here/../std/UNICODE-LICENSE" "$work/UNICODE-LICENSE"
+cp -- "$here/../stdlib/UNICODE-LICENSE" "$work/UNICODE-LICENSE"
 
 # The trees to hide: this repository, the other clones of it, and the default
 # place of the sources. A path is masked only if it exists here.

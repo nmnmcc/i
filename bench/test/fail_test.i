@@ -1,7 +1,7 @@
 //// Errors through `Fail`: `fail.catch` with and without a raised error
 //// (docs/performance.md). Each test runs `rounds` catches.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/fail
 )
 

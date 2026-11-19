@@ -7,8 +7,8 @@ Run a focused regression before choosing the wider checks for your change.
 
 ```i test stdout=exact package=checks title="test/bool_test.i"
 (
-	testlib = (test) = std/test
-	std/bool
+	testlib = (test) = i/test
+	i/bool
 )
 
 test("negation", () { assert(bool.not(True) == False) })
@@ -24,20 +24,20 @@ The docs runner supplies the manifest and compares this transcript at O0/O2. Rep
 ## Filtered tests
 
 ```sh
-"$I" test --project std --opt 0 std/bool_test.negate_true_test
+"$I" test --project stdlib --opt 0 i/bool_test.negate_true_test
 ```
 
 ```text
-pass std/bool_test.negate_true_test
+pass i/bool_test.negate_true_test
 1 passed, 0 failed
 ```
 
 ```sh
-"$I" test --project std --opt 2 std/bool_test.negate_true_test
+"$I" test --project stdlib --opt 2 i/bool_test.negate_true_test
 ```
 
 ```text
-pass std/bool_test.negate_true_test
+pass i/bool_test.negate_true_test
 1 passed, 0 failed
 ```
 

@@ -25,11 +25,11 @@ fn project(root: &Path) -> PathBuf {
     let examples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples");
     let project = root.join("hello");
     copy_dir(&examples.join("hello"), &project);
-    let std_path = examples.join("../std").canonicalize().unwrap();
+    let std_path = examples.join("../stdlib").canonicalize().unwrap();
     let manifest = std::fs::read_to_string(project.join("i.toml"))
         .unwrap()
         .replace(
-            "\"../../std\"",
+            "\"../stdlib\"",
             &format!("{:?}", std_path.display().to_string()),
         );
     std::fs::write(project.join("i.toml"), manifest).unwrap();

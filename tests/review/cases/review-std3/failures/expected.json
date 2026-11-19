@@ -20,7 +20,7 @@
         "0"
       ],
       "exit": 1,
-      "stdout": "FAIL review/cases.one_property_failure\n  assertion failed: std/property v1: falsified\nseed: 0\nreason: assert\nreview/cases:13:4\nFAIL review/cases.nan_before_library\n  float: result is not finite\nreview/cases:25:2\nFAIL review/cases.positive_infinity_before_library\n  float: result is not finite\nreview/cases:30:2\nFAIL review/cases.negative_infinity_before_library\n  float: result is not finite\nreview/cases:35:2\npass review/cases.caller_can_catch_final_failure\npass review/qa_corpus_runtime_test.qa_startup\n2 passed, 4 failed\n",
+      "stdout": "FAIL review/cases.one_property_failure\n  assertion failed: i/property v1: falsified\nseed: 0\nreason: assert\nreview/cases:13:4\nFAIL review/cases.nan_before_library\n  float: result is not finite\nreview/cases:25:2\nFAIL review/cases.positive_infinity_before_library\n  float: result is not finite\nreview/cases:30:2\nFAIL review/cases.negative_infinity_before_library\n  float: result is not finite\nreview/cases:35:2\npass review/cases.caller_can_catch_final_failure\npass review/qa_corpus_runtime_test.qa_startup\n2 passed, 4 failed\n",
       "stderr": ""
     },
     "test2": {
@@ -30,7 +30,7 @@
         "2"
       ],
       "exit": 1,
-      "stdout": "FAIL review/cases.one_property_failure\n  assertion failed: std/property v1: falsified\nseed: 0\nreason: assert\nreview/cases:13:4\nFAIL review/cases.nan_before_library\n  float: result is not finite\nreview/cases:25:2\nFAIL review/cases.positive_infinity_before_library\n  float: result is not finite\nreview/cases:30:2\nFAIL review/cases.negative_infinity_before_library\n  float: result is not finite\nreview/cases:35:2\npass review/cases.caller_can_catch_final_failure\npass review/qa_corpus_runtime_test.qa_startup\n2 passed, 4 failed\n",
+      "stdout": "FAIL review/cases.one_property_failure\n  assertion failed: i/property v1: falsified\nseed: 0\nreason: assert\nreview/cases:13:4\nFAIL review/cases.nan_before_library\n  float: result is not finite\nreview/cases:25:2\nFAIL review/cases.positive_infinity_before_library\n  float: result is not finite\nreview/cases:30:2\nFAIL review/cases.negative_infinity_before_library\n  float: result is not finite\nreview/cases:35:2\npass review/cases.caller_can_catch_final_failure\npass review/qa_corpus_runtime_test.qa_startup\n2 passed, 4 failed\n",
       "stderr": ""
     }
   }

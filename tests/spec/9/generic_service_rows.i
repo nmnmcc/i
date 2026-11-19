@@ -1,7 +1,7 @@
 // spec: 4.7, 4.8, 9.2, 9.3
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/fail
 )
 

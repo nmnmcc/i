@@ -1,6 +1,6 @@
 (
-	list = std/list
-	(Some, None) = std/option
+	list = i/list
+	(Some, None) = i/option
 )
 
 value = list.fold([1, 2], None, (acc, x) {

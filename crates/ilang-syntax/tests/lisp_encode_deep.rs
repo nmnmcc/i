@@ -318,7 +318,7 @@ fn same_code_with_record_label_spelling(
 fn reusable_encoder_agrees_with_independent_lisp_printer_on_valid_corpus() {
     use ilang_syntax::lisp::SourceEncoder;
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let mut dirs = vec![root.join("lib"), root.join("std"), root.join("tests/spec")];
+    let mut dirs = vec![root.join("lib"), root.join( "stdlib"), root.join("tests/spec")];
     let scope = scope();
     let mut checked = 0;
     let mut native_checked = 0;

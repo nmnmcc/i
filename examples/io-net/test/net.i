@@ -1,5 +1,5 @@
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/net
 	i/task
 	i/fail

@@ -3,7 +3,7 @@
 
 // Decision 7: rule 13 uses whole scalar bounds and fresh noncovariant holes.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 Box(A) = (value = A)

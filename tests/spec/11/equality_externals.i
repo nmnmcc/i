@@ -4,7 +4,7 @@
 // Each `@external` declaration is one value; two declarations of one import
 // are two values.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 @external("test:math/v1", "add")
