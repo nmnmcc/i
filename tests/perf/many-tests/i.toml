@@ -1,7 +1,7 @@
 name = "many_tests"
 
+[dependencies]
+i = { path = "../../../stdlib" }
+
 [test]
 collection = "i/test.tests"
-
-[dev-dependencies]
-i = { path = "../../../stdlib" }

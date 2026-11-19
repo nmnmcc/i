@@ -2,6 +2,7 @@
 //! accesses, the order of arguments, type tests, services, which top-level
 //! bindings are generalized, the fields of constructor patterns, which
 //! patterns may fail, and the signatures of host exports.
+mod common;
 
 use ilang_check::hir::DefId;
 use ilang_check::hir::{BuiltinType, ModuleId, TypeRef};
@@ -55,7 +56,7 @@ fn check() -> (PackageGraph, Typed, ModuleId) {
     let dir = tempfile::tempdir().unwrap();
     fs::write(
         dir.path().join("i.toml"),
-        "name = \"app\"\n\n[wasm]\nexports = [\"app/main.div\"]\n",
+        common::manifest("app") + "\n[wasm]\nexports = [\"app/main.div\"]\n",
     )
     .unwrap();
     fs::create_dir_all(dir.path().join("src")).unwrap();

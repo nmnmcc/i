@@ -1,1 +1,4 @@
 name = "tree"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

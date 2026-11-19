@@ -16,6 +16,22 @@ fn root() -> PathBuf {
         .unwrap()
 }
 
+/// The `[dependencies]` line of the standard library, the repository's
+/// `stdlib/`, as a path dependency.
+fn stdlib_dependency() -> String {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .expect("the repository has stdlib/");
+    format!("i = {{ path = {:?} }}\n", dir.to_str().unwrap())
+}
+
+/// The `i.toml` of a package named `name` whose only dependency is the
+/// standard library.
+fn manifest(name: &str) -> String {
+    format!("name = {name:?}\n\n[dependencies]\n{}", stdlib_dependency())
+}
+
 /// Diagnostic display paths are relative to the loaded package, so many
 /// unrelated fixtures are called `src/main.i`. Count the original files,
 /// including a lone fixture copied into a temporary package, separately.
@@ -244,6 +260,11 @@ fn compare_inner(name: &str, dir: &Path, totals: &mut Totals, prepare_quotes: bo
     let mut old_templates = Vec::new();
     let mut new_templates = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
+        // The library is compared as a job of its own; in other projects it is
+        // an external dependency, not the file under comparison.
+        if p.name == "i" && !(name == "std" || name.starts_with("stdlib")) {
+            continue;
+        }
         for m in &p.modules {
             let source = graph.sources.get(m.source);
             let lisp = source.display.ends_with(".is");
@@ -429,7 +450,7 @@ fn resolve3_differential() {
     // lone file.
     let mut jobs: Vec<(String, PathBuf, Option<tempfile::TempDir>)> = Vec::new();
     if wanted("std") {
-        jobs.push(("std".into(), root.join("std"), None));
+        jobs.push(("std".into(), root.join("stdlib"), None));
     }
     // A focused imported E1 counterexample. Compare resolver input/diagnostics
     // with the migration adapter; the independent inference audit keeps its own oracle.
@@ -466,13 +487,13 @@ fn resolve3_differential() {
                 // suite.
                 let text = std::fs::read_to_string(&case).unwrap();
                 let dir = tempfile::tempdir().unwrap();
-                let manifest = if text.contains("std/test") {
+                let manifest = if text.contains("i/test") {
                     format!(
-                        "name = \"spec\"\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-                        root.join("std").to_str().unwrap()
+                        "name = \"spec\"\n[test]\ncollection = \"i/test.tests\"\n[dependencies]\n{}",
+                        stdlib_dependency()
                     )
                 } else {
-                    "name = \"spec\"\n".to_string()
+                    manifest("spec")
                 };
                 std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
                 std::fs::create_dir_all(dir.path().join("src")).unwrap();
@@ -502,7 +523,7 @@ fn resolve3_differential() {
     // the lowering, sums, keys, provides, row variables.
     if wanted("extra") {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("i.toml"), "name = \"extra\"\n").unwrap();
+        std::fs::write(dir.path().join("i.toml"), manifest("extra")).unwrap();
         std::fs::create_dir_all(dir.path().join("src")).unwrap();
         for (i, text) in EXTRA.iter().enumerate() {
             let (_, errors) = syn3::parse_module(text);
@@ -706,7 +727,7 @@ fn resolve3_prepared_quotes() {
     let (_, errors) = syn3::lisp::from_lisp(source);
     assert!(errors.is_empty(), "{errors:?}");
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"quotes\"\n").unwrap();
+    std::fs::write(dir.path().join("i.toml"), manifest("quotes")).unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.is"), source).unwrap();
     let mut totals = Totals::default();
@@ -721,7 +742,7 @@ fn resolve3_deep() {
     let depth = 20_000;
     let text = format!("x = {}1{}\n", "[".repeat(depth), "]".repeat(depth));
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"deep\"\n").unwrap();
+    std::fs::write(dir.path().join("i.toml"), manifest("deep")).unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), &text).unwrap();
     let (graph, _) = ilang_package::load(dir.path());
@@ -729,6 +750,10 @@ fn resolve3_deep() {
     let mut modules = Vec::new();
     for (package, p) in graph.packages.iter().enumerate() {
         for m in &p.modules {
+            // The Lisp macro source is not the deep row syntax this test covers.
+            if graph.sources.get(m.source).display.ends_with(".is") {
+                continue;
+            }
             // Parsing is recursive too; keep this test focused on the resolver
             // entry point by preparing its input on a deep stack.
             let (module, errors) =

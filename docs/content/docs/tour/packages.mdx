@@ -152,7 +152,7 @@ hello, package
 
 `path` is relative to the manifest; `util` is the caller’s import prefix for `words`. Only the package’s own name, `i`, and declared dependencies are visible; dependency dev-dependencies do not propagate. Module and package cycles are rejected.
 
-If the package itself is named `std`, its copied standard library cannot use the dependency key `std`, because a package cannot depend on itself. `i new std` names the key `stdlib`, and source imports it as `stdlib/int`.
+A dependency key is the import prefix: `i = "…"` makes the modules visible as `i/int`. The name `i` is reserved for the standard library itself, so `i new i` is rejected; a package named `i` can only be the library or a fork, and it cannot depend on itself.
 
 A location dependency such as `"github.com/alice/json@1.4.0"` uses Git, omits `https://`, and sets a minimum version; `//directory` before `@` selects a subpackage, and fetched packages cannot use path dependencies. Selection takes the greatest requested minimum per location and major version; distinct majors stay separate. `i.lock`, beside the root manifest, records reached locations, versions, tag commits, and package SHA-256 hashes; changed commits or bytes fail integrity checks, while local paths remain unlocked.
 
@@ -163,8 +163,8 @@ A location dependency such as `"github.com/alice/json@1.4.0"` uses Git, omits `h
 ```toml file=i.toml title="i.toml"
 name = "tour"
 
-[dev-dependencies]
-std = { path = "../stdlib" }
+[dependencies]
+i = { path = "../stdlib" }
 
 [test]
 collection = "i/test.tests"
@@ -192,7 +192,7 @@ pass tour/greeting_test.greeting
 1 passed, 0 failed
 ```
 
-Here `../stdlib` points to the standard library's directory. Tests can import source modules; source cannot import tests, and another package cannot import them. `[dependencies]` serves source and tests; `[dev-dependencies]` serves only tests.
+Here `../stdlib` points to the standard library's source directory; a new package names the published location instead. Tests can import source modules; source cannot import tests, and another package cannot import them. `[dependencies]` serves source and tests; `[dev-dependencies]` serves only tests.
 
 ## Entries and exports
 

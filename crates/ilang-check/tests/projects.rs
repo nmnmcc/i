@@ -2,6 +2,7 @@
 //! It is loaded and resolved, and the diagnostics are compared with its
 //! `expected.out`. `UPDATE=1` writes the files. These test names and
 //! resolution; types are tested in `tests/types.rs`.
+mod common;
 
 use std::fs;
 use std::path::Path;
@@ -71,7 +72,7 @@ fn ok_projects_are_clean() {
 #[test]
 fn an_external_fail_need_retains_the_host_error_shape() {
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    common::write_manifest(dir.path(), "app");
     fs::create_dir(dir.path().join("src")).unwrap();
     let source = "@external(\"app\", \"value\")\nvalue : () <- (Fail(String)) -> Int\n";
     fs::write(dir.path().join("src/main.i"), source).unwrap();

@@ -5,7 +5,7 @@
 fn named_provider_diagnostics_match_all_fourteen_landed_projects() {
     // Every use of a supplied service must be checked, including cached handlers.
     // Use each real manifest: mixed_install_12 and mixed_install_6 import
-    // std/test and must expand their macros before comparing diagnostics.
+    // i/test and must expand their macros before comparing diagnostics.
     // The b1 whole-method meet is inhabited; retain all four concrete
     // provider failures. m32 additionally rejects its duplicate key.
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/review/cases");

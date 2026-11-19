@@ -17292,12 +17292,6 @@
       ]
     },
     {
-      "origin": "/tmp/review-k4s/std/src/string.i",
-      "sha256": "20c5ee8446b7f2c88efff66d10c5da01b55af90ed15d7312ca5ae732f6234d40",
-      "source": "docs/spec.md §§4.5 rule 4, 4.7, 9.2: equal service arguments and principal inference",
-      "case": "review-k4s/std"
-    },
-    {
       "origin": "/tmp/review-k4s/std/src/time.i",
       "sha256": "342a6fb448f61f488e0d70a2cddfd17adb1012002eaca6cfc67065d4aacc4280",
       "source": "docs/spec.md §§4.5 rule 4, 4.7, 9.2: equal service arguments and principal inference",

@@ -5,5 +5,8 @@
 # take it.
 name = "spec"
 
+[dependencies]
+i = { path = "../../../../stdlib" }
+
 [wasm]
 exports = ["spec/m.f"]

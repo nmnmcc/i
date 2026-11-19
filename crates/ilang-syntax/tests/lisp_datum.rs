@@ -424,7 +424,7 @@ fn format_corpus_has_a_lisp_round_trip() {
 fn libraries_have_a_lisp_round_trip() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     check_corpus(&root.join("lib"));
-    check_corpus(&root.join( "stdlib"));
+    check_corpus(&root.join("stdlib"));
 }
 
 #[test]

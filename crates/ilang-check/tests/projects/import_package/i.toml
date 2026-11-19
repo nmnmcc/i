@@ -1,4 +1,7 @@
 name = "app"
 
+[dependencies]
+i = { path = "../../../../../stdlib" }
+
 [dev-dependencies]
 check = { path = "check" }

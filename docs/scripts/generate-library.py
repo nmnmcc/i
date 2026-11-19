@@ -146,7 +146,7 @@ def declaration(source, name):
 
 def generate():
     modules = [(prefix + '/' + file.stem, file.read_text())
-               for prefix, directory in [('i', ROOT / 'lib/i'), ('std', ROOT / 'std/src')]
+               for prefix, directory in [('i', ROOT / 'stdlib/src')]
                for file in sorted(directory.glob('*.i'))]
     types = inferred_types(modules)
     # Do not replace any generated pages unless every value has a checked type.

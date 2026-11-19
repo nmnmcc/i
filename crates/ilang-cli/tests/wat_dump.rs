@@ -1,5 +1,5 @@
 //! A tool for refactors that must not change the generated code: with
-//! `WAT_DUMP=<dir>`, writes the WAT of std, bench, examples/hello, and every
+//! `WAT_DUMP=<dir>`, writes the WAT of stdlib, bench, examples/hello, and every
 //! case of `tests/spec`, with and without tests, for both targets, into
 //! `<dir>`. Run it before and after a change and compare the two
 //! directories with `diff -r`. Without `WAT_DUMP` it does nothing.
@@ -51,7 +51,7 @@ fn wat_dump() {
     std::fs::create_dir_all(&out).unwrap();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let filter = std::env::var("WAT_FILTER").ok();
-    for p in ["std", "bench", "examples/hello"] {
+    for p in ["stdlib", "bench", "examples/hello"] {
         if filter.as_ref().is_none_or(|f| p.contains(f)) {
             dump(&root.join(p), p, &out);
         }
@@ -81,7 +81,14 @@ fn wat_dump() {
                 dump(&path, &name, &out);
             } else if path.extension().is_some_and(|e| e == "i") {
                 let dir = tempfile::tempdir().unwrap();
-                std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
+                std::fs::write(
+                    dir.path().join("i.toml"),
+                    format!(
+                        "name = \"spec\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+                        root.join("stdlib").to_str().unwrap()
+                    ),
+                )
+                .unwrap();
 
                 let stem = path.file_stem().unwrap().to_string_lossy().into_owned();
                 single_file::write(dir.path(), &stem, &std::fs::read_to_string(&path).unwrap());

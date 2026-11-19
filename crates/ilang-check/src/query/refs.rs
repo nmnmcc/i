@@ -287,7 +287,8 @@ impl Query<'_> {
         } else if !self.is_own(defined) {
             let package = &self.graph.packages[p.module(defined).package];
             let module = &p.module(defined).path;
-            return if Some(defined) == p.prelude || p.module(defined).package == self.graph.library
+            return if Some(defined) == p.prelude
+                || self.graph.is_language(p.module(defined).package)
             {
                 refuse(format!(
                     "`{module}` is in the library `i`: its names are built in and cannot be renamed"

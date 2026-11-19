@@ -364,7 +364,7 @@ impl Query<'_> {
         if to.kind == ilang_package::ModuleKind::Prelude {
             return None;
         }
-        if from.package == to.package || to.package == self.graph.library {
+        if from.package == to.package {
             return Some(to.path.clone());
         }
         let package = &self.graph.packages[from.package];

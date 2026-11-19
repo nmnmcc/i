@@ -29,7 +29,10 @@ def main():
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)
     (args.directory / 'src').mkdir(exist_ok=True)
-    (args.directory / 'i.toml').write_text('name = "stress"\n')
+    # Every root package depends on the standard library `i` (E0641).
+    library = Path(__file__).resolve().parents[2] / 'stdlib'
+    (args.directory / 'i.toml').write_text(
+        'name = "stress"\n\n[dependencies]\ni = { path = ' + json.dumps(str(library)) + ' }\n')
     (args.directory / 'src/main.i').write_text(source(args.part, args.n))
 
 

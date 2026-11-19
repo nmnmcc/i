@@ -1483,12 +1483,24 @@ pub(crate) fn scalar_pat(t: &Ty) -> Pat {
 #[cfg(test)]
 mod literal_coverage_tests {
     use super::*;
+    /// The `i.toml` of a package named `name` whose only dependency is the
+    /// standard library, the repository's `stdlib/`.
+    fn manifest(name: &str) -> String {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../stdlib")
+            .canonicalize()
+            .expect("the repository has stdlib/");
+        format!(
+            "name = {name:?}\n\n[dependencies]\ni = {{ path = {:?} }}\n",
+            dir.to_str().unwrap()
+        )
+    }
     #[test]
     fn complements_preserve_cross_columns_and_prefixes() {
         // Excluded values are specialized separately; prefixes cannot
         // be treated as literal strings when testing a cofinite row.
         let root = tempfile::tempdir().unwrap();
-        std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::write(root.path().join("i.toml"), manifest("app")).unwrap();
         std::fs::create_dir(root.path().join("src")).unwrap();
         std::fs::write(root.path().join("src/main.i"), "x = 1\n").unwrap();
         let (graph, ds) = ilang_package::load(root.path());
@@ -1541,7 +1553,7 @@ mod literal_coverage_tests {
         // An optimization may avoid the matrix, but must make the
         // same usefulness/coverage decisions as the full-row algorithm.
         let root = tempfile::tempdir().unwrap();
-        std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::write(root.path().join("i.toml"), manifest("app")).unwrap();
         std::fs::create_dir(root.path().join("src")).unwrap();
         std::fs::write(root.path().join("src/main.i"), "x = 1\n").unwrap();
         let (graph, ds) = ilang_package::load(root.path());

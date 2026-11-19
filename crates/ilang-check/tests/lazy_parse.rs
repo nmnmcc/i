@@ -2,7 +2,10 @@
 //! library and of the dependencies only the modules that an import reaches
 //! (and the prelude, the runtime modules, and the modules named by the
 //! manifest). An unreached module is not read: its problems are not
-//! reported, while a reached module's problems are.
+//! reported, while a reached module's problems are. The library is the
+//! package `i` (`stdlib/`), a path dependency of `app`.
+
+mod common;
 
 use ilang_package::PackageGraph;
 use std::fs;
@@ -18,19 +21,23 @@ fn write(dir: &Path, files: &[(&str, &str)]) {
 
 /// Writes the package `app` and, beside it, one package per entry of
 /// `packages` (name, its dependency names, its files). `app` depends on
-/// `app_deps`. Each package names its dependencies by path.
+/// `app_deps` and on the standard library `i`. Each package names its
+/// dependencies by path.
 fn load(
     app_deps: &[&str],
     app: &[(&str, &str)],
     packages: &[(&str, &[&str], &[(&str, &str)])],
 ) -> (tempfile::TempDir, PackageGraph) {
     let dir = tempfile::tempdir().unwrap();
-    let manifest = |name: &str, deps: &[&str]| {
+    let manifest = |name: &str, deps: &[&str], library: bool| {
         let mut text = format!("name = \"{name}\"\n");
-        if !deps.is_empty() {
+        if !deps.is_empty() || library {
             text.push_str("[dependencies]\n");
             for d in deps {
                 text.push_str(&format!("{d} = {{ path = \"../{d}\" }}\n"));
+            }
+            if library {
+                text.push_str(&common::stdlib_dependency());
             }
         }
         text
@@ -38,11 +45,11 @@ fn load(
     for (name, deps, files) in packages {
         let root = dir.path().join(name);
         write(&root, files);
-        fs::write(root.join("i.toml"), manifest(name, deps)).unwrap();
+        fs::write(root.join("i.toml"), manifest(name, deps, false)).unwrap();
     }
     let root = dir.path().join("app");
     write(&root, app);
-    fs::write(root.join("i.toml"), manifest("app", app_deps)).unwrap();
+    fs::write(root.join("i.toml"), manifest("app", app_deps, true)).unwrap();
     let (graph, diags) = ilang_package::load(&root);
     assert!(diags.is_empty(), "{diags:?}");
     (dir, graph)
@@ -216,28 +223,46 @@ fn imports_are_followed_through_dependency_packages() {
 
 /// Of the library, a program with no imports has the prelude, the
 /// runtime modules, and the modules that code generation calls
-/// (`CODEGEN_LIBRARY`), with their imports, in the order of the graph.
+/// (`CODEGEN_LIBRARY`), with their imports, in the order of the graph: the
+/// built-in prelude, the compiled package, then the dependency `i`, whose
+/// modules are in file order.
 #[test]
 fn library_modules_are_parsed_only_when_reached() {
     let (_dir, graph) = load(&[], &[("src/main.i", "main = () { Nil }\n")], &[]);
     assert_eq!(
         parsed_paths(&graph),
         [
-            "i/prelude",
-            "i/fail",
-            "i/control",
-            "i/resource",
-            "i/request",
-            "i/key",
-            "i/core",
-            "i/float_text",
+            "$prelude",
+            "app/main",
             "i/big",
             "i/bits",
-            "i/task",
+            "i/control",
+            "i/core",
+            "i/fail",
+            "i/float_text",
+            "i/key",
             "i/random",
-            "app/main"
+            "i/request",
+            "i/resource",
+            "i/task",
         ]
     );
+    // They are found in the dependency `i`, not in the built-in package.
+    let library = graph.standard_library().unwrap();
+    assert_ne!(library, graph.library);
+    let (parsed, _) = ilang_check::parse(&graph);
+    for p in &parsed {
+        if p.path.starts_with("i/") {
+            assert_eq!(p.package, library, "{}", p.path);
+        } else if p.path == "$prelude" {
+            assert_eq!(p.package, graph.library);
+        }
+    }
+    // Every other module of `i` is not parsed.
+    let paths = parsed_paths(&graph);
+    for unreached in ["i/json", "i/list", "i/syntax", "i/test"] {
+        assert!(!paths.contains(&unreached.to_string()), "{paths:?}");
+    }
     let (_dir, graph) = load(
         &[],
         &[("src/main.i", "(\n\ti/io\n)\nmain = () { Nil }\n")],
@@ -268,7 +293,11 @@ fn manifest_exports_reach_dependency_modules() {
         &[
             (
                 "i.toml",
-                "name = \"app\"\n[dependencies]\nlib = { path = \"../lib\" }\n[wasm]\nexports = [\"lib/used.greet\"]\n",
+                format!(
+                    "name = \"app\"\n[dependencies]\nlib = {{ path = \"../lib\" }}\n{}[wasm]\nexports = [\"lib/used.greet\"]\n",
+                    common::stdlib_dependency()
+                )
+                .as_str(),
             ),
             ("src/main.i", "main = () { Nil }\n"),
         ],

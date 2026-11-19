@@ -5,14 +5,7 @@ use ilang_package::Diagnostic;
 
 fn check(source: &str) -> Vec<Diagnostic> {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(
-        dir.path().join("i.toml"),
-        format!(
-            "name = \"app\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib")
-        ),
-    )
-    .unwrap();
+    std::fs::write(dir.path().join("i.toml"), common::manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
     let (graph, ds) = ilang_package::load(dir.path());
@@ -90,7 +83,7 @@ _ = (f, g, h)
 #[test]
 fn an_imported_weak_value_does_not_take_facts_from_an_earlier_caller() {
     let (_, _, ds) = common::check_files(&[
-        ("i.toml", "name = \"probe\"\n"),
+        ("i.toml", common::manifest("probe").as_str()),
         (
             "src/lib.i",
             include_str!("../../../tests/spec/4.8/f1_imported_weak/src/lib.i"),

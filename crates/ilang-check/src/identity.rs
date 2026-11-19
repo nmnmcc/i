@@ -12,7 +12,8 @@ use std::path::PathBuf;
 /// dependency.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PackageIdentity {
-    /// The library package `i`.
+    /// The built-in package with the prelude, or the standard library
+    /// `i`, wherever it is in the graph.
     Library,
     /// The package that is compiled.
     Root,
@@ -39,7 +40,7 @@ pub struct TypeIdentity {
 /// What the package `id` of `graph` is.
 pub fn package_identity(graph: &PackageGraph, id: PackageId) -> PackageIdentity {
     let p = &graph.packages[id];
-    if id == graph.library {
+    if graph.is_language(id) {
         return PackageIdentity::Library;
     }
     if Some(id) == graph.root {

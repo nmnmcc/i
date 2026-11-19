@@ -170,7 +170,7 @@ impl Clone for Parsed {
 /// the runtime modules ([`ilang_package::library::RUNTIME`]), the library
 /// modules that code generation calls ([`CODEGEN_LIBRARY`]), and the
 /// modules named by the compiled package's manifest (`[wasm]` exports and
-/// entries). A module of another package (the library `i` or a dependency)
+/// entries). A module of another package (a dependency, as the library `i`)
 /// is parsed only when one of those reaches it through imports; an
 /// unreached module is not read, so its problems are not reported. Without
 /// a compiled package every module of the graph is parsed.
@@ -199,9 +199,17 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             queue.push_back((graph.library, i));
         }
     }
-    for path in ilang_package::library::RUNTIME.iter().chain(CODEGEN_LIBRARY) {
-        if let Some(&i) = index.get(&(graph.library, *path)) {
-            queue.push_back((graph.library, i));
+    // The runtime and code generation modules are in the library `i`, a
+    // dependency (or the compiled package itself), found by module path in
+    // any package.
+    for path in ilang_package::library::RUNTIME
+        .iter()
+        .chain(CODEGEN_LIBRARY)
+    {
+        for package in 0..graph.packages.len() {
+            if let Some(&i) = index.get(&(package, *path)) {
+                queue.push_back((package, i));
+            }
         }
     }
     let pkg = &graph.packages[root];
@@ -250,7 +258,9 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
         // Quote lowering imports `i/syntax` into a module with a Lisp
         // template, and a macro may put templates into any module.
         if graph.sources.get(m.source).display.ends_with(".is") || has_macro(&parsed.ast) {
-            targets.push((graph.library, "i/syntax".to_string()));
+            for target in 0..graph.packages.len() {
+                targets.push((target, "i/syntax".to_string()));
+            }
         }
         for (target, path) in targets {
             if let Some(&j) = index.get(&(target, path.as_str()))
@@ -280,10 +290,11 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 /// (`provider_finish`), install the request providers
 /// (`request._provider_root`, `_provider_owner`, `_provider_await`), wait
 /// with `request.await_owned`, and run tasks with `task._provider_runner`
-/// and `task.run`. [`parse`] always parses them with the prelude and
+/// and `task.run`, and macro expansion (also during interface inspection)
+/// needs `i/syntax`. [`parse`] always parses them with the prelude and
 /// [`ilang_package::library::RUNTIME`]; their own imports are followed as
 /// usual.
-pub const CODEGEN_LIBRARY: &[&str] = &["i/fail", "i/request", "i/task"];
+pub const CODEGEN_LIBRARY: &[&str] = &["i/fail", "i/request", "i/task", "i/syntax"];
 
 /// Parses every module of the graph, also those that no import reaches.
 pub fn parse_all(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
@@ -308,9 +319,7 @@ fn import_package(
     first: &str,
 ) -> Option<PackageId> {
     let pkg = &graph.packages[from];
-    if first == "i" {
-        Some(graph.library)
-    } else if first == pkg.name {
+    if first == pkg.name {
         Some(from)
     } else if let Some((_, id)) = pkg.dependencies.iter().find(|(n, _)| n == first) {
         *id
@@ -442,9 +451,7 @@ pub fn check_compiler_exports(
     let modules = (0..program.modules.len())
         .map(|i| hir::ModuleId(i as u32))
         .collect::<Vec<_>>();
-    for id in
-        macro_sandbox::foreign_externals(&program, graph.library, &modules, &program.host_exports)
-    {
+    for id in macro_sandbox::foreign_externals(&program, graph, &modules, &program.host_exports) {
         let def = program.def(id);
         diags.push(Diagnostic::error(
             code::COMPILER_CAPABILITY,

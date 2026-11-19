@@ -3,6 +3,19 @@ use ilang_cli::{BuildOptions, CollectionResult, Level, Target};
 use ilang_host::Outcome;
 use std::path::Path;
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 fn options(level: Level) -> BuildOptions {
     BuildOptions {
         tests: false,
@@ -12,7 +25,11 @@ fn options(level: Level) -> BuildOptions {
     }
 }
 fn project(path: &Path) {
-    std::fs::write(path.join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        path.join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::create_dir(path.join("src")).unwrap();
     std::fs::write(path.join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x body) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {~body}))})))\n").unwrap();
     std::fs::write(path.join("src/main.i"), "(m = app/macros\nsyntax = i/syntax\ntask = i/task)\n(anchor)\n@external(\"test:unselected\", \"missing\")\nmissing : () -> Nil\nanchor = Nil\nm.emit(anchor, good, assert(True))\nm.emit(anchor, bad, assert(False))\nm.emit(anchor, number, 42)\nm.emit(anchor, compiler_only, syntax.show)\nm.emit(anchor, needs_foreign, missing())\nm.emit(anchor, concurrent, assert(task.both(() { 1 }, () { 2 }) == (1, 2)))\n").unwrap();
@@ -332,7 +349,11 @@ fn collections_call_aliases_and_computed_function_values() {
     for value in ["worker", "make(42)"] {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("src")).unwrap();
-        std::fs::write(dir.path().join("i.toml"), "name = \"probe\"\n").unwrap();
+        std::fs::write(
+            dir.path().join("i.toml"),
+            format!("name = \"probe\"\n{}", library_dependencies()),
+        )
+        .unwrap();
         std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
         std::fs::write(dir.path().join("src/main.i"), format!("(m = probe/macros)\nworker = () {{ panic(\"target invoked\") }}\nmake = (n) {{ () {{ assert(n == 42) }} }}\ntarget = {value}\nm.register(target)\nmain = () {{ Nil }}\n")).unwrap();
         let manifest = ilang_cli::collections(dir.path(), false, true).unwrap();

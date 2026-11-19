@@ -18,7 +18,18 @@ fn project(name: &str, source: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("ilang-multicore-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("src")).unwrap();
-    std::fs::write(dir.join("i.toml"), format!("name = {name:?}\n")).unwrap();
+    let library = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    std::fs::write(
+        dir.join("i.toml"),
+        format!(
+            "name = {name:?}\n[dependencies]\ni = {{ path = {:?} }}\n",
+            library.to_str().unwrap()
+        ),
+    )
+    .unwrap();
     std::fs::write(dir.join("src/main.i"), source).unwrap();
     dir
 }

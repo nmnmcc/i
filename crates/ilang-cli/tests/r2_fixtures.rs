@@ -8,6 +8,19 @@ use ilang_syntax::{
 };
 use std::{fs, path::PathBuf};
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 /// The byte range of a header group `( … )` from the span the tree gives it:
 /// the whole group, or a lowered representation containing only its entries.
 fn group(text: &str, span: ilang_syntax::span::Span) -> (usize, usize) {
@@ -166,7 +179,10 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
         .join(", ");
     fs::write(
         directory.path().join("i.toml"),
-        format!("name = \"app\"\n[wasm]\nexports = [{exports}]\n"),
+        format!(
+            "name = \"app\"\n[wasm]\nexports = [{exports}]\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     (directory, cases)

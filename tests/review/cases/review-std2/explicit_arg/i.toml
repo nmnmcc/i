@@ -1,4 +1,7 @@
 name = "probe"
 
+[dependencies]
+i = { path = "../../../../../stdlib" }
+
 [entries]
 legacy = "main.example"

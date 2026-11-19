@@ -218,8 +218,22 @@ fn unused_diagnostics(text: &str, names: &[&str]) -> Vec<lsp::Diagnostic> {
         .collect()
 }
 
+/// The `[dependencies]` line of the standard library, the repository's
+/// `stdlib/`, as a path dependency.
+fn stdlib_dependency() -> String {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .expect("the repository has stdlib/");
+    format!("i = {{ path = {:?} }}\n", dir.to_str().unwrap())
+}
+
 fn package(dir: &Path, files: &[(&str, &str)]) {
-    fs::write(dir.join("i.toml"), "name = \"app\"\n").unwrap();
+    fs::write(
+        dir.join("i.toml"),
+        format!("name = \"app\"\n\n[dependencies]\n{}", stdlib_dependency()),
+    )
+    .unwrap();
     for (path, text) in files {
         let p = dir.join(path);
         fs::create_dir_all(p.parent().unwrap()).unwrap();
@@ -488,9 +502,12 @@ fn the_library_is_written_in_a_private_directory() {
 #[test]
 fn an_unsaved_manifest() {
     let dir = tempfile::tempdir().unwrap();
-    let manifest = "name = \"app\"\n\n[dependencies]\nnope = { path = \"../nowhere\" }\n";
+    let manifest = format!(
+        "name = \"app\"\n\n[dependencies]\nnope = {{ path = \"../nowhere\" }}\n{}",
+        stdlib_dependency()
+    );
     package(dir.path(), &[("src/main.i", "x = 1\n")]);
-    fs::write(dir.path().join("i.toml"), manifest).unwrap();
+    fs::write(dir.path().join("i.toml"), &manifest).unwrap();
     let main = file_uri(&dir.path().join("src/main.i"));
     let toml = file_uri(&dir.path().join("i.toml"));
     let mut c = Client::start();
@@ -1015,11 +1032,20 @@ fn workspace_with(lisp: bool, main: &str) -> Ws {
     fs::create_dir_all(lib.join("src")).unwrap();
     fs::create_dir_all(app.join("src")).unwrap();
     fs::create_dir_all(app.join("test")).unwrap();
-    fs::write(lib.join("i.toml"), "name = \"lib\"\n").unwrap();
+    // `lib` is the root package of its own check when one of its files is
+    // open, so it has the standard library too.
+    fs::write(
+        lib.join("i.toml"),
+        format!("name = \"lib\"\n\n[dependencies]\n{}", stdlib_dependency()),
+    )
+    .unwrap();
     fs::write(lib.join("src/text.i"), LIB_TEXT).unwrap();
     fs::write(
         app.join("i.toml"),
-        "name = \"app\"\n\n[dependencies]\nlib = { path = \"../lib\" }\n",
+        format!(
+            "name = \"app\"\n\n[dependencies]\nlib = {{ path = \"../lib\" }}\n{}",
+            stdlib_dependency()
+        ),
     )
     .unwrap();
     fs::write(app.join("src/shapes.i"), SHAPES).unwrap();
@@ -2700,7 +2726,14 @@ fn lsp_diagnostics_of_several_packages() {
     for name in ["one", "two"] {
         let p = dir.path().join(name);
         fs::create_dir_all(p.join("src")).unwrap();
-        fs::write(p.join("i.toml"), format!("name = \"{name}\"\n")).unwrap();
+        fs::write(
+            p.join("i.toml"),
+            format!(
+                "name = \"{name}\"\n\n[dependencies]\n{}",
+                stdlib_dependency()
+            ),
+        )
+        .unwrap();
         fs::write(p.join("src/main.i"), "main = () { nope }\n").unwrap();
     }
     let one = file_uri(&dir.path().join("one/src/main.i"));

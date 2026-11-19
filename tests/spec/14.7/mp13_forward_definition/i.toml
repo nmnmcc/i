@@ -1,3 +1,6 @@
 # spec: 14.7
 # expect: pass
 name = "probe"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

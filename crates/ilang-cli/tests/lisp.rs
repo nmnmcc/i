@@ -1,9 +1,26 @@
 use std::process::Command;
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 #[test]
 fn lisp_modules_are_checked_with_source_locations() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/math.is"),
@@ -185,7 +202,11 @@ fn conversion_accepts_a_block_containing_a_function_and_value() {
 fn interpolation_keeps_its_result_through_both_surface_conversions() {
     // Interpolation becomes concatenation before the core tree.
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     let mut file = dir.path().join("src/main.i");
     std::fs::write(

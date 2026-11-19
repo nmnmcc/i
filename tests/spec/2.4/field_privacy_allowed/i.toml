@@ -3,5 +3,8 @@
 # entry: legacy
 name = "app"
 
+[dependencies]
+i = { path = "../../../../stdlib" }
+
 [entries]
 legacy = "main.allowed"

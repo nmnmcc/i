@@ -61,7 +61,7 @@ if (process.argv[2] === 'ilang') {{
         project = WORK / name
         (project / 'src').mkdir(parents=True, exist_ok=True)
         (project / 'i.toml').write_text('name = "replay"\n')
-        source = re.sub(r'\s*testlib\s*=\s*\(test\)\s*=\s*std/test\s*,?', '', source)
+        source = re.sub(r'\s*testlib\s*=\s*\(test\)\s*=\s*i/test\s*,?', '', source)
         source += '\nmain = () {\n' + ''.join('\t' + t + '()\n' for t in tests) + '\tNil\n}\n'
         (project / 'src/main.i').write_text(source)
         for level in [0, 2]:

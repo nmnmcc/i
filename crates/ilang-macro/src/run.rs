@@ -123,17 +123,10 @@ pub fn compile_owned(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| CompileError::Internal(e.to_string()))?;
     let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
-    use ilang_package::lock::{FileKind, PackageFile, hash};
-    let files = graph.packages[graph.library]
-        .modules
-        .iter()
-        .map(|m| PackageFile {
-            path: m.path.clone(),
-            kind: FileKind::Regular,
-            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
-        })
-        .collect::<Vec<_>>();
-    let mut result = MacroProgram::new(wasm, binding_plan, hash(&files));
+    // The trusted package is the language: the built-in prelude and the
+    // standard library `i`, which is a dependency, not built in. Its
+    // bindings carry the same hash (`ilang_wasm` lowering).
+    let mut result = MacroProgram::new(wasm, binding_plan, graph.language_hash());
     result.metered = true;
     Ok(result)
 }

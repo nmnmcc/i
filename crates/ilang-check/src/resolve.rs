@@ -346,11 +346,12 @@ impl<'a> Resolver<'a> {
     }
 
     fn is_core(&self, m: ModuleId) -> bool {
-        self.p.module(m).package == self.graph.library && self.module_name(m) == "i/core"
+        self.graph.is_standard_library(self.p.module(m).package) && self.module_name(m) == "i/core"
     }
 
+    /// Whether the current module is in the prelude or the standard library.
     fn in_library(&self) -> bool {
-        self.p.module(self.cur).package == self.graph.library
+        self.graph.is_language(self.p.module(self.cur).package)
     }
 
     fn new_var(&mut self) -> VarId {
@@ -555,10 +556,7 @@ impl<'a> Resolver<'a> {
                         let mut message =
                             format!("`{name}` is exported but not defined in this module");
                         let package = &self.graph.packages[self.p.module(m).package];
-                        let mut packages = vec![
-                            ("i".to_string(), self.graph.library),
-                            (package.name.clone(), self.p.module(m).package),
-                        ];
+                        let mut packages = vec![(package.name.clone(), self.p.module(m).package)];
                         packages.extend(
                             package
                                 .dependencies
@@ -647,9 +645,7 @@ impl<'a> Resolver<'a> {
         let pkg = &self.graph.packages[me.package];
         let first = item.path[0].name.as_str();
         let is_test = me.kind == ModuleKind::Test;
-        let package = if first == "i" {
-            Some(self.graph.library)
-        } else if first == pkg.name {
+        let package = if first == pkg.name {
             Some(me.package)
         } else if let Some((_, id)) = pkg.dependencies.iter().find(|(n, _)| n == first) {
             *id
@@ -664,7 +660,7 @@ impl<'a> Resolver<'a> {
             let msg = if dev {
                 format!("`{first}` is a dev-dependency, so only modules under `test/` may use it")
             } else {
-                format!("`{first}` is not `i`, the name of this package, or a dependency name")
+                format!("`{first}` is not the name of this package or a dependency name")
             };
             self.error(code::UNKNOWN_PACKAGE, item.path[0].span, msg);
             return None;
@@ -849,9 +845,7 @@ impl<'a> Resolver<'a> {
                     let me = self.p.module(ModuleId(m));
                     let first = &path[0];
                     let pkg = &self.graph.packages[me.package];
-                    let package = if first == "i" {
-                        Some(self.graph.library)
-                    } else if *first == pkg.name {
+                    let package = if *first == pkg.name {
                         Some(me.package)
                     } else {
                         pkg.dependencies

@@ -5,6 +5,21 @@ mod common;
 
 use ilang_check::hir::{DefKind, TypeBody};
 
+/// The module paths of the standard library `i` (`stdlib/src/`), in the
+/// order of its package: by file name.
+fn stdlib_paths() -> Vec<String> {
+    let src = common::stdlib_dir().join("src");
+    let mut names: Vec<String> = std::fs::read_dir(&src)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    names
+        .iter()
+        .map(|n| format!("i/{}", n.rsplit_once('.').unwrap().0))
+        .collect()
+}
+
 #[test]
 fn library_resolves_cleanly() {
     let (graph, program, diags) = common::check_all_modules(&[]);
@@ -12,54 +27,62 @@ fn library_resolves_cleanly() {
     assert!(rendered.is_empty(), "{rendered:#?}");
     let program = program.unwrap();
     let paths: Vec<&str> = program.modules.iter().map(|m| m.path.as_str()).collect();
-    assert_eq!(
-        paths,
-        [
-            "$prelude",
-            "i/fail",
-            "i/control",
-            "i/resource",
-            "i/assertion",
-            "i/request",
-            "i/key",
-            "i/core",
-            "i/float_text",
-            "i/big",
-            "i/bits",
-            "i/io",
-            "i/task",
-            "i/clock",
-            "i/random",
-            "i/syntax",
-            "i/fs",
-            "i/process",
-            "i/net",
-            "i/tls",
-            "i/fetch",
-            "i/stdio"
-        ]
-    );
+    // The built-in prelude, then the modules of the dependency `i`.
+    let mut want = vec!["$prelude".to_string()];
+    want.extend(stdlib_paths());
+    assert_eq!(paths, want);
+    assert_eq!(want.len(), 1 + 49);
+    // The modules that the compiler names are all there.
+    for path in ilang_package::library::RUNTIME
+        .iter()
+        .chain(ilang_check::CODEGEN_LIBRARY)
+        .chain(&["i/syntax", "i/core"])
+    {
+        assert!(paths.contains(path), "{path}");
+    }
 }
 
-/// Every registered module path has its own source in the package `i`,
-/// with the text of the list.
+/// The built-in package has only the prelude, with the text of
+/// `lib/prelude.i`; every library module is in the package `i`, from its
+/// file in `stdlib/src/`.
 #[test]
 fn library_modules_have_sources() {
     let (graph, _, _) = common::check_all_modules(&[]);
-    let package = &graph.packages[graph.library];
-    let registered = std::iter::once(ilang_package::library::PRELUDE)
-        .chain(ilang_package::library::MODULES.iter().copied());
+    let builtin = &graph.packages[graph.library];
+    assert_eq!(builtin.modules.len(), 1);
+    let (path, text) = ilang_package::library::PRELUDE;
+    assert_eq!(builtin.modules[0].path, path);
+    assert_eq!(graph.sources.get(builtin.modules[0].source).text, text);
+    let id = graph.standard_library().expect("the dependency `i`");
+    let root = &graph.packages[graph.root.unwrap()];
+    assert_eq!(root.dependencies, [("i".to_string(), Some(id))]);
+    let package = &graph.packages[id];
+    assert_eq!(package.name, "i");
+    let dir = common::stdlib_dir();
+    assert_eq!(package.dir.as_deref(), Some(dir.as_path()));
     let mut count = 0;
-    for (path, text) in registered {
+    for path in stdlib_paths() {
         let module = package
             .modules
             .iter()
             .find(|m| m.path == path)
             .unwrap_or_else(|| panic!("{path} has no module"));
-        assert_eq!(graph.sources.get(module.source).text, text, "{path}");
+        let file = graph.sources.get(module.source);
+        let rest = path.strip_prefix("i/").unwrap();
+        let on_disk = ["i", "is"]
+            .iter()
+            .map(|e| dir.join("src").join(rest).with_extension(e))
+            .find(|p| p.is_file())
+            .unwrap_or_else(|| panic!("{path} has no file"));
+        assert_eq!(
+            file.text,
+            std::fs::read_to_string(on_disk).unwrap(),
+            "{path}"
+        );
         count += 1;
     }
     assert_eq!(package.modules.len(), count);
+    assert_eq!(count, 49);
 }
 
 /// The exported names of each library module.
@@ -513,11 +536,7 @@ fn the_prelude_is_not_importable() {
     // The built-in names need no import.
     let main = "check = (x : Result(Int, Nil)) -> Bool {\n\tx |>\n\t\t(Ok(_)) { True }\n\t\t& (Error(_)) { panic(\"no\") }\n}\n";
     let (graph, program, diags) = common::check_files(&[("src/main.i", main)]);
-    let errors: Vec<_> = diags
-        .iter()
-        .filter(|d| d.is_error() && d.code != ilang_package::code::NO_LIBRARY)
-        .cloned()
-        .collect();
+    let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).cloned().collect();
     let rendered = graph.sources.render_all(&errors);
     assert!(rendered.is_empty(), "{rendered:#?}");
     let program = program.unwrap();

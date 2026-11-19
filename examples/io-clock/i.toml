@@ -1,1 +1,4 @@
 name = "io_clock"
+
+[dependencies]
+i = { path = "../../stdlib" }

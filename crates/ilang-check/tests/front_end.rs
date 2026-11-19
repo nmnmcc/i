@@ -42,12 +42,9 @@ fn declared_external_variables_are_general_in_library_declarations() {
         "src/main.i",
         "(i/core)\nf = () { (core.inspect(1), core.inspect(True)) }",
     )]);
-    let source = graph.packages[graph.library]
-        .modules
-        .iter()
-        .find(|m| m.path == "i/core")
-        .unwrap()
-        .source;
+    // `i/core` is in the dependency `i`, not built in.
+    let (package, index) = graph.standard_library_module("i/core").unwrap();
+    let source = graph.packages[package].modules[index].source;
     let text = graph.sources.get(source).text.clone();
     // The library already declares `inspect: <A>(A) -> String`.
     assert!(text.contains("inspect : <A>(A) -> String"));

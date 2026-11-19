@@ -21,6 +21,7 @@ fn compile_project(
 ) -> Vec<u8> {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
+    test_project::depend_on_library(dir.path());
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
     let (graph, diags) = ilang_package::load(dir.path());
@@ -266,7 +267,7 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
     use std::collections::BTreeSet;
     let source = r#"
       (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	syntax = i/syntax)
       @external("test:syntax", "source")
       source : () -> syntax.Syntax

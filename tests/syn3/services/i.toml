@@ -1,3 +1,4 @@
 name = "syn3_services"
 
 [dependencies]
+i = { path = "../../../stdlib" }

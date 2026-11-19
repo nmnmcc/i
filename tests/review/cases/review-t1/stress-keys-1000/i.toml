@@ -1,1 +1,4 @@
 name="stress"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

@@ -1,1 +1,4 @@
 name = "echo"
+
+[dependencies]
+i = { path = "../../stdlib" }

@@ -639,10 +639,11 @@ impl<'c> Server<'c> {
 
     fn publish(&mut self, root: &Path, a: &Analysis) {
         let mut by_file: HashMap<PathBuf, Vec<lsp::Diagnostic>> = HashMap::new();
-        let library = a.graph.library;
-        let library_sources: HashSet<SourceId> = a.graph.packages[library]
-            .modules
-            .iter()
+        // The prelude and the standard library `i`, unless `i` is the
+        // package being edited.
+        let library_sources: HashSet<SourceId> = (0..a.graph.packages.len())
+            .filter(|&id| a.graph.is_language(id) && Some(id) != a.graph.root)
+            .flat_map(|id| &a.graph.packages[id].modules)
             .map(|m| m.source)
             .collect();
         let mut seen = HashSet::new();
@@ -1087,8 +1088,9 @@ impl<'c> Server<'c> {
     }
 }
 
-/// Writes the files of the library package `i`, so that a definition there
-/// can be shown. They are in a private directory of the server.
+/// Writes the files of the built-in package (the prelude), so that a
+/// definition there can be shown; the library `i` is a dependency with its
+/// own directory. They are in a private directory of the server.
 fn write_library(a: &Analysis) {
     for m in &a.graph.packages[a.graph.library].modules {
         let Some(path) = a.paths.get(&m.source) else {

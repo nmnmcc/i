@@ -2,19 +2,37 @@
 use ilang_host::{HostImports, HostOptions, Outcome, Program};
 use ilang_wasm::{Numeric, Options};
 
+/// A manifest for `name` that depends on the standard library of this
+/// repository by path.
+fn manifest(name: &str) -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "name = {name:?}\n[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 fn run(source: &str) {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"rest\"\n").unwrap();
+    std::fs::write(dir.path().join("i.toml"), manifest("rest")).unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
     let (mut graph, diagnostics) = ilang_package::load(dir.path());
     assert!(!diagnostics.iter().any(|d| d.is_error()), "{diagnostics:?}");
     let needs_task = source.contains("i/task");
-    graph.packages[graph.library].modules.retain(|m| {
+    // The library modules are in the package `i`; the built-in package has
+    // only the prelude.
+    let library = graph
+        .standard_library()
+        .expect("the package depends on the standard library");
+    graph.packages[library].modules.retain(|m| {
         needs_task
             || matches!(
                 m.path.as_str(),
-                "$prelude" | "i/control" | "i/fail" | "i/resource" | "i/core"
+                "i/control" | "i/fail" | "i/resource" | "i/core"
             )
             || ilang_package::library::RUNTIME.contains(&m.path.as_str())
     });
@@ -64,7 +82,7 @@ fn task_keep_uses_the_invoking_catch_after_yield() {
 #[test]
 fn external_host_errors_raise_through_the_callers_fail() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(dir.path().join("i.toml"), manifest("app")).unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),

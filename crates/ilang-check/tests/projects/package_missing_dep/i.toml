@@ -1,5 +1,6 @@
 name = "app"
 
 [dependencies]
+i = { path = "../../../../../stdlib" }
 gone = { path = "gone" }
 nofile = { path = "nofile" }

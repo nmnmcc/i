@@ -1,36 +1,18 @@
-//! The library package `i`, which every program has: the library modules
-//! and the prelude of built-in names.
+//! The built-in package, which every program has: only the prelude of
+//! built-in names. The library modules `i/...` are not built in; they come
+//! from the package named `i` (`stdlib/`), a dependency of every package
+//! that is not itself `i` (see [`crate::code::NO_LIBRARY`]).
 
 use crate::{ModuleKind, ModuleSource, Package, PackageGraph};
 
-/// The module paths and sources of the library modules, and of the prelude.
-pub const MODULES: &[(&str, &str)] = &[
-    ("i/fail", include_str!("../../../lib/i/fail.i")),
-    ("i/control", include_str!("../../../lib/i/control.i")),
-    ("i/resource", include_str!("../../../lib/i/resource.i")),
-    ("i/assertion", include_str!("../../../lib/i/assertion.i")),
-    ("i/request", include_str!("../../../lib/i/request.i")),
-    ("i/key", include_str!("../../../lib/i/key.i")),
-    ("i/core", include_str!("../../../lib/i/core.i")),
-    ("i/float_text", include_str!("../../../lib/i/float_text.i")),
-    ("i/big", include_str!("../../../lib/i/big.i")),
-    ("i/bits", include_str!("../../../lib/i/bits.i")),
-    ("i/io", include_str!("../../../lib/i/io.i")),
-    ("i/task", include_str!("../../../lib/i/task.i")),
-    ("i/clock", include_str!("../../../lib/i/clock.i")),
-    ("i/random", include_str!("../../../lib/i/random.i")),
-    ("i/syntax", include_str!("../../../lib/i/syntax.i")),
-    ("i/fs", include_str!("../../../lib/i/fs.i")),
-    ("i/process", include_str!("../../../lib/i/process.i")),
-    ("i/net", include_str!("../../../lib/i/net.i")),
-    ("i/tls", include_str!("../../../lib/i/tls.i")),
-    ("i/fetch", include_str!("../../../lib/i/fetch.i")),
-    ("i/stdio", include_str!("../../../lib/i/stdio.i")),
-];
+/// The name of the built-in package. `$` is not in a name, so no
+/// dependency, and no import, can name it.
+pub const BUILTIN_NAME: &str = "$builtin";
 
 /// The library modules whose functions the runtime calls
 /// (`ilang_wasm::ir::RUNTIME_CALLS`). Every program has them, also a
-/// compiler program that selects only an import closure.
+/// compiler program that selects only an import closure. They are in the
+/// package `i`, found by module path.
 pub const RUNTIME: &[&str] = &["i/float_text", "i/big", "i/bits"];
 
 /// The module path of the prelude. No import can name it: `$` is not in a
@@ -39,31 +21,25 @@ pub const PRELUDE_PATH: &str = "$prelude";
 
 pub const PRELUDE: (&str, &str) = (PRELUDE_PATH, include_str!("../../../lib/prelude.i"));
 
-/// Adds the package `i` to an empty graph, as package 0.
+/// Adds the built-in package, with only the prelude, to an empty graph, as
+/// package 0 ([`PackageGraph::library`]).
 pub(crate) fn add(graph: &mut PackageGraph) {
     assert!(graph.packages.is_empty());
-    let mut modules = Vec::new();
-    let all = std::iter::once((PRELUDE, ModuleKind::Prelude))
-        .chain(MODULES.iter().map(|&m| (m, ModuleKind::Src)));
-    for ((path, text), kind) in all {
-        let file = match kind {
-            ModuleKind::Prelude => "prelude",
-            _ => path.strip_prefix("i/").unwrap_or(path),
-        };
-        let source = graph.sources.add(format!("<i>/{file}.i"), text.to_string());
-        modules.push(ModuleSource {
-            path: path.to_string(),
-            source,
-            kind,
-        });
-    }
+    let (path, text) = PRELUDE;
+    let source = graph
+        .sources
+        .add("<i>/prelude.i".to_string(), text.to_string());
     graph.packages.push(Package {
-        name: "i".to_string(),
+        name: BUILTIN_NAME.to_string(),
         dir: None,
         manifest_source: None,
         dependencies: Vec::new(),
         dev_dependencies: Vec::new(),
-        modules,
+        modules: vec![ModuleSource {
+            path: path.to_string(),
+            source,
+            kind: ModuleKind::Prelude,
+        }],
         wasm_exports: Vec::new(),
         wasm_synchronous: Vec::new(),
         entries: Vec::new(),

@@ -95,7 +95,7 @@ fn graph_with_path_dependencies() {
         &[
             (
                 "app/i.toml",
-                "name = \"app\"\n[dependencies]\nu = { path = \"../util\" }\nv = { path = \"../util\" }\n[dev-dependencies]\nt = { path = \"../tools\" }\ni = { path = \"../../stdlib\" }\n",
+                "name = \"app\"\n[dependencies]\nu = { path = \"../util\" }\nv = { path = \"../util\" }\n[dev-dependencies]\nt = { path = \"../tools\" }\ni = { path = \"../stdlib\" }\n",
             ),
             ("app/src/main.i", "x = 1\n"),
             ("app/src/a/b.i", "x = 1\n"),
@@ -112,8 +112,8 @@ fn graph_with_path_dependencies() {
     library(&dir.path().join("stdlib"));
     let (graph, diags) = load(&dir.path().join("app"));
     assert!(diags.is_empty(), "{diags:?}");
-    // `i`, app, util, tools, and the path package named `i`. One package for
-    // one directory.
+    // The built-in package, app, util, tools, and the path package named
+    // `i`. One package for one directory.
     assert_eq!(graph.packages.len(), 5);
     let root = &graph.packages[graph.root.unwrap()];
     assert_eq!(root.dependencies[0].1, root.dependencies[1].1);
@@ -138,37 +138,33 @@ fn graph_with_path_dependencies() {
         graph.sources.get(util.modules[0].source).display,
         "../util/src/lib.i"
     );
-    // The library package.
-    let lib = &graph.packages[graph.library];
-    assert_eq!(lib.name, "i");
-    let paths: Vec<&str> = lib.modules.iter().map(|m| m.path.as_str()).collect();
-    assert_eq!(
-        paths,
-        [
-            "$prelude",
-            "i/fail",
-            "i/control",
-            "i/resource",
-            "i/assertion",
-            "i/request",
-            "i/key",
-            "i/core",
-            "i/float_text",
-            "i/big",
-            "i/bits",
-            "i/io",
-            "i/task",
-            "i/clock",
-            "i/random",
-            "i/syntax",
-            "i/fs",
-            "i/process",
-            "i/net",
-            "i/tls",
-            "i/fetch",
-            "i/stdio"
-        ]
-    );
+    // The built-in package has only the prelude; the library modules are in
+    // the package named `i`, the dev-dependency.
+    let builtin = &graph.packages[graph.library];
+    assert_eq!(builtin.name, ilang_package::library::BUILTIN_NAME);
+    assert!(builtin.dir.is_none());
+    let paths: Vec<&str> = builtin.modules.iter().map(|m| m.path.as_str()).collect();
+    assert_eq!(paths, ["$prelude"]);
+    let (name, library) = root
+        .dev_dependencies
+        .iter()
+        .find(|(n, _)| n == "i")
+        .unwrap();
+    assert_eq!(name, "i");
+    let library = library.unwrap();
+    assert!(graph.is_standard_library(library));
+    assert!(graph.is_language(library));
+    assert!(graph.is_language(graph.library));
+    assert!(!graph.is_language(graph.root.unwrap()));
+    assert_eq!(graph.standard_library(), Some(library));
+    let paths: Vec<&str> = graph.packages[library]
+        .modules
+        .iter()
+        .map(|m| m.path.as_str())
+        .collect();
+    assert_eq!(paths, ["i/core"]);
+    assert_eq!(graph.standard_library_module("i/core"), Some((library, 0)));
+    assert_eq!(graph.standard_library_module("i/syntax"), None);
 }
 
 #[test]
@@ -201,51 +197,123 @@ fn circles_and_missing() {
     assert_eq!(diags[0].code, code::NO_PACKAGE);
 }
 
+/// The repository's `stdlib/`, the package `i`.
+fn stdlib() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap()
+}
+
 #[test]
 fn standard_library_modules() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib");
-    let (graph, diags) = load(&path);
-    assert!(diags.is_empty(), "{diags:?}");
+    // The library modules come from the package `i` in `stdlib/`, here a
+    // path dependency, and none is built in.
+    let dir = tempfile::tempdir().unwrap();
+    let manifest = format!(
+        "name = \"app\"\n[dependencies]\ni = {{ path = \"{}\" }}\n",
+        stdlib().display()
+    );
+    write(
+        dir.path(),
+        &[("i.toml", manifest.as_str()), ("src/app.i", "x = 1\n")],
+    );
+    let (graph, diags) = load(dir.path());
+    assert!(diags.is_empty(), "{:?}", graph.sources.render_all(&diags));
     let root = &graph.packages[graph.root.unwrap()];
-    let paths: Vec<&str> = root
-        .modules
-        .iter()
-        .filter(|m| m.kind == ModuleKind::Src)
-        .map(|m| m.path.as_str())
-        .collect();
+    let library = root.dependencies[0].1.unwrap();
+    assert_eq!(graph.standard_library(), Some(library));
+    let package = &graph.packages[library];
+    assert_eq!(package.name, "i");
+    assert_eq!(package.dir.as_deref(), Some(stdlib().as_path()));
+    // A dependency: only its `src/` modules.
+    assert!(package.modules.iter().all(|m| m.kind == ModuleKind::Src));
+    let paths: Vec<&str> = package.modules.iter().map(|m| m.path.as_str()).collect();
     assert_eq!(
         paths,
         [
+            "i/assertion",
+            "i/big",
             "i/bit_array",
+            "i/bits",
             "i/bool",
             "i/calendar",
             "i/cli",
+            "i/clock",
+            "i/control",
+            "i/core",
             "i/crypto",
             "i/csv",
             "i/dict",
+            "i/fail",
+            "i/fetch",
             "i/float",
+            "i/float_text",
+            "i/fs",
             "i/http",
             "i/int",
+            "i/io",
             "i/json",
+            "i/key",
             "i/list",
             "i/log",
+            "i/net",
             "i/option",
             "i/order",
             "i/pair",
             "i/path",
+            "i/process",
             "i/property",
+            "i/random",
             "i/regex",
+            "i/request",
+            "i/resource",
             "i/result",
             "i/schema",
             "i/sequence",
             "i/set",
+            "i/stdio",
             "i/stream",
             "i/string",
+            "i/syntax",
+            "i/task",
             "i/test",
             "i/time",
+            "i/tls",
             "i/uri",
         ]
     );
+    assert_eq!(paths.len(), 49);
+    // The runtime modules are among them.
+    for path in ilang_package::library::RUNTIME {
+        assert!(graph.standard_library_module(path).is_some(), "{path}");
+    }
+    // The built-in package has only the prelude.
+    let builtin = &graph.packages[graph.library];
+    assert_eq!(builtin.modules.len(), 1);
+    assert_eq!(builtin.modules[0].kind, ModuleKind::Prelude);
+}
+
+#[test]
+fn the_standard_library_compiled_as_the_root() {
+    // `stdlib/` itself, compiled: it needs no dependency `i`, and its own
+    // modules are the library.
+    let (graph, diags) = load(&stdlib());
+    assert!(diags.is_empty(), "{:?}", graph.sources.render_all(&diags));
+    let root = graph.root.unwrap();
+    assert_eq!(graph.standard_library(), Some(root));
+    assert_eq!(
+        graph
+            .standard_library_module("i/core")
+            .map(|(package, _)| package),
+        Some(root)
+    );
+    let src = graph.packages[root]
+        .modules
+        .iter()
+        .filter(|m| m.kind == ModuleKind::Src)
+        .count();
+    assert_eq!(src, 49);
 }
 
 // E5 removes dependency defaults: only the root's explicit entry is selected.
@@ -380,8 +448,52 @@ fn the_prelude_has_a_path_that_no_import_names() {
     assert_eq!(prelude[0].path, ilang_package::library::PRELUDE_PATH);
     assert_eq!(prelude[0].path, "$prelude");
     assert!(lib.modules.iter().all(|m| m.path != "i/prelude"));
+    // The built-in package has nothing else, and no dependency can name it.
+    assert_eq!(lib.modules.len(), 1);
+    assert_eq!(lib.name, "$builtin");
+    assert!(!ilang_package::is_name(&lib.name));
     assert_eq!(
         graph.sources.get(prelude[0].source).display,
         "<i>/prelude.i"
     );
+}
+
+/// The language hash covers the prelude and the modules of the package `i`,
+/// and nothing of the other packages; it is the hash that a host grants to
+/// the bindings of both.
+#[test]
+fn the_language_hash_covers_the_prelude_and_the_library() {
+    use ilang_package::lock::{FileKind, PackageFile, hash};
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &[
+            (
+                "app/i.toml",
+                "name = \"app\"\n[dependencies]\ni = { path = \"../stdlib\" }\n",
+            ),
+            ("app/src/main.i", "x = 1\n"),
+        ],
+    );
+    library(&dir.path().join("stdlib"));
+    let (graph, diags) = load(&dir.path().join("app"));
+    assert!(diags.is_empty(), "{diags:?}");
+    let file = |path: &str, text: &str| PackageFile {
+        path: path.into(),
+        kind: FileKind::Regular,
+        bytes: text.as_bytes().to_vec(),
+    };
+    let (prelude_path, prelude_text) = ilang_package::library::PRELUDE;
+    let want = hash(&[file(prelude_path, prelude_text), file("i/core", "x = 1\n")]);
+    assert_eq!(graph.language_hash(), want);
+
+    // The compiled package does not take part.
+    write(&dir.path().join("app"), &[("src/main.i", "x = 2\n")]);
+    let (again, _) = load(&dir.path().join("app"));
+    assert_eq!(again.language_hash(), want);
+
+    // A change to `i` changes it.
+    write(&dir.path().join("stdlib"), &[("src/core.i", "x = 2\n")]);
+    let (changed, _) = load(&dir.path().join("app"));
+    assert_ne!(changed.language_hash(), want);
 }

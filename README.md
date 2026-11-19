@@ -26,7 +26,7 @@ main = () {
 }
 ```
 
-`i new demo` makes a package with a copy of the standard library in `demo/std`; `demo/i.toml` names that copy with `std = { path = "std" }`:
+`i new demo` makes a package whose `demo/i.toml` depends on the versioned standard library `i`:
 
 ```sh
 i new demo
@@ -35,7 +35,7 @@ rm demo/test/main_test.i
 
 Write the program above to `demo/src/main.i`; the generated test is removed because it tests the program it replaces. `i run --project demo` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `&` are one function that matches its argument. No type is written, and every type is checked.
 
-The `stdlib/` copy is an ordinary path dependency that belongs to the package: 30 files, about 465 KiB, readable and editable. `.gitignore` lists only `/build/`, so the copy is committed with the package and shipped by `i publish`. It includes `stdlib/UNICODE-LICENSE` and the copyright notices in its sources; keep them when you redistribute it. Nothing refreshes the copy: `i update` handles versioned dependencies, not this directory. To move to a newer standard library, make a temporary package with the newer compiler and replace `stdlib/` with that package's `stdlib/`. A package named `std` imports the copy as `stdlib/…`.
+The standard library is the package `i`, published from this repository with tags such as `stdlib-v0.1.0`. `i new` writes the newest version as a minimum; the first check resolves it into the global cache and records the exact version, commit and content hash in `i.lock`. Nothing is copied into the project, and `i publish` does not carry the library. Upgrade it with `i update i`; to read its source, see `stdlib/` in this repository. `collection = "i/test.tests"` registers the package's tests in the `tests` collection that the library declares in `i/test`.
 
 A function type has three parts, `(P) <- (S) -> R`: the parameters, the services the function needs, and the result. An error is a service too, `Fail(E)`. All of it is inferred. A service is an ordinary value: a function takes it with `<-` in its head, and the caller gives it with `<-` after an expression, so a test gives its own:
 
@@ -185,7 +185,7 @@ Every command takes `--help`. Editor support is in [editors](editors): a VS Code
 
 ## Documentation and status
 
-The language is defined in one document, [docs/spec.md](docs/spec.md). The library modules `i/…` are in [lib/i](lib/i) and the standard library `stdlib/…` is in [i/src](i/src); each module is documented in its source. The reasons for the design are in [docs/design](docs/design).
+The language is defined in one document, [docs/spec.md](docs/spec.md). The library modules `i/…` are in [stdlib/src](stdlib/src); each module is documented in its source. The reasons for the design are in [docs/design](docs/design).
 
 The examples above and the files under `examples` join branch chains with `&`; a value-level `|` separator is a compile error that asks for `&`. i is in development and has no release: the spec comes first, the compiler does not yet do everything in it, and the language still changes.
 

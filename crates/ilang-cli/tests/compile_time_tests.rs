@@ -22,8 +22,7 @@ fn build(
         target: ilang_cli::Target::Native,
     };
     if tests {
-        return ilang_cli::build_tests(root, options, Some("i/test.tests"))
-            .map(|(built, _)| built);
+        return ilang_cli::build_tests(root, options, Some("i/test.tests")).map(|(built, _)| built);
     }
     ilang_cli::build(
         root,
@@ -39,6 +38,7 @@ fn build(
 fn fixture() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     write(dir.path(), "i.toml", "name = \"app\"\n");
+    test_project::depend_on_library(dir.path());
     write(
         dir.path(),
         "src/helpers.is",
@@ -113,6 +113,7 @@ fn ordinary_roots_and_initializers_cannot_reach_compile_time_bindings() {
         "i.toml",
         "name = \"app\"\n[wasm]\nexports = [\"app/main.entry\"]\n",
     );
+    test_project::depend_on_library(root);
     write(
         root,
         "src/main.i",
@@ -140,12 +141,12 @@ fn tests_use_each_builds_unmarked_quote_templates() {
         write(
             root,
             "test/check.i",
-            "(\n\ttestlib = (test) = std/test\n\tapp/forward, syntax = i/syntax)\n\ntest(\"check\", () { assert(syntax.show(forward.forward()) == \"(f x)\") Nil })\n",
+            "(\n\ttestlib = (test) = i/test\n\tapp/forward, syntax = i/syntax)\n\ntest(\"check\", () { assert(syntax.show(forward.forward()) == \"(f x)\") Nil })\n",
         );
         write(
             root,
             "test/quote.is",
-            "(, (= syntax (/ i syntax)) (= testlib (, test) (/ std test)))\n(= quoted `(a b))\n(test \"quote_test\" (-> (,) _ {(assert (== ((. syntax show) quoted) \"(a b)\")) Nil}))\n",
+            "(, (= syntax (/ i syntax)) (= testlib (, test) (/ i test)))\n(= quoted `(a b))\n(test \"quote_test\" (-> (,) _ {(assert (== ((. syntax show) quoted) \"(a b)\")) Nil}))\n",
         );
         let built = build(root, true, opt).unwrap();
         let templates = built
@@ -189,6 +190,7 @@ fn selected_test_collection_installs_its_quote_templates() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
     write(root, "i.toml", "name = \"app\"\n");
+    test_project::depend_on_library(root);
     write(
         root,
         "src/macros.is",

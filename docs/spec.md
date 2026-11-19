@@ -238,11 +238,13 @@ A test module may be imported only by test modules of the same package. Its expo
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the **library modules** (§9, §10, §13, §14, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
+- the dependency name `i`, for the **standard library** (§9, §10, §13, §14, §B.7.1); a package named `i` is the library itself and reaches its own modules this way;
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
 
 A module may only import modules that are named in this way. Then the rest of the path is the path of the module in that package, as that package names it. So with the dependency `json`, `json/decode` is the module `src/decode.i` of that package.
+
+The standard library is the versioned package that the dependency name `i` names; no library module is built into the compiler. The compiler injects only the prelude names (§2.7), which need no import. A package may not define a module whose path starts with `i` unless its own name is `i`: the standard library or a fork.
 
 Each package gives its own names to the packages it uses, so there is no space of package names that all packages share. All modules of the packages that a program uses, directly or through other packages, are compiled together. A type or a value is named by its package (§2.7), the path of its module in that package, and its name. So two definitions with the same name in different modules or packages are different, and two packages that give one dependency different names still use the same types.
 
@@ -426,8 +428,8 @@ check = "github.com/carol/check@2.1.0"
 exports = ["app/math.add"]                     # host exports (§10.2): module path, ".", function name
 ```
 
-- `name` must be a `name` (§1.3), and not `i`. It is only used inside the package. A package may have any `name`, and the packages that use it give it their own dependency names.
-- The key of a dependency is its **dependency name**. It must be a `name`, not `i`, not the `name` of this package, and not the same as another dependency name or dev-dependency name of this package.
+- `name` must be a `name` (§1.3). It is only used inside the package. A package may have any `name`, and the packages that use it give it their own dependency names. The name `i` is reserved for the standard library and a fork of it; such a package cannot have a dependency named `i`.
+- The key of a dependency is its **dependency name**. It must be a `name`, not the `name` of this package, and not the same as another dependency name or dev-dependency name of this package. The standard library is the dependency named `i`.
 - A **location** is the address of a git repository, without `https://`, for example `github.com/alice/json`. The repository is got with git from `https://` and the location. A location may end with `//` and a directory path, for a package that is in that directory of the repository. Any git host may be used; there is no central list of packages.
 - A version is `major.minor.patch`, three decimal numbers, as in Semantic Versioning.
 - `{ path = "…" }` is a package in a directory on this computer. Only the package that is compiled, and the packages that it gets by path, may have path dependencies. A package that is got by location may not have them.

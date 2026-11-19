@@ -26,7 +26,19 @@ fn shift(d: &mut Datum, n: u32) {
 #[test]
 fn template_sites_keep_call_and_template_locations() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!(
+            "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../stdlib")
+                .canonicalize()
+                .unwrap()
+                .to_str()
+                .unwrap()
+        ),
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     let main = "\nmain = () { fake() }\n";
     let template = "// (assert False)\nhelper = 1\n";
@@ -112,7 +124,19 @@ fn template_sites_keep_call_and_template_locations() {
 #[test]
 fn ordinary_sites_keep_the_same_wat_without_expansion_notes() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!(
+            "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../stdlib")
+                .canonicalize()
+                .unwrap()
+                .to_str()
+                .unwrap()
+        ),
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),

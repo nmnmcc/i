@@ -5,12 +5,17 @@ fn checked(source: &str) -> (Vec<String>, Vec<String>) {
     let (mut graph, _, _) = common::check_files(&[("src/main.i", source)]);
     // These are checker unit tests, independent of the task/effects port.
     // Fail is an ordinary service declared by the prelude.
-    graph.packages[graph.library].modules.retain(|m| {
-        matches!(
-            m.path.as_str(),
-            "$prelude" | "i/control" | "i/resource" | "i/core"
-        )
-    });
+    // The prelude is the built-in package; the library modules are in the
+    // dependency `i`.
+    let library = graph.standard_library().expect("the dependency `i`");
+    for package in [graph.library, library] {
+        graph.packages[package].modules.retain(|m| {
+            matches!(
+                m.path.as_str(),
+                "$prelude" | "i/control" | "i/resource" | "i/core"
+            )
+        });
+    }
     let checked = ilang_check::check(&graph);
     let errors = checked
         .diags

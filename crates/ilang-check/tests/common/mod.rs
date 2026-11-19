@@ -26,11 +26,40 @@ pub fn expect_unused(diags: &[Diagnostic], names: &[&str]) {
     assert_eq!(actual, expected);
 }
 
+/// The repository's `stdlib/`: the package `i`, the standard library. It is
+/// not built in; a test package has it as a path dependency.
+pub fn stdlib_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .expect("the repository has stdlib/")
+}
+
+/// The `[dependencies]` line of the standard library, as a path dependency
+/// on [`stdlib_dir`].
+pub fn stdlib_dependency() -> String {
+    format!(
+        "i = {{ path = {:?} }}\n",
+        stdlib_dir().display().to_string()
+    )
+}
+
+/// The `i.toml` of a package named `name` whose only dependency is the
+/// standard library.
+pub fn manifest(name: &str) -> String {
+    format!("name = {name:?}\n\n[dependencies]\n{}", stdlib_dependency())
+}
+
+/// Writes [`manifest`] of `name` into `dir`.
+pub fn write_manifest(dir: &std::path::Path, name: &str) {
+    fs::write(dir.join("i.toml"), manifest(name)).unwrap();
+}
+
 /// Writes a package named `app` with the given files into a new directory,
 /// then loads and checks it.
 pub fn check_files(files: &[(&str, &str)]) -> (PackageGraph, Option<Program>, Vec<Diagnostic>) {
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    write_manifest(dir.path(), "app");
     for (path, text) in files {
         let p = dir.path().join(path);
         fs::create_dir_all(p.parent().unwrap()).unwrap();
@@ -49,7 +78,7 @@ pub fn check_all_modules(
     files: &[(&str, &str)],
 ) -> (PackageGraph, Option<Program>, Vec<Diagnostic>) {
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    write_manifest(dir.path(), "app");
     for (path, text) in files {
         let p = dir.path().join(path);
         fs::create_dir_all(p.parent().unwrap()).unwrap();

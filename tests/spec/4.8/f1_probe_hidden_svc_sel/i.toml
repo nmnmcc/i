@@ -2,3 +2,6 @@
 # expect: compile-error E0501
 name = "probe"
 version = "0.1.0"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

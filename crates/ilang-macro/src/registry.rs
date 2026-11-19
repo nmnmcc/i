@@ -95,9 +95,7 @@ impl Registry {
             let mut layer: HashMap<String, (Value, bool)> = HashMap::new();
             for import in &p.ast.imports {
                 let first = &import.path[0].name;
-                let id = if first == "i" {
-                    Some(graph.library)
-                } else if *first == package.name {
+                let id = if *first == package.name {
                     Some(p.package)
                 } else {
                     package

@@ -23,7 +23,7 @@ main = () <- (io : Io) {
 False
 ```
 
-[bool](/docs/library/generated/std-bool) lists `not` among its exports; select an export for its declaration and source documentation.
+[bool](/docs/library/generated/i-bool) lists `not` among its exports; select an export for its declaration and source documentation.
 
 ## Text
 
@@ -52,7 +52,7 @@ héllo
 6
 ```
 
-[string](/docs/library/generated/std-string) documents index units and costs alongside its functions.
+[string](/docs/library/generated/i-string) documents index units and costs alongside its functions.
 
 ## Lists
 
@@ -74,7 +74,7 @@ main = () <- (io : Io) {
 [2, 4, 6]
 ```
 
-[list](/docs/library/generated/std-list) includes callback signatures.
+[list](/docs/library/generated/i-list) includes callback signatures.
 
 ## Parsed numbers
 
@@ -101,15 +101,15 @@ main = () <- (io : Io) {
 Error(Nil)
 ```
 
-[int](/docs/library/generated/std-int) documents accepted input and the `Fail(Nil)` service required for parsing.
+[int](/docs/library/generated/i-int) documents accepted input and the `Fail(Nil)` service required for parsing.
 
 ## Dependencies
 
-Add `std = { path = "../stdlib" }` under `[dependencies]` in `i.toml`; paths are package-relative. Test-only imports use `[dev-dependencies]`. Compiler-supplied `i/…` modules need no dependency.
+Add `i = "github.com/nmnmcc/i//stdlib@0.1.0"` under `[dependencies]` in `i.toml`, or a path for a fork. The key is the import prefix, so the modules are `i/…`.
 
 ## Modules
 
-**std:** [bit_array](/docs/library/generated/std-bit-array) · [bool](/docs/library/generated/std-bool) · [calendar](/docs/library/generated/std-calendar) · [cli](/docs/library/generated/std-cli) · [crypto](/docs/library/generated/std-crypto) · [csv](/docs/library/generated/std-csv) · [dict](/docs/library/generated/std-dict) · [float](/docs/library/generated/std-float) · [http](/docs/library/generated/std-http) · [int](/docs/library/generated/std-int) · [json](/docs/library/generated/std-json) · [list](/docs/library/generated/std-list) · [log](/docs/library/generated/std-log) · [option](/docs/library/generated/std-option) · [order](/docs/library/generated/std-order) · [pair](/docs/library/generated/std-pair) · [path](/docs/library/generated/std-path) · [property](/docs/library/generated/std-property) · [regex](/docs/library/generated/std-regex) · [result](/docs/library/generated/std-result) · [schema](/docs/library/generated/std-schema) · [sequence](/docs/library/generated/std-sequence) · [set](/docs/library/generated/std-set) · [stream](/docs/library/generated/std-stream) · [string](/docs/library/generated/std-string) · [time](/docs/library/generated/std-time) · [uri](/docs/library/generated/std-uri).
+**i:** [bit_array](/docs/library/generated/i-bit-array) · [bool](/docs/library/generated/i-bool) · [calendar](/docs/library/generated/i-calendar) · [cli](/docs/library/generated/i-cli) · [crypto](/docs/library/generated/i-crypto) · [csv](/docs/library/generated/i-csv) · [dict](/docs/library/generated/i-dict) · [float](/docs/library/generated/i-float) · [http](/docs/library/generated/i-http) · [int](/docs/library/generated/i-int) · [json](/docs/library/generated/i-json) · [list](/docs/library/generated/i-list) · [log](/docs/library/generated/i-log) · [option](/docs/library/generated/i-option) · [order](/docs/library/generated/i-order) · [pair](/docs/library/generated/i-pair) · [path](/docs/library/generated/i-path) · [property](/docs/library/generated/i-property) · [regex](/docs/library/generated/i-regex) · [result](/docs/library/generated/i-result) · [schema](/docs/library/generated/i-schema) · [sequence](/docs/library/generated/i-sequence) · [set](/docs/library/generated/i-set) · [stream](/docs/library/generated/i-stream) · [string](/docs/library/generated/i-string) · [time](/docs/library/generated/i-time) · [uri](/docs/library/generated/i-uri).
 
 **i:** [assertion](/docs/library/generated/i-assertion) · [big](/docs/library/generated/i-big) · [bits](/docs/library/generated/i-bits) · [clock](/docs/library/generated/i-clock) · [control](/docs/library/generated/i-control) · [core](/docs/library/generated/i-core) · [fail](/docs/library/generated/i-fail) · [fetch](/docs/library/generated/i-fetch) · [float_text](/docs/library/generated/i-float-text) · [fs](/docs/library/generated/i-fs) · [io](/docs/library/generated/i-io) · [key](/docs/library/generated/i-key) · [net](/docs/library/generated/i-net) · [process](/docs/library/generated/i-process) · [random](/docs/library/generated/i-random) · [request](/docs/library/generated/i-request) · [resource](/docs/library/generated/i-resource) · [stdio](/docs/library/generated/i-stdio) · [syntax](/docs/library/generated/i-syntax) · [task](/docs/library/generated/i-task) · [tls](/docs/library/generated/i-tls).
 

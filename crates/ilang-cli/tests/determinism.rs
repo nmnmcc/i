@@ -115,7 +115,7 @@ fn echo_builds_identically() {
 }
 
 #[test]
-fn project_using_std_builds_identically() {
-    // cli-log depends on std as a normal dependency.
+fn project_using_the_library_builds_identically() {
+    // cli-log depends on the library `i` as a normal dependency.
     check_project("cli-log", &example("cli-log"));
 }

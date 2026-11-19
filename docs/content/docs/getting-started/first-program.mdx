@@ -14,25 +14,16 @@ made the package `hello` in `hello`
 run it with `i run --project hello`
 ```
 
-Put `i` on `PATH`. The command creates `i.toml`, `.gitignore`, `src/main.i`, `test/main_test.i`, and a copy of the standard library in `stdlib/`; `i.toml` names that copy with `std = { path = "std" }` under `[dependencies]`, so the package needs no other source tree and stays portable when it moves.
+Put `i` on `PATH`. The command creates `i.toml`, `.gitignore`, `src/main.i`, and `test/main_test.i`. `i.toml` depends on the versioned standard library `i`:
 
-## The standard library copy
-
-The copy is 30 files, about 465 KiB: `i/i.toml`, `stdlib/UNICODE-LICENSE`, and the sources under `i/src`. It is an ordinary path dependency, so you can read and change it like your own code.
-
-`.gitignore` lists only `/build/`, so `stdlib/` is committed with the package and shipped by `i publish`. The copy keeps `stdlib/UNICODE-LICENSE` and the copyright and licence notices in its source files; keep them when you redistribute the package.
-
-No command refreshes the copy: `i update` manages versioned dependencies, but `stdlib/` is a plain directory. To move to a newer standard library, make a temporary package with the newer compiler and replace the directory:
-
-```sh
-i new refresh --path ../refresh
-rm -rf std
-cp -a ../refresh/std std
-rm -rf ../refresh
-i check
+```toml
+[dependencies]
+i = "github.com/nmnmcc/i//stdlib@0.1.0"
 ```
 
-If the package itself is named `std`, its copy cannot use the dependency key `std`, because a package cannot depend on itself. `i new std` names the key `stdlib`, and code imports the copy as `stdlib/int`.
+`i new` writes the newest published version as the minimum. The first check resolves it into the global cache and records the exact version, commit and content hash in `i.lock`; nothing is copied into the project. `i update i` raises the version, and the source is in `stdlib/` of the i repository. The standard library is not part of `i publish`.
+
+`collection = "i/test.tests"` registers this package's tests in the `tests` collection that the library declares in `i/test`.
 
 ## Program
 

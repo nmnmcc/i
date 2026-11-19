@@ -2,38 +2,67 @@
 #![allow(dead_code)]
 use std::path::Path;
 
-/// The manifest that `i new` writes: `std` is a portable dependency copied
-/// next to the program, not a local absolute path.
-pub fn new_manifest(name: &str) -> String {
-    // A package named `std` cannot depend on itself; `i new` uses another key.
-    let dependency = if name == "std" { "stdlib" } else { "std" };
+/// The location of the standard library, which `i new` depends on.
+pub const LIBRARY_PLACE: &str = "github.com/nmnmcc/i//stdlib";
+
+/// The manifest that `i new` writes for `name` when the newest tag of the
+/// standard library is `stdlib-v<version>`: the library `i` by location,
+/// with no machine path and no copied package.
+pub fn new_manifest(name: &str, version: &str) -> String {
     format!(
-        "name = {name:?}\n[test]\ncollection = \"i/test.tests\"\n[dependencies]\n{dependency} = {{ path = \"std\" }}\n"
+        "name = {name:?}\n[test]\ncollection = \"i/test.tests\"\n[dependencies]\ni = \"{LIBRARY_PLACE}@{version}\"\n"
     )
 }
 
-pub fn manifest(name: &str) -> String {
-    let std = Path::new(env!("CARGO_MANIFEST_DIR"))
+/// The standard library of this repository, `stdlib/`.
+pub fn library_dir() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../stdlib")
         .canonicalize()
-        .unwrap();
+        .unwrap()
+}
+
+/// A manifest for a package named `name` that depends on the standard
+/// library of this repository by path, and collects tests with `i/test`.
+pub fn manifest(name: &str) -> String {
     format!(
-        "name = {name:?}\n[test]\ncollection = \"i/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n",
-        std.to_str().unwrap()
+        "name = {name:?}\n[test]\ncollection = \"i/test.tests\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+        library_dir().to_str().unwrap()
     )
 }
 
+/// Makes the package in `project` collect tests with `i/test` and depend on
+/// the standard library of this repository by path. Other keys are kept.
+/// A package that will be got by location (as in the `i publish` tests)
+/// should have no path dependency; use [`configure_tests_only`] for it.
 pub fn configure(project: &Path) {
+    configure_in(project, "dependencies");
+}
+
+/// As [`configure`]: the library is a normal dependency even when only the
+/// tests import it, because a package's runtime modules are part of every
+/// compiled program and a fetched package never loads dev-dependencies.
+pub fn configure_tests_only(project: &Path) {
+    configure_in(project, "dependencies");
+}
+
+/// Makes the package in `project` depend on the standard library of this
+/// repository by path, as every root package must (E0641), without a test
+/// collection. Other keys are kept.
+pub fn depend_on_library(project: &Path) {
+    let path = project.join("i.toml");
+    let mut manifest: toml_edit::DocumentMut =
+        std::fs::read_to_string(&path).unwrap().parse().unwrap();
+    manifest["dependencies"]["i"]["path"] = toml_edit::value(library_dir().to_str().unwrap());
+    std::fs::write(path, manifest.to_string()).unwrap();
+}
+
+fn configure_in(project: &Path, table: &str) {
     let path = project.join("i.toml");
     let mut manifest: toml_edit::DocumentMut =
         std::fs::read_to_string(&path).unwrap().parse().unwrap();
     manifest["test"]["collection"] = toml_edit::value("i/test.tests");
-    manifest["dev-dependencies"]["std"]["path"] = toml_edit::value(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../stdlib")
-            .to_str()
-            .unwrap(),
-    );
+    manifest[table]["i"]["path"] = toml_edit::value(library_dir().to_str().unwrap());
     std::fs::write(path, manifest.to_string()).unwrap();
 }
 

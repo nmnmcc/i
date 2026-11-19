@@ -135,18 +135,27 @@ pub(crate) fn import_indices(
         .iter()
         .position(|m| m.kind == ilang_package::ModuleKind::Prelude)
         .expect("loaded graph includes the prelude");
-    let syntax = parsed
-        .iter()
-        .position(|m| m.package == graph.library && m.path == "i/syntax")
-        .expect("loaded graph includes compiler syntax module");
-    let mut queue = VecDeque::from([start, prelude, syntax]);
-    // The runtime calls these library modules, so every program has them.
-    queue.extend(ilang_package::library::RUNTIME.iter().map(|&path| {
+    // `i/syntax` and the runtime modules are in the library `i`, a
+    // dependency of the program (or the program itself), not built in: they
+    // are found by module path in whatever package has them.
+    let library_module = |path: &str| {
         parsed
             .iter()
-            .position(|m| m.package == graph.library && m.path == path)
-            .unwrap_or_else(|| panic!("loaded graph includes runtime module {path}"))
-    }));
+            .position(|m| m.kind != ilang_package::ModuleKind::Prelude && m.path == path)
+            .unwrap_or_else(|| {
+                panic!(
+                    "the parsed program has no library module `{path}`: a macro program needs the standard library `i` as a dependency, with `{path}` parsed"
+                )
+            })
+    };
+    let syntax = library_module("i/syntax");
+    let mut queue = VecDeque::from([start, prelude, syntax]);
+    // The runtime calls these library modules, so every program has them.
+    queue.extend(
+        ilang_package::library::RUNTIME
+            .iter()
+            .map(|&path| library_module(path)),
+    );
     let mut selected = BTreeSet::new();
     let mut errors = Vec::new();
     while let Some(index) = queue.pop_front() {
@@ -160,9 +169,7 @@ pub(crate) fn import_indices(
                 .path
                 .first()
                 .expect("parser guarantees a nonempty import path");
-            let id = if first.name == "i" {
-                Some(graph.library)
-            } else if first.name == package.name {
+            let id = if first.name == package.name {
                 Some(module.package)
             } else {
                 package

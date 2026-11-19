@@ -1,4 +1,5 @@
 //! The queries for editors (`ilang_check::query`) on small packages.
+mod common;
 
 use ilang_check::Checked;
 use ilang_check::hir::ModuleId;
@@ -16,7 +17,7 @@ impl Fixture {
     /// A package named `app` with these files.
     fn new(files: &[(&str, &str)]) -> Fixture {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        common::write_manifest(dir.path(), "app");
         for (path, text) in files {
             let p = dir.path().join(path);
             fs::create_dir_all(p.parent().unwrap()).unwrap();

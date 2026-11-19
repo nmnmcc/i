@@ -1,5 +1,5 @@
-//! Package loading: the package file, the modules of a package, the library
-//! package `i`, and the graph of packages that a program uses.
+//! Package loading: the package file, the modules of a package, the built-in
+//! package with the prelude, and the graph of packages that a program uses.
 //!
 //! A package is a directory with an `i.toml` file; every `.i` file under its
 //! `src/` or `test/` directory is a module of it. Packages with a location
@@ -224,8 +224,8 @@ pub enum ModuleKind {
     Src,
     /// A module under `test/`.
     Test,
-    /// The built-in names, written in i. It is in the package `i`, but
-    /// it may not be imported.
+    /// The built-in names, written in i. It is in the built-in package
+    /// ([`PackageGraph::library`]), and it may not be imported.
     Prelude,
 }
 
@@ -240,7 +240,7 @@ pub struct ModuleSource {
 #[derive(Clone, Debug)]
 pub struct Package {
     pub name: String,
-    /// The canonical directory. `None` for the library package `i`. For a
+    /// The canonical directory. `None` for the built-in package. For a
     /// package with a location, it is in the cache (see [`git`]).
     pub dir: Option<PathBuf>,
     pub manifest_source: Option<SourceId>,
@@ -295,12 +295,14 @@ impl PackageLocation {
     }
 }
 
-/// The packages of a program: the library package `i`, the compiled package,
-/// and its dependencies.
+/// The packages of a program: the built-in package with the prelude, the
+/// compiled package, and its dependencies (among them the library `i`).
 #[derive(Clone, Debug)]
 pub struct PackageGraph {
     pub sources: Sources,
     pub packages: Vec<Package>,
+    /// The built-in package (see [`library`]): only the prelude. The
+    /// library modules `i/...` are in the package named `i`.
     pub library: PackageId,
     /// The compiled package, or `None` when it could not be read.
     pub root: Option<PackageId>,
@@ -310,6 +312,77 @@ pub struct PackageGraph {
     /// Whether the program is compiled for test execution rather than with
     /// its normal entries and host exports.
     pub test_run: bool,
+}
+
+impl PackageGraph {
+    /// Whether a package is the standard library: a package named `i`
+    /// ([`LIBRARY_NAME`]), the dependency of every other package, or the
+    /// compiled package when it is the library itself.
+    pub fn is_standard_library(&self, id: PackageId) -> bool {
+        self.packages[id].name == LIBRARY_NAME
+    }
+
+    /// Whether a package is part of the language: the built-in package
+    /// with the prelude ([`PackageGraph::library`]) or the standard library.
+    /// Only these may use names kept for the runtime.
+    pub fn is_language(&self, id: PackageId) -> bool {
+        id == self.library || self.is_standard_library(id)
+    }
+
+    /// The content hash of the language: the modules of the built-in
+    /// prelude and of the standard library `i` ([`PackageGraph::is_language`]),
+    /// as [`lock::hash`] of their module paths and texts. It is the one
+    /// trusted package that a host grants: the host bindings declared in the
+    /// prelude or in `i` carry it (`ilang_wasm`), and the macro runner and
+    /// `i run` grant it. Other packages' bindings carry their own hash.
+    pub fn language_hash(&self) -> String {
+        use lock::{FileKind, PackageFile, hash};
+        let files = (0..self.packages.len())
+            .filter(|&id| self.is_language(id))
+            .flat_map(|id| &self.packages[id].modules)
+            .map(|m| PackageFile {
+                path: m.path.clone(),
+                kind: FileKind::Regular,
+                bytes: self.sources.get(m.source).text.as_bytes().to_vec(),
+            })
+            .collect::<Vec<_>>();
+        hash(&files)
+    }
+
+    /// The standard library package of the program: the compiled package
+    /// when it is named `i`, else its dependency (or dev-dependency) `i`,
+    /// else any package named `i`. `None` when there is none, which the
+    /// loader has reported ([`code::NO_LIBRARY`]).
+    pub fn standard_library(&self) -> Option<PackageId> {
+        if let Some(root) = self.root {
+            if self.is_standard_library(root) {
+                return Some(root);
+            }
+            let p = &self.packages[root];
+            if let Some(id) = p
+                .dependencies
+                .iter()
+                .chain(&p.dev_dependencies)
+                .find(|(n, _)| n == LIBRARY_NAME)
+                .and_then(|(_, id)| *id)
+            {
+                return Some(id);
+            }
+        }
+        (0..self.packages.len()).find(|&id| self.is_standard_library(id))
+    }
+
+    /// The module of the standard library with a module path, as
+    /// `(package, index in its modules)`, wherever the library is in the
+    /// graph.
+    pub fn standard_library_module(&self, path: &str) -> Option<(PackageId, usize)> {
+        let package = self.standard_library()?;
+        let index = self.packages[package]
+            .modules
+            .iter()
+            .position(|m| m.path == path)?;
+        Some((package, index))
+    }
 }
 
 /// How packages are loaded.
@@ -735,7 +808,6 @@ fn has_library(manifest: &Manifest) -> bool {
     manifest
         .dependencies
         .iter()
-        .chain(&manifest.dev_dependencies)
         .any(|d| d.name == LIBRARY_NAME)
 }
 

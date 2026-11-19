@@ -10,6 +10,19 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 fn example(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../examples")
@@ -57,7 +70,11 @@ fn retry_executable<T>(mut run: impl FnMut() -> std::io::Result<T>) -> std::io::
 fn package(dir: &Path, main: &str) -> PathBuf {
     let project = dir.join("app");
     std::fs::create_dir_all(project.join("src")).unwrap();
-    std::fs::write(project.join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        project.join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::write(project.join("src/main.i"), main).unwrap();
     project
 }
@@ -94,7 +111,10 @@ fn default_output_and_named_entries() {
     let manifest = project.join("i.toml");
     std::fs::write(
         &manifest,
-        "name = \"app\"\n\n[entries]\nother = \"main.other\"\n",
+        format!(
+            "name = \"app\"\n\n[entries]\nother = \"main.other\"\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     let out = i(&["build"], &project);
@@ -534,7 +554,10 @@ fn packages_need_the_program_entry() {
     );
     std::fs::write(
         project.join("i.toml"),
-        "name = \"app\"\n\n[wasm]\nexports = [\"app/main.double\"]\n",
+        format!(
+            "name = \"app\"\n\n[wasm]\nexports = [\"app/main.double\"]\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     let out = i(&["build"], &project);

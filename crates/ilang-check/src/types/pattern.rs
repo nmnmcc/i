@@ -1414,12 +1414,24 @@ fn field_vars(p: &Program, t: &Type, out: &mut Vec<TyVarId>, depth: usize) {
 #[cfg(test)]
 mod shared_place_tests {
     use super::*;
+    /// The `i.toml` of a package named `name` whose only dependency is the
+    /// standard library, the repository's `stdlib/`.
+    fn manifest(name: &str) -> String {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../stdlib")
+            .canonicalize()
+            .expect("the repository has stdlib/");
+        format!(
+            "name = {name:?}\n\n[dependencies]\ni = {{ path = {:?} }}\n",
+            dir.to_str().unwrap()
+        )
+    }
     #[test]
     fn written_occurrences_include_other_constructors_and_aliases() {
         // Count every written occurrence after aliases,
         // across every constructor of the family, before inference.
         let root = tempfile::tempdir().unwrap();
-        std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::write(root.path().join("i.toml"), manifest("app")).unwrap();
         std::fs::create_dir(root.path().join("src")).unwrap();
         std::fs::write(
             root.path().join("src/main.i"),

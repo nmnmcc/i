@@ -1,5 +1,7 @@
 //! Repository warning inventory. Run with UNUSED_AUDIT=<output directory>.
 //! Like wat_dump, this writes artifacts only when explicitly requested.
+mod common;
+
 use ilang_check::code;
 use ilang_package::{Diagnostic, ModuleKind};
 use ilang_syntax::{ast, span::LineIndex};
@@ -97,7 +99,7 @@ fn unused_audit() {
     }
     for path in &singles {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("i.toml"), "name = \"spec\"\n").unwrap();
+        common::write_manifest(dir.path(), "spec");
         std::fs::create_dir(dir.path().join("test")).unwrap();
         std::fs::copy(path, dir.path().join("test/case.i")).unwrap();
         bounded(

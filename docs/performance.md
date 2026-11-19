@@ -90,7 +90,7 @@ script gives instruction counts for the same things from now on.
 |---|---|
 | Library `catch` against the built-in `fail.catch`, with an error caught | 1.9 to 2.1 times as slow |
 | The same, with no error | 2.9 to 3.1 times as slow |
-| Float to text after the runtime moved into i (`lib/i/float_text.i`), typical values | about 3 times as slow as before |
+| Float to text after the runtime moved into i (`stdlib/src/float_text.i`), typical values | about 3 times as slow as before |
 | The same, largest float (max `Float`) | 2.0 times |
 | The same, `5e-324` (smallest subnormal) | 5.9 times |
 | `NUM` integer kernel (`integer` in `tests/perf/numeric`) at step N4 | about 15% slower |
@@ -721,7 +721,7 @@ wall-time observations, not guarantees for other filesystems or cache sizes.
 ## Large Int arithmetic in i
 
 Beyond the native fast paths, Int comparison, addition, subtraction,
-multiplication, division and remainder are implemented in `lib/i/big.i`.
+multiplication, division and remainder are implemented in `stdlib/src/big.i`.
 Operands are read by index with
 `size` and `limb`, in base 2^30. Each result is written into fresh private
 construction storage; that storage receives no writes after `finish`.

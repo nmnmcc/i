@@ -3,6 +3,10 @@
 //! The shown type of every top-level name, then the problems, are
 //! compared with `<case>.out` or `<case>/expected.out`. `library.out` has
 //! the types of the library modules. `UPDATE=1` writes the files.
+//! Every package has the standard library `i` (`stdlib/`) as a path
+//! dependency.
+
+mod common;
 
 use ilang_check::hir::{DefId, DefKind, ModuleId, Program, TypeRef};
 use ilang_check::identity::{PackageIdentity, TypeIdentity, type_identity};
@@ -56,7 +60,8 @@ fn output(graph: &PackageGraph, short: bool, library: bool) -> String {
         same_as_text(program, types);
         for (i, m) in program.modules.iter().enumerate() {
             let wanted = if library {
-                m.package == graph.library
+                // The prelude and the library `i`, a dependency.
+                graph.is_language(m.package)
             } else {
                 Some(m.package) == graph.root
             };
@@ -153,7 +158,7 @@ fn types() {
     for path in &entries {
         if path.extension().is_some_and(|e| e == "i") {
             let dir = tempfile::tempdir().unwrap();
-            fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+            common::write_manifest(dir.path(), "app");
             fs::create_dir_all(dir.path().join("src")).unwrap();
             fs::copy(path, dir.path().join("src/main.i")).unwrap();
             let (graph, diags) = ilang_package::load(dir.path());
@@ -185,7 +190,7 @@ fn types() {
 #[test]
 fn library() {
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    common::write_manifest(dir.path(), "app");
     let (graph, _) = ilang_package::load(dir.path());
     let actual = output(&graph, false, true);
     let mut failed = Vec::new();
@@ -226,7 +231,7 @@ fn many_uses_of_a_parameter() {
     let mut smallest = None;
     for n in [50, 100, 200] {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        common::write_manifest(dir.path(), "app");
         fs::create_dir_all(dir.path().join("src")).unwrap();
         fs::write(dir.path().join("src/main.i"), source_for(n)).unwrap();
         let (graph, diags) = ilang_package::load(dir.path());
@@ -253,7 +258,7 @@ fn shown_names_skip_types_and_ignore_written_variable_names() {
     // spelling of a declared variable. Need rows keep N; There is no
     // independent error channel on an unknown callback.
     let dir = tempfile::tempdir().unwrap();
-    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    common::write_manifest(dir.path(), "app");
     fs::create_dir(dir.path().join("src")).unwrap();
     fs::write(
         dir.path().join("src/main.i"),
@@ -287,7 +292,10 @@ fn scheme_types_know_each_type_by_what_it_is() {
     write("dep/src/u.i", "(\n\tT(..)\n)\nT = (String)\n");
     write(
         "app/i.toml",
-        "name = \"app\"\n[dependencies]\ndep = { path = \"../dep\" }\n",
+        &format!(
+            "name = \"app\"\n[dependencies]\ndep = {{ path = \"../dep\" }}\n{}",
+            common::stdlib_dependency()
+        ),
     );
     write("app/src/geo/u.i", "(\n\tT(..)\n)\nT = (Int)\n");
     write(

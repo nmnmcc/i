@@ -38,9 +38,7 @@ pub fn missing_module_message(
                 continue;
             }
             let (_, rest) = module.path.split_once('/').unwrap();
-            if target == graph.library {
-                alternatives.insert(format!("i/{rest}"));
-            } else if target == from {
+            if target == from {
                 alternatives.insert(format!("{}/{rest}", package.name));
             } else {
                 for (name, id) in package.dependencies.iter().chain(
@@ -125,9 +123,7 @@ impl Resolver<'_> {
             return Vec::new();
         };
         let mut prefixes = BTreeSet::new();
-        if target == self.graph.library {
-            prefixes.insert("i".to_string());
-        } else if target == here.package {
+        if target == here.package {
             prefixes.insert(package.name.clone());
         } else {
             for (name, id) in package.dependencies.iter().chain(

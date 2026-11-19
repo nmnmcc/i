@@ -3,6 +3,19 @@
 use ilang_syntax::{parse_module, print, syn3};
 use std::path::{Path, PathBuf};
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/syn3/block_nesting")
 }
@@ -48,7 +61,10 @@ fn a_round_tripped_program_keeps_scope_and_order() {
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        "name = \"block_nesting_roundtrip\"\n",
+        format!(
+            "name = \"block_nesting_roundtrip\"\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::write(dir.path().join("src/main.i"), &converted).unwrap();

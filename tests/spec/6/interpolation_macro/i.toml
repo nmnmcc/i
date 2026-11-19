@@ -1,3 +1,6 @@
 # spec: 1.6, 6.9, 13
 # expect: pass
 name = "spec"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

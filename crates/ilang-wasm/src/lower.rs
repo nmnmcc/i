@@ -910,7 +910,8 @@ struct Lowerer<'a> {
     external_funcs: HashMap<DefId, Option<FuncId>>,
     /// The content hash of each package that declares an import, computed
     /// once: hashing every source of the package per import was measured at
-    /// a twentieth of a test build.
+    /// a twentieth of a test build. For the prelude and the standard library
+    /// it is the language hash ([`PackageGraph::language_hash`]).
     package_hashes: HashMap<PackageId, String>,
     /// The services that an environment statement may provide lazily
     /// (`lazy_provide`), found before lowering: a call `x.f(…)` of an
@@ -1081,14 +1082,15 @@ impl<'a> Lowerer<'a> {
                 || (self.options.tests && self.options.target != ir::Target::Wasi))
     }
 
-    /// A definition of the library package, by module path and name.
+    /// A definition of the standard library `i`, by module path and name.
+    /// The library is a dependency (or the compiled package), not built in.
     fn library_def(&self, path: &str, name: &str) -> DefId {
         let (mi, m) = self
             .program
             .modules
             .iter()
             .enumerate()
-            .find(|(_, m)| m.path == path && m.package == self.graph.library)
+            .find(|(_, m)| m.path == path && self.graph.is_standard_library(m.package))
             .unwrap_or_else(|| panic!("library module {path}"));
         let index = m
             .defs
@@ -1101,8 +1103,9 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// Whether a module is in the prelude or the standard library `i`.
     fn is_library(&self, m: ModuleId) -> bool {
-        self.program.module(m).package == self.graph.library
+        self.graph.is_language(self.program.module(m).package)
     }
 
     fn number_types(&mut self) {
@@ -2072,7 +2075,15 @@ impl<'a> Lowerer<'a> {
                     .as_bytes()
                     .to_vec(),
             };
+            // The prelude and the standard library `i` are one trusted
+            // package, the language, with one hash for both, the one that the
+            // macro runner and `i run` grant. Other packages keep their own.
             let package_hash = match &package.location {
+                _ if self.graph.is_language(source_module.package) => self
+                    .package_hashes
+                    .entry(source_module.package)
+                    .or_insert_with(|| self.graph.language_hash())
+                    .clone(),
                 Some(location) => location.hash.clone(),
                 None => self
                     .package_hashes

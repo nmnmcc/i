@@ -606,7 +606,7 @@ fn spec_case_reverse_order_and_recovery(
     let project = if path.is_dir() {
         path.to_path_buf()
     } else {
-        std::fs::write(temp.path().join("i.toml"), "name = \"spec\"\n").unwrap();
+        common::write_manifest(temp.path(), "spec");
         std::fs::create_dir(temp.path().join("test")).unwrap();
         std::fs::copy(
             path,

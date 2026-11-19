@@ -1,4 +1,7 @@
 name = "app"
 
+[dependencies]
+i = { path = "../../../../stdlib" }
+
 [wasm]
 exports = ["app/main.call"]

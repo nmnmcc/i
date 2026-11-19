@@ -258,6 +258,8 @@ fn wasm_exports_and_editor_checks_have_the_same_roots() {
         dir.path().join("i.toml"),
         [
             "name = \"app\"",
+            "[dependencies]",
+            common::stdlib_dependency().trim_end(),
             "[wasm]",
             "exports = [\"app/helper.run\"]",
             "",

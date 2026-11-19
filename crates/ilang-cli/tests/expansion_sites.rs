@@ -6,6 +6,19 @@ use ilang_syntax::lisp::{
 };
 use std::collections::BTreeSet;
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 fn shift(d: &mut Datum, n: u32) {
     d.span.start += n;
     d.span.end += n;
@@ -26,7 +39,11 @@ fn shift(d: &mut Datum, n: u32) {
 #[test]
 fn template_stop_keeps_call_and_template_locations() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     let main = "\nmain = () { fake() }\n";
     let template = "// (assert False)\nhelper = 1\n";

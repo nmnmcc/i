@@ -5,9 +5,26 @@
 use ilang_cli::{BuildOptions, Level, build};
 use ilang_host::{HostOptions, Outcome, Program, services};
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 fn program(source: &str, opt: Level) -> Program {
     let directory = tempfile::tempdir().unwrap();
-    std::fs::write(directory.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        directory.path().join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::create_dir(directory.path().join("src")).unwrap();
     std::fs::write(directory.path().join("src/main.i"), source).unwrap();
     let built = build(
@@ -529,7 +546,11 @@ fn task_run_discharges_scheduler_in_the_printed_entry_need() {
     // its caller. Keep the exact program that exposed the leaked need.
     let source = include_str!("../../../tests/spec/9.9/task_run_environment_type.i");
     let directory = tempfile::tempdir().unwrap();
-    std::fs::write(directory.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        directory.path().join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::create_dir(directory.path().join("src")).unwrap();
     std::fs::write(directory.path().join("src/main.i"), source).unwrap();
     let output = std::process::Command::new(env!("CARGO_BIN_EXE_i"))

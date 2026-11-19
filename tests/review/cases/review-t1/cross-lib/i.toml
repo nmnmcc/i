@@ -1,1 +1,4 @@
 name="lib"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

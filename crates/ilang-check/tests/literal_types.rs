@@ -1,4 +1,6 @@
 //! Interpretation checks: expectations come from literal-types, not snapshots.
+mod common;
+
 use ilang_check::types::Typed;
 
 fn check(source: &str) -> (Vec<(String, String)>, Vec<String>) {
@@ -7,14 +9,7 @@ fn check(source: &str) -> (Vec<(String, String)>, Vec<String>) {
 
 fn check_export(source: &str, export: bool) -> (Vec<(String, String)>, Vec<String>) {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(
-        dir.path().join("i.toml"),
-        format!(
-            "name = \"app\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib")
-        ),
-    )
-    .unwrap();
+    std::fs::write(dir.path().join("i.toml"), common::manifest("app")).unwrap();
     if export {
         use std::io::Write;
         let mut f = std::fs::OpenOptions::new()

@@ -1,3 +1,4 @@
 name = "syn3_block_nesting"
 
 [dependencies]
+i = { path = "../../../stdlib" }
