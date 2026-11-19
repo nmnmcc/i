@@ -6,6 +6,7 @@
 	dict = std/dict
 	int = std/int
 	list = std/list
+	option = (Some) = std/option
 )
 
 check = (ok : Bool, what : String) -> () {
@@ -58,10 +59,10 @@ test("diag3_merge_count", () {
 // Build the accumulator cells but skip the final reverse and append.
 merge_no_finish = (xs : List(Int), ys : List(Int), acc : List(Int), n : Int) -> Int {
 	xs |>
-		([]) { n + list.length(acc) + list.length(ys) }
+		([]) { n + list.length(ys) }
 		& ([x, ..xs2]) {
 			ys |>
-				([]) { n + list.length(acc) + list.length(xs) }
+				([]) { n + list.length(xs) }
 				& ([y, ..ys2]) {
 					{ x > y } |>
 						(True) { merge_no_finish(xs, ys2, [y, ..acc], n + 1) }
