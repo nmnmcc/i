@@ -215,8 +215,8 @@ fn imports_are_followed_through_dependency_packages() {
 }
 
 /// Of the library, a program with no imports has the prelude, the
-/// runtime modules, and `i/fail` (every entry calls it), with their
-/// imports, in the order of the graph.
+/// runtime modules, and the modules that code generation calls
+/// (`CODEGEN_LIBRARY`), with their imports, in the order of the graph.
 #[test]
 fn library_modules_are_parsed_only_when_reached() {
     let (_dir, graph) = load(&[], &[("src/main.i", "main = () { Nil }\n")], &[]);
@@ -226,10 +226,15 @@ fn library_modules_are_parsed_only_when_reached() {
             "i/prelude",
             "i/fail",
             "i/control",
+            "i/resource",
+            "i/request",
+            "i/key",
             "i/core",
             "i/float_text",
             "i/big",
             "i/bits",
+            "i/task",
+            "i/random",
             "app/main"
         ]
     );
@@ -241,7 +246,9 @@ fn library_modules_are_parsed_only_when_reached() {
     let paths = parsed_paths(&graph);
     assert!(paths.contains(&"i/io".to_string()), "{paths:?}");
     assert!(!paths.contains(&"i/net".to_string()), "{paths:?}");
-    assert!(!paths.contains(&"i/task".to_string()), "{paths:?}");
+    for unreached in ["i/fs", "i/process", "i/tls", "i/fetch", "i/stdio"] {
+        assert!(!paths.contains(&unreached.to_string()), "{paths:?}");
+    }
 }
 
 /// A `[wasm]` export may name a dependency module that nothing imports.

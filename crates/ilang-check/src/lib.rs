@@ -167,8 +167,8 @@ impl Clone for Parsed {
 /// Parses the modules of the program. Syntax errors keep their codes.
 ///
 /// Every module of the compiled package is parsed, and so are the prelude,
-/// the runtime modules ([`ilang_package::library::RUNTIME`] and `i/fail`,
-/// which every entry calls), and the
+/// the runtime modules ([`ilang_package::library::RUNTIME`]), the library
+/// modules that code generation calls ([`CODEGEN_LIBRARY`]), and the
 /// modules named by the compiled package's manifest (`[wasm]` exports and
 /// entries). A module of another package (the library `i` or a dependency)
 /// is parsed only when one of those reaches it through imports; an
@@ -199,7 +199,7 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             queue.push_back((graph.library, i));
         }
     }
-    for path in ilang_package::library::RUNTIME.iter().chain(ENTRY_RUNTIME) {
+    for path in ilang_package::library::RUNTIME.iter().chain(CODEGEN_LIBRARY) {
         if let Some(&i) = index.get(&(graph.library, *path)) {
             queue.push_back((graph.library, i));
         }
@@ -274,10 +274,16 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     (out, diags)
 }
 
-/// Library modules that code generation calls for every entry, whether or
-/// not the program imports them: the entry wrapper ends with `fail.catch`
-/// and `fail.from_result` (`ilang_wasm::lower`, `provider_finish`).
-const ENTRY_RUNTIME: &[&str] = &["i/fail"];
+/// Library modules that code generation calls by path, whether or not the
+/// program imports them (`ilang_wasm::lower`, `Lowerer::library_callee`):
+/// entry wrappers end with `fail.catch` / `fail.from_result`
+/// (`provider_finish`), install the request providers
+/// (`request._provider_root`, `_provider_owner`, `_provider_await`), wait
+/// with `request.await_owned`, and run tasks with `task._provider_runner`
+/// and `task.run`. [`parse`] always parses them with the prelude and
+/// [`ilang_package::library::RUNTIME`]; their own imports are followed as
+/// usual.
+pub const CODEGEN_LIBRARY: &[&str] = &["i/fail", "i/request", "i/task"];
 
 /// Parses every module of the graph, also those that no import reaches.
 pub fn parse_all(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
