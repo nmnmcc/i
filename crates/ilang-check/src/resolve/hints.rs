@@ -65,25 +65,69 @@ pub fn missing_module_message(
     message
 }
 
+/// The exports of a module of the graph that was not parsed because no
+/// import reaches it. Advice names it as if it had been parsed.
+pub(super) struct HintModule {
+    pub package: PackageId,
+    pub path: String,
+    pub kind: ModuleKind,
+    /// Exported values, macros, and constructors.
+    pub values: HashSet<String>,
+    /// Exported types.
+    pub types: HashSet<String>,
+}
+
 impl Resolver<'_> {
+    /// The modules of the graph that were not parsed, with their exports.
+    /// They are parsed here, only when advice is given, and not reported:
+    /// a module with a syntax error is left out.
+    fn unparsed(&self) -> &[HintModule] {
+        if !self.hint_unparsed {
+            return &[];
+        }
+        self.hint_index.get_or_init(|| {
+            let mut extra = Vec::new();
+            for (package, p) in self.graph.packages.iter().enumerate() {
+                for m in &p.modules {
+                    if self.by_path.contains_key(&(package, m.path.clone())) {
+                        continue;
+                    }
+                    let (parsed, errors) = crate::parse_one(self.graph, package, m);
+                    if errors.is_empty() {
+                        extra.push(parsed);
+                    }
+                }
+            }
+            if extra.is_empty() {
+                return Vec::new();
+            }
+            export_index(self.graph, &extra)
+        })
+    }
+
     /// Import spellings from the current package, including dependency aliases.
     fn import_paths(&self, target: ModuleId) -> Vec<String> {
-        let here = self.p.module(self.cur);
+        if target == self.cur {
+            return Vec::new();
+        }
         let module = self.p.module(target);
-        if target == self.cur
-            || module.kind == ModuleKind::Prelude
-            || module.kind == ModuleKind::Test && here.kind != ModuleKind::Test
+        self.import_paths_of(module.package, &module.path, module.kind)
+    }
+
+    fn import_paths_of(&self, target: PackageId, path: &str, kind: ModuleKind) -> Vec<String> {
+        let here = self.p.module(self.cur);
+        if kind == ModuleKind::Prelude || kind == ModuleKind::Test && here.kind != ModuleKind::Test
         {
             return Vec::new();
         }
         let package = &self.graph.packages[here.package];
-        let Some((_, rest)) = module.path.split_once('/') else {
+        let Some((_, rest)) = path.split_once('/') else {
             return Vec::new();
         };
         let mut prefixes = BTreeSet::new();
-        if module.package == self.graph.library {
+        if target == self.graph.library {
             prefixes.insert("i".to_string());
-        } else if module.package == here.package {
+        } else if target == here.package {
             prefixes.insert(package.name.clone());
         } else {
             for (name, id) in package.dependencies.iter().chain(
@@ -92,7 +136,7 @@ impl Resolver<'_> {
                     .iter()
                     .filter(|_| here.kind == ModuleKind::Test),
             ) {
-                if *id == Some(module.package) {
+                if *id == Some(target) {
                     prefixes.insert(name.clone());
                 }
             }
@@ -135,6 +179,21 @@ impl Resolver<'_> {
                     format!(
                         "Add `{name}` to the names in your existing import of `{path}`, or use `{alias}.{name}`."
                     )
+                } else {
+                    format!("Import `({name}) = {path}` to use `{name}`.")
+                };
+                candidates.insert((!is_module, path, advice));
+            }
+        }
+        for module in self.unparsed() {
+            let is_module = module.path.rsplit('/').next() == Some(name);
+            let is_export = !module_only && module.values.contains(name);
+            if !is_module && !is_export {
+                continue;
+            }
+            for path in self.import_paths_of(module.package, &module.path, module.kind) {
+                let advice = if is_module {
+                    format!("Import `{path}` to use the module `{name}`.")
                 } else {
                     format!("Import `({name}) = {path}` to use `{name}`.")
                 };
@@ -190,6 +249,19 @@ impl Resolver<'_> {
                         ty.name, ty.name
                     )
                 };
+                candidates.insert((path, advice));
+            }
+        }
+        for module in self.unparsed() {
+            if !module.types.contains(&original.name) {
+                continue;
+            }
+            for path in self.import_paths_of(module.package, &module.path, module.kind) {
+                let alias = path.rsplit('/').next().unwrap();
+                let advice = format!(
+                    "`{path}` also exports a type named `{}`. Import `{path}` and use `{alias}.{}` if that is the type you intended.",
+                    original.name, original.name
+                );
                 candidates.insert((path, advice));
             }
         }

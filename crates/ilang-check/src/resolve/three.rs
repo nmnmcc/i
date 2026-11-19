@@ -46,11 +46,122 @@ pub fn resolve3(
     modules: &[n::Module],
     transitions: &[ilang_syntax::syn3::facts::Transition],
     report_errors: bool,
+    hint_unparsed: bool,
 ) -> (Program, Vec<Diagnostic>) {
     assert_eq!(parsed.len(), modules.len());
     ilang_syntax::syn3::deep::deep(|| {
-        resolve_here(graph, parsed, modules, transitions, report_errors)
+        resolve_here(
+            graph,
+            parsed,
+            modules,
+            transitions,
+            report_errors,
+            hint_unparsed,
+        )
     })
+}
+
+/// A resolver with no modules yet.
+fn fresh<'a>(
+    graph: &'a PackageGraph,
+    parsed: &'a [Parsed],
+    diags: Vec<Diagnostic>,
+    hint_unparsed: bool,
+) -> Resolver<'a> {
+    Resolver {
+        graph,
+        parsed,
+        p: Program {
+            package_identities: (0..graph.packages.len())
+                .map(|id| crate::identity::package_identity(graph, id))
+                .collect(),
+            ..Program::default()
+        },
+        diags,
+        generated_values: Vec::new(),
+        generated_types: Vec::new(),
+        defs_by_name: Vec::new(),
+        macros_by_name: Vec::new(),
+        types_by_name: Vec::new(),
+        ctors_by_name: Vec::new(),
+        slots: Vec::new(),
+        scopes: Vec::new(),
+        by_path: HashMap::new(),
+        builtin_values: HashMap::new(),
+        builtin_types: HashMap::new(),
+        cur: ModuleId(0),
+        locals: Vec::new(),
+        fn_depth: 0,
+        ty_frames: Vec::new(),
+        ty_def: None,
+        circular: HashSet::new(),
+        pending: Vec::new(),
+        reserved: Vec::new(),
+        def_tables: HashMap::new(),
+        local_tables: HashMap::new(),
+        checked_inputs: None,
+        hint_unparsed,
+        hint_index: std::cell::OnceCell::new(),
+    }
+}
+
+/// The exported names of each module, from the first pass over top-level
+/// definitions alone: the export flags are all set by that pass. Only for
+/// repair advice; nothing is reported.
+pub(super) fn export_index(
+    graph: &PackageGraph,
+    parsed: &[Parsed],
+    modules: &[n::Module],
+    transitions: &[ilang_syntax::syn3::facts::Transition],
+) -> Vec<super::hints::HintModule> {
+    let pre = pres(graph, parsed, modules, transitions);
+    let mut r = R3 {
+        r: fresh(graph, parsed, Vec::new(), false),
+        modules,
+        pre: &pre,
+    };
+    r.create_modules();
+    for m in 0..parsed.len() as u32 {
+        r.collect(ModuleId(m));
+    }
+    let r = r.r;
+    parsed
+        .iter()
+        .enumerate()
+        .map(|(mi, module)| {
+            let mut values: HashSet<String> = r.p.modules[mi]
+                .defs
+                .iter()
+                .filter(|d| d.exported)
+                .map(|d| d.name.clone())
+                .collect();
+            values.extend(
+                r.macros_by_name[mi]
+                    .iter()
+                    .filter(|(_, exported)| **exported)
+                    .map(|(name, _)| name.clone()),
+            );
+            values.extend(
+                r.ctors_by_name[mi]
+                    .iter()
+                    .filter(|(_, c)| r.p.ty(c.ty).constructors_exported)
+                    .map(|(name, _)| name.clone()),
+            );
+            let types =
+                r.p.types
+                    .iter()
+                    .filter(|t| t.module.0 as usize == mi && t.exported)
+                    .map(|t| t.name.clone())
+                    .collect();
+            super::hints::HintModule {
+                package: module.package,
+                path: module.path.clone(),
+                kind: module.kind,
+                values,
+                types,
+            }
+        })
+        .collect()
 }
 
 fn pres(
@@ -80,6 +191,7 @@ fn resolve_here(
     modules: &[n::Module],
     transitions: &[ilang_syntax::syn3::facts::Transition],
     report_errors: bool,
+    hint_unparsed: bool,
 ) -> (Program, Vec<Diagnostic>) {
     let pre = pres(graph, parsed, modules, transitions);
     let mut diags = Vec::new();
@@ -91,39 +203,7 @@ fn resolve_here(
         }
     }
     let mut r = R3 {
-        r: Resolver {
-            graph,
-            parsed,
-            p: Program {
-                package_identities: (0..graph.packages.len())
-                    .map(|id| crate::identity::package_identity(graph, id))
-                    .collect(),
-                ..Program::default()
-            },
-            diags,
-            generated_values: Vec::new(),
-            generated_types: Vec::new(),
-            defs_by_name: Vec::new(),
-            macros_by_name: Vec::new(),
-            types_by_name: Vec::new(),
-            ctors_by_name: Vec::new(),
-            slots: Vec::new(),
-            scopes: Vec::new(),
-            by_path: HashMap::new(),
-            builtin_values: HashMap::new(),
-            builtin_types: HashMap::new(),
-            cur: ModuleId(0),
-            locals: Vec::new(),
-            fn_depth: 0,
-            ty_frames: Vec::new(),
-            ty_def: None,
-            circular: HashSet::new(),
-            pending: Vec::new(),
-            reserved: Vec::new(),
-            def_tables: HashMap::new(),
-            local_tables: HashMap::new(),
-            checked_inputs: None,
-        },
+        r: fresh(graph, parsed, diags, hint_unparsed),
         modules,
         pre: &pre,
     };
@@ -283,6 +363,8 @@ fn typed_output_here(
             def_tables: HashMap::new(),
             local_tables: HashMap::new(),
             checked_inputs: Some(checked),
+            hint_unparsed: true,
+            hint_index: std::cell::OnceCell::new(),
         },
         modules: &modules,
         pre: &pre,

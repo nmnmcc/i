@@ -42,6 +42,12 @@ fn output(graph: &PackageGraph, short: bool, library: bool) -> String {
             })
             .collect::<Vec<_>>();
         ilang_check::check_resolved_selected(graph, program, diags, &selected)
+    } else if library {
+        // `check` parses only the library modules a program reaches; the
+        // library table covers every library module.
+        let (parsed, diags) = ilang_check::parse_all(graph);
+        assert!(diags.is_empty(), "{diags:?}");
+        ilang_check::check_parsed(graph, &parsed)
     } else {
         ilang_check::check(graph)
     };

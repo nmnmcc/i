@@ -42,6 +42,32 @@ pub fn check_files(files: &[(&str, &str)]) -> (PackageGraph, Option<Program>, Ve
     (graph, checked.program, diags)
 }
 
+/// Like [`check_files`], but checks every module of the graph, also the
+/// library and dependency modules that no import reaches (which
+/// [`ilang_check::parse`] leaves out). For tests about the library itself.
+pub fn check_all_modules(
+    files: &[(&str, &str)],
+) -> (PackageGraph, Option<Program>, Vec<Diagnostic>) {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    for (path, text) in files {
+        let p = dir.path().join(path);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, text).unwrap();
+    }
+    let (graph, mut diags) = ilang_package::load(dir.path());
+    let checked = check_all_parsed(&graph);
+    diags.extend(checked.diags);
+    (graph, checked.program, diags)
+}
+
+/// [`ilang_check::check`] over every module of the graph.
+pub fn check_all_parsed(graph: &PackageGraph) -> ilang_check::Checked {
+    let (parsed, diags) = ilang_check::parse_all(graph);
+    assert!(diags.is_empty(), "{diags:?}");
+    ilang_check::check_parsed(graph, &parsed)
+}
+
 pub fn module(program: &Program, path: &str) -> ModuleId {
     let i = program.modules.iter().position(|m| m.path == path).unwrap();
     ModuleId(i as u32)

@@ -7,7 +7,7 @@ use ilang_check::hir::{DefKind, TypeBody};
 
 #[test]
 fn library_resolves_cleanly() {
-    let (graph, program, diags) = common::check_files(&[]);
+    let (graph, program, diags) = common::check_all_modules(&[]);
     let rendered = graph.sources.render_all(&diags);
     assert!(rendered.is_empty(), "{rendered:#?}");
     let program = program.unwrap();
@@ -45,7 +45,7 @@ fn library_resolves_cleanly() {
 /// with the text of the list.
 #[test]
 fn library_modules_have_sources() {
-    let (graph, _, _) = common::check_files(&[]);
+    let (graph, _, _) = common::check_all_modules(&[]);
     let package = &graph.packages[graph.library];
     let registered = std::iter::once(ilang_package::library::PRELUDE)
         .chain(ilang_package::library::MODULES.iter().copied());
@@ -65,7 +65,7 @@ fn library_modules_have_sources() {
 /// The exported names of each library module.
 #[test]
 fn library_names() {
-    let (_, program, _) = common::check_files(&[]);
+    let (_, program, _) = common::check_all_modules(&[]);
     let program = program.unwrap();
     let expect: &[(&str, &[&str])] = &[
         ("i/fail", &["raise", "catch", "from_result", "map_error"]),
@@ -337,8 +337,8 @@ fn library_names() {
 /// `control.suspend: (Boundary(…), (Continuation(…)) -> …) -> A`.
 #[test]
 fn library_labels() {
-    let (graph, _, _) = common::check_files(&[]);
-    let checked = ilang_check::check(&graph);
+    let (graph, _, _) = common::check_all_modules(&[]);
+    let checked = common::check_all_parsed(&graph);
     assert!(
         !checked.diags.iter().any(|d| d.is_error()),
         "{:?}",
@@ -381,7 +381,7 @@ fn library_labels() {
 /// The built-in custom types are in the prelude.
 #[test]
 fn prelude_types() {
-    let (_, program, _) = common::check_files(&[]);
+    let (_, program, _) = common::check_all_modules(&[]);
     let program = program.unwrap();
     let prelude = program.prelude.unwrap();
     let mut found: Vec<(String, Vec<String>)> = program
