@@ -103,3 +103,14 @@ Acceptance in one paired run (same machine, five alternating rounds):
 
 If the first measurement is under -15%, stop and revisit; do not grow the pass
 into general monomorphization.
+
+## Verification before merge
+
+The merge criterion is one: the head commit of the pull request has a complete
+successful CI run. A documentation commit pushed on top of a verified code
+commit does not extend that verification. In particular, `[skip ci]` skips the
+workflow for that commit but the commit still joins the workflow's concurrency
+group and cancels the run of the code commit still in flight; the head then has
+no check at all. Either rebase or amend documentation into the code commit
+before pushing, or let the documentation commit trigger its own full run and
+wait for it to finish.
