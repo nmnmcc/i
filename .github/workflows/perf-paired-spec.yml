@@ -1,0 +1,73 @@
+# Paired comparison of current main and the known-function-argument
+# specialization, on one runner. Started by a push to this file.
+name: Perf paired specialize
+
+on:
+  push:
+    branches: [ci/perf-baseline]
+    paths: [.github/workflows/perf-paired-spec.yml]
+
+permissions:
+  contents: read
+
+env:
+  BASELINE_RUN: "44503007673"
+  # Filled in when the Perf build specialize run has produced its artifact.
+  SPEC_RUN: "44524349990"
+  RAYON_NUM_THREADS: 1
+  REPEATS: "5"
+
+jobs:
+  paired:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: a906931b9166b650f14d1d96d1100daa54fd5e51
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-current
+          path: bin/current
+          run-id: ${{ env.BASELINE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-spec
+          path: bin/spec
+          run-id: ${{ env.SPEC_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of both binaries
+        run: |
+          for b in current spec; do
+            chmod +x "bin/$b/i"
+            xargs nix-store --realise < "bin/$b/i.nix-paths" > /dev/null
+            "bin/$b/i" --version
+          done
+          mkdir -p out
+          { uname -a; nproc; lscpu; free -h; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+      - name: Alternate the two binaries
+        run: |
+          set -x
+          for r in $(seq 1 "$REPEATS"); do
+            if [ $((r % 2)) -eq 1 ]; then order="current spec"; else order="spec current"; fi
+            for b in $order; do
+              cat /proc/loadavg > "out/load-$r-$b.txt"
+              /usr/bin/time -v -o "out/time-$r-$b.txt" \
+                "bin/$b/i" test --project bench --opt 2 --time \
+                > "out/run-$r-$b.log" 2> "out/stderr-$r-$b.log"
+              grep -hE "^pass bench/bench_test" "out/run-$r-$b.log"
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-paired-spec-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
