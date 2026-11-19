@@ -445,7 +445,7 @@
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "crates/ilang-cli/src/commands/package.rs:826bab0a71cc61a4": {
-    "suffix": "f: () -> ()\n",
+    "suffix": "f: () -> Nil\n",
     "substitutions": [
       [
         "{module}",
@@ -940,7 +940,7 @@
     ],
     "track": "T3"
   },
-  "tests/review/cases/review-runtime/echo-types/.invalid/src/main.i:033c3a6c2411563f": {
+  "tests/review/cases/review-runtime/echo-types/.invalid/src/main.i:7359196926a3b5f2": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0110: an item by position may not come after an item by label",
@@ -949,7 +949,7 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-std1/stream/.invalid/src/stream.i:2bd0f8ec00250ab9": {
+  "tests/review/cases/review-std1/stream/.invalid/src/stream.i:1d8d57936a119a04": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
@@ -980,7 +980,7 @@
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
     ]
   },
-  "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:2bd0f8ec00250ab9": {
+  "tests/review/cases/review-std1/stream-positive/.invalid/src/stream.i:1d8d57936a119a04": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin.",
     "diagnostics": [
       "E0101: expected an expression, found `)`",
@@ -1021,7 +1021,7 @@
     "not_source": true,
     "reason": "Generated TOML manifest for the isolated interval measurement package; this is not i source."
   },
-  "crates/ilang-wasm/tests/codegen.rs:0521135b5af7674d": {
+  "crates/ilang-wasm/tests/codegen.rs:7f62a28b86ea4a86": {
     "prefix": "(i/control)\nf = (b, x) { a1 = x\n",
     "substitutions": [
       [
@@ -1075,31 +1075,31 @@
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
+  "tests/review/cases/review-a1/_loose/confirmed/capture-from-old/original/.invalid/src/main.i:0a893e968d3624cd": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:2eeb5a5afc1cebae": {
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/once/.invalid/src/main.i:0a893e968d3624cd": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
+  "tests/review/cases/review-a1/_loose/confirmed/capture-keep-layout/original/.invalid/src/main.i:0a893e968d3624cd": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:2eeb5a5afc1cebae": {
+  "tests/review/cases/review-a1/_loose/confirmed/capture-plain/original/.invalid/src/main.i:0a893e968d3624cd": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:6100ddd868490a15": {
+  "tests/review/cases/review-a1/_loose/runtime-new/03/original/.invalid/src/main.i:0663c6ec83481901": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0115: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file",
@@ -1107,31 +1107,31 @@
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:6167fd29bbd38815": {
+  "tests/review/cases/review-a1/_loose/runtime/17/original/.invalid/src/main.i:3a6d243c7248614a": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
-  "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:eb2f2775666edf45": {
+  "tests/review/cases/review-a1/_loose/runtime/20/original/.invalid/src/main.i:90e56e02654c5bd4": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0105: a block ends with an expression"
     ]
   },
-  "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:b40bf9426d491496": {
+  "tests/review/cases/review-a1/_loose/runtime/21/original/.invalid/src/main.i:dd7efdfe79d7c1f8": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0105: a block ends with an expression"
     ]
   },
-  "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:b40bf9426d491496": {
+  "tests/review/cases/review-a1/runtime/21/.invalid/src/main.i:dd7efdfe79d7c1f8": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0105: a block ends with an expression"
     ]
   },
-  "tests/review/cases/review-native3/alias/.invalid/src/main.i:29277826a986d622": {
+  "tests/review/cases/review-native3/alias/.invalid/src/main.i:79753173e5d05fb8": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
-  "tests/review/cases/review-native3/direct/.invalid/src/main.i:2fcdef033b2b0fe3": {
+  "tests/review/cases/review-native3/direct/.invalid/src/main.i:9706d304a148858b": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/field/.invalid/src/main.i:9cca1d56794833b3": {
@@ -1152,36 +1152,36 @@
       "E0101: expected `,`, `?` or `)`, found `!`"
     ]
   },
-  "tests/review/cases/review-native3/positive/.invalid/src/main.i:05223b2c9df25096": {
+  "tests/review/cases/review-native3/positive/.invalid/src/main.i:70795c57667c54a7": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0001: i has no `!` operator. To negate a Boolean `x`, import `i/core` and write `core.not(x)`.",
       "E0101: expected an expression, found `!`"
     ]
   },
-  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:d1e513c0f4edab11": {
+  "tests/review/cases/review-native3/raw_ctor/.invalid/src/main.i:1add8bba64fe41d6": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
-  "tests/spec/1.7/a1_same_line_negative.i:13c31898de80a63a": {
+  "tests/spec/1.7/a1_same_line_negative.i:36a7b8aebe802235": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
       "E0101: expected an expression, found `->`"
     ]
   },
-  "tests/spec/2.2/a1_empty_header.i:1e1dadc9eac538e0": {
+  "tests/spec/2.2/a1_empty_header.i:8b67d8aab12b6772": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0115: a file with nothing to import or export leaves the group out"
     ]
   },
-  "tests/spec/2.2/a1_header_order.i:6b727ececa1a4d55": {
+  "tests/spec/2.2/a1_header_order.i:019af1373dfc7268": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0115: the imports come before the exports"
     ]
   },
-  "tests/spec/2.2/a1_macro_attribute_same_line.i:468afe62335bfdb0": {
+  "tests/spec/2.2/a1_macro_attribute_same_line.i:7900668e308062c1": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: expected an item: a type definition, or a binding `pattern = value`, found `=`"
@@ -1238,7 +1238,7 @@
       "E0101: a label in data is written `label = value`; `:` only gives a type to a pattern"
     ]
   },
-  "crates/ilang-check/tests/front_end.rs:1b999808f689275a": {
+  "crates/ilang-check/tests/front_end.rs:6c94116f096e14ab": {
     "reason": "Checker rejects the removed attribute.",
     "diagnostics": [
       "E0301: removed @main attribute"
@@ -1255,7 +1255,7 @@
     "not_source": true
   },
   "crates/ilang-syntax/tests/lex.rs:ddde3fac3dd9ded9": {
-    "suffix": "\nf = () { () }\n",
+    "suffix": "\nf = () { Nil }\n",
     "reason": "An annotation token tested by the lexer, with its item"
   },
   "crates/ilang-check/tests/expansion_origins.rs:180e6929bae4a332": {
@@ -1390,7 +1390,7 @@
       "E0002: this string is not closed"
     ]
   },
-  "tests/spec/6/interpolation_import.i:ecd8ff798c1c584a": {
+  "tests/spec/6/interpolation_import.i:4f0a16bec973f449": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
       "E0101: expected an UpName, found `a string`"
@@ -1402,7 +1402,7 @@
       "E0101: expected a type, found `a string`"
     ]
   },
-  "tests/spec/6/interpolation_pattern.i:88e260862f055ddf": {
+  "tests/spec/6/interpolation_pattern.i:de4fa7cdd34a3a60": {
     "reason": "STR negative case: literal-only context, malformed delimiter/indentation, or invalid string pattern.",
     "diagnostics": [
       "E0111: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`",
@@ -1560,7 +1560,7 @@
   "crates/ilang-cli/tests/value_type_performance.rs:217fe1a139ac8e12": {
     "not_source": "Rust format string for a type name"
   },
-  "crates/ilang-cli/src/commands/package.rs:3498a1f2e73f73d9": {
+  "crates/ilang-cli/src/commands/package.rs:d9aec12e3badd478": {
     "substitutions": [
       [
         "{name}",
@@ -1581,13 +1581,13 @@
     ],
     "reason": "Render the existing source template; runtime tests still exercise the full generator"
   },
-  "tests/spec/1.7/a1_same_line_tuple.i:bb17b44ae2201195": {
+  "tests/spec/1.7/a1_same_line_tuple.i:8c75136def717f74": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0106: a discard binds nothing, so it may not be used as a value"
     ]
   },
-  "tests/spec/6/a1_wrong_pattern.i:03fa6b0f25d02282": {
+  "tests/spec/6/a1_wrong_pattern.i:99d070a3bfa79a5c": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0108: in a pattern, `-` comes before an int literal and `-.` before a float literal"
@@ -1849,7 +1849,7 @@
   "crates/ilang-cli/tests/multicore.rs:7111383378a50a4c": {
     "not_source": "Delimiter used to split a fixture before its main declaration."
   },
-  "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:dd5c2f037478d5e2": {
+  "tests/review/cases/review-k4s/rand_mut_tmp/.invalid/src/main.i:d3ccfe824a0c255e": {
     "reason": "A provide operation has no expression on its left, retaining a service statement where an expression is required.",
     "diagnostics": [
       "E0101: expected an expression, found `<-`",
@@ -1858,19 +1858,19 @@
       "E0101: `|` no longer joins function values: join the branches with `&`"
     ]
   },
-  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:36554751752e4970": {
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_41_16/.invalid/src/main.i:d002c42999d1aeab": {
     "reason": "Unsupported block-comment delimiters remain malformed; the diagnostic transcript is line-commented data, not executable old syntax.",
     "diagnostics": [
       "E0101: expected an expression, found `*`"
     ]
   },
-  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:a65388b95df1a4ec": {
+  "tests/review/cases/review-k4d/_loose/fuzz/bad/typediff_46_85/.invalid/src/main.i:7873c0df916a5c69": {
     "reason": "Unsupported block-comment delimiters remain malformed; the diagnostic transcript is line-commented data, not executable old syntax.",
     "diagnostics": [
       "E0101: expected an expression, found `*`"
     ]
   },
-  "tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i:581dc5481bbfc47f": {
+  "tests/review/cases/review-k4s/outer_closure_direct/.invalid/src/main.i:092a75c9d22a25e0": {
     "reason": "The block ends in a binding containing the original directly invoked outer closure, with no result expression; retains the original BlockEnd counterexample.",
     "diagnostics": [
       "E0105: a block ends with an expression"
@@ -1907,7 +1907,7 @@
     "not_source": true,
     "reason": "TOML root/dependency manifests for the entry-default fixture, not i code."
   },
-  "crates/ilang-check/tests/rest_services.rs:cba1acee53aef38c": {
+  "crates/ilang-check/tests/rest_services.rs:94edbe197060a65f": {
     "substitutions": [
       [
         ";",
@@ -1920,7 +1920,7 @@
     "suffix": " (message = String)\n",
     "reason": "Complete this Entry binding-name replacement fragment with the actual remaining record definition from the fixture."
   },
-  "crates/ilang-check/tests/row_schemes.rs:a3c551731c3dfc91": {
+  "crates/ilang-check/tests/row_schemes.rs:bb8f1f1210b8cae3": {
     "suffix": " (message = String)\n",
     "reason": "Complete this Entry binding-name replacement fragment with the actual remaining record definition from the fixture."
   },
@@ -1960,11 +1960,11 @@
     "reason": "Render the Rust format string with a representative intersection and call; the runtime test checks the full generator."
   },
   "crates/ilang-cli/tests/http.rs:5d670fc264ba0466": {
-    "suffix": "() { () }\n",
+    "suffix": "() { Nil }\n",
     "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
   },
   "crates/ilang-cli/tests/http.rs:df75d3c57754e19a": {
-    "suffix": "() { () }\n",
+    "suffix": "() { Nil }\n",
     "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
   },
   "crates/ilang-cli/tests/http.rs:ef4fa58b5b0b6bad": {
@@ -1979,7 +1979,7 @@
       ],
       [
         "{source}",
-        "(http = i/http)\n_http_test_body = () { () }\n"
+        "(http = i/http)\n_http_test_body = () { Nil }\n"
       ]
     ],
     "reason": "Render the HTTP wrapper format string with a minimal imported body; runtime HTTP tests exercise the actual assembled programs."
@@ -2063,7 +2063,7 @@
       ],
       [
         "{invariant_head}",
-        "Dep = ()\nS(N) = (() <- N -> (), (N) -> ())\nT(N) = (() <- N -> ())\nAlias(N) = T(N)\n"
+        "Dep = ()\nS(N) = (() <- N -> Nil, (N) -> Nil)\nT(N) = (() <- N -> Nil)\nAlias(N) = T(N)\n"
       ],
       [
         "{row}",
@@ -2094,7 +2094,7 @@
   "crates/ilang-cli/tests/entries.rs:8d7768dd6917cb79": {
     "not_source": "TOML package attack manifest or manifest template; exercised by the package-command regression"
   },
-  "crates/ilang-cli/tests/macro_run.rs:090fdb1b01bba12a": {
+  "crates/ilang-cli/tests/macro_run.rs:35abb52e0704b5c7": {
     "reason": "Render the MP13 Rust format! template with its first item order and unescape Rust braces; the unit test exercises all three rendered variants.",
     "substitutions": [
       [
@@ -2111,7 +2111,7 @@
       ]
     ]
   },
-  "crates/ilang-cli/tests/multicore.rs:1fe6d808ca5d4464": {
+  "crates/ilang-cli/tests/multicore.rs:2de704ad3de53cc6": {
     "substitutions": [
       [
         "{{",
@@ -2123,13 +2123,13 @@
       ],
       [
         "{waiter}",
-        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, ())\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
+        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
       ]
     ],
     "suffix": "fail.raise(\"outer\")\n })\n}\n",
     "reason": "Render the stress generator header with its actual waiter fixture prefix and closing tail."
   },
-  "crates/ilang-cli/tests/multicore.rs:203342379404a684": {
+  "crates/ilang-cli/tests/multicore.rs:55501a8791848e11": {
     "substitutions": [
       [
         "{{",
@@ -2146,12 +2146,12 @@
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
-  "crates/ilang-cli/tests/multicore.rs:25af78ab3812c31f": {
-    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, ())\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(()) = task.channel()\n",
+  "crates/ilang-cli/tests/multicore.rs:6327b0b7252cc7e5": {
+    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(Nil) = task.channel()\n",
     "suffix": "fail.raise(\"outer\")\n })\n}\n",
     "reason": "A per-pair stress-generator block inside its actual main/scope header and closing tail."
   },
-  "crates/ilang-cli/tests/multicore.rs:2c4654c954432f13": {
+  "crates/ilang-cli/tests/multicore.rs:db9949635d0493c5": {
     "substitutions": [
       [
         "{{",
@@ -2287,7 +2287,7 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/wasi.rs:b8180cef56db63bf": {
+  "crates/ilang-cli/tests/wasi.rs:dce8e21640ce6174": {
     "substitutions": [
       [
         "{wasi_module}",
@@ -2356,19 +2356,19 @@
   "tests/review/cases/review-a1/_loose/cases/18_old_expected_fn_group/original/.invalid/src/main.i:42b07aa0ae5bb3f1": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
   },
-  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:ba22210598eab895": {
+  "tests/review/cases/review-a1/_loose/runtime/18/original/.invalid/src/main.i:8508ca2b8d7ea338": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-a1/cases/18_old_expected_fn_group/.invalid/src/main.i:42b07aa0ae5bb3f1": {
     "reason": "Historical review input; exact parser diagnostics retained. See tests/review/inventory.json for origin. (valid in syntax three)"
   },
-  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:ba22210598eab895": {
+  "tests/review/cases/review-a1/runtime/18/.invalid/src/main.i:8508ca2b8d7ea338": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-native3/external/.invalid/src/main.i:4c5e4fdb6620342b": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
-  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:c3560d130e85cfa8": {
+  "tests/review/cases/review-native3/int_assign/.invalid/src/main.i:afccf95798ef23ba": {
     "reason": "Intentional negative syntax example. (valid in syntax three)"
   },
   "tests/review/cases/review-rec/_loose/probes/src/main.i:7c6c6f2310812bc2": {
@@ -2377,7 +2377,7 @@
       "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
     ]
   },
-  "tests/review/cases/review-runtime/echo-types/src/task.i:d34f1075542b01ad": {
+  "tests/review/cases/review-runtime/echo-types/src/task.i:16a58a0b7110f7a2": {
     "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters",
@@ -2390,13 +2390,13 @@
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
   },
-  "tests/review/cases/review-std1/factory/src/main.i:9083dc65664c46cf": {
+  "tests/review/cases/review-std1/factory/src/main.i:8c2864b9c5f6d54d": {
     "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
     ]
   },
-  "tests/review/cases/review-std1/variance/src/main.i:9c635f662f81f9ba": {
+  "tests/review/cases/review-std1/variance/src/main.i:719c233a65047be5": {
     "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters",
@@ -2489,7 +2489,7 @@
   "crates/ilang-check/tests/row_schemes.rs:6ef77ad854a3321f": {
     "not_source": "Prefix used to select an actual shipped declaration; no right-hand side is present in this search literal."
   },
-  "crates/ilang-check/tests/row_schemes.rs:be6a0ac8f8bb9ed4": {
+  "crates/ilang-check/tests/row_schemes.rs:6dcc8a3f2ac97559": {
     "not_source": "Rust format template completed with the actual shipped Stream, Step and Sink declarations before checking."
   },
   "crates/ilang-check/src/types/display.rs:a81e88c3ce345716": {
@@ -2499,7 +2499,7 @@
     "reason": "TOML manifest for the archived-program CLI tests, not i source.",
     "not_source": true
   },
-  "crates/ilang-cli/tests/docfix_diagnostics.rs:498de9d34c9581c7": {
+  "crates/ilang-cli/tests/docfix_diagnostics.rs:ca9ae7acf074ff80": {
     "not_source": "Diagnostic-message assertion containing a filename and line/column; not i source."
   },
   "crates/ilang-cli/tests/docfix_diagnostics.rs:fdf024a384e5141d": {
@@ -2513,7 +2513,7 @@
     ],
     "reason": "POLY1 (§4.6): intended quantified-union case remains in syn3-pending.txt until quantified types are implemented. Both written operands currently hit the same explicit gate."
   },
-  "tests/spec/7/keyed_data_order.i:e5cf9ef0b4293e28": {
+  "tests/spec/7/keyed_data_order.i:505f9da399e30e6f": {
     "diagnostics": [
       "E0110: an item by position may not come after an item by label",
       "E0101: an item by position may not come after an item by label"
@@ -2617,7 +2617,7 @@
     ],
     "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
   },
-  "crates/ilang-cli/tests/tls.rs:a1d5aef7cad97033": {
+  "crates/ilang-cli/tests/tls.rs:4c73e28c2d6baaa7": {
     "substitutions": [
       [
         "{server:?}",
@@ -2686,7 +2686,7 @@
     ],
     "reason": "Render the source template of the Lisp-branch helper"
   },
-  "crates/ilang-cli/tests/http.rs:0864e7f8a201269f": {
+  "crates/ilang-cli/tests/http.rs:bc362bb8e4220dc0": {
     "substitutions": [
       [
         "{{",
@@ -2703,7 +2703,7 @@
     ],
     "reason": "Render the Rust format string with a representative port; check the full resulting program."
   },
-  "crates/ilang-cli/tests/http.rs:5a0c88e79f161145": {
+  "crates/ilang-cli/tests/http.rs:da0061ddcca4da4d": {
     "substitutions": [
       [
         "{{",
@@ -2720,7 +2720,7 @@
     ],
     "reason": "Render the Rust format string with a representative port; check the full resulting program."
   },
-  "crates/ilang-cli/tests/http.rs:32ed0ae27c59d146": {
+  "crates/ilang-cli/tests/http.rs:d2d5ea2b6b89454f": {
     "substitutions": [
       [
         "{{",
@@ -2766,7 +2766,7 @@
     ],
     "reason": "Parse the actual generated match skeleton; test tables instantiate each narrowing case."
   },
-  "crates/ilang-cli/tests/macro_budget.rs:3918fc22b8111295": {
+  "crates/ilang-cli/tests/macro_budget.rs:49681585b1077535": {
     "substitutions": [
       [
         "{{",
@@ -2803,7 +2803,7 @@
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
-  "crates/ilang-cli/tests/multicore.rs:fedd76149f77cced": {
+  "crates/ilang-cli/tests/multicore.rs:1b558a72799d32d4": {
     "substitutions": [
       [
         "{{",
@@ -2837,7 +2837,7 @@
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
-  "crates/ilang-cli/tests/wasi.rs:e07f4cf1e23e10d3": {
+  "crates/ilang-cli/tests/wasi.rs:4e335e1263edd876": {
     "substitutions": [
       [
         "{IO}",
@@ -2858,7 +2858,7 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "editors/vscode/test/sample.i:3172d6adba8d5e8e": {
+  "editors/vscode/test/sample.i:8b19a349c1d6f0fe": {
     "reason": "Intentional negative syntax example.",
     "diagnostics": [
       "E0101: a function type with type parameters must be the type of a binding",
