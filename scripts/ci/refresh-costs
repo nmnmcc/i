@@ -279,7 +279,10 @@ def main():
                 fail(f'{path}:{number}: set {name!r} is not in the table')
             if key not in set(sets[name]['keys']):
                 fail(f'{path}:{number}: {key!r} is not a key of {name}')
-            timed.setdefault(name, {})[key] = seconds
+            # The runners observe cases with four threads (libtest's default,
+            # the corpus --jobs 4); a shard's wall time is about the sum over
+            # its cases divided by four. Store that per-case share.
+            timed.setdefault(name, {})[key] = seconds / 4.0
     for name, found in timed.items():
         sets[name].setdefault('costs', {}).update(found)
         print(f'refresh-costs: {name}: {len(found)} costs from the timings', file=sys.stderr)
