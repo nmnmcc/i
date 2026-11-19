@@ -1064,7 +1064,7 @@ algorithms are the same.
 ### Benchmark table
 
 Median of five alternating rounds in one job, seconds. Process CPU time is
-within 0.01 s of the wall time in every row, so only the wall time is shown.
+within 0.02 s of the wall time in every row, so only the wall time is shown.
 
 | Benchmark | current `--opt 0` | current `--opt 2` | documented `--opt 2` | always-inline 40 `--opt 2` | 40 vs current |
 |---|---:|---:|---:|---:|---:|
@@ -1078,8 +1078,8 @@ within 0.01 s of the wall time in every row, so only the wall time is shown.
 | `dict_insert` | 0.582 | 0.452 | 0.410 | 0.450 | -0.4% |
 | `equality` | 0.314 | 0.255 | 0.228 | 0.247 | -3% |
 
-Peak RSS of the whole `i test --project bench` at `--opt 2`: 540 MB on
-`current`, 435 MB at `--opt 0`. The 1M-element lists do not approach the
+Median peak RSS of the whole `i test --project bench` over the five rounds:
+421 MB on `current` at `--opt 2`, 396 MB at `--opt 0`. The 1M-element lists do not approach the
 runner's memory; the 11-19 GB figures earlier in this document were the `std`
 test collection's Wasmtime compilation, which this package does not have.
 

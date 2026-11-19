@@ -44,8 +44,8 @@ pub enum Error {
 /// references. 20 made list-heavy benchmarks about 25% faster and the
 /// optimization of `std`'s tests about 1 s slower. On 2026-11-19 a paired
 /// run on one CI runner (five alternating rounds, `--opt 2`) measured 40
-/// against 20: `list_sort` 2.000 -> 1.652 s, `list_build` -19%,
-/// `list_map` -15%, `list_reverse` -13%, and no benchmark slower; the price
+/// against 20: `list_sort` 1.966 -> 1.615 s, `list_build` -19%,
+/// `list_map` -15%, `list_reverse` -12%, and no benchmark slower; the price
 /// is compile time, about 1.8 s more for `std`'s test build in the earlier
 /// measurement.
 pub const ALWAYS_INLINE: u32 = 40;
