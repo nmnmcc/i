@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Runs a command up to three times with a growing pause. A Nix cache proxy on
+# the runner is rate limited now and then (`ResourceExhausted`, a disabled
+# substituter); one retry usually gets the store paths. After the third
+# failure the message says "environment failure", so a run can tell a broken
+# runner from a broken change.
+set -u
+attempt=0
+until "$@"; do
+  attempt=$((attempt + 1))
+  if ((attempt >= 3)); then
+    echo "environment failure: $* still fails after 3 attempts" >&2
+    exit 1
+  fi
+  sleep $((attempt * 15))
+done

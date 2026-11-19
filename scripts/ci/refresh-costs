@@ -10,7 +10,7 @@ key list, and every set this script does not know stay as they are.
 --sync-keys rewrites the key lists of the sets it knows from the repository
 and drops the costs of keys that no longer exist. It knows ilang-check-tests,
 ilang-cli-tests, std-tests, spec-cases, corpus-cases, docs-examples and
-value-type-cases (the spec cases again, which ilang-check's value_types walks);
+value-type-recovery-cases (the spec cases again, which ilang-check's value_types walks);
 any other set of the table is left as it is.
 
 A log is either GitHub's combined run log (`job<TAB>step<TAB>timestamp text`)
@@ -88,7 +88,7 @@ def repository_keys():
         'ilang-cli-tests': ['bin:i'] + ['test:' + s for s in stems('ilang-cli') if s != 'spec'],
         'spec-cases': spec,
         # value_types' spec_corpus_reverse_order_and_recovery walks the same cases.
-        'value-type-cases': spec,
+        'value-type-recovery-cases': spec,
         'corpus-cases': corpus,
         'std-tests': [f'{p}@{level}' for p in sorted(PROJECTS.values()) for level in LEVELS],
         'docs-examples': docs,

@@ -10,19 +10,20 @@ on:
     branches: [main, redesign]
   pull_request:
   workflow_dispatch:
+    inputs:
+      levels:
+        description: 'Optimisation levels (0, or 0,2); empty follows the event'
+        default: ''
 
 permissions:
   contents: read
 
-# Three groups. A main push has its own group and is never cancelled, so no
-# pull request can hold up or replace the run that deploys. Every pull request
-# shares `pr`, so at most one pull request gate runs at a time and the 20
-# concurrent jobs of one run are not split with another run's; a newer pull
-# request replaces a pending one (GitHub cancels pending runs in a group
-# anyway), which keeps the gate that finally runs on the newest commit. The
-# daily run has its own group and is never cancelled.
+# One group per branch, plus main and schedule on their own. A newer commit on
+# a branch cancels that branch's older run; another branch can never cancel it,
+# so every pull request can still reach a finished gate. Main is never
+# cancelled (it deploys), and the daily run is never cancelled either.
 concurrency:
-  group: ${{ github.workflow }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'main' || (github.event_name == 'schedule' && 'schedule' || 'pr') }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'main' || (github.event_name == 'schedule' && 'schedule' || format('branch-{0}', github.head_ref || github.ref_name)) }}
   cancel-in-progress: ${{ github.event_name != 'schedule' && !(github.event_name == 'push' && github.ref == 'refs/heads/main') }}
 
 env:
@@ -157,7 +158,7 @@ jobs:
   release:
     name: build (release i)
     needs: changes
-    if: fromJSON(needs.changes.outputs.changed).rust || fromJSON(needs.changes.outputs.changed).docs
+    if: fromJSON(needs.changes.outputs.changed).rust || fromJSON(needs.changes.outputs.changed).docs || fromJSON(needs.changes.outputs.changed).editors
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -174,12 +175,11 @@ jobs:
       # the Actions cache is used, not FlakeHub, and the daemon is pinned.
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       # devenv 2.4.0, prebuilt in the binary cache of nixpkgs.
       - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: release-${{ hashFiles('Cargo.lock') }}
@@ -218,48 +218,12 @@ jobs:
           name: build (release i)
           id: ${{ github.job }}-${{ strategy.job-index }}
 
-  lint:
-    name: lint (rust)
+  # The Rust lint and every crate but ilang-check and ilang-cli, whose tests
+  # are sharded below. The lint runs only on a Rust change (or the snippets,
+  # which read the .md files); the tests only on a Rust change.
+  misc:
+    name: lint and test (rust, other crates)
     needs: changes
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          submodules: true
-      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-        with:
-          extra-conf: |
-            always-allow-substitutes = true
-      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
-        with:
-          use-flakehub: disabled
-          use-gha-cache: enabled
-          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
-      - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          key: lint-${{ hashFiles('Cargo.lock') }}
-          cmd-format: devenv shell -- {0}
-          cache-directories: ~/.cache/ccache
-          save-if: true
-      # Without a rust change (docs or editors only), formatting and Clippy
-      # cannot change; the snippets of the .md and .mdx files can.
-      - name: Run the Rust lint
-        env:
-          PART: ${{ fromJSON(needs.changes.outputs.changed).rust && 'rust-lint' || 'snippets' }}
-        run: devenv shell -- ./scripts/checks "$PART"
-      - uses: ./.github/actions/marker
-        with:
-          name: lint (rust)
-          id: ${{ github.job }}-${{ strategy.job-index }}
-
-  # Every crate but ilang-check and ilang-cli, whose tests are sharded below.
-  rest:
-    name: test (workspace, other crates)
-    needs: changes
-    if: fromJSON(needs.changes.outputs.changed).rust
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
@@ -274,22 +238,27 @@ jobs:
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: test-rest-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: true
+      - name: Run the Rust lint
+        if: fromJSON(needs.changes.outputs.changed).rust || fromJSON(needs.changes.outputs.changed).docs
+        env:
+          PART: ${{ fromJSON(needs.changes.outputs.changed).rust && 'rust-lint' || 'snippets' }}
+        run: devenv shell -- ./scripts/checks "$PART"
       - name: Run the Rust tests
+        if: fromJSON(needs.changes.outputs.changed).rust
         run: devenv shell -- ./scripts/checks rust-test
       - uses: ./.github/actions/marker
         with:
-          name: test (workspace, other crates)
+          name: lint and test (rust, other crates)
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # ilang-check's test binaries but value_types, in the shards of the plan
@@ -319,11 +288,10 @@ jobs:
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # The shards build the same crate, so they share one cache; the
@@ -368,11 +336,10 @@ jobs:
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: test-value-types-${{ hashFiles('Cargo.lock') }}
@@ -413,11 +380,10 @@ jobs:
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: test-cli-${{ hashFiles('Cargo.lock') }}
@@ -448,7 +414,7 @@ jobs:
       CHECKS_TEST_GROUP: spec-${{ matrix.shard }}
       I_SPEC_SHARD: ${{ matrix.shard }}
       # The push/PR gate runs O0; the daily run compares O0 and O2.
-      CHECKS_SPEC_LEVELS: ${{ github.event_name == 'schedule' && '0,2' || '0' }}
+      CHECKS_SPEC_LEVELS: ${{ inputs.levels != '' && inputs.levels || (github.event_name == 'schedule' && '0,2' || '0') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -459,11 +425,10 @@ jobs:
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: test-spec-${{ hashFiles('Cargo.lock') }}
@@ -477,74 +442,92 @@ jobs:
           name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
-  js:
-    name: test (javascript)
-    needs: changes
-    if: fromJSON(needs.changes.outputs.changed).rust
+  # The JavaScript SDK and browser tests, the editor support, and the
+  # documentation site, which reuses the release i of job `release`. One job
+  # so that the plan needs one marker and the concurrency slots stay for the
+  # shards that carry the long work.
+  web:
+    name: test (javascript, editors, docs)
+    needs: [changes, release]
+    if: fromJSON(needs.changes.outputs.changed).rust || fromJSON(needs.changes.outputs.changed).docs || fromJSON(needs.changes.outputs.changed).editors
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
+    env:
+      I_BIN: ${{ github.workspace }}/target/release/i
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
         with:
           extra-conf: |
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: js-${{ hashFiles('Cargo.lock') }}
+          key: web-${{ hashFiles('Cargo.lock') }}
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: true
       - name: Run the JavaScript tests
+        if: fromJSON(needs.changes.outputs.changed).rust
         run: devenv shell -- ./scripts/checks js
       - name: Keep the browser test results
-        if: always()
+        if: always() && fromJSON(needs.changes.outputs.changed).rust
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: browser-${{ github.run_id }}
           path: target/browser
           overwrite: true
           retention-days: 14
-      - uses: ./.github/actions/marker
-        with:
-          name: test (javascript)
-          id: ${{ github.job }}-${{ strategy.job-index }}
-
-  # The editor support: VS Code extension tests, the tree-sitter grammar (generate, tests, the
-  # queries on every .i source) and a check of the Zed extension. Needs only what the Devenv
-  # shell has (node and npm, a C compiler for tree-sitter, Rust), network access for `npm ci`,
-  # and no release `i`. Without the wasm32-wasip1 target the Zed check runs for the host.
-  editors:
-    name: test (editors)
-    needs: changes
-    if: fromJSON(needs.changes.outputs.changed).editors
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-        with:
-          extra-conf: |
-            always-allow-substitutes = true
-      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
-        with:
-          use-flakehub: disabled
-          use-gha-cache: enabled
-          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
-      - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - name: Run the editor checks
+        if: fromJSON(needs.changes.outputs.changed).editors
         run: devenv shell -- ./scripts/checks editors
+      # The release i, for the documentation examples.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: fromJSON(needs.changes.outputs.changed).docs
+        with:
+          name: i-release
+          path: target/release
+      - name: Prepare the example compiler
+        if: fromJSON(needs.changes.outputs.changed).docs
+        run: |
+          chmod +x target/release/i
+          ./scripts/ci/retry sh -c 'xargs nix-store --realise < target/release/i.nix-paths > /dev/null'
+          target/release/i --version
+      - name: Install the site's packages
+        if: fromJSON(needs.changes.outputs.changed).docs
+        working-directory: docs
+        run: devenv shell -- npm ci
+      - name: Build the site and run the site checks
+        if: fromJSON(needs.changes.outputs.changed).docs
+        working-directory: docs
+        run: |
+          devenv shell -- npm run build
+          devenv shell -- npm run check:placeholders
+          devenv shell -- npm run check:links
+          devenv shell -- npm run check:rendering
+      - name: Run the documentation examples
+        if: fromJSON(needs.changes.outputs.changed).docs
+        working-directory: docs
+        run: devenv shell -- npm run check:examples
+      - name: Keep the site for deployment
+        if: fromJSON(needs.changes.outputs.changed).docs && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-site
+          path: docs/dist
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 3
       - uses: ./.github/actions/marker
         with:
-          name: test (editors)
+          name: test (javascript, editors, docs)
           id: ${{ github.job }}-${{ strategy.job-index }}
 
   # `scripts/checks i` with the release i and without the review corpus,
@@ -573,11 +556,10 @@ jobs:
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+        run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: i-release
@@ -612,6 +594,7 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.corpus) }}
     env:
       CHECKS_SHARD: ${{ matrix.shard }}
+      CHECKS_CORPUS_LEVELS: ${{ inputs.levels != '' && inputs.levels || (github.event_name == 'schedule' && '0,2' || '0') }}
       # One thread per i process; the runner's four cores run four cases.
       RAYON_NUM_THREADS: 1
       # The runner's cores are slower than the machine the expectations were recorded on.
@@ -624,7 +607,6 @@ jobs:
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
         with:
-          use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -636,7 +618,7 @@ jobs:
       - name: Fetch the libraries of i
         run: |
           chmod +x target/release/i
-          xargs nix-store --realise < target/release/i.nix-paths > /dev/null
+          ./scripts/ci/retry sh -c 'xargs nix-store --realise < target/release/i.nix-paths > /dev/null'
           target/release/i --version
           python3 --version
       - name: Review corpus, shard ${{ matrix.shard }}
@@ -655,84 +637,10 @@ jobs:
           name: ${{ matrix.display }}
           id: ${{ github.job }}-${{ strategy.job-index }}
 
-  # The documentation site, with the release i for its examples. Shard 1
-  # builds the site (its prebuild runs `npm run generate`) and runs the site
-  # checks; every other shard runs `npm run generate` itself. Every shard runs
-  # k/N of the examples (CHECKS_SHARD; set docs-examples). On a push to main
-  # shard 1 uploads docs/dist, which docs.yml deploys after a green run.
-  docs:
-    name: ${{ matrix.display }}
-    needs: [plan, release]
-    if: fromJSON(needs.plan.outputs.changed).rust || fromJSON(needs.plan.outputs.changed).docs
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
-      matrix:
-        include: ${{ fromJSON(needs.plan.outputs.docs) }}
-    env:
-      I_BIN: ${{ github.workspace }}/target/release/i
-      CHECKS_SHARD: ${{ matrix.shard }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-        with:
-          extra-conf: |
-            always-allow-substitutes = true
-      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
-        with:
-          use-flakehub: disabled
-          use-gha-cache: enabled
-          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
-      - name: Install devenv
-        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
-      # Reuse the release job's compiler instead of building another one.
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: i-release
-          path: target/release
-      - name: Prepare the example compiler
-        run: |
-          chmod +x target/release/i
-          xargs nix-store --realise < target/release/i.nix-paths > /dev/null
-          target/release/i --version
-      - name: Install the site's packages
-        working-directory: docs
-        run: devenv shell -- npm ci
-      - name: Build the site and run the site checks
-        if: matrix.index == 0
-        working-directory: docs
-        run: |
-          devenv shell -- npm run build
-          devenv shell -- npm run check:placeholders
-          devenv shell -- npm run check:links
-          devenv shell -- npm run check:rendering
-      - name: Generate the library pages
-        if: matrix.index != 0
-        working-directory: docs
-        run: devenv shell -- npm run generate
-      - name: Run the examples, shard ${{ matrix.shard }}
-        working-directory: docs
-        run: devenv shell -- npm run check:examples
-      - name: Keep the site for deployment
-        if: matrix.index == 0 && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: docs-site
-          path: docs/dist
-          if-no-files-found: error
-          overwrite: true
-          retention-days: 3
-      - uses: ./.github/actions/marker
-        with:
-          name: ${{ matrix.display }}
-          id: ${{ github.job }}-${{ strategy.job-index }}
-
   # The one required check. See the comment at the top and scripts/ci/summary.
   summary:
     name: summary (required)
-    needs: [changes, plan, release, lint, rest, check_tests, value_types, cli_tests, spec, js, editors, std, corpus, docs]
+    needs: [changes, plan, release, misc, check_tests, value_types, cli_tests, spec, std, corpus, web]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 10

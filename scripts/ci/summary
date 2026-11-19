@@ -73,7 +73,7 @@ def main():
         if result is None:
             continue
         if e['runs'] and result == 'skipped':
-            problems.append(f'job {e["job"]}: skipped, but the plan runs it')
+            problems.append(f'job {e["job"]}: skipped, but the plan runs it; a required job cannot pass by being skipped')
         if not e['runs'] and result != 'skipped':
             problems.append(f'job {e["job"]}: {result}, but the path filters skip it')
 

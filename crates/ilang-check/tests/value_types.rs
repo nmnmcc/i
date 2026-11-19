@@ -732,7 +732,7 @@ fn spec_case_keys(root: &std::path::Path, cases: &[std::path::PathBuf]) -> Vec<S
     keys
 }
 
-/// The plan of the case keys with the costs of the set `value-type-cases` of
+/// The plan of the case keys with the costs of the set `value-type-recovery-cases` of
 /// the cost table (`CHECKS_COSTS`, or `ci/costs.json`); without the table,
 /// `fallback_shards` shards of equal cases.
 fn value_type_plan(keys: &[String], fallback_shards: usize) -> ilang_shard::CasePlan {
@@ -741,7 +741,7 @@ fn value_type_plan(keys: &[String], fallback_shards: usize) -> ilang_shard::Case
         .unwrap_or_else(|| {
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ci/costs.json")
         });
-    ilang_shard::plan_cases(&costs, "value-type-cases", keys, fallback_shards)
+    ilang_shard::plan_cases(&costs, "value-type-recovery-cases", keys, fallback_shards)
 }
 
 #[test]
