@@ -32,11 +32,6 @@ jobs:
         with:
           extra-conf:
             always-allow-substitutes = true
-      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
-        with:
-          use-flakehub: disabled
-          use-gha-cache: enabled
-          source-revision: cd88146e8de45fc50afaee98634fea04249c3c84b7
       - name: Install devenv
         run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - name: Build the release i
