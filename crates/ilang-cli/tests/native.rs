@@ -177,6 +177,14 @@ main = () {
 
 #[test]
 fn http_get_over_tls() {
+    // This reaches https://example.com: real DNS and a real certificate
+    // chain. The gate has a deterministic TLS test in `tls.rs` (a local
+    // server, a self-signed CA, handshake, ALPN, read/write, and the
+    // certificate and name errors); this one runs in the daily job.
+    if std::env::var("CHECKS_NETWORK_TESTS").as_deref() != Ok("1") {
+        eprintln!("skip http_get_over_tls: set CHECKS_NETWORK_TESTS=1 (the daily run does)");
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let exe = build(&example("http-get"), dir.path(), "http_get");
     let out = run(&exe, &[]);

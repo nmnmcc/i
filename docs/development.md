@@ -77,6 +77,21 @@ Every push to main runs the full gate. A pull request runs the same gate except 
 a run is in its job summary. When a run fails, open the first red job in the
 summary and start there.
 
+### Cost table
+
+`ci/costs.json` holds the measured seconds of every unit of every set. The
+planner reads it; a unit with no cost takes the set median, and the plan
+prints those keys. To refresh it, run `scripts/ci/refresh-costs` on the CI
+logs (it accepts log files or directories). A set that is missing entirely
+stops the plan; a stale table only makes the shards less even, never less
+correct, so do not edit shard counts by hand when the table ages.
+
+Per-case timings (spec, the value-types recovery loop and the review corpus)
+are collected by setting `CHECKS_TIMINGS` to a file path; the runs then write
+one `{"key": ..., "seconds": ...}` line per case, and CI uploads the file as
+an artifact. The variable is unset in normal runs and changes neither the
+order nor the concurrency of the cases.
+
 The slow sets are split into shards by `i-shard` (`crates/ilang-shard`), so
 no shard list is written by hand. The units of a set (test targets, spec
 cases, corpus cases, projects) are its sorted keys, and their costs come from

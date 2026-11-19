@@ -486,16 +486,40 @@ fn main() {
                         i
                     };
                     let Some(case) = ready.get(i) else { break };
+                    let started = std::time::Instant::now();
                     let r = run_case(case);
-                    results.lock().unwrap().push((case.name.clone(), r));
+                    let seconds = started.elapsed().as_secs_f64();
+                    results
+                        .lock()
+                        .unwrap()
+                        .push((case.name.clone(), seconds, r));
                 }
             });
         }
     });
     let mut results = results.into_inner().unwrap();
     results.sort_by(|a, b| a.0.cmp(&b.0));
+    if let Some(path) = std::env::var_os("CHECKS_TIMINGS") {
+        use std::io::Write;
+        let path = std::path::PathBuf::from(path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .unwrap();
+        for (name, seconds, _) in &results {
+            writeln!(
+                file,
+                "{{\"set\":\"spec-cases\",\"key\":{name:?},\"seconds\":{seconds:.3}}}"
+            )
+            .unwrap();
+        }
+    }
     let mut passed = 0;
-    for (name, r) in results {
+    for (name, _, r) in results {
         match r {
             Ok(()) => {
                 passed += 1;

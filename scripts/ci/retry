@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Runs a command up to three times with a growing pause. A Nix cache proxy on
 # the runner is rate limited now and then (`ResourceExhausted`, a disabled
-# substituter); one retry usually gets the store paths. After the third
-# failure the message says "environment failure", so a run can tell a broken
-# runner from a broken change.
+# substituter); one retry usually gets the store paths. Each attempt has a
+# four-minute cap, so a rate-limited install cannot eat a job's whole timeout.
+# After the third failure the message says "environment failure", so a run can
+# tell a broken runner from a broken change.
 set -u
 attempt=0
-until "$@"; do
+until timeout 240 "$@"; do
   attempt=$((attempt + 1))
   if ((attempt >= 3)); then
     echo "environment failure: $* still fails after 3 attempts" >&2
