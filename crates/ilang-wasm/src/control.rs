@@ -303,8 +303,8 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
     })
 }
 
-/// Invariant: a call in tail position that provides an environment (§9.4
-/// rule 3) **and whose callee may suspend** must not stay a tail call.
+/// A call in tail position that provides an environment to its callee,
+/// where the callee may suspend, must not stay a tail call.
 ///
 /// A tail call leaves no frame, so it is not a `Suspendable` point and has no
 /// `Point` record. The provided environment is then not in any `Point` delta,
@@ -314,9 +314,9 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
 /// reads a wrong value (`ref.cast` trap). Demoting the call to `Let` +
 /// `Return` gives it a point, a delta, and a frame record.
 ///
-/// A tail call without a provided environment (`Env::Param`) has no delta to
-/// lose and stays a tail call; this keeps the tail recursion in
-/// `tests/spec/9/environment.i` and ordinary loops on the tail-call path.
+/// A tail call without a provided environment has no delta to lose and stays
+/// a tail call; this keeps the recursion in `tests/spec/9/environment.i` and
+/// ordinary loops on the tail-call path.
 ///
 /// Only a callee that is a function value (`Value`, `Shaped`, `Lazy`) is
 /// demoted. A direct call stays a tail call, so a recursive loop keeps its
@@ -350,7 +350,7 @@ fn demote_suspending_tail_calls(
                     args: args.clone(),
                     env: *env,
                 };
-                suspends(&value, may).then(|| (value, *site))
+                suspends(&value, may).then_some((value, *site))
             }
             _ => None,
         };
