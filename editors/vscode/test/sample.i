@@ -12,10 +12,10 @@
 /// A user.
 User = (name = String, age = Int)
 
-Shape(A) = <B>(A, B) <- (Fail(String), ..N) -> A | Nil
+Shape(A) = <B>(A, B) <- (Fail(String), ..N) -> A | ()
 
 @host("console")
-Console = (print = (String) -> Nil)
+Console = (print = (String) -> ())
 
 @external("env", "now")
 now : () -> Float

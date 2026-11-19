@@ -2,7 +2,7 @@
 // expect: stop "panic: keyed binding failed"
 unpack = (data : (value = Int)) {
 	(value = 0) = data
-	Nil
+	()
 }
 main = () {
 	unpack((value = 1)) <- (

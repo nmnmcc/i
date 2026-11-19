@@ -135,7 +135,7 @@ test("cli_options", () {
 		} ==
 			Ok(False),
 	)
-	Nil
+	()
 })
 
 // validate spelling before duplicate names, then positional placement.
@@ -314,7 +314,7 @@ test("cli_definition_errors", () {
 		} ==
 			Ok(Pair(3, "x")),
 	)
-	Nil
+	()
 })
 
 // token spelling, separator ownership and values independent of readers.
@@ -474,7 +474,7 @@ test("cli_token_ownership", () {
 		} ==
 			Ok(-2),
 	)
-	Nil
+	()
 })
 
 // repetition precedes arity checking and aliases identify the same leaf.
@@ -534,7 +534,7 @@ test("cli_repetition", () {
 		fail.catch(() { cli.parse(m, ["-n", "a", "--name=", "-n", "é"]) }) ==
 			Ok(["a", "", "é"]),
 	)
-	Nil
+	()
 })
 
 // allocation is completed before any missing/conversion callback runs.
@@ -676,7 +676,7 @@ test("cli_error_order", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 // optional absence and caller-supplied defaults; ordered positional rest.
@@ -725,7 +725,7 @@ test("cli_allocation", () {
 		} ==
 			Error(cli.ExtraArgument(index = 2, token = "c")),
 	)
-	Nil
+	()
 })
 
 // exactly std/int.parse's signed ASCII decimal grammar, with fixed error.
@@ -755,7 +755,7 @@ test("cli_converters", () {
 	list.each(["", "é", " a b ", "\u{0}"], (value) {
 		assert(cli.text(value) == Ok(value))
 	})
-	Nil
+	()
 })
 
 // The bucket observation laws: heterogeneous types and every bucket consumed.
@@ -845,7 +845,7 @@ test("cli_composition_laws", () {
 		fail.catch(() { cli.parse(mixed, ["--jobs=3", "-v"]) }) ==
 			Ok(Triple(3, "prefix", True)),
 	)
-	Nil
+	()
 })
 
 // byte-exact help, all display forms, verbatim content, no callbacks.
@@ -977,7 +977,7 @@ test("cli_help", () {
 		} ==
 			Ok(True),
 	)
-	Nil
+	()
 })
 
 // Reverse accumulators preserve large inputs without suffix copies.
@@ -1010,6 +1010,6 @@ test("cli_long_inputs", () {
 				}),
 			),
 	)
-	Nil
+	()
 })
 // Bucket consumption must preserve heterogeneous values without leaking needs.

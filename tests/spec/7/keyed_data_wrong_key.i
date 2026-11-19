@@ -2,5 +2,5 @@
 // expect: compile-error E0501
 main = () {
 	(other = _) = (name = "Ada")
-	Nil
+	()
 }

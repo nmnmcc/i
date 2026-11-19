@@ -16,5 +16,5 @@ main = () {
 	assert({ 1 == 1 || 1 == 2 |> (True) { 7 } & (False) { 8 } } == 7)
 	assert({ 1 |> inc |> inc } == 3)
 	assert({ 1 + 2 * 3 |> inc } == 8)
-	Nil
+	()
 }

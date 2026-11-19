@@ -59,7 +59,7 @@ does not establish the new runtime implementation.
 Implementation:
 
 - Key is invariant, fresh and identity-based. Keyed compares key plus payload.
-  The private primitive read uses Result(A, Nil); ordinary i maps it to the
+  The private primitive read uses Result(A, ()); ordinary i maps it to the
   public Lookup type. This keeps Lookup constructors ordinary library values.
 - Portable walks values with an explicit stack. Patched closures reserve the
   final capture slot for a fresh walk token, as multicore.md §3.6 specifies.
@@ -152,7 +152,7 @@ have Await | Owner added before inference, then call ordinary i await_owned
 and from_result. Namespace spelling never selects a task or IO implementation.
 The wire stays ABI v3. Request(Result(A,Never)) still receives Ok(A).
 
-Group zero/change observers are local Request(Nil) cells with no host id and
+Group zero/change observers are local Request(()) cells with no host id and
 no group membership. Check/subscription and each start/answer/cancel notification
 are indivisible on this one worker. Notifications implement the private revision
 observation without exporting a producer-ticket enumeration. Their progress
@@ -301,7 +301,7 @@ Bundle = ()
 @host("probe", "request")
 Work = (start = () -> Request(Int))
 make = () <- (work : Work) { Bundle }
-probe = () <- (bundle : Bundle) { Nil }
+probe = () <- (bundle : Bundle) { () }
 ```
 
 The entry's ordinary inferred environment contains only Bundle. Under the
@@ -450,7 +450,7 @@ Corrected intermediate failures:
   exemption. The R4a stop now passes at both optimization levels.
 - Three portability probes accidentally returned their own boundary or a share
   of it, creating infinite types (E0505). The probes now keep a finite outer
-  Nil-returning boundary and test the specified crossing point. A separate
+  ()-returning boundary and test the specified crossing point. A separate
   incorrect Task-handle portability assertion was replaced with the scope-
   witness rule and an independent unused-service retention check.
 - Scope setup originally suspended before keep_env, losing unused services at a
@@ -597,9 +597,9 @@ Corrected intermediate checks in this stage:
 - The host fixture initially omitted wasm.exports and its public service types,
   and tried to export ScheduleError/RandomError through the ABI. Explicit
   exports and exhaustive result handling corrected those compilation failures.
-- Initial host assertions omitted the specified panic prefix, assumed Nil was
+- Initial host assertions omitted the specified panic prefix, assumed () was
   JS null, and required a newline after an otherwise complete deadlock message.
-  They now assert the exact first message line, use JS undefined for Nil, and
+  They now assert the exact first message line, use JS undefined for (), and
   retain separate call-position checks where §11.7 specifies positions.
 - event_services initially parsed a tuple after yield as another function call.
   A named tuple binding corrected the source; O0/O2 both passed.
@@ -656,7 +656,7 @@ and finishes the detailed WAT comparison; neither is claimed by this checkpoint.
 
 The added conformance generator reads every .i case in §§9.9/9.11. Compile-error
 cases stay in the real spec suite; every runnable case is compiled into shared
-O0/O2 modules. The temporary adaptation removes @main, adds an ABI Nil wrapper
+O0/O2 modules. The temporary adaptation removes @main, adds an ABI () wrapper
 which stops on an unexpected typed error, exports its required service types,
 and gives each test's host declaration a distinct namespace. It does not edit
 the original spec sources. Distinct namespaces are required by the general
@@ -1259,7 +1259,7 @@ An external function is also an ordinary provider factory. The initial lowering
 looked such definitions up as initialized i globals, causing an illegal-cast
 trap before the host callback ran. Provider calls now reuse the checked external
 calling convention. The minimal reproduction declares `Token { }`, an external
-`make: () -> Token`, and `main = (token ! Token) { Nil }`, then selects make as
+`make: () -> Token`, and `main = (token ! Token) { () }`, then selects make as
 Token's provider. All 15 provider execution tests and all 17 WASI tests pass;
 the same external-factory reproduction executes exactly one callback on Node.
 

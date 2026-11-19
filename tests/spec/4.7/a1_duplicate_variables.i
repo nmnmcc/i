@@ -7,5 +7,5 @@ pair = <A, A>(x : A) { (x, x) }
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

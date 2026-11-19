@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.send : (A) -> A\napp/main.f : () -> Stop\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.send : (A) -> A\napp/main.f : () -> Stop\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

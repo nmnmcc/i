@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (Dep, S(N), ..N) -> Int\napp/main.h1 : () <- (N - Dep, S(N)) -> Int\napp/main.main : () <- (N - Dep - S(Dep), T(N)) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.us : () <- (S(N), ..N) -> Int\napp/main.ut : () <- (T(N), ..N) -> Int\napp/main.usa : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.h0 : () <- (Dep, S(N), ..N) -> Int\napp/main.h1 : () <- (N - Dep, S(N)) -> Int\napp/main.main : () <- (N - Dep - S(Dep), T(N)) -> ()\n",
       "stderr": "src/main.i:13:1: warning[W0504]: top-level binding `usa` is not used\n"
     },
     "test0": {

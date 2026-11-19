@@ -41,7 +41,7 @@ test("clock_fake", () {
 					clock.ClockError(operation = "sleep_ns", code = "invalid"),
 				),
 		)
-		Nil
+		()
 	} <- (
 		clock.Clock(
 			monotonic_ns = () { request.ready(Ok(42)) },
@@ -50,7 +50,7 @@ test("clock_fake", () {
 				request.ready(
 					{ n < 0 } |>
 						(True) { Error("invalid") }
-						& (False) { Ok(Nil) },
+						& (False) { Ok(()) },
 				)
 			},
 		),

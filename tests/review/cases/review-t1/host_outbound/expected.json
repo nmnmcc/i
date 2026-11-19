@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.log : (\"error\" | \"info\" | \"warn\") -> Nil\nprobe/main.number : (Int - 0) -> Nil\n",
+      "stdout": "probe/main.log : (\"error\" | \"info\" | \"warn\") -> ()\nprobe/main.number : (Int - 0) -> ()\n",
       "stderr": ""
     },
     "test0": {

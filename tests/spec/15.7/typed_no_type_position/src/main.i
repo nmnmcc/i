@@ -3,4 +3,4 @@
 	m = spec/macros
 )
 T = m.m(Int)
-main = () { Nil }
+main = () { () }

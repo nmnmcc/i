@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.wrap : (() <- (Fail(Never), S(N), ..N) -> Int) <- (Fail(Never), ..N) -> Int\napp/main.main : () <- (Assert, Fail(Never)) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.wrap : (() <- (Fail(Never), S(N), ..N) -> Int) <- (Fail(Never), ..N) -> Int\napp/main.main : () <- (Assert, Fail(Never)) -> ()\n",
       "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `get` is not used\n"
     },
     "test0": {

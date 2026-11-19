@@ -3,14 +3,14 @@ src/main.i:22:7: error[E0316]: the full type of an external function must be wri
 src/main.i:25:10: error[E0317]: the type of an external function may not have type variables
 src/main.i:25:16: error[E0317]: the type of an external function may not have type variables
 src/main.i:28:12: error[E0316]: the full type of an external function must be written, with no `_`
-src/main.i:32:7: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
-src/main.i:35:7: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
-src/main.i:35:24: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
-src/main.i:38:7: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
-src/main.i:38:13: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
-src/main.i:38:27: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
-src/main.i:38:37: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
-src/main.i:41:7: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
-src/main.i:41:21: error[E0318]: the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:32:7: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:35:7: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:35:24: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:38:7: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:38:13: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:38:27: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:38:37: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:41:7: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
+src/main.i:41:21: error[E0318]: the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors
 src/main.i:45:13: error[E0319]: an external function may have no need or exactly Fail(E)
 src/main.i:48:7: error[E0319]: an external function may have no need or exactly Fail(E)

@@ -9,6 +9,6 @@ main = () {
 	_syn3_0 : S(String) = S(f = (_ : String) { 42 })
 	{
 		wrap(1)
-		Nil
+		()
 	} <- (_syn3_0)
 }

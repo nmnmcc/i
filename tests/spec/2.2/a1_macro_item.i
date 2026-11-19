@@ -7,5 +7,5 @@ make(1)
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

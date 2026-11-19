@@ -7,5 +7,5 @@ value = (name = 1)
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

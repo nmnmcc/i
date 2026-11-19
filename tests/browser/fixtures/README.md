@@ -27,14 +27,14 @@ tables, so a result buffer cannot overwrite a request's expected answer.
 - `ilang_start` prints `start` and a line feed through the service, so tests see
   that it runs once and may call imports.
 - Imports: `ilang:host/v1` `panic`, `reference_id` and `cancel`; the services
-  `app:console/v1` `print(String) -> Nil`, `app:storage/v1`
+  `app:console/v1` `print(String) -> ()`, `app:storage/v1`
   `read(String) -> String ^ String`, the async `app:clock/v1`
   `later(Float) -> Float ^ String`, whose import takes the request id first
   (B.4); the external `app:math/v1` `hypot(Float, Float) -> Float`.
 - Round trips of every type: `string_roundtrip`, `int_roundtrip`,
   `bit_array_roundtrip`, `float_roundtrip`, `bool_roundtrip`, `nil_roundtrip`,
   `opaque_roundtrip`, and `same_reference` through `reference_id`.
-- `choose(Float) -> String ^ Nil | Bool | Int | Float | String | BitArray`:
+- `choose(Float) -> String ^ () | Bool | Int | Float | String | BitArray`:
   selector 0 gives `"ok"`, 1 to 6 an error of each member, 7 a tag that is too
   big.
 - `read_through`, `hypot` and `print` forward to the imports.
@@ -119,7 +119,7 @@ It has no metadata; tests give it (see `tests/browser/fixture-abi.mjs` and
 `crates/ilang-host/src/tests.rs`). It imports the externals `echo_string`,
 `echo_int`, `echo_bits`, `echo_ref`, `echo_bool`, `echo_float` and `echo_nil`
 from module `custom`, and the service `custom:fallible/v1`
-`fallible(Float) -> String ^ Nil | Bool | Int | Float | String | BitArray`.
+`fallible(Float) -> String ^ () | Bool | Int | Float | String | BitArray`.
 Each export forwards to one import. The module makes and frees the parameter
 buffers of the imports and gives the result buffers of the imports on to the
 host as its own results.
@@ -127,7 +127,7 @@ host as its own results.
 ## one-thread.wat
 
 It has its own `ilang.abi` section and imports `app:console/v1`
-`print(String) -> Nil` and the async `app:clock/v1`
+`print(String) -> ()` and the async `app:clock/v1`
 `later(Float) -> Float ^ String`. Its async entry `app/main.main` and its async
 test `app/test.waits` each print `begin`, then wait for `later` three times in a
 row and print `answer` after each answer: 4 prints and 3 starts of `later`,

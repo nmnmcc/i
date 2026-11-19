@@ -8,5 +8,5 @@ main = () {
     stdio.print(core.inspect(n + 1))
     "s"
   })
-  Nil
+  ()
 }

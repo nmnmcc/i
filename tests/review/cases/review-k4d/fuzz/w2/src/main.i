@@ -1,7 +1,7 @@
 Dep = (v = Int)
 get = () <- (d : Dep) { d.v }
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
-T(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
+T(N) = (f = () <- N -> Int, m = (N) -> ())
 us = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
 	f()
@@ -20,10 +20,10 @@ main = () {
 	l0_0 = () { ut() }
 	_syn3_0 : T(T(S(Never))) = T(
 		f = () { get() + ut() + us() },
-		m = (_ : T(S(Never))) { Nil },
+		m = (_ : T(S(Never))) { () },
 	)
 	{
 		ut()
-		Nil
+		()
 	} <- (_syn3_0)
 }

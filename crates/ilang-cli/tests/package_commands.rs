@@ -721,7 +721,7 @@ fn published(w: &World, src: &str) -> PathBuf {
             ("src/api.i", src),
             (
                 "test/api_test.i",
-                "(\n\ttestlib = (test) = std/test\n\tpub/api\n)\n\ntest(\"works\", () { api.one |> (1) { Nil } & (other) { panic(\"no\") } })\n",
+                "(\n\ttestlib = (test) = std/test\n\tpub/api\n)\n\ntest(\"works\", () { api.one |> (1) { () } & (other) { panic(\"no\") } })\n",
             ),
         ],
     );
@@ -1219,7 +1219,7 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
 #[test]
 fn publish_sees_what_the_host_must_give() {
     let w = World::new();
-    let api = "(\n\tnow\n\tIo\n)\n\n@external(\"env\", \"now\")\nnow : () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n";
+    let api = "(\n\tnow\n\tIo\n)\n\n@external(\"env\", \"now\")\nnow : () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> ())\n";
     let dir = w.project(
         "pub",
         &[
@@ -1257,7 +1257,7 @@ fn publish_sees_what_the_host_must_give() {
     );
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed constructors api.Io: Io(print: (String) -> Nil)"),
+        out.contains("changed constructors api.Io: Io(print: (String) -> ())"),
         "{out}"
     );
 }
@@ -1286,7 +1286,7 @@ fn publish_sees_the_standard_service_of_i_io() {
     let (ok, out) = try_publish(&w, &dir, &[("src/api.i", printing)], "1.0.1");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("added host \"i:io/v1\": (print: (String) -> Nil)"),
+        out.contains("added host \"i:io/v1\": (print: (String) -> ())"),
         "{out}"
     );
     assert!(out.contains("a new minor version"), "{out}");
@@ -1362,7 +1362,7 @@ fn publish_tells_apart_types_that_are_shown_alike() {
 #[test]
 fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
     let w = World::new();
-    let api = "(\n\tf\n)\n\n@external(\"env\", \"now\")\nnow : () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> Nil)\n\nf = () { now() }\n";
+    let api = "(\n\tf\n)\n\n@external(\"env\", \"now\")\nnow : () -> Int\n\n@host(\"pub:io/v1\")\nIo = (print = (String) -> ())\n\nf = () { now() }\n";
     let dir = w.project(
         "pub",
         &[
@@ -1433,11 +1433,11 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
     );
     assert!(!ok, "{out}");
     assert!(
-        out.contains("changed host \"pub:io/v1\": (print: (String) -> Nil)"),
+        out.contains("changed host \"pub:io/v1\": (print: (String) -> ())"),
         "{out}"
     );
     assert!(
-        out.contains("to host \"pub:io/v1\": (show: (String) -> Nil)"),
+        out.contains("to host \"pub:io/v1\": (show: (String) -> ())"),
         "{out}"
     );
 }
@@ -1637,7 +1637,7 @@ fn add_rejects_dependency_with_source_link() {
     let manifest = "name = \"app\"\n";
     let app = w.project(
         "app",
-        &[("i.toml", manifest), ("src/main.i", "main = () { Nil }\n")],
+        &[("i.toml", manifest), ("src/main.i", "main = () { () }\n")],
     );
     let err = w.fails(&[
         "add",
@@ -1671,7 +1671,7 @@ fn package_commands_reject_tampered_cache_with_original_sidecar() {
                 "i.toml",
                 "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
             ),
-            ("src/main.i", "main = () { Nil }\n"),
+            ("src/main.i", "main = () { () }\n"),
         ],
     );
     let project = app.to_str().unwrap();
@@ -1888,7 +1888,7 @@ fn publish_rejects_duplicate_test_names() {
         &dir,
         &[(
             "test/dup_test.i",
-            "(\n\ttestlib = (test) = std/test\n)\n\ntest(\"same\", () { Nil })\n\ntest(\"same\", () { Nil })\n",
+            "(\n\ttestlib = (test) = std/test\n)\n\ntest(\"same\", () { () })\n\ntest(\"same\", () { () })\n",
         )],
         "1.0.0",
     );
@@ -1913,11 +1913,11 @@ fn publish_does_not_panic_on_an_unnamed_test() {
             ("i.toml", &manifest),
             (
                 "src/unnamed.is",
-                "(, (= syntax (/ i syntax)))\n(, tests unnamed)\n(= tests Nil)\n(@ macro\n  (= unnamed\n    (-> (, body) (<- _ (, (: items (. syntax Items))))\n      {(= target `generated_test)\n       ((. items add) `tests target [(, \"mode\" \"test\")] body)\n       `(= ~target (-> (,) _ {(~body)}))})))\n",
+                "(, (= syntax (/ i syntax)))\n(, tests unnamed)\n(= tests (,))\n(@ macro\n  (= unnamed\n    (-> (, body) (<- _ (, (: items (. syntax Items))))\n      {(= target `generated_test)\n       ((. items add) `tests target [(, \"mode\" \"test\")] body)\n       `(= ~target (-> (,) _ {(~body)}))})))\n",
             ),
             (
                 "test/unnamed_test.i",
-                "(u = pub/unnamed)\nu.unnamed(() { Nil })\n",
+                "(u = pub/unnamed)\nu.unnamed(() { () })\n",
             ),
         ],
         "1.0.0",

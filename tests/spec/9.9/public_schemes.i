@@ -47,4 +47,4 @@ map_concurrently : <A, B, E, N>(List(A), (A) <- (Fail(E), ..N) -> B) <- (
 	..N,
 ) -> List(B) = task.map_concurrently
 
-main = () { Nil }
+main = () { () }

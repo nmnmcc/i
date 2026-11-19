@@ -1,11 +1,11 @@
 Dep = ()
 
-S(N) = (() <- N -> Nil)
+S(N) = (() <- N -> ())
 
-T(N) = (() <- N -> Nil)
+T(N) = (() <- N -> ())
 
 Bad = T(S(Never) | S(Dep))
 
 use = (x : Bad) { x }
 
-main = () { Nil }
+main = () { () }

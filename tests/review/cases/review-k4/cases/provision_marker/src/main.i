@@ -1,5 +1,5 @@
 S(A) = (value = A)
-G(N) = (() <- N -> Nil, (N) -> Nil)
+G(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : G(N)) {
 	G(f, _) = s
 	f()
@@ -12,10 +12,10 @@ with = <A, R, N>(x : A, f : () <- N -> R) {
 read = () <- (s : S(String)) { s.value <> "!" }
 
 main = () {
-	_syn3_1 : G(Never) = G(() { Nil }, (_ : Never) { Nil })
+	_syn3_1 : G(Never) = G(() { () }, (_ : Never) { () })
 	{
 		run(() { use() })
 		with(1, read)
-		Nil
+		()
 	} <- (_syn3_1)
 }

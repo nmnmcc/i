@@ -7,7 +7,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -57,16 +57,16 @@ test("structures", () {
 	no(Some(1) == None)
 	yes(None == None)
 	no(Ok(1) == Error(1))
-	yes(Ok(Nil) == Ok(Nil))
+	yes(Ok(()) == Ok(()))
 	yes(True == True)
 	no(True == False)
-	yes(Nil == Nil)
+	yes(() == ())
 })
 
-mixed = (x : { Int | String | Nil }) { x == Nil }
+mixed = (x : { Int | String | () }) { x == () }
 
 test("different_types", () {
-	yes(mixed(Nil))
+	yes(mixed(()))
 	no(mixed(1))
 	no(mixed(""))
 })

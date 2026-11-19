@@ -1,7 +1,7 @@
 //// Sets: collections of values with no two the same, which may not be
 //// changed.
 ////
-//// A `Set(A)` is a `Dict(A, Nil)` (see `std/dict`): members are compared
+//// A `Set(A)` is a `Dict(A, ())` (see `std/dict`): members are compared
 //// with `==` and found by their `core.hash`, so any value may be a member.
 //// `insert`, `delete`, and `contains` take O(log n) steps. Two sets with the
 //// same members are `==`. The order of `to_list` and `fold` is not fixed.
@@ -35,7 +35,7 @@
 )
 
 /// A set of values of type `a`.
-Set(A) = (Dict(A, Nil))
+Set(A) = (Dict(A, ()))
 
 /// A set with no members.
 new = <A>() -> Set(A) { Set(dict.new()) }
@@ -52,7 +52,7 @@ is_empty = <A>(set : Set(A)) -> Bool { size(set) == 0 }
 /// The set with a new member. If it is already there, the set is the same.
 insert = <A>(into : Set(A), this : A) -> Set(A) {
 	Set(d) = into
-	Set(dict.insert(d, this, Nil))
+	Set(dict.insert(d, this, ()))
 }
 
 /// The set without a member.
@@ -80,7 +80,7 @@ to_list = <A>(set : Set(A)) -> List(A) {
 /// ```
 from_list = <A>(members : List(A)) -> Set(A) {
 	go = (rest, d) {
-		rest |> ([]) { Set(d) } & ([x, ..xs]) { go(xs, dict.insert(d, x, Nil)) }
+		rest |> ([]) { Set(d) } & ([x, ..xs]) { go(xs, dict.insert(d, x, ())) }
 	}
 	go(members, dict.new())
 }
@@ -96,10 +96,10 @@ fold = <A, Acc, N>(
 }
 
 /// Calls a function with every member.
-each = <A, B, N>(set : Set(A), with : (A) <- N -> B) -> Nil {
-	fold(set, Nil, (_, x) {
+each = <A, B, N>(set : Set(A), with : (A) <- N -> B) -> () {
+	fold(set, (), (_, x) {
 		with(x)
-		Nil
+		()
 	})
 }
 

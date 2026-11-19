@@ -12,9 +12,9 @@
 
 Box(A) = (value = A)
 
-Sink(A) = (put = (A) -> Nil)
+Sink(A) = (put = (A) -> ())
 
-capture = <A>(x : A, f : ((A) -> Nil) -> Nil) -> A {
+capture = <A>(x : A, f : ((A) -> ()) -> ()) -> A {
 	control.boundary((b) {
 		f((a) {
 			control.suspend(b, (k) {
@@ -26,7 +26,7 @@ capture = <A>(x : A, f : ((A) -> Nil) -> Nil) -> A {
 	})
 }
 
-capture2 = <A>(x : A, f : (Sink(A)) -> Nil) -> A {
+capture2 = <A>(x : A, f : (Sink(A)) -> ()) -> A {
 	capture(x, (k) { f(Sink(put = k)) })
 }
 
@@ -107,13 +107,13 @@ test("folds", () {
 })
 
 // Decision 7: a service argument and a parameter of a parameter are hidden.
-Feed(A) = (put = (A) -> Nil)
+Feed(A) = (put = (A) -> ())
 
-with_feed = <A>(seed : A, body : () <- (Feed(A)) -> Nil) -> A {
+with_feed = <A>(seed : A, body : () <- (Feed(A)) -> ()) -> A {
 	capture(seed, (put) { body() <- (Feed(put = put)) })
 }
 
-loop = <S>(init : S, body : (S, (S) -> Nil) -> Nil) -> Nil {
+loop = <S>(init : S, body : (S, (S) -> ()) -> ()) -> () {
 	again = (s : S) { body(s, again) }
 	again(init)
 }
@@ -121,6 +121,6 @@ loop = <S>(init : S, body : (S, (S) -> Nil) -> Nil) -> Nil {
 test("hidden_service_and_setter", () {
 	assert(with_feed(0, () <- (feed : Feed(Int)) { feed.put(5) }) == 5)
 	loop(0, (n, again) {
-		{ n == 3 } |> (True) { Nil } & (False) { again(n + 1) }
+		{ n == 3 } |> (True) { () } & (False) { again(n + 1) }
 	})
 })

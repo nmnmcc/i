@@ -16,35 +16,35 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
 // §9.9 lets the failure come before or after any one step of the waiting
 // child, so the child repeats its step until the cancellation reaches it.
-yield_forever = () -> Nil {
+yield_forever = () -> () {
 	task.yield()
 	yield_forever()
 }
 
-sync_forever = () -> Nil {
+sync_forever = () -> () {
 	task.sync(
-		task.map(task.always(Nil), (_) { Nil }),
+		task.map(task.always(()), (_) { () }),
 	)
 	sync_forever()
 }
 
 probe = (
 	label : String,
-	wait : () <- (Fail(Never), task.Scheduler, request.Root) -> Nil
+	wait : () <- (Fail(Never), task.Scheduler, request.Root) -> ()
 ) {
 	result = fail.catch(() {
 		task.scope((s) {
-			armed : task.Channel(Nil) = task.channel()
+			armed : task.Channel(()) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
-						task.send(armed, Nil)
+						task.send(armed, ())
 						wait()
 						panic("cancelled body continued")
 					},
@@ -66,18 +66,18 @@ probe = (
 
 main = () {
 	probe("yield", () { yield_forever() })
-	c : task.Channel(Nil) = task.channel()
-	probe("send", () { task.send(c, Nil) })
+	c : task.Channel(()) = task.channel()
+	probe("send", () { task.send(c, ()) })
 	probe("receive", () { task.receive(c) })
 	probe("sync", () { sync_forever() })
 	result = fail.catch(() {
 		task.scope((s) {
 			target = task.go(s, () { task.sync(task.never()) })
-			armed : task.Channel(Nil) = task.channel()
+			armed : task.Channel(()) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() {
-						task.send(armed, Nil)
+						task.send(armed, ())
 						task.join(target)
 					},
 					() {
@@ -97,7 +97,7 @@ main = () {
 	probe("scope-end", () {
 		task.scope((inner) {
 			task.go(inner, () { task.sync(task.never()) })
-			Nil
+			()
 		})
 	})
 }

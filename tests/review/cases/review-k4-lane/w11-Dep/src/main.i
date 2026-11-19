@@ -2,7 +2,7 @@ Dep = (value = Int)
 
 get = () <- (d : Dep) { d.value }
 
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
 
 use = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
@@ -19,6 +19,6 @@ wrap : <N>(() <- (Fail(Never), S(N), ..N) -> Int, S(N)) <- (
 
 main = () {
 	assert(
-		wrap(() { use() }, S(f = () { get() }, m = (_ : Dep) { Nil })) == 7,
+		wrap(() { use() }, S(f = () { get() }, m = (_ : Dep) { () })) == 7,
 	) <- (Dep(value = 7))
 }

@@ -5,5 +5,5 @@ outer = <A1>(x : A1) {
 
 main = () {
 	assert(outer("s") == "s")
-	Nil
+	()
 }

@@ -81,7 +81,7 @@ fn cases() -> Vec<(String, String)> {
         ),
         (tuple(&[]), "()".into()),
         (tuple(&[tuple(&[integer(1)])]), "((1))".into()),
-        ("(ref.null eq)".into(), "Nil".into()),
+        ("(ref.null eq)".into(), "()".into()),
         (
             "(struct.new $obj (i32.const 5) (i32.const 16) (i64.const 40) (f64.const 0) \
              (ref.null $bytes) (ref.null $values) (ref.null $limbs) (ref.null $call))"
@@ -110,7 +110,7 @@ fn cases() -> Vec<(String, String)> {
         (format!("(call $result_ok {})", integer(1)), "Ok(1)".into()),
         (
             "(call $result_error (ref.null eq))".into(),
-            "Error(Nil)".into(),
+            "Error(())".into(),
         ),
         (
             format!(

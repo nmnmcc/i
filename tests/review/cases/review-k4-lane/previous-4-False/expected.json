@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> Nil\napp/main.example : () <- (Sink(A, Never)) -> Result(Nil, A)\napp/main.main : () <- (Sink(A, Never)) -> Result(Nil, A)\n",
+      "stdout": "app/main.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> ()\napp/main.example : () <- (Sink(A, Never)) -> Result((), A)\napp/main.main : () <- (Sink(A, Never)) -> Result((), A)\n",
       "stderr": ""
     },
     "test0": {

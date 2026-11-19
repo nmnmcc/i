@@ -14,7 +14,7 @@ NotFound = (id = String)
 
 Db = (find = (String) <- (Fail(NotFound)) -> User)
 
-Log = (write = (String) -> Nil)
+Log = (write = (String) -> ())
 
 Base = (value = Int)
 
@@ -57,7 +57,7 @@ fake_db = Db(
 	},
 )
 
-quiet_log = Log(write = (text) { Nil })
+quiet_log = Log(write = (text) { () })
 
 lookup = (id : String) -> Result(String, NotFound) {
 	attempt(() {

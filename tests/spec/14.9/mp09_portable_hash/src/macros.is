@@ -3,7 +3,7 @@
 (= First (,))
 (= Second (, Int))
 (@ macro (= check (-> (,) _ {
-    (assert (== ((. core hash) Nil) 84696351))
+    (assert (== ((. core hash) (,)) 84696351))
     (assert (== ((. core hash) True) 978348367))
     (assert (== ((. core hash) False) 4218009092))
     (assert (== ((. core hash) 0) 1105629711))
@@ -14,7 +14,7 @@
     (assert (== ((. core hash) (, 42 "x")) 950806038))
     (assert (== ((. core hash) []) 2872932083))
     (assert (== ((. core hash) [42]) 4186791901))
-    (assert (== ((. core hash) (-> (,) _ Nil)) 34363494))
+    (assert (== ((. core hash) (-> (,) _ (,))) 34363494))
     (assert (== ((. core hash) ((. key new))) 34363494))
     (assert (== ((. core hash) First) 2966186304))
     (assert (== ((. core hash) (Second 42)) 4154392699))

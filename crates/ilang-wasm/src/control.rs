@@ -774,7 +774,7 @@ mod tests {
                 dst: 2,
                 env: Env::Param,
                 service: 1,
-                value: Atom::Nil,
+                value: Atom::Unit,
                 in_place: false,
             },
             Stmt::Let {
@@ -794,7 +794,7 @@ mod tests {
                     env: Env::Local(2),
                     site: None,
                 }],
-                otherwise: vec![Stmt::Return(Atom::Nil)],
+                otherwise: vec![Stmt::Return(Atom::Unit)],
             },
         ];
         let mut p = Program {
@@ -852,21 +852,21 @@ mod tests {
                         dst: 1,
                         env: Env::Param,
                         service: 0,
-                        value: Atom::Nil,
+                        value: Atom::Unit,
                         in_place: false,
                     },
                     Stmt::LetEnv {
                         dst: 2,
                         env: Env::Local(1),
                         service: 1,
-                        value: Atom::Nil,
+                        value: Atom::Unit,
                         in_place: false,
                     },
                     Stmt::LetEnv {
                         dst: 3,
                         env: Env::Local(2),
                         service: 2,
-                        value: Atom::Nil,
+                        value: Atom::Unit,
                         in_place: false,
                     },
                     Stmt::Block {

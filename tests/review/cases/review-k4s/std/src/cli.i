@@ -354,16 +354,16 @@ valid_short = (name : String) -> Bool {
 
 positional = (kind : Kind) -> Bool { kind == Positional || kind == Remaining }
 
-validate = (fields : List(Field)) -> Result(Nil, DefinitionError) {
+validate = (fields : List(Field)) -> Result((), DefinitionError) {
 	go = (
 		remaining : List(Field),
 		longs : List(String),
 		shorts : List(String),
 		positions : List(String),
 		had_rest : Bool
-	) -> Result(Nil, DefinitionError) {
+	) -> Result((), DefinitionError) {
 		remaining |>
-			([]) { Ok(Nil) }
+			([]) { Ok(()) }
 			& ([field, ..tail]) {
 				short_error = field.short |>
 					(Some(name)) {

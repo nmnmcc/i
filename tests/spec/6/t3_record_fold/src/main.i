@@ -18,5 +18,5 @@ main = () {
 	})
 	assert(r == (n = 3, total = 6))
 	assert(s.n == 3)
-	Nil
+	()
 }

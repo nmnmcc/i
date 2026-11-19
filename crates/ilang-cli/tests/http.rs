@@ -133,7 +133,7 @@ fn http_timeout() {
 main = () {{
  task.run(() {{
   result = fail.catch(() {{ http.send_timeout(http.client().send, http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
-  result |> (Error(http.Timeout)) {{ Nil }} & (_) {{ panic("expected timeout") }}
+  result |> (Error(http.Timeout)) {{ () }} & (_) {{ panic("expected timeout") }}
  }})
 }}
 "#
@@ -151,7 +151,7 @@ fn http_dns() {
 
 main = () {
 	result = fail.catch(() { http.get("http://name.invalid/") })
-	result |> (Error(http.Dns(_))) { Nil } & (_) { panic("expected DNS error") }
+	result |> (Error(http.Dns(_))) { () } & (_) { panic("expected DNS error") }
 }
 "#,
     );
@@ -170,7 +170,7 @@ fn http_dns_distinct_from_connection_refused() {
 main = () {{
 	result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/") }})
 	result |>
-		(Error(http.Connect(_))) {{ Nil }}
+		(Error(http.Connect(_))) {{ () }}
 		& (_) {{ panic("expected connection error") }}
 }}
 "#
@@ -258,7 +258,7 @@ fn http_redirect_limit() {
 main = () {{
 	result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/start") }})
 	result |>
-		(Error(http.Protocol("too many redirects"))) {{ Nil }}
+		(Error(http.Protocol("too many redirects"))) {{ () }}
 		& (_) {{ panic("expected redirect limit") }}
 }}
 "#
@@ -467,7 +467,7 @@ read_pieces = (
 	{ bit_array.byte_size(piece) == 0 } |>
 		(True) { (bit_array.concat(list.reverse(acc)), count) }
 		& (False) {
-			{ count == 0 } |> (True) { stdio.print("piece") } & (False) { Nil }
+			{ count == 0 } |> (True) { stdio.print("piece") } & (False) { () }
 			read_pieces(body, [piece, ..acc], count + 1)
 		}
 }

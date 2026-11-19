@@ -7,7 +7,7 @@
 //!
 //! The rule that the inferred type of an exported binding may use only exported
 //! types, and the rules that an entry point has a type its kind allows (a test
-//! gives `Nil`; a host export takes and gives only types the host can take), are
+//! gives `()`; a host export takes and gives only types the host can take), are
 //! checked by type inference (`types/infer.rs`); resolution checks the
 //! written types.
 

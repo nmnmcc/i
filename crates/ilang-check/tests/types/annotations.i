@@ -36,7 +36,7 @@ result_written = <A, E>(r : Result(A, E)) -> A {
 	r |> (Ok(v)) { v } & (Error(e)) { fail.raise(e) }
 }
 
-diff_written = (x : { Int | String | Nil }) -> { Int | String | Nil } - String {
+diff_written = (x : { Int | String | () }) -> { Int | String | () } - String {
 	1
 }
 

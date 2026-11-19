@@ -19,7 +19,7 @@ Dep = (v = Int)
 
 S(N) = (f = () <- N -> Int)
 
-T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
+T(A, N) = (g = (A) <- N -> A, m = (N) -> ())
 
 fr = () { run(() { use() }) }
 
@@ -28,7 +28,7 @@ loop = (x) { x(x) }
 closed = () {
 	_syn3_0 : T(Int, Dep) = T(
 		g = (x : Int) { x + get() },
-		m = (_ : Dep) { Nil },
+		m = (_ : Dep) { () },
 	)
 	_syn3_1 : S(Dep) = S(f = () { get() })
 	both() <- (Dep(v = 1), _syn3_0, _syn3_1)
@@ -36,7 +36,7 @@ closed = () {
 
 main = () {
 	closed()
-	Nil
+	()
 }
 
 get = () <- (d : Dep) { d.v }

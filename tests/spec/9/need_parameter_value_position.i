@@ -5,5 +5,5 @@ Holder(R, N) = (boundary = Boundary(R, N))
 forward = <R, N>(b : Boundary(R, N), body : () <- N -> R) <- (..env : N) {
 	body() <- env
 }
-unused_value = <N>(x : N) <- (..env : N) { Nil }
-main = () { Nil }
+unused_value = <N>(x : N) <- (..env : N) { () }
+main = () { () }

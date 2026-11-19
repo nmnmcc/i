@@ -22,9 +22,9 @@ label = (u : User) {
 
 test("spread_is_a_catch_all", () {
 	(kind(User(name = "a", age = 20)), kind(User(name = "b", age = 5))) |>
-		((1, 2)) { Nil }
+		((1, 2)) { () }
 		& (_) { panic("kind") }
 	(label(User(name = "a", age = 20)), label(User(name = "b", age = 5))) |>
-		(("a", "young b")) { Nil }
+		(("a", "young b")) { () }
 		& (_) { panic("label") }
 })

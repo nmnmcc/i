@@ -45,21 +45,21 @@ def programs():
     decode = lambda s: json.loads('"' + s.replace('\n', '\\n') + '"')
     exact = decode(re.search(r'let exact = "((?:\\.|[^"\\])*)";', rust).group(1))
     for inferred in [False, True]:
-        text = exact.replace("local : () -> Nil ! N | S(N)", 'local') if inferred else exact
+        text = exact.replace("local : () -> () ! N | S(N)", 'local') if inferred else exact
         yield f'entry-{inferred}', text, 'E0522'
-        yield f'unused-{inferred}', text.replace('local() }', 'Nil }'), None
+        yield f'unused-{inferred}', text.replace('local() }', '() }'), None
     array = rust.split('let sources = [', 1)[1].split('\n    ];', 1)[0]
     for i, match in enumerate(re.finditer(r'"((?:\\.|[^"\\])*)"', array)):
         for inferred in [False, True]:
             text = decode(match[1])
             if inferred:
-                for old in ["local : () -> Nil ! N | S(N)", '-> Nil ! N | S(N)',
+                for old in ["local : () -> () ! N | S(N)", '-> () ! N | S(N)',
                             '-> A ? E ! N | Outer(A, E, N)', '-> Int ! N | Outer(N)',
-                            '-> Nil ? E ! N | Sink(E, N)']:
+                            '-> () ? E ! N | Sink(E, N)']:
                     text = text.replace(old, 'local' if old.startswith('local:') else '')
-                text = text.replace('() -> Nil ? E ! N | S(E, N) {', '() {')
+                text = text.replace('() -> () ? E ! N | S(E, N) {', '() {')
             yield f'previous-{i}-{inferred}', text + '\n@main\nmain = () { example() }\n', 'E0522'
-    chain = ("S(N) { S(() -> Nil ! N, (N) -> Nil) }\nuse(N) = (s ! S(N)) { S(f, _) = s f() }\nrun(N) = (body : () -> Nil ! N) { body() }\nforward_0 = () { run(() { use() }) }\n")
+    chain = ("S(N) { S(() -> () ! N, (N) -> ()) }\nuse(N) = (s ! S(N)) { S(f, _) = s f() }\nrun(N) = (body : () -> () ! N) { body() }\nforward_0 = () { run(() { use() }) }\n")
     for n in range(1, 64):
         chain += f'forward_{n} = () {{ run(() {{ forward_{n-1}() }}) }}\n'
     yield 'previous-chain-64', chain + '\n@main\nmain = () { forward_63() }\n', 'E0522'

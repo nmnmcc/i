@@ -30,13 +30,13 @@
 //!
 //! # Values
 //!
-//! Every value is an `eqref`. Apart from Nil, Int and host references, it is a
+//! Every value is an `eqref`. Apart from `()`, Int and host references, it is a
 //! struct of a subtype of `$val`, whose field 0 is the value tag: a `$cons`
 //! for a list that is not empty, else an `$obj`:
 //!
 //! | Tag | Value | Representation |
 //! |---|---|---|
-//! | 0 | Nil | the null reference |
+//! | 0 | `()` | the null reference |
 //! | 1 | Bool | field 1 is 0 or 1; use `$bool_new` (or the globals `$value_true` and `$value_false`) |
 //! | 2 | Float | field 3; always finite |
 //! | 3 | String | field 4: UTF-8 bytes |
@@ -72,7 +72,7 @@
 //! 2) and 4 `Fail` (type id 3). The code generator numbers the other constructors from
 //! [`FIRST_CONSTRUCTOR`] and installs their names, in order, with
 //! `$constructors_install (param (ref $values))`, an array of String values.
-//! `Bool` and `Nil` use tags 1 and 0, not constructor ids.
+//! `Bool` and `()` use tags 1 and 0, not constructor ids.
 //!
 //! Numeric workers have separate internal signatures and receive the original
 //! closure plus the current call-site environment. Generic closure references,

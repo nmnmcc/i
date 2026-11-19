@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.main : () <- (Gate, request.Owner, task.Runner) -> Nil\n",
+      "stdout": "app/main.main : () <- (Gate, request.Owner, task.Runner) -> ()\n",
       "stderr": ""
     },
     "test0": {

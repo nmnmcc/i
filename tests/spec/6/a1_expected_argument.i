@@ -19,5 +19,5 @@ main = () {
 	]
 	names = list_map(opts, (Some(u)) { u.name } & (None) { "" })
 	assert(names == ["Ada", "", "Bob"])
-	Nil
+	()
 }

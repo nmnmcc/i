@@ -9,7 +9,7 @@
 main = () {
 	assert(
 		fail.catch(() {
-			resource.ensure(() { Nil }, () { fail.raise("final") })
+			resource.ensure(() { () }, () { fail.raise("final") })
 		}) ==
 			Error("final"),
 	)

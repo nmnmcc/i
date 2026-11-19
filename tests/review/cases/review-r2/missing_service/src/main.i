@@ -14,6 +14,6 @@ needs = () <- (m : Missing) { m.value }
 main = () <- (io : Io) {
 	task.scope((s) {
 		task.go(s, () { needs() })
-		Nil
+		()
 	})
 }

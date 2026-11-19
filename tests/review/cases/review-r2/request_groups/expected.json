@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.main : () <- (Assert, Fail(Never), Later, request.Await, request.Root, task.Scheduler) -> Nil\n",
+      "stdout": "app/main.main : () <- (Assert, Fail(Never), Later, request.Await, request.Root, task.Scheduler) -> ()\n",
       "stderr": ""
     },
     "test0": {

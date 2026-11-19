@@ -40,8 +40,8 @@ safe = (id) {
 // inferred: (id: String) -> User ? HttpError ! Http
 
 // At the top place.
-rest = (v : { Int | String | Nil }) {
-	v |> (_ : Int) { "int" } & (Nil) { "nil" } & (other) { other }
+rest = (v : { Int | String | () }) {
+	v |> (_ : Int) { "int" } & (()) { "nil" } & (other) { other }
 }
 
 // Every constructor of `Result` before: `Result` is taken.
@@ -50,7 +50,7 @@ whole = (v : { Result(Int, Int) | String }) {
 }
 
 // At a place below a constructor.
-nested = (r : Result(Int | String, Nil)) {
+nested = (r : Result(Int | String, ())) {
 	r |> (Ok(_ : Int)) { "" } & (Ok(s)) { s } & (Error(_)) { "error" }
 }
 
@@ -62,7 +62,7 @@ pairs = (p : (Int | String, Bool)) {
 // Two levels down: every `Result` below `Ok` is taken, but rule 12 takes
 // out whole type constructors only, so after `Ok(Ok(_))` alone `inner`
 // would still be a `Result`.
-deep = (r : Result(Result(Int, String) | Nil, Nil)) {
+deep = (r : Result(Result(Int, String) | (), ())) {
 	r |>
 		(Ok(Ok(_))) { "ok" }
 		& (Ok(Error(s))) { s }
@@ -76,8 +76,8 @@ guarded = (v : { Int | String }) { v |> (_ : Int ? True) { "int" } & (x) { x } }
 
 literal = (v : { Int | String }) { v |> (1) { "one" } & (x) { x } }
 
-partial = (v : { Result(Int, String) | Nil }) {
-	v |> (Ok(1)) { Nil } & (Error(_)) { Nil } & (other) { other }
+partial = (v : { Result(Int, String) | () }) {
+	v |> (Ok(1)) { () } & (Error(_)) { () } & (other) { other }
 }
 
 // Rule 12 looks at what the patterns match, not at the types: the first

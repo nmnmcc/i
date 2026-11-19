@@ -32,7 +32,7 @@ main = (io ! Io) {{
 }}
 '''
     if family == 'choose':
-        declarations = "pick = (a, b, c, n : Int) { { n % 3 } |> { 0 -> a 1 -> b _ -> c } }\nspawn = (s : task.Scope(Never), a : task.Channel(Int), b : task.Channel(Int), c : task.Channel(Int), n : Int) -> Nil ! task.Scheduler | Assert {\n n |> { 0 -> Nil _ -> {\n task.go(s, () { assert(task.sync(task.choose([task.receive_event(a), task.receive_event(b), task.receive_event(c)])) == n) })\n spawn(s, a, b, c, n - 1)\n } }\n}\ndrain = (a : task.Channel(Int), b : task.Channel(Int), c : task.Channel(Int), n : Int) -> Nil ! task.Scheduler {\n n |> { 0 -> Nil _ -> { task.send(pick(a, b, c, n), n) drain(a, b, c, n - 1) } }\n}\n"
+        declarations = "pick = (a, b, c, n : Int) { { n % 3 } |> { 0 -> a 1 -> b _ -> c } }\nspawn = (s : task.Scope(Never), a : task.Channel(Int), b : task.Channel(Int), c : task.Channel(Int), n : Int) -> () ! task.Scheduler | Assert {\n n |> { 0 -> () _ -> {\n task.go(s, () { assert(task.sync(task.choose([task.receive_event(a), task.receive_event(b), task.receive_event(c)])) == n) })\n spawn(s, a, b, c, n - 1)\n } }\n}\ndrain = (a : task.Channel(Int), b : task.Channel(Int), c : task.Channel(Int), n : Int) -> () ! task.Scheduler {\n n |> { 0 -> () _ -> { task.send(pick(a, b, c, n), n) drain(a, b, c, n - 1) } }\n}\n"
         body = f'''a: task.Channel(Int) = task.channel()
  b: task.Channel(Int) = task.channel()
  c: task.Channel(Int) = task.channel()
@@ -41,11 +41,11 @@ main = (io ! Io) {{
     else:
         child = 'task.send(c, n)' if family == 'senders' else 'assert(task.receive(c) == n)'
         parent = 'assert(task.receive(c) == n)' if family == 'senders' else 'task.send(c, n)'
-        declarations = f'''spawn = (s: task.Scope(Never), c: task.Channel(Int), n: Int) -> Nil ! task.Scheduler | Assert {{
- n |> {{ 0 -> Nil _ -> {{ task.go(s, () {{ {child} }}) spawn(s, c, n - 1) }} }}
+        declarations = f'''spawn = (s: task.Scope(Never), c: task.Channel(Int), n: Int) -> () ! task.Scheduler | Assert {{
+ n |> {{ 0 -> () _ -> {{ task.go(s, () {{ {child} }}) spawn(s, c, n - 1) }} }}
 }}
-drain = (c: task.Channel(Int), n: Int) -> Nil ! task.Scheduler | Assert {{
- n |> {{ 0 -> Nil _ -> {{ {parent} drain(c, n - 1) }} }}
+drain = (c: task.Channel(Int), n: Int) -> () ! task.Scheduler | Assert {{
+ n |> {{ 0 -> () _ -> {{ {parent} drain(c, n - 1) }} }}
 }}
 '''
         body = f'c: task.Channel(Int) = task.channel() spawn(s, c, {count}) drain(c, {count})'

@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.marker : Nil\napp/cases.get : () <- (Dep) -> Int\napp/cases.use : (A) <- (Fail(B), S(A, B, N), ..N) -> A\napp/cases.run : (() <- N -> A) <- N -> A\napp/cases.forward : (A & B) <- (Fail(C), S(A & B, C, N), ..N) -> B\napp/cases.left : (Bool) <- (Fail(Never), S(Int, Never, N), ..N) -> Int\napp/cases.right : (Bool) <- (Fail(Never), S(Int, Never, N), ..N) -> Int\napp/cases.generated_test : () <- (Fail(Never)) -> Nil\napp/cases.generated_test : () <- (Fail(Never)) -> Nil\napp/cases.generated_test : () -> Nil\napp/cases.generated_test : () <- (Fail(Never)) -> Nil\napp/cases.make : (Int) -> () <- (Fail(Never)) -> Int\napp/cases.generated_test : () <- (Fail(Never)) -> Nil\n",
+      "stdout": "app/main.marker : ()\napp/cases.get : () <- (Dep) -> Int\napp/cases.use : (A) <- (Fail(B), S(A, B, N), ..N) -> A\napp/cases.run : (() <- N -> A) <- N -> A\napp/cases.forward : (A & B) <- (Fail(C), S(A & B, C, N), ..N) -> B\napp/cases.left : (Bool) <- (Fail(Never), S(Int, Never, N), ..N) -> Int\napp/cases.right : (Bool) <- (Fail(Never), S(Int, Never, N), ..N) -> Int\napp/cases.generated_test : () <- (Fail(Never)) -> ()\napp/cases.generated_test : () <- (Fail(Never)) -> ()\napp/cases.generated_test : () -> ()\napp/cases.generated_test : () <- (Fail(Never)) -> ()\napp/cases.make : (Int) -> () <- (Fail(Never)) -> Int\napp/cases.generated_test : () <- (Fail(Never)) -> ()\n",
       "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `marker` is not used\n"
     },
     "test0": {

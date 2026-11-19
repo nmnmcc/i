@@ -10,7 +10,7 @@
 	i/control
 )
 
-Paused = (Continuation(Nil, PausedSum, Never))
+Paused = (Continuation((), PausedSum, Never))
 
 Done = ()
 PausedSum = Paused | Done
@@ -42,9 +42,9 @@ main = () {
 	})
 	p |>
 		(Paused(k)) {
-			x = control.resume(k, Nil)
+			x = control.resume(k, ())
 			x
 		}
 		& (Done) { panic("not paused") }
-	Nil
+	()
 }

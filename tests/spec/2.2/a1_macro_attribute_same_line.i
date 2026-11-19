@@ -6,5 +6,5 @@
 
 main = () {
   assert(True)
-  Nil
+  ()
 }

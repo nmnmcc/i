@@ -1,2 +1,2 @@
-worker = () { Nil }
+worker = () { () }
 main = worker

@@ -1,6 +1,6 @@
 Clock = (now = () -> Int)
 
-Log = (write = (String) -> Nil)
+Log = (write = (String) -> ())
 
 State(S) = (get = () -> S)
 

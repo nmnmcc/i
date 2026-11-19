@@ -192,7 +192,7 @@ close_pending = () {
 						),
 					),
 			)
-			Nil
+			()
 		})
 	})
 	net.close_datagram(b)

@@ -14,4 +14,4 @@ kind = (h : { Window | Socket }) {
 	h |> (_ : Window) { "window" } & (_ : Socket) { "socket" }
 }
 
-test("t", () { Nil })
+test("t", () { () })

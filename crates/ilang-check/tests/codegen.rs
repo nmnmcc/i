@@ -45,7 +45,7 @@ div = (a : Int, h : Handle) {
 	a |>
 		(0) { fail.raise("zero") }
 		& (1) { fail.raise(a) }
-		& (2) { fail.raise(Nil) }
+		& (2) { fail.raise(()) }
 		& (_) { a }
 }
 "#;
@@ -178,6 +178,6 @@ fn codegen_data() {
     assert_eq!(sigs[0].1.result, HostType::Int);
     assert_eq!(
         sigs[0].1.errors,
-        vec![HostType::Nil, HostType::Int, HostType::String]
+        vec![HostType::Unit, HostType::Int, HostType::String]
     );
 }

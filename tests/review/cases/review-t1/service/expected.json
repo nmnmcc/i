@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.cur : (A) <- (State(A)) -> A\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.cur : (A) <- (State(A)) -> A\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

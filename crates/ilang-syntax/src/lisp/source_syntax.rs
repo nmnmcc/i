@@ -333,7 +333,7 @@ mod tests {
     fn accepted_lisp_item_uses_its_parsed_kind() {
         // Empty data is `(,)`; the migration item reader rejects this
         // function head, so the accepted item must not be reparsed there.
-        let source = "(test \"quote\" (-> (,) _ { Nil }))";
+        let source = "(test \"quote\" (-> (,) _ { (,) }))";
         let (module, errors) = migration_syntax::lisp::parse_source(source);
         assert!(errors.is_empty(), "{errors:?}");
         let scope = Scope {
@@ -341,7 +341,7 @@ mod tests {
             marks: BTreeSet::new(),
         };
         let syntax = source_item_syntax(&module.items[0], &scope, source, true);
-        assert_eq!(syntax.show(), "(test \"quote\" (-> (,) _ Nil))");
+        assert_eq!(syntax.show(), "(test \"quote\" (-> (,) _ (,)))");
     }
 
     #[test]
@@ -516,8 +516,8 @@ mod tests {
             ),
             (
                 Mode::Item,
-                "(test \"name\" { (-> (,) _ { Nil }) })",
-                "(test \"name\" (-> (,) _ Nil))",
+                "(test \"name\" { (-> (,) _ { (,) }) })",
+                "(test \"name\" (-> (,) _ (,)))",
             ),
         ];
         for (mode, source, expected) in cases {

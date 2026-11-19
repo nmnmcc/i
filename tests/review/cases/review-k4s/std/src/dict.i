@@ -411,10 +411,10 @@ values = <K, V>(dict : Dict(K, V)) -> List(V) {
 }
 
 /// Calls a function with every entry, in the order of `fold`.
-each = <K, V, A, N>(dict : Dict(K, V), with : (K, V) <- N -> A) -> Nil {
-	fold(dict, Nil, (_, k, v) {
+each = <K, V, A, N>(dict : Dict(K, V), with : (K, V) <- N -> A) -> () {
+	fold(dict, (), (_, k, v) {
 		with(k, v)
-		Nil
+		()
 	})
 }
 

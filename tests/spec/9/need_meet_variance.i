@@ -6,11 +6,11 @@
 
 Syn3ServiceFail(E) = Fail(E)
 // The other-direction parameter gives the same union on both paths.
-need_int = () <- (f : Syn3ServiceFail(Int)) { Nil }
+need_int = () <- (f : Syn3ServiceFail(Int)) { () }
 
-need_string = () <- (f : Syn3ServiceFail(String)) { Nil }
+need_string = () <- (f : Syn3ServiceFail(String)) { () }
 
-both_fail = () -> Nil {
+both_fail = () -> () {
 	need_int()
 	need_string()
 }
@@ -20,11 +20,11 @@ fail_value = (x : Fail(Int) & Fail(String)) -> Fail(Int | String) { x }
 // The same-direction parameter gives the same intersection on both paths.
 Read(A) = (value = A)
 
-need_read_int = () <- (r : Read(Int)) { Nil }
+need_read_int = () <- (r : Read(Int)) { () }
 
-need_read_one = () <- (r : Read(1)) { Nil }
+need_read_one = () <- (r : Read(1)) { () }
 
-both_read: () <- (Read(1)) -> Nil = () {
+both_read: () <- (Read(1)) -> () = () {
 	need_read_int()
 	need_read_one()
 }
@@ -37,8 +37,8 @@ main = () {
 		both_read()
 		fail.catch(() {
 			both_fail()
-			Nil
+			()
 		})
-		Nil
+		()
 	} <- (read_value(Read(value = 1)))
 }

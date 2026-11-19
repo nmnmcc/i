@@ -12,14 +12,14 @@ Later = (double = (Int) <- (Fail(String)) -> Int, echo = (String) -> String)
 
 main = () <- (later : Later) {
 	task.scope((s) {
-		ready : task.Channel(Nil) = task.channel()
+		ready : task.Channel(()) = task.channel()
 		// Both children use the async Await route. Order the host log calls
 		// explicitly: workers may otherwise start either call first (§9.9).
 		assert(
 			task.both(
 				() {
 					value = later.double(21)
-					task.send(ready, Nil)
+					task.send(ready, ())
 					value
 				},
 				() {

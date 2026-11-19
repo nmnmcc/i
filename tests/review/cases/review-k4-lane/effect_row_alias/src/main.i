@@ -1,9 +1,9 @@
 Dep = ()
 
-S(N) = (() <- N -> Nil)
+S(N) = (() <- N -> ())
 
 Bad = S(Never) | S(Dep)
 
-use = (body : () <- (Bad) -> Nil) { body() }
+use = (body : () <- (Bad) -> ()) { body() }
 
-main = () { Nil }
+main = () { () }

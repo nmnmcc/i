@@ -407,7 +407,7 @@ impl Checker<'_> {
                 match c {
                     Ctor::Custom(r) => self.p.ty(r.ty).params.len(),
                     Ctor::Shape(shape) => shape.len(),
-                    Ctor::Nil | Ctor::Cons => 1,
+                    Ctor::Empty | Ctor::Cons => 1,
                     Ctor::Lit(_) => 0,
                 },
             ),

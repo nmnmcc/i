@@ -1,12 +1,12 @@
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
 }
-first : <N>() <- (Fail(Never), ..N) -> Nil = () <- (s : S(N)) -> Nil {
+first : <N>() <- (Fail(Never), ..N) -> () = () <- (s : S(N)) -> () {
 	second()
 }
-second : <N>() <- (Fail(Never), ..N) -> Nil = () <- (s : S(N)) -> Nil {
+second : <N>() <- (Fail(Never), ..N) -> () = () <- (s : S(N)) -> () {
 	first()
 	use()
 }

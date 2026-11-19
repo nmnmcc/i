@@ -10,12 +10,12 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 main = () <- (out : Out) {
 	result = fail.catch(() {
 		task.scope((s) {
-			ready : task.Channel(Nil) = task.channel()
+			ready : task.Channel(()) = task.channel()
 			resource.ensure(
 				() {
 					task.go(s, () {
@@ -25,7 +25,7 @@ main = () <- (out : Out) {
 					// §9.9 permits the sibling to start or be dropped unstarted.
 					unstarted = task.go(s, () { task.sync(task.never()) })
 					// Install the body final and create its join target before failure.
-					task.send(ready, Nil)
+					task.send(ready, ())
 					task.join(unstarted)
 				},
 				() {

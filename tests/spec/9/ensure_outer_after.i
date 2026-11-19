@@ -9,7 +9,7 @@
 main = () {
 	fail.catch(() {
 		resource.ensure(
-			() { resource.ensure(() { fail.raise(1) }, () { Nil }) },
+			() { resource.ensure(() { fail.raise(1) }, () { () }) },
 			() { panic("outer") },
 		)
 	})

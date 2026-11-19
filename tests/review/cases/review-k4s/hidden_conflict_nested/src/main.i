@@ -1,4 +1,4 @@
-Cell(A) = (read = () -> A, write = (A) -> Nil)
+Cell(A) = (read = () -> A, write = (A) -> ())
 int = () <- (c : Cell(Int)) { c.read() }
 text = () <- (c : Cell(String)) { c.read() }
 apply = (f) { f() }

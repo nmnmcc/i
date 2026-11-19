@@ -1,7 +1,7 @@
 Dep = (v = Int)
 get = () <- (d : Dep) { d.v }
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
-T(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
+T(N) = (f = () <- N -> Int, m = (N) -> ())
 us = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
 	f()
@@ -22,18 +22,18 @@ main = () {
 	w = () {
 		_syn3_0 : S(Dep | T(Dep)) = S(
 			f = () { ut() + get() },
-			m = (_ : { Dep | T(Dep) }) { Nil },
+			m = (_ : { Dep | T(Dep) }) { () },
 		)
 		run(() { run(() { usa() }) }) + h0() + run(() { ut() + get() }) <- (
 			Dep(v = 1),
 			_syn3_0,
 		)
 	}
-	_syn3_1 : T(S(Never)) = T(f = () { get() }, m = (_ : S(Never)) { Nil })
+	_syn3_1 : T(S(Never)) = T(f = () { get() }, m = (_ : S(Never)) { () })
 	{
 		l = () { run(() { us() + usa() }) }
 		h0() + l() + ut() + h1() + w()
-		Nil
+		()
 	} <- (_syn3_1)
 }
 // src/main.i:21:1: error[E0505]: this type has itself inside it, through a type variable (§4.7)

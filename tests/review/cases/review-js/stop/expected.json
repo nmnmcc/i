@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.x : Never\nprobe/main.main : () -> Nil\n",
+      "stdout": "probe/main.x : Never\nprobe/main.main : () -> ()\n",
       "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `x` is not used\n"
     },
     "test0": {

@@ -14,13 +14,13 @@ read = () <- (r : Reading) { r.read() }
 
 test("keep_env keeps a portable lazy service as its value", () {
 	kept = control.boundary((b) {
-		control.keep((x : Nil) { read() }) <- (Reading(read = () { 1 }))
+		control.keep((x : ()) { read() }) <- (Reading(read = () { 1 }))
 	})
 	core.portable(kept) |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic("portable service became non-portable") }
-	{ kept(Nil) == 1 } |>
-		(True) { Nil }
+	{ kept(()) == 1 } |>
+		(True) { () }
 		& (False) { panic("wrong kept service") }
 })
 
@@ -29,18 +29,18 @@ test("keep_env keeps services without light boundary metadata", () {
 		{
 			original = the_reading()
 			{ original == the_reading() } |>
-				(True) { Nil }
+				(True) { () }
 				& (False) { panic("service identity changed") }
 			// The old service is still cached in the boundary metadata. It is
 			// no longer bound, so keep_env must keep only its replacement.
 			{
-				kept = control.keep((x : Nil) { read() })
+				kept = control.keep((x : ()) { read() })
 				core.portable(kept) |>
-					(True) { Nil }
+					(True) { () }
 					& (False) { panic("kept an unbound service") }
-				kept(Nil)
+				kept(())
 			} <- (Reading(read = () { 1 }))
 		} <- (Reading(read = () { control.escape(b, 0) }))
 	})
-	{ r == 1 } |> (True) { Nil } & (False) { panic("wrong kept service") }
+	{ r == 1 } |> (True) { () } & (False) { panic("wrong kept service") }
 })

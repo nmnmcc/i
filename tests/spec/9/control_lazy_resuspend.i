@@ -9,7 +9,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -21,7 +21,7 @@ Step = More | Done
 
 // Puts `text` in front of the value of the boundary `log`.
 note = (log, text) {
-	control.suspend(log, (k) { text <> " " <> control.resume(k, Nil) })
+	control.suspend(log, (k) { text <> " " <> control.resume(k, ()) })
 }
 
 // Each frame puts its number in the value once. The innermost suspends

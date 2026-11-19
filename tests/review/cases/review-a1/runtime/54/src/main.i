@@ -5,5 +5,5 @@ f = () {
 
 main = () {
 	assert(f() == -2)
-	Nil
+	()
 }

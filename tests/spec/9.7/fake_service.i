@@ -19,14 +19,14 @@ greeting = () <- (kv : Kv, later : Later) {
 }
 
 test("with_fakes", () {
-	greeting() |> ("hello fake name!") { Nil } & (other) { panic(other) } <- (
+	greeting() |> ("hello fake name!") { () } & (other) { panic(other) } <- (
 		Kv(get = (key) { "fake " <> key }),
 		Later(echo = (text) { text <> "!" }),
 	)
 })
 
 test("with_the_host", () <- (later : Later) {
-	greeting() |> ("hello name") { Nil } & (other) { panic(other) } <- (
+	greeting() |> ("hello name") { () } & (other) { panic(other) } <- (
 		Kv(get = (key) { key }),
 	)
 })

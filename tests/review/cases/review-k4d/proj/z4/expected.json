@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.ask : () <- (Svc(A)) -> A\napp/main.tell : (Int) -> \"other\" | \"two\"\napp/main.main : () <- (Fail(Never), Io) -> Nil\n",
+      "stdout": "app/main.ask : () <- (Svc(A)) -> A\napp/main.tell : (Int) -> \"other\" | \"two\"\napp/main.main : () <- (Fail(Never), Io) -> ()\n",
       "stderr": "src/main.i:12:3: error[E0515]: the type hides the environment statement's obligation for `Svc(String)`: every instance must use the same service form\nsrc/main.i:22:15: error[E0515]: `Svc(_)` and `Svc(String)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 22:9 needs it)\nsrc/main.i:24:8: error[E0515]: `Svc(String)` and `Svc(Int)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\n3 errors\n"
     },
     "run0": {

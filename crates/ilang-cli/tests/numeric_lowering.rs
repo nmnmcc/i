@@ -171,8 +171,8 @@ fn corpus() -> Vec<Case> {
     ));
     cases.push(float_case("loop_float(10000, x)", -0.0, 2500.0));
     cases.push(float_case("control.boundary((b) { a = x *. 0.5 y = control.suspend(b, (k) { control.resume(k, 1.0) }) a +. y })", 5.0, 3.5));
-    cases.push(float_case("control.boundary((b) { a = x *. 0.5 control.suspend(b, (k) { control.resume(k, Nil) }) control.suspend(b, (k) { control.resume(k, Nil) }) a })", -0.0, -0.0));
-    cases.push(int_case("control.boundary((b) { a = x * 1073741823 control.suspend(b, (k) { control.resume(k, Nil) }) a + 1 })", 1073741823.into(), "1152921502459363330".parse().unwrap()));
+    cases.push(float_case("control.boundary((b) { a = x *. 0.5 control.suspend(b, (k) { control.resume(k, ()) }) control.suspend(b, (k) { control.resume(k, ()) }) a })", -0.0, -0.0));
+    cases.push(int_case("control.boundary((b) { a = x * 1073741823 control.suspend(b, (k) { control.resume(k, ()) }) a + 1 })", 1073741823.into(), "1152921502459363330".parse().unwrap()));
     cases.push(Case { body: "resource.ensure(() { a = x *. 2.0 a +. 1.0 }, () { record(core.inspect(x)) }) |> core.inspect".into(), input: Value::Float(-0.0), expected: "1.0".into(), stop: false, events: vec!["-0.0".into()] });
     cases.push(Case { body: "control.boundary((b) { resource.ensure(() { a = x *. 0.5 control.suspend(b, (k) { control.cancel(k) 2.0 }) a }, () { record(core.inspect(x)) }) }) |> core.inspect".into(), input: Value::Float(-0.0), expected: "2.0".into(), stop: false, events: vec!["-0.0".into()] });
     cases.push(Case {
@@ -190,7 +190,7 @@ fn corpus() -> Vec<Case> {
         "x /. 1.0e-308",
         "{ unused = x *. x 0.0 }",
         "{ pair = (0.0, x *. x) pair.0 }",
-        "control.boundary((b) { a = x control.suspend(b, (k) { control.resume(k, Nil) }) a *. a })",
+        "control.boundary((b) { a = x control.suspend(b, (k) { control.resume(k, ()) }) a *. a })",
         "resumed_h(x)",
         "resource.ensure(() { x *. x }, () { record(\"must not run\") })",
     ] {
@@ -604,7 +604,7 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
 	i/resource
 )
 @external("numeric:events", "record")
-record : (String) -> Nil
+record : (String) -> ()
 make_float = (x : Float) { (v : Float) -> Float { v +. x } }
 bounded_float = (x : Float) -> Float {
 	{ x >=. -.1.0 } |>
@@ -629,7 +629,7 @@ step_float = (x : Float) -> Float { x *. 0.5 +. 0.25 }
 apply = (f : (Float) -> Float, x : Float) -> Float { f(x) }
 suspend_int = (b, x : Int) -> Int {
 	a = x + 1
-	control.suspend(b, (k) { control.resume(k, Nil) })
+	control.suspend(b, (k) { control.resume(k, ()) })
 	a + 2
 }
 loop_down = (n : Int, acc : Int) -> Int {
@@ -827,7 +827,7 @@ bounded_div = (x : Float, y : Float) -> Float {
                         panic!("record takes String")
                     };
                     recorded.lock().unwrap().push(message.clone());
-                    Ok(Value::Nil)
+                    Ok(Value::Unit)
                 })
                 .unwrap();
             // Stops invalidate an instance. Each case starts from a fresh one.
@@ -1002,7 +1002,7 @@ fn transitive_suspend_preserves_pending_logical_frames() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"trace\"\n").unwrap();
-    std::fs::write(dir.path().join("src/main.i"), "(i/control)\ng = (b, x : Float) -> Float {\n y = control.suspend(b, (k) { control.resume(k, 1.0) })\n x *. x +. y\n}\nf = (b, x : Float) -> Float {\n y = g(b, x)\n y +. 0.25\n}\nh = (b, x : Float) -> Float {\n y = f(b, x)\n y +. 0.5\n}\n\nmain = () {\n control.boundary((b) { h(b, 1.0e308) })\n Nil\n}\n").unwrap();
+    std::fs::write(dir.path().join("src/main.i"), "(i/control)\ng = (b, x : Float) -> Float {\n y = control.suspend(b, (k) { control.resume(k, 1.0) })\n x *. x +. y\n}\nf = (b, x : Float) -> Float {\n y = g(b, x)\n y +. 0.25\n}\nh = (b, x : Float) -> Float {\n y = f(b, x)\n y +. 0.5\n}\n\nmain = () {\n control.boundary((b) { h(b, 1.0e308) })\n ()\n}\n").unwrap();
     let (graph, diags) = ilang_package::load(dir.path());
     assert!(diags.is_empty());
     let checked = ilang_check::check(&graph);

@@ -9,13 +9,13 @@
 main = () <- (io : Io) {
 	r = fail.catch(() {
 		task.scope((s) {
-			gate : task.Channel(Nil) = task.channel()
+			gate : task.Channel(()) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() { fail.raise("child") },
 					() {
 						io.print("final-start")
-						task.send(gate, Nil)
+						task.send(gate, ())
 						task.yield()
 						io.print("final-end")
 					},

@@ -316,7 +316,7 @@ class RunnerTests(unittest.TestCase):
                 self.assertEqual(len(runner.check_content(content, [pattern])[0]), 1)
 
     def test_page_errors(self):
-        for source in ('```i check\nmain = () { Nil }\n',
+        for source in ('```i check\nmain = () { () }\n',
                        '```i file=src/a.i\na = 1\n```\n```i file=src/a.i\na = 2\n```\n',
                        '```i file=../escape\ndata\n```\n',
                        '```i types\n(answer)\nanswer = 42\n```\n',

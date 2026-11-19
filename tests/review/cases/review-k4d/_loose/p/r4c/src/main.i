@@ -3,7 +3,7 @@
 )
 Dep = (v = Int)
 get = () <- (d : Dep) { d.v }
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
 use = <N>() <- (s : S(N)) { s.f() }
 run = <A, N>(body : () <- N -> A) { body() }
 fw = () { use() }
@@ -19,14 +19,14 @@ tell = (x : Int) {
 }
 
 main = () <- (io : Io) {
-	_syn3_0 : S(Dep) = S(f = () { get() }, m = (_ : Dep) { Nil })
+	_syn3_0 : S(Dep) = S(f = () { get() }, m = (_ : Dep) { () })
 	{
 		h = () { run(fr) }
 		k = () { run(h) + fw() }
 		io.print(
 			tell(k()),
 		)
-		_syn3_1 : S(Never) = S(f = () { 1 }, m = (_ : Never) { Nil })
+		_syn3_1 : S(Never) = S(f = () { 1 }, m = (_ : Never) { () })
 		io.print(
 			tell(k() + fr()),
 		) <- (_syn3_1)

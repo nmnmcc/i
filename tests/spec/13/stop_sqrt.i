@@ -11,5 +11,5 @@ value = () { core.sqrt(-.1.0) }
 
 main = () {
 	value()
-	Nil
+	()
 }

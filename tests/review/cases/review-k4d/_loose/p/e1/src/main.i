@@ -23,6 +23,6 @@ main = () {
 	_syn3_2 : State(Int) = State(get = () { 5 })
 	{
 		outer((c : () <- (State(Int)) -> Int) { c() })
-		Nil
+		()
 	} <- (_syn3_2)
 }

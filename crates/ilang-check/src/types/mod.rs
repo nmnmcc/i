@@ -659,7 +659,8 @@ impl LocalTypes {
 /// A type that the host can take, as one part of a host export.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum HostType {
-    Nil,
+    /// `()`, empty data.
+    Unit,
     Bool,
     Int,
     Float,
@@ -670,7 +671,7 @@ pub enum HostType {
 }
 
 /// The types of a host export: its parameters, its value, and the
-/// members of its errors in the canonical order (`Nil`, `Bool`, `Int`,
+/// members of its errors in the canonical order (`()`, `Bool`, `Int`,
 /// `Float`, `String`, `BitArray`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostSignature {

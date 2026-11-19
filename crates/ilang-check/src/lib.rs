@@ -400,9 +400,9 @@ pub fn check_selected(
     graph: &PackageGraph,
     program: &mut hir::Program,
     target: hir::DefId,
-    require_nil: bool,
+    require_unit: bool,
 ) -> (types::Typed, Vec<Diagnostic>) {
-    check_selected_many(graph, program, &[(target, require_nil)])
+    check_selected_many(graph, program, &[(target, require_unit)])
 }
 
 pub fn check_selected_many(

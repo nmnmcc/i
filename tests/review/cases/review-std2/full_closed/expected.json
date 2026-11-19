@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.make : ((Entry) <- (Fail(A), ..N) -> Nil) -> Sink(A, N)\nprobe/main.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> Nil\nprobe/main.send : (Entry) <- (Fail(String), Sink(String, Never)) -> Nil\nprobe/main.example : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.make : ((Entry) <- (Fail(A), ..N) -> ()) -> Sink(A, N)\nprobe/main.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> ()\nprobe/main.send : (Entry) <- (Fail(String), Sink(String, Never)) -> ()\nprobe/main.example : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

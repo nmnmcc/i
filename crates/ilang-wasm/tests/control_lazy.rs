@@ -84,7 +84,7 @@ guarded = (b) {
 				})
 				x <> "!"
 			},
-			() { Nil },
+			() { () },
 		)
 	})
 	core.inspect(r)
@@ -106,7 +106,7 @@ main = () {
 		d = control.boundary((b) { guarded(b) })
 		e = nested()
 		core.inspect((a, c, d, e))
-		Nil
+		()
 	} <- (Name(text = "main"), Tag(text = "main"))
 }
 "#;
@@ -377,9 +377,9 @@ const CANCEL_OUT: &str = r#"(
 )
 
 // Hands k2 out of the cancel, to the boundary `b0` around it.
-Out = (put = (Inner) -> Nil)
-Inner = (Continuation(Nil, Int, Out))
-Paused = (Continuation(Nil, Outer, Out))
+Out = (put = (Inner) -> ())
+Inner = (Continuation((), Int, Out))
+Paused = (Continuation((), Outer, Out))
 Done = ()
 Outer = Paused | Done
 Handed = (Inner)
@@ -462,14 +462,14 @@ const MAIN_OUT: &str = r#"// The resumed final function ends, and the `$cancel` 
 main = () {
 	// The computations need `Out`. This one is never called.
 	{
-		control.resume(paused(), Nil)
-		Nil
-	} <- (Out(put = (k2) { Nil }))
+		control.resume(paused(), ())
+		()
+	} <- (Out(put = (k2) { () }))
 }
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Out))
+const THIRD: &str = r#"Third = (Continuation((), ThirdSum, Out))
 Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 ThirdSum = Third | Over
@@ -477,7 +477,7 @@ ThirdSum = Third | Over
 keep = (t) { t |> (Over) { Over } & (t) { t } }
 
 // Not in tail position, so the frame waits.
-inner = (k2) { control.resume(k2, Nil) + 1 }
+inner = (k2) { control.resume(k2, ()) + 1 }
 
 h = (b3, k2) {
 	control.suspend(b3, (k3) { Third(k3) })
@@ -508,9 +508,9 @@ main = () {
 		k3 = { control.boundary((b3) { o1(b3, k2) }) } |>
 			(Third(k3)) { k3 }
 			& (Over) { panic("not paused") }
-		control.resume(k3, Nil)
-		Nil
-	} <- (Out(put = (k2) { Nil }))
+		control.resume(k3, ())
+		()
+	} <- (Out(put = (k2) { () }))
 }
 "#;
 
@@ -522,7 +522,7 @@ const ENV_TAIL_RESUME: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, PausedSum, Name))
+Paused = (Continuation((), PausedSum, Name))
 Done = ()
 PausedSum = Paused | Done
 
@@ -548,8 +548,8 @@ main = () {
 			(Paused(k)) { k }
 			& (Done) { panic("not paused") }
 		{
-			control.resume(k, Nil)
-			Nil
+			control.resume(k, ())
+			()
 		} <- (Name(text = "resumer"))
 	} <- (Name(text = "start"))
 }
@@ -562,7 +562,7 @@ const ENV_TAIL_CANCEL: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, PausedSum, Name))
+Paused = (Continuation((), PausedSum, Name))
 Done = ()
 PausedSum = Paused | Done
 
@@ -572,7 +572,7 @@ g = (b) {
 	resource.ensure(
 		() {
 			control.suspend(b, (k) { Paused(k) })
-			Nil
+			()
 		},
 		() { panic(name()) },
 	)
@@ -594,7 +594,7 @@ main = () {
 			& (Done) { panic("not paused") }
 		{
 			control.cancel(k)
-			Nil
+			()
 		} <- (Name(text = "resumer"))
 	} <- (Name(text = "start"))
 }
@@ -607,7 +607,7 @@ const CANCEL_INNER: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, PausedSum, Io))
+Paused = (Continuation((), PausedSum, Io))
 Done = ()
 PausedSum = Paused | Done
 
@@ -639,7 +639,7 @@ main = () <- (io : Io) {
 		& (Done) { panic("not paused") }
 	say("cancel")
 	control.cancel(k)
-	say("cancel gave Nil")
+	say("cancel gave ()")
 }
 "#;
 
@@ -655,10 +655,10 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, PausedSum, Fail(Int)))
+Paused = (Continuation((), PausedSum, Fail(Int)))
 Done = ()
 PausedSum = Paused | Done
-Held = (Continuation(Nil, HeldSum, Fail(Int)))
+Held = (Continuation((), HeldSum, Fail(Int)))
 Over = ()
 HeldSum = Held | Over
 
@@ -671,9 +671,9 @@ paused = () {
 				resource.ensure(
 					() {
 						control.suspend(outer, (k) { Paused(k) })
-						Nil
+						()
 					},
-					() { control.suspend(inner, (k2) { Nil }) },
+					() { control.suspend(inner, (k2) { () }) },
 				)
 			})
 			fail.raise(7)
@@ -699,7 +699,7 @@ main = () <- (io : Io) {
 			Over
 		})
 		held |>
-			(Held(k2)) { control.resume(k2, Nil) }
+			(Held(k2)) { control.resume(k2, ()) }
 			& (Over) { panic("not held") }
 	})
 	io.print(core.inspect(r))
@@ -748,7 +748,7 @@ fn eager(name: &str) -> (String, &'static str, &'static str, i32) {
         ),
         "cancel_suspends_to_inner_boundary" => (
             CANCEL_INNER.to_string(),
-            "cancel\nfinal\nafter inner: f of inner\ncancel gave Nil\n",
+            "cancel\nfinal\nafter inner: f of inner\ncancel gave ()\n",
             "",
             0,
         ),
@@ -904,7 +904,7 @@ fn bench_source(depth: u32, rounds: u32, capture_only: bool) -> String {
             &(u64::from(rounds) * u64::from(rounds + 1) / 2).to_string(),
         );
     let main = if capture_only {
-        "\n\nmain = () { control.boundary((b) { down(b, DEPTH) })  Nil }\n"
+        "\n\nmain = () { control.boundary((b) { down(b, DEPTH) })\n() }\n"
     } else {
         "\n\nmain = () { run(DEPTH) }\n"
     }
@@ -1090,16 +1090,16 @@ fn nested_source(depth: u32) -> String {
 	i/control
 )
 Done = ()
-More = (Int, Continuation(Nil, Step, Never))
+More = (Int, Continuation((), Step, Never))
 Step = Done | More
-check = (ok) { ok |> (True) { Nil } & (False) { panic("tree walk") } }
+check = (ok) { ok |> (True) { () } & (False) { panic("tree walk") } }
 emit = (b, n) { control.suspend(b, (k) { More(n, k) }) }
 copy = (b, step) {
 	step |>
-		(Done) { Nil }
+		(Done) { () }
 		& (More(v, k)) {
 			emit(b, v)
-			copy(b, control.resume(k, Nil))
+			copy(b, control.resume(k, ()))
 		}
 }
 walk = (b, n) {
@@ -1126,7 +1126,7 @@ drive = (step, count, sum, want) {
 		}
 		& (More(v, k)) {
 			check(v == want)
-			drive(control.resume(k, Nil), count + 1, sum + v, next(want))
+			drive(control.resume(k, ()), count + 1, sum + v, next(want))
 		}
 }
 
@@ -1192,7 +1192,7 @@ fn recursion_source(paused: bool) -> String {
          \t\t(More(_, k)) { k }\n\
          \t\t& (_) { panic(\"not paused\") }\n\
          \tcheck(\n\
-         \t\trec(50_000, () { done(control.resume(k, Nil)) }) == 100_000,\n\
+         \t\trec(50_000, () { done(control.resume(k, ())) }) == 100_000,\n\
          \t\t\"recursion lost a frame\",\n\
          \t)\n\
          }"
@@ -1226,7 +1226,7 @@ fn resume_twice_from_new_places() {
 )
 Name = (text = String)
 Done = (String)
-More = (String, Continuation(Nil, Step, Name))
+More = (String, Continuation((), Step, Name))
 Step = Done | More
 name = () <- (n : Name) { n.text }
 leaf = (b) {
@@ -1245,7 +1245,7 @@ run = (b) {
 	x = inside(b)
 	Done(x <> "/" <> name())
 }
-check = (ok) { ok |> (True) { Nil } & (False) { panic("resume environment") } }
+check = (ok) { ok |> (True) { () } & (False) { panic("resume environment") } }
 
 main = () {
 	{
@@ -1253,13 +1253,13 @@ main = () {
 			(More(_, k)) { k }
 			& (_) { panic("not paused") }
 		{
-			k2 = control.resume(k, Nil) |>
+			k2 = control.resume(k, ()) |>
 				(More(s, k)) {
 					check(s == "inside")
 					k
 				}
 				& (_) { panic("not paused twice") }
-			control.resume(k2, Nil) |>
+			control.resume(k2, ()) |>
 				(Done(s)) { check(s == "inside/inside,inside/second") }
 				& (_) { panic("not done") } <- (Name(text = "second"))
 		} <- (Name(text = "first"))
@@ -1281,9 +1281,9 @@ fn counted_frames() {
 	i/resource
 )
 Done = ()
-More = (String, Continuation(Nil, Step, Never))
+More = (String, Continuation((), Step, Never))
 Step = Done | More
-check = (ok) { ok |> (True) { Nil } & (False) { panic("counted frame") } }
+check = (ok) { ok |> (True) { () } & (False) { panic("counted frame") } }
 layer = (b, n) {
 	n |>
 		(0) {
@@ -1292,7 +1292,7 @@ layer = (b, n) {
 		}
 		& (_) {
 			x = layer(b, n - 1)
-			n |> (4) { control.suspend(b, (k) { More(x, k) }) } & (_) { Nil }
+			n |> (4) { control.suspend(b, (k) { More(x, k) }) } & (_) { () }
 			core.inspect(n) <> x
 		}
 }
@@ -1317,7 +1317,7 @@ main = () {
 					},
 					() {
 						control.suspend(log, (k) {
-							"final " <> control.resume(k, Nil)
+							"final " <> control.resume(k, ())
 						})
 					},
 				)
@@ -1325,8 +1325,8 @@ main = () {
 			}),
 			"start",
 		)
-		k2 = next(control.resume(k, Nil), "3210")
-		k3 = next(control.resume(k2, Nil), "6543210")
+		k2 = next(control.resume(k, ()), "3210")
+		k3 = next(control.resume(k2, ()), "6543210")
 		control.cancel(k3)
 		"end"
 	})

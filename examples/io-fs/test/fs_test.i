@@ -29,5 +29,5 @@ test("file_operations", () {
 	fs.close(f2)
 	assert(fs.read_file(path) == <<"a\nb\nc":utf8>>)
 	fs.remove(path)
-	Nil
+	()
 })

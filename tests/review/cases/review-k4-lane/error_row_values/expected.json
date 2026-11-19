@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.one : () <- (Fail(1)) -> Nil\napp/main.two : () <- (Fail(2)) -> Nil\napp/main.pick : (Bool) -> () <- (Fail(1 | 2)) -> Nil\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.one : () <- (Fail(1)) -> ()\napp/main.two : () <- (Fail(2)) -> ()\napp/main.pick : (Bool) -> () <- (Fail(1 | 2)) -> ()\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

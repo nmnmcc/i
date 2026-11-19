@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "stress/main.calls : () -> Nil\n",
+      "stdout": "stress/main.calls : () -> ()\n",
       "stderr": "src/main.i:1:1: warning[W0504]: top-level binding `calls` is not used\n"
     },
     "test0": {

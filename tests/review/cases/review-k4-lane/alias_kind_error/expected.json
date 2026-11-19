@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.bad : (() <- (N & Svc(Never)) -> Nil, Svc(Int), Svc(Nil)) -> N | Svc(Int | Nil)\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:7:2: error[E0515]: `Svc(Int)` and `Svc(Nil)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\nsrc/main.i:8:2: error[E0225]: an environment row may only be bound, captured or provided after `<-`; it is not ordinary data\n2 errors\n"
+      "stdout": "app/main.bad : (() <- (N & Svc(Never)) -> (), Svc(Int), Svc(())) -> N | Svc(Int | ())\napp/main.main : () -> ()\n",
+      "stderr": "src/main.i:7:2: error[E0515]: `Svc(Int)` and `Svc(())` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\nsrc/main.i:8:2: error[E0225]: an environment row may only be bound, captured or provided after `<-`; it is not ordinary data\n2 errors\n"
     },
     "run0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:2: error[E0515]: `Svc(Int)` and `Svc(Nil)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\nsrc/main.i:8:2: error[E0225]: an environment row may only be bound, captured or provided after `<-`; it is not ordinary data\n2 errors\n"
+      "stderr": "src/main.i:7:2: error[E0515]: `Svc(Int)` and `Svc(())` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\nsrc/main.i:8:2: error[E0225]: an environment row may only be bound, captured or provided after `<-`; it is not ordinary data\n2 errors\n"
     },
     "run2": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:7:2: error[E0515]: `Svc(Int)` and `Svc(Nil)` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\nsrc/main.i:8:2: error[E0225]: an environment row may only be bound, captured or provided after `<-`; it is not ordinary data\n2 errors\n"
+      "stderr": "src/main.i:7:2: error[E0515]: `Svc(Int)` and `Svc(())` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal\nsrc/main.i:8:2: error[E0225]: an environment row may only be bound, captured or provided after `<-`; it is not ordinary data\n2 errors\n"
     }
   }
 }

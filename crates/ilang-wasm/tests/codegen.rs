@@ -112,7 +112,7 @@ fn metered_macro_program_is_valid_wasm() {
     )
     .unwrap();
     ilang_wasm::validate(&wasm).unwrap();
-    assert!(!wat("\nmain = () { Nil }\n").contains("ilang:macro/budget/v1"));
+    assert!(!wat("\nmain = () { () }\n").contains("ilang:macro/budget/v1"));
 }
 
 /// The text of the function with this comment line.
@@ -154,7 +154,7 @@ fn closures_capture_what_they_use() {
 
 #[test]
 fn metadata() {
-    let bytes = wasm("\nmain = () { Nil }\n").unwrap();
+    let bytes = wasm("\nmain = () { () }\n").unwrap();
     let mut found = None;
     for payload in wasmparser::Parser::new(0).parse_all(&bytes) {
         if let wasmparser::Payload::CustomSection(s) = payload.unwrap()
@@ -200,7 +200,7 @@ fn metadata() {
 #[test]
 fn externals_are_imports() {
     let external = "@external(\"app:math/v1\", \"sqrt\")\nsqrt : (Float) -> Float\n";
-    for main in ["main = () { f()  Nil }", "main = () { Nil }"] {
+    for main in ["main = () { f()\n() }", "main = () { () }"] {
         let bytes = wasm(&format!("{external}f = () {{ sqrt(2.0) }}\n\n{main}\n")).unwrap();
         let mut imports = Vec::new();
         let mut abi = None;
@@ -233,7 +233,7 @@ fn externals_are_imports() {
 #[test]
 fn calls_that_may_suspend_are_split() {
     let text = wat(
-        " (i/control)\ntwice = (f) { f(1) + f(2) }\nlast = (f) { f(1) }\nplain = (n) { n + 1 }\nuses = (n) { plain(n) + twice((x) { x }) }\n\nmain = () {\n  control.boundary((b) { uses(1) + last((x) { x }) })\n  Nil\n}\n",
+        " (i/control)\ntwice = (f) { f(1) + f(2) }\nlast = (f) { f(1) }\nplain = (n) { n + 1 }\nuses = (n) { plain(n) + twice((x) { x }) }\n\nmain = () {\n  control.boundary((b) { uses(1) + last((x) { x }) })\n  ()\n}\n",
     );
     // Each call of a closure that is not a tail call is in a handler that
     // adds its frame record, with a segment and a re-entry function.
@@ -253,7 +253,7 @@ fn calls_that_may_suspend_are_split() {
     assert_eq!(uses.matches("(catch_ref $capture").count(), 1, "{uses}");
     // `assertion.catch` is i code now.
     assert!(
-        wasm(" (i/assertion)\n\nmain = () {\n  assertion.catch(() { assert(False) })\n  Nil\n}\n")
+        wasm(" (i/assertion)\n\nmain = () {\n  assertion.catch(() { assert(False) })\n  ()\n}\n")
             .is_ok()
     );
 }
@@ -321,7 +321,7 @@ fn many_points(n: usize) -> String {
         ));
     }
     s.push_str(&format!(
-        "  a{n}\n}}\n\nmain = () {{ control.boundary((b) {{ f(b, 0) }})  Nil }}\n"
+        "  a{n}\n}}\n\nmain = () {{ control.boundary((b) {{ f(b, 0) }})\n() }}\n"
     ));
     assert!(ilang_syntax::parse_module(&s).1.is_empty());
     s
@@ -388,7 +388,7 @@ different = () { equal(get_a(), get_b()) }
 same_a = (a : A, b : Alias) { equal(a, b) }
 echo = (a : A) { a }
 
-main = () { Nil }
+main = () { () }
 "#;
     let (graph, checked, _dir) = checked_with_exports(
         source,

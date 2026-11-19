@@ -22,337 +22,337 @@ text = (pattern : String, input : String) -> String {
 
 test("literal", () {
 	assert(text("abc", "--abc--") == "abc")
-	Nil
+	()
 })
 
 test("missing", () {
 	assert(text("abc", "ab") == "<no match>")
-	Nil
+	()
 })
 
 test("dot_unicode", () {
 	assert(text(".", "🦀") == "🦀")
-	Nil
+	()
 })
 
 test("dot_no_lf", () {
 	assert(text(".", "\n") == "<no match>")
-	Nil
+	()
 })
 
 test("dotall", () {
 	assert(text("(?s).", "\n") == "\n")
-	Nil
+	()
 })
 
 test("range", () {
 	assert(text("[a-z]+", "123hello!") == "hello")
-	Nil
+	()
 })
 
 test("negated", () {
 	assert(text("[^a-c]+", "abcXYZ") == "XYZ")
-	Nil
+	()
 })
 
 test("digit", () {
 	assert(text("\\d+", "x123z") == "123")
-	Nil
+	()
 })
 
 test("digit_unicode", () {
 	assert(text("\\d+", "x١٢٣!") == "١٢٣")
-	Nil
+	()
 })
 
 test("not_digit", () {
 	assert(text("\\D+", "12abc3") == "abc")
-	Nil
+	()
 })
 
 test("word", () {
 	assert(text("\\w+", "--café_2!") == "café_2")
-	Nil
+	()
 })
 
 test("word_unicode", () {
 	assert(text("\\w+", "--汉字!") == "汉字")
-	Nil
+	()
 })
 
 test("not_word", () {
 	assert(text("\\W+", "word !ok") == " !")
-	Nil
+	()
 })
 
 test("space", () {
 	assert(text("\\s+", "a\t \nb") == "\t \n")
-	Nil
+	()
 })
 
 test("space_unicode", () {
 	assert(text("\\s+", "a  b") == "  ")
-	Nil
+	()
 })
 
 test("not_space", () {
 	assert(text("\\S+", " \na! ") == "a!")
-	Nil
+	()
 })
 
 test("boundary", () {
 	assert(text("\\bcat\\b", "scat cat!") == "cat")
-	Nil
+	()
 })
 
 test("not_boundary", () {
 	assert(text("\\Bcat", "scat cat") == "cat")
-	Nil
+	()
 })
 
 test("unicode_boundary", () {
 	assert(text("\\bélan\\b", "élan!") == "élan")
-	Nil
+	()
 })
 
 test("greedy_star", () {
 	assert(text("a*", "aaab") == "aaa")
-	Nil
+	()
 })
 
 test("lazy_star", () {
 	assert(text("a*?", "aaab") == "")
-	Nil
+	()
 })
 
 test("greedy_plus", () {
 	assert(text("a+", "baaa") == "aaa")
-	Nil
+	()
 })
 
 test("lazy_plus", () {
 	assert(text("a+?", "baaa") == "a")
-	Nil
+	()
 })
 
 test("greedy_optional", () {
 	assert(text("a?", "a") == "a")
-	Nil
+	()
 })
 
 test("lazy_optional", () {
 	assert(text("a??", "a") == "")
-	Nil
+	()
 })
 
 test("exact", () {
 	assert(text("a{3}", "aaaa") == "aaa")
-	Nil
+	()
 })
 
 test("bounded", () {
 	assert(text("a{2,4}", "aaaaa") == "aaaa")
-	Nil
+	()
 })
 
 test("bounded_lazy", () {
 	assert(text("a{2,4}?", "aaaaa") == "aa")
-	Nil
+	()
 })
 
 test("open_bound", () {
 	assert(text("a{2,}", "aaaa") == "aaaa")
-	Nil
+	()
 })
 
 test("zero", () {
 	assert(text("a{0}", "bbb") == "")
-	Nil
+	()
 })
 
 test("zero_optional", () {
 	assert(text("a{0,2}", "aaa") == "aa")
-	Nil
+	()
 })
 
 test("alternate_first", () {
 	assert(text("a|ab", "ab") == "a")
-	Nil
+	()
 })
 
 test("alternate_second", () {
 	assert(text("ab|a", "ab") == "ab")
-	Nil
+	()
 })
 
 test("leftmost", () {
 	assert(text("b|a", "ab") == "a")
-	Nil
+	()
 })
 
 test("group", () {
 	assert(text("(ab)+", "ababx") == "abab")
-	Nil
+	()
 })
 
 test("noncapture", () {
 	assert(text("(?:ab)+", "ababx") == "abab")
-	Nil
+	()
 })
 
 test("start", () {
 	assert(text("^a", "ba") == "<no match>")
-	Nil
+	()
 })
 
 test("end", () {
 	assert(text("a$", "ab") == "<no match>")
-	Nil
+	()
 })
 
 test("dollar_strict", () {
 	assert(text("a$", "a\n") == "<no match>")
-	Nil
+	()
 })
 
 test("multiline", () {
 	assert(text("(?m)^a$", "b\na\nc") == "a")
-	Nil
+	()
 })
 
 test("absolute_start", () {
 	assert(text("\\Aa", "a\na") == "a")
-	Nil
+	()
 })
 
 test("absolute_end", () {
 	assert(text("a\\z", "ba") == "a")
-	Nil
+	()
 })
 
 test("case", () {
 	assert(text("(?i)abc", "ABC") == "ABC")
-	Nil
+	()
 })
 
 test("case_unicode", () {
 	assert(text("(?i)é", "É") == "É")
-	Nil
+	()
 })
 
 test("case_kelvin", () {
 	assert(text("(?i)k", "K") == "K")
-	Nil
+	()
 })
 
 test("case_longs", () {
 	assert(text("(?i)[a-z]", "ſ") == "ſ")
-	Nil
+	()
 })
 
 test("case_sigma", () {
 	assert(text("(?i)σ", "ς") == "ς")
-	Nil
+	()
 })
 
 test("case_negation", () {
 	assert(text("(?i)[^a]+", "AaB") == "B")
-	Nil
+	()
 })
 
 test("flag_scope", () {
 	assert(text("((?i)a)b", "Ab") == "Ab")
-	Nil
+	()
 })
 
 test("flag_restore", () {
 	assert(text("((?i)a)b", "AB") == "<no match>")
-	Nil
+	()
 })
 
 test("scoped_flags", () {
 	assert(text("(?i:a)b", "Ab") == "Ab")
-	Nil
+	()
 })
 
 test("unset_flag", () {
 	assert(text("(?i)a(?-i)b", "Ab") == "Ab")
-	Nil
+	()
 })
 
 test("class_escape", () {
 	assert(text("[\\dA-F]+", "Z1AF!") == "1AF")
-	Nil
+	()
 })
 
 test("class_negated_escape", () {
 	assert(text("[^\\D]+", "a123b") == "123")
-	Nil
+	()
 })
 
 test("escaped_dot", () {
 	assert(text("\\.", "x.y") == ".")
-	Nil
+	()
 })
 
 test("escaped_tab", () {
 	assert(text("\\t+", "\t\tx") == "\t\t")
-	Nil
+	()
 })
 
 test("hex", () {
 	assert(text("\\x41+", "AAA") == "AAA")
-	Nil
+	()
 })
 
 test("unicode_hex", () {
 	assert(text("\\u{1f980}", "🦀") == "🦀")
-	Nil
+	()
 })
 
 test("empty_alt", () {
 	assert(text("|a", "a") == "")
-	Nil
+	()
 })
 
 test("empty_group", () {
 	assert(text("()", "a") == "")
-	Nil
+	()
 })
 
 test("nested_empty", () {
 	assert(text("(a*)*b", "aaab") == "aaab")
-	Nil
+	()
 })
 
 test("greedy_follow", () {
 	assert(text("a*ab", "aaaab") == "aaaab")
-	Nil
+	()
 })
 
 test("lazy_follow", () {
 	assert(text("a*?b", "aaab") == "aaab")
-	Nil
+	()
 })
 
 test("branch_backtrack", () {
 	assert(text("(ab|a)b", "ab") == "ab")
-	Nil
+	()
 })
 
 test("class_dash", () {
 	assert(text("[-a]+", "--aa") == "--aa")
-	Nil
+	()
 })
 
 test("class_end_dash", () {
 	assert(text("[a-]+", "aa--") == "aa--")
-	Nil
+	()
 })
 
 test("astral_range", () {
 	assert(text("[😀-🙏]+", "x😀🙏!") == "😀🙏")
-	Nil
+	()
 })
 
 test("error_lookahead", () {
@@ -360,10 +360,10 @@ test("error_lookahead", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_negative_lookahead", () {
@@ -371,10 +371,10 @@ test("error_negative_lookahead", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_lookbehind", () {
@@ -382,10 +382,10 @@ test("error_lookbehind", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_negative_lookbehind", () {
@@ -393,10 +393,10 @@ test("error_negative_lookbehind", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_backreference", () {
@@ -404,10 +404,10 @@ test("error_backreference", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_named_backreference", () {
@@ -415,10 +415,10 @@ test("error_named_backreference", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_unclosed_group", () {
@@ -426,10 +426,10 @@ test("error_unclosed_group", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_unclosed_class", () {
@@ -437,10 +437,10 @@ test("error_unclosed_class", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_reverse_range", () {
@@ -448,10 +448,10 @@ test("error_reverse_range", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_empty_class", () {
@@ -459,10 +459,10 @@ test("error_empty_class", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_unknown_escape", () {
@@ -470,10 +470,10 @@ test("error_unknown_escape", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_trailing_escape", () {
@@ -481,10 +481,10 @@ test("error_trailing_escape", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_repeated_quantifier", () {
@@ -492,10 +492,10 @@ test("error_repeated_quantifier", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_leading_quantifier", () {
@@ -503,10 +503,10 @@ test("error_leading_quantifier", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_reversed_bounds", () {
@@ -514,10 +514,10 @@ test("error_reversed_bounds", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_large_count", () {
@@ -525,10 +525,10 @@ test("error_large_count", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_duplicate_name", () {
@@ -536,10 +536,10 @@ test("error_duplicate_name", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_invalid_name", () {
@@ -547,10 +547,10 @@ test("error_invalid_name", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_empty_name", () {
@@ -558,10 +558,10 @@ test("error_empty_name", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_unclosed_count", () {
@@ -569,10 +569,10 @@ test("error_unclosed_count", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_surrogate", () {
@@ -580,10 +580,10 @@ test("error_surrogate", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_large_scalar", () {
@@ -591,10 +591,10 @@ test("error_large_scalar", () {
 		(Error(regex.RegexError(position = position, reason = reason))) {
 			assert(position >= 0)
 			assert(reason != "")
-			Nil
+			()
 		}
 		& (Ok(_)) { panic("expected compile error") }
-	Nil
+	()
 })
 
 test("error_position", () {
@@ -607,7 +607,7 @@ test("error_position", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("capture_index_name", () {
@@ -625,7 +625,7 @@ test("capture_index_name", () {
 	assert(regex.group(c, 3) == None)
 	assert(regex.group(c, -1) == None)
 	assert(regex.named(c, "unknown") == None)
-	Nil
+	()
 })
 
 test("capture_last_iteration", () {
@@ -635,7 +635,7 @@ test("capture_last_iteration", () {
 	assert(
 		regex.group(c, 1) == Some(regex.Match(start = 1, end = 2, text = "b")),
 	)
-	Nil
+	()
 })
 
 test("capture_alternation", () {
@@ -646,7 +646,7 @@ test("capture_alternation", () {
 	assert(
 		regex.group(c, 2) == Some(regex.Match(start = 0, end = 1, text = "b")),
 	)
-	Nil
+	()
 })
 
 test("unicode_scalar_offsets", () {
@@ -654,7 +654,7 @@ test("unicode_scalar_offsets", () {
 		regex.find(compile("🦀é"), "中🦀é!") ==
 			Some(regex.Match(start = 1, end = 3, text = "🦀é")),
 	)
-	Nil
+	()
 })
 
 test("find_all", () {
@@ -665,7 +665,7 @@ test("find_all", () {
 				regex.Match(start = 4, end = 5, text = "a"),
 			],
 	)
-	Nil
+	()
 })
 
 test("find_all_empty", () {
@@ -677,7 +677,7 @@ test("find_all_empty", () {
 				regex.Match(start = 2, end = 2, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 test("find_all_suppress_adjacent_empty", () {
@@ -688,7 +688,7 @@ test("find_all_suppress_adjacent_empty", () {
 				regex.Match(start = 2, end = 2, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 test("find_all_lazy", () {
@@ -698,7 +698,7 @@ test("find_all_lazy", () {
 		) ==
 			3,
 	)
-	Nil
+	()
 })
 
 test("replace_first", () {
@@ -706,77 +706,77 @@ test("replace_first", () {
 		regex.replace(compile("(?<x>a)(b)"), "ab ab", "${x}-$2-$0-$$") ==
 			"a-b-ab-$ ab",
 	)
-	Nil
+	()
 })
 
 test("replace_all", () {
 	assert(
 		regex.replace_all(compile("(a)"), "a a", "<$1>") == "<a> <a>",
 	)
-	Nil
+	()
 })
 
 test("replace_missing", () {
 	assert(
 		regex.replace(compile("(a)?b"), "b", "$1/$2/${missing}") == "//",
 	)
-	Nil
+	()
 })
 
 test("replace_braces", () {
 	assert(
 		regex.replace(compile("(a)"), "a", "${1}x") == "ax",
 	)
-	Nil
+	()
 })
 
 test("replace_longest_name", () {
 	assert(
 		regex.replace(compile("(a)"), "a", "$1x") == "",
 	)
-	Nil
+	()
 })
 
 test("replace_empty", () {
 	assert(
 		regex.replace_all(compile(""), "é🦀", "-") == "-é-🦀-",
 	)
-	Nil
+	()
 })
 
 test("replace_literal_dollar", () {
 	assert(
 		regex.replace(compile("a"), "a", "${x $!") == "${x $!",
 	)
-	Nil
+	()
 })
 
 test("replace_absent", () {
 	assert(
 		regex.replace_all(compile("z"), "abc", "x") == "abc",
 	)
-	Nil
+	()
 })
 
 test("split", () {
 	assert(
 		regex.split(compile("[,;]"), ",a;b,") == ["", "a", "b", ""],
 	)
-	Nil
+	()
 })
 
 test("split_empty", () {
 	assert(
 		regex.split(compile(""), "é🦀") == ["", "é", "🦀", ""],
 	)
-	Nil
+	()
 })
 
 test("split_absent", () {
 	assert(
 		regex.split(compile("z"), "abc") == ["abc"],
 	)
-	Nil
+	()
 })
 
 test("empty_input", () {
@@ -786,14 +786,14 @@ test("empty_input", () {
 	assert(
 		regex.find(compile("a"), "") == None,
 	)
-	Nil
+	()
 })
 
 test("catastrophic_5000", () {
 	assert(
 		regex.is_match(compile("(a*)*b"), string.repeat("a", 5000)) == False,
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 100.
@@ -807,7 +807,7 @@ test("rust_empty_100", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 110.
@@ -820,7 +820,7 @@ test("rust_empty_110", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 120.
@@ -834,7 +834,7 @@ test("rust_empty_120", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 130.
@@ -848,7 +848,7 @@ test("rust_empty_130", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 200.
@@ -862,7 +862,7 @@ test("rust_empty_200", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 210.
@@ -876,7 +876,7 @@ test("rust_empty_210", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 220.
@@ -890,7 +890,7 @@ test("rust_empty_220", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 230.
@@ -903,7 +903,7 @@ test("rust_empty_230", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 240.
@@ -917,7 +917,7 @@ test("rust_empty_240", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 300.
@@ -931,7 +931,7 @@ test("rust_empty_300", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 310.
@@ -944,7 +944,7 @@ test("rust_empty_310", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 320.
@@ -958,7 +958,7 @@ test("rust_empty_320", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 330.
@@ -972,7 +972,7 @@ test("rust_empty_330", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 400.
@@ -984,7 +984,7 @@ test("rust_empty_400", () {
 				regex.Match(start = 1, end = 2, text = "b"),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 500.
@@ -993,7 +993,7 @@ test("rust_empty_500", () {
 		regex.find_all(compile(""), "") ==
 			[regex.Match(start = 0, end = 0, text = "")],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 510.
@@ -1005,7 +1005,7 @@ test("rust_empty_510", () {
 				regex.Match(start = 1, end = 1, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 520.
@@ -1019,7 +1019,7 @@ test("rust_empty_520", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 600.
@@ -1033,7 +1033,7 @@ test("rust_empty_600", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })
 
 // Rust regex testdata/empty.toml, 610.
@@ -1047,5 +1047,5 @@ test("rust_empty_610", () {
 				regex.Match(start = 3, end = 3, text = ""),
 			],
 	)
-	Nil
+	()
 })

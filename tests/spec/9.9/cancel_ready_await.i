@@ -9,12 +9,12 @@
 	i/fail
 )
 
-probe = (wait : () <- (request.Await) -> Nil) {
+probe = (wait : () <- (request.Await) -> ()) {
 	result = fail.catch(() {
 		task.scope((s) {
-			armed : task.Channel(Nil) = task.channel()
+			armed : task.Channel(()) = task.channel()
 			task.go(s, () {
-				task.send(armed, Nil)
+				task.send(armed, ())
 				// §9.9: the failure may come before or after the await; the
 				// child then waits until the cancellation reaches it.
 				wait()
@@ -31,13 +31,13 @@ probe = (wait : () <- (request.Await) -> Nil) {
 }
 
 main = () {
-	borrowed = request.ready(Nil)
+	borrowed = request.ready(())
 	probe(() { request.await(borrowed) })
 	// §9.9: "Timing may choose ... which failures precede cancellation"; when
 	// the await completed before the failure, it took the answer.
 	after = request.state(borrowed)
-	assert(after == request.Ready(Nil) || after == request.Taken)
-	owned = request.ready(Nil)
+	assert(after == request.Ready(()) || after == request.Taken)
+	owned = request.ready(())
 	probe(() { request.await_owned(owned) })
 	settled = request.state(owned)
 	assert(settled == request.Cancelled || settled == request.Taken)

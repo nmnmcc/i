@@ -11,10 +11,10 @@
 main = () {
 	control.boundary((outer) {
 		control.boundary((inner) {
-			control.suspend(outer, (k) { control.resume(k, Nil) })
+			control.suspend(outer, (k) { control.resume(k, ()) })
 			control.suspend(inner, (k) { control.suspend(inner, (k2) { 1 }) })
 			0
 		})
 	})
-	Nil
+	()
 }

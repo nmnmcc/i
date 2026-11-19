@@ -15,5 +15,5 @@ main = () {
 	assert(classify(0) == "zero")
 	assert(classify("value") == "other")
 	assert(guarded((n) { n + 1 }) == 4)
-	Nil
+	()
 }

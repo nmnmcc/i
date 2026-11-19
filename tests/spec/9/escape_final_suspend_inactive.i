@@ -13,9 +13,9 @@ main = () {
 			() { control.escape(b, 1) },
 			() {
 				control.suspend(b, (_) { 2 })
-				Nil
+				()
 			},
 		)
 	})
-	Nil
+	()
 }

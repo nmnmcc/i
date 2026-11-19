@@ -378,7 +378,6 @@ fn builtin_definitions_preserve_builtins_and_fresh_parameter_binders() {
         "Bool",
         "True",
         "False",
-        "Nil",
         "Result",
         "Ok",
         "Error",
@@ -1294,11 +1293,11 @@ fn show_as_only_breaks_lines_at_ambiguous_statement_boundaries() {
 
 #[test]
 fn show_as_attribute_item_uses_only_required_line_breaks() {
-    let item = root("(@ custom (= f (-> (,) _ Nil)))");
+    let item = root("(@ custom (= f (-> (,) _ (,))))");
     // An attribute is on a line of its own in the layout of the source syntax.
     assert_eq!(
         item.show_as(Position::Item).unwrap(),
-        "@custom\nf = () { Nil }"
+        "@custom\nf = () { () }"
     );
     let (module, errors) =
         ilang_syntax::parse_module(&format!("{}\n", item.show_as(Position::Item).unwrap()));
@@ -1435,7 +1434,7 @@ fn captured_rest_service_survives_both_macro_encoders_and_scoped_decoding() {
         ast::{ExprKind, ItemKind, Param},
         lisp::{self, scoped::ScopedSource},
     };
-    let source = "f = <N>() <- (db: Db, ..env: N) { Nil }";
+    let source = "f = <N>() <- (db: Db, ..env: N) { () }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let ItemKind::Binding(binding) = &module.items[0].kind else {
@@ -1454,7 +1453,7 @@ fn captured_rest_service_survives_both_macro_encoders_and_scoped_decoding() {
     // detached polymorphic expression.
     assert_eq!(
         syntax.show(),
-        "(-> [N] (,) (<- _ (, (: db Db) .. (: env N))) Nil)"
+        "(-> [N] (,) (<- _ (, (: db Db) .. (: env N))) (,))"
     );
     let mut expanded = ScopedSource::new(source.into());
     assert!(
@@ -1480,7 +1479,7 @@ fn captured_rest_service_survives_both_macro_encoders_and_scoped_decoding() {
         panic!()
     };
     let encoded = lisp::expression_syntax(&binding.value, root("env").scope(), source);
-    assert_eq!(encoded.show(), "(-> ((! db Db) (! .. env N)) _ {Nil})");
+    assert_eq!(encoded.show(), "(-> ((! db Db) (! .. env N)) _ {()})");
     let datums = lisp::parse(&encoded.show()).unwrap();
     let public = ilang_syntax::syn3::lisp::convert_quote(&datums[0]);
     let internal = ilang_syntax::syn3::lisp::unconvert_quote(&public);
@@ -1497,7 +1496,7 @@ fn a_captured_rest_row_can_still_be_provided_after_macro_decoding() {
         ast::{ExprKind, ItemKind, Param, Stmt},
         lisp::{self, scoped::ScopedSource},
     };
-    let source = "f = <N>(body: () <- N -> Nil) <- (..env: N) { body() <- env }";
+    let source = "f = <N>(body: () <- N -> ()) <- (..env: N) { body() <- env }";
     let (module, errors) = ilang_syntax::parse_module(source);
     assert!(errors.is_empty(), "{errors:?}");
     let ItemKind::Binding(binding) = &module.items[0].kind else {

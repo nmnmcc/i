@@ -9,7 +9,7 @@
 )
 
 main = () {
-	callback = control.keep((_ : Nil) {
+	callback = control.keep((_ : ()) {
 		task.scope((s) {
 			task.go(s, () { fail.raise("callback") })
 			task.sync(task.never())
@@ -17,7 +17,7 @@ main = () {
 	})
 	assert(
 		task.run(() {
-			assert(fail.catch(() { callback(Nil) }) == Error("callback"))
+			assert(fail.catch(() { callback(()) }) == Error("callback"))
 			task.yield()
 			42
 		}) ==

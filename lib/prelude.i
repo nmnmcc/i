@@ -5,7 +5,6 @@
 //// `Boundary`, and `Continuation` are built into the compiler.
 (
 	Bool(..)
-	Nil(..)
 	Result(..)
 	AssertionFailure(..)
 	Assert(..)
@@ -18,7 +17,6 @@ True = ()
 
 False = ()
 Bool = True | False
-Nil = ()
 
 Ok(A) = (A)
 Error(E) = (E)
@@ -38,6 +36,6 @@ panic : (String) -> Never
 /// Reports a failure to `Assert` when `c` is `False`.
 assert = (c : Bool) <- (a : Assert) {
 	c |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { a.fail(AssertionFailure(message = "assert")) }
 }

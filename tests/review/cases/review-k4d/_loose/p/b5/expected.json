@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.main : () -> ()\n",
       "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `get` is not used\nsrc/main.i:8:1: warning[W0504]: top-level binding `run` is not used\n"
     },
     "test0": {

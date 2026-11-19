@@ -1,6 +1,6 @@
 f : (Int) -> Int
-warned : (Int, Float) -> Nil
-not_warned : (Int, Float) -> Nil
+warned : (Int, Float) -> ()
+not_warned : (Int, Float) -> ()
 7:2: warning[W0502]: this value is not used, and working it out does nothing
 8:2: warning[W0502]: this value is not used, and working it out does nothing
 9:2: warning[W0502]: this value is not used, and working it out does nothing

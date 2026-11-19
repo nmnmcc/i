@@ -1,9 +1,9 @@
 // spec: 4.5, 9.2
 // expect: pass
 // N <: First | (N - First) must not close an inferred record callback row.
-First = (run = () -> Nil)
+First = (run = () -> ())
 
-Second = (run = () -> Nil)
+Second = (run = () -> ())
 
 operation = () <- (second : Second) { second.run() }
 
@@ -13,7 +13,7 @@ wrapper = (p : (send = _)) { handle(() { p.send() }) }
 
 main = () {
 	wrapper((send = () { operation() })) <- (
-		First(run = () { Nil }),
-		Second(run = () { Nil }),
+		First(run = () { () }),
+		Second(run = () { () }),
 	)
 }

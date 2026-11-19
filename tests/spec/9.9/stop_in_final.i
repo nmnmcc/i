@@ -12,7 +12,7 @@ main = () {
 			resource.ensure(
 				() {
 					resource.ensure(
-						() { Nil },
+						() { () },
 						() {
 							task.yield()
 							panic("final")

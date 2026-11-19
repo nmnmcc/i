@@ -4,4 +4,4 @@
 	core = i/core
 )
 f = (x : core.String) -> core.Int { x }
-main = () { Nil }
+main = () { () }

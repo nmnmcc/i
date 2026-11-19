@@ -33,33 +33,33 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
 probe = (phase : Int, typed : Bool) {
 	result = fail.catch(() {
 		task.scope((s) {
-			gate : task.Channel(Nil) = task.channel()
-			never : task.Channel(Nil) = task.channel()
-			started : task.Channel(Nil) = task.channel()
+			gate : task.Channel(()) = task.channel()
+			never : task.Channel(()) = task.channel()
+			started : task.Channel(()) = task.channel()
 			child = task.go(s, () {
 				fail.catch(() {
 					resource.ensure(
 						() {
 							phase |>
 								(0) {
-									task.send(started, Nil)
+									task.send(started, ())
 									task.receive(never)
 								}
-								& (_) { Nil }
+								& (_) { () }
 							typed |>
 								(True) { fail.raise("child") }
-								& (False) { Nil }
+								& (False) { () }
 						},
 						() {
 							print("start")
-							phase |> (1) { task.send(gate, Nil) } & (_) { Nil }
+							phase |> (1) { task.send(gate, ()) } & (_) { () }
 							resource.ensure(
 								() { task.yield() },
 								() {
@@ -72,7 +72,7 @@ probe = (phase : Int, typed : Bool) {
 						},
 					)
 				})
-				Nil
+				()
 			})
 			// §9.9: "Timing may choose ... which failures precede
 			// cancellation"; the child says it started before the parent fails.

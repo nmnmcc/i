@@ -8,7 +8,7 @@ main = () {
 	control.boundary((b) {
 		control.suspend(b, (k) {
 			control.cancel(k)
-			control.resume(k, Nil)
+			control.resume(k, ())
 		})
 	})
 }

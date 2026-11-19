@@ -55,12 +55,12 @@ shared monotype, rather than a generalized function at every call:
 ```i
 calls = () {
 	f = {
-		g = (x) { Nil }
+		g = (x) { () }
 		g
 	}
 	f("a")
 	f("b")
-	Nil
+	()
 }
 ```
 

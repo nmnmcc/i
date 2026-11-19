@@ -6,5 +6,5 @@ main = () {
 	assert("\(x)" == x)
 	assert("\(x)\(x)" == "ii")
 	assert("" <> "a\(x)b" <> "!" == "aib!")
-	Nil
+	()
 }

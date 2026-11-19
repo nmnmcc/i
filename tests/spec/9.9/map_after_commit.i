@@ -11,14 +11,14 @@
 main = () {
 	task.scope((s) {
 		c : task.Channel(Int) = task.channel()
-		ack : task.Channel(Nil) = task.channel()
+		ack : task.Channel(()) = task.channel()
 		task.go(s, () {
 			task.send(c, 7)
-			task.send(ack, Nil)
+			task.send(ack, ())
 		})
 		event = task.map(task.receive_event(c), (x) {
 			assert(x == 7)
-			request.await_owned(request.ready(Nil))
+			request.await_owned(request.ready(()))
 			fail.raise("map")
 		})
 		assert(fail.catch(() { task.sync(event) }) == Error("map"))

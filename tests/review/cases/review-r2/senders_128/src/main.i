@@ -10,7 +10,7 @@
 )
 spawn = (s, c, n : Int) {
 	{ n == 0 } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			task.go(s, () { task.send(c, n) })
 			spawn(s, c, n - 1)

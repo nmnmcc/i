@@ -9,5 +9,5 @@ first = (r : Result(Int, Int)) {
 
 main = () {
 	first(Error(7))
-	Nil
+	()
 }

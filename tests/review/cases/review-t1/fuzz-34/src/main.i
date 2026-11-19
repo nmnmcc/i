@@ -22,5 +22,5 @@ main = () {
 	assert(f(("c", False)) == 5)
 	assert(f(("", True)) == 5)
 	assert(f(("", False)) == 5)
-	Nil
+	()
 }

@@ -6,5 +6,5 @@
 identity = (r : ()) { r }
 main = () {
 	assert(identity(()) == ())
-	Nil
+	()
 }

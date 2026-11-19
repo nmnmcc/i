@@ -1,14 +1,14 @@
 Dep = ()
-get = () <- (d : Dep) { Nil }
-run = <N>(body : () <- N -> Nil) { body() }
-S(N) = (f = () <- N -> Nil)
+get = () <- (d : Dep) { () }
+run = <N>(body : () <- N -> ()) { body() }
+S(N) = (f = () <- N -> ())
 use = <N>() <- (s : S(N)) { s.f() }
 
 main = <N>() {
 	local2 = () {
 		_syn3_0 : S(Dep) = S(f = () { get() })
 		{
-			local : () <- (S(N), ..N) -> Nil = () { use() }
+			local : () <- (S(N), ..N) -> () = () { use() }
 			local()
 		} <- (_syn3_0)
 	}

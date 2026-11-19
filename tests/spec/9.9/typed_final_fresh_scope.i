@@ -14,7 +14,7 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
@@ -26,17 +26,17 @@ forever = () -> Never {
 main = () {
 	result = fail.catch(() {
 		task.scope((s) {
-			gate : task.Channel(Nil) = task.channel()
+			gate : task.Channel(()) = task.channel()
 			task.go(s, () {
 				resource.ensure(
 					() { fail.raise("child") },
 					() {
 						print("start")
-						task.send(gate, Nil)
+						task.send(gate, ())
 						local = fail.catch(() {
 							task.run(() {
 								task.scope((fresh) {
-									started : task.Channel(Nil) = task.channel()
+									started : task.Channel(()) = task.channel()
 									task.go(fresh, () {
 										task.receive(started)
 										fail.raise("fresh")
@@ -44,7 +44,7 @@ main = () {
 									sibling = task.go(fresh, () {
 										resource.ensure(
 											() {
-												task.send(started, Nil)
+												task.send(started, ())
 												forever()
 											},
 											() {

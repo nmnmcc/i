@@ -35,7 +35,7 @@ fn tested() -> tempfile::TempDir {
         ("src/lib.i", " (twice)\n\ntwice = (n : Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { Nil } & (_) { panic(\"no\") } })\n",
+            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { () } & (_) { panic(\"no\") } })\n",
         ),
     ])
 }
@@ -109,7 +109,7 @@ fn sharded() -> (tempfile::TempDir, std::path::PathBuf) {
     let mut test = String::from("(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n");
     for name in ["a", "b", "c", "d", "e"] {
         test.push_str(&format!(
-            "\ntest(\"{name}\", () {{ lib.twice(2) |> (4) {{ Nil }} & (_) {{ panic(\"no\") }} }})\n"
+            "\ntest(\"{name}\", () {{ lib.twice(2) |> (4) {{ () }} & (_) {{ panic(\"no\") }} }})\n"
         ));
     }
     let dir = package(&[

@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "review/cases.adapter : (() <- (Assert) -> Nil) <- (Assert) -> Nil\nreview/cases.generated_test : () <- (Assert) -> Nil\nreview/cases.generated_test : () -> Nil\nreview/cases.generated_test : () -> Nil\nreview/cases.generated_test : () -> Nil\nreview/cases.generated_test : () <- (Assert) -> Nil\n",
+      "stdout": "review/cases.adapter : (() <- (Assert) -> ()) <- (Assert) -> ()\nreview/cases.generated_test : () <- (Assert) -> ()\nreview/cases.generated_test : () -> ()\nreview/cases.generated_test : () -> ()\nreview/cases.generated_test : () -> ()\nreview/cases.generated_test : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

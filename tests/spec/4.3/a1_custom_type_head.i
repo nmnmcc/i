@@ -7,5 +7,5 @@ Box(Int) = (Int)
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

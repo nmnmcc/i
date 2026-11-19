@@ -8,5 +8,5 @@ Schema(User, _) = Int
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

@@ -14,7 +14,7 @@ test("stdio_fake", () {
 		)
 		stdio.print("hello")
 		stdio.print_error("error")
-		Nil
+		()
 	} <- (
 		stdio.Stdio(
 			read = (n) {
@@ -27,19 +27,19 @@ test("stdio_fake", () {
 			write = (bytes) {
 				request.ready(
 					{ bytes == <<"hello\n":utf8>> } |>
-						(True) { Ok(Nil) }
+						(True) { Ok(()) }
 						& (False) { Error("wrong_bytes") },
 				)
 			},
 			write_error = (bytes) {
 				request.ready(
 					{ bytes == <<"error\n":utf8>> } |>
-						(True) { Ok(Nil) }
+						(True) { Ok(()) }
 						& (False) { Error("wrong_bytes") },
 				)
 			},
-			flush = () { request.ready(Ok(Nil)) },
-			flush_error = () { request.ready(Ok(Nil)) },
+			flush = () { request.ready(Ok(())) },
+			flush_error = () { request.ready(Ok(())) },
 		),
 	)
 })

@@ -11,4 +11,4 @@ need_int = () <- (r: Read(Int)) { r.read() }
 need_string = () <- (r: Read(String)) { r.read() }
 use = () { both(need_int, need_string) }
 
-main = () { Nil }
+main = () { () }

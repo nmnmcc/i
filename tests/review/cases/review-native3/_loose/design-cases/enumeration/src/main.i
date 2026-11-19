@@ -5,7 +5,7 @@
 	i/request
 )
 @host("review:gate/v1", "request")
-Gate = (wait = () -> Request(Nil))
+Gate = (wait = () -> Request(()))
 
 main = () <- (gate : Gate, root : request.Root) {
 	pending = gate.wait()

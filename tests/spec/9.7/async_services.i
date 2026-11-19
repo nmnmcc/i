@@ -24,7 +24,7 @@
 Later = (double = (Int) <- (Fail(String)) -> Int, echo = (String) -> String)
 
 @host("test:io/v1")
-Io = (print = (String) -> Nil)
+Io = (print = (String) -> ())
 
 twice = (n : Int) <- (later : Later) { later.double(later.double(n)) }
 
@@ -36,7 +36,7 @@ main = () <- (later : Later, io : Io) {
 		() { 5 },
 		() {
 			later.echo("final")
-			Nil
+			()
 		},
 	)
 	e = control.boundary((bd) {
@@ -49,5 +49,5 @@ main = () <- (later : Later, io : Io) {
 
 // A test that may call an async function is async too.
 test("async_test", () <- (later : Later) {
-	later.double(21) |> (42) { Nil } & (n) { panic(core.inspect(n)) }
+	later.double(21) |> (42) { () } & (n) { panic(core.inspect(n)) }
 })

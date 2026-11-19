@@ -10,5 +10,5 @@
 test("two_statements", () {
 	assert
 	1 + 1 == 2
-	Nil
+	()
 })

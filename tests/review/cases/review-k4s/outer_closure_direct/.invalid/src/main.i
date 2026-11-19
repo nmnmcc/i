@@ -1,5 +1,5 @@
 // old-syntax-check: E0105
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s: S(N)) {
 	S(f, _) = s
 	f()

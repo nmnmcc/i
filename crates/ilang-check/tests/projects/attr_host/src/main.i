@@ -1,10 +1,10 @@
-One = (f = () -> Nil)
+One = (f = () -> ())
 
-Other = (g = () -> Nil)
+Other = (g = () -> ())
 @host("app:a/v1")
 Two = One | Other
 @host("app:a/v1")
-Unlabelled = (() -> Nil)
+Unlabelled = (() -> ())
 
 @host("app:a/v1")
 NotFn = (n = Int)
@@ -13,4 +13,4 @@ NotFn = (n = Int)
 Alias = Int
 
 @host("app:b/v1", "async")
-First = (read = () -> String, write = (String) -> Nil)
+First = (read = () -> String, write = (String) -> ())

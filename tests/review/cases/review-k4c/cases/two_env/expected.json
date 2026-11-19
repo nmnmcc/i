@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N, N2), ..N, ..N2) -> Nil\napp/main.wrap : () <- (Fail(Never), S(N, N2), ..N, ..N2) -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N, N2), ..N, ..N2) -> ()\napp/main.wrap : () <- (Fail(Never), S(N, N2), ..N, ..N2) -> ()\n",
       "stderr": "src/main.i:8:1: warning[W0504]: top-level binding `wrap` is not used\n"
     },
     "test0": {

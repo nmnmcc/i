@@ -19,7 +19,7 @@ new : <A>() -> Key(A)
 wrap : <A>(Key(A), A) -> Keyed
 
 @external("ilang:key", "read")
-read : <A>(Key(A), Keyed) -> Result(A, Nil)
+read : <A>(Key(A), Keyed) -> Result(A, ())
 
 /// Reads only a value marked by this same key.
 unwrap = <A>(k : Key(A), x : Keyed) -> Lookup(A) {

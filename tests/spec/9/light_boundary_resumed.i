@@ -17,9 +17,9 @@ main = () {
 	r = fail.catch(() {
 		fail = the_fail()
 		control.boundary((g) {
-			control.suspend(g, (k) { () { control.resume(k, Nil)() } })
+			control.suspend(g, (k) { () { control.resume(k, ())() } })
 			fail.raise(1)
 		})
 	})
-	r |> (Ok(later)) { later() } & (Error(_)) { Nil }
+	r |> (Ok(later)) { later() } & (Error(_)) { () }
 }

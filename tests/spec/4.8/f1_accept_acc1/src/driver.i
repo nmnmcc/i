@@ -1,2 +1,2 @@
 (main)
-main = () { Nil }
+main = () { () }

@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.use : () <- (Fail(A), S(A)) -> Nil\nprobe/main.first : () <- (Fail(String), S(String)) -> Nil\nprobe/main.second : () <- (Fail(Int), S(Int)) -> Nil\nprobe/main.example : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.use : () <- (Fail(A), S(A)) -> ()\nprobe/main.first : () <- (Fail(String), S(String)) -> ()\nprobe/main.second : () <- (Fail(Int), S(Int)) -> ()\nprobe/main.example : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

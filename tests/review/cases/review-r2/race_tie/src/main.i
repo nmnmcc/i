@@ -6,10 +6,10 @@
 
 main = () <- (io : Io) {
 	task.scope((s) {
-		armed : task.Channel(Nil) = task.channel()
-		release : task.Channel(Nil) = task.channel()
+		armed : task.Channel(()) = task.channel()
+		release : task.Channel(()) = task.channel()
 		finals : task.Channel(Int) = task.channel()
-		acknowledged : task.Channel(Nil) = task.channel()
+		acknowledged : task.Channel(()) = task.channel()
 		collected = task.go(s, () {
 			a = task.receive(finals)
 			b = task.receive(finals)
@@ -17,15 +17,15 @@ main = () <- (io : Io) {
 			assert(pair == (1, 2) || pair == (2, 1))
 			io.print("left-final")
 			io.print("right-final")
-			task.send(acknowledged, Nil)
-			task.send(acknowledged, Nil)
+			task.send(acknowledged, ())
+			task.send(acknowledged, ())
 		})
 		raced = task.go(s, () {
 			task.race(
 				() {
 					resource.ensure(
 						() {
-							task.send(armed, Nil)
+							task.send(armed, ())
 							task.receive(release)
 							1
 						},
@@ -38,7 +38,7 @@ main = () <- (io : Io) {
 				() {
 					resource.ensure(
 						() {
-							task.send(armed, Nil)
+							task.send(armed, ())
 							task.receive(release)
 							2
 						},
@@ -55,9 +55,9 @@ main = () <- (io : Io) {
 		// workers paragraph permits either winner and either order of final steps.
 		task.receive(armed)
 		task.receive(armed)
-		task.send(release, Nil)
+		task.send(release, ())
 		// Neither final can finish until the collector has heard from both.
-		task.send(release, Nil)
+		task.send(release, ())
 		winner = task.join(raced)
 		assert(winner == 1 || winner == 2)
 		io.print("winner")

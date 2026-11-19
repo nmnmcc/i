@@ -11,7 +11,7 @@
   (import "custom" "echo_bool" (func $echo_bool (param i32) (result i32)))
   (import "custom" "echo_float" (func $echo_float (param f64) (result f64)))
   (import "custom" "echo_nil" (func $echo_nil))
-  ;; (selector: Float) -> String ? Nil | Bool | Int | Float | String | BitArray
+  ;; (selector: Float) -> String ? () | Bool | Int | Float | String | BitArray
   (import "custom:fallible/v1" "fallible"
     (func $fallible (param f64) (result i32 i32 i32 i32 i32 i32 i32 f64 i32 i32 i32 i32)))
 

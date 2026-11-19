@@ -558,13 +558,13 @@ pub fn collections(
     ))
 }
 
-/// A tool decides whether it requires Nil or accepts any return value.
+/// A tool decides whether it requires `()` or accepts any return value.
 #[derive(Clone, Copy)]
 pub enum CollectionResult<'a> {
     /// The consumer accepts any result.
     Any,
-    /// The consumer requires Nil, checked by the type solver.
-    Nil,
+    /// The consumer requires `()`, checked by the type solver.
+    Unit,
     /// A consumer-defined contract over the inferred complete type scheme.
     /// Named type identities are interpreted in the supplied checked program.
     Checked(
@@ -664,7 +664,7 @@ pub fn build_collection(
         &graph,
         program,
         target,
-        matches!(result, CollectionResult::Nil),
+        matches!(result, CollectionResult::Unit),
     );
     diags.extend(more);
     if diags.iter().any(Diagnostic::is_error) {
@@ -838,7 +838,7 @@ second : (Float) -> Float
 main = () {
   first(1.0)
   second(2.0)
-  Nil
+  ()
 }
 "#,
         )
@@ -928,7 +928,7 @@ fn cli_grants_the_resolved_library_content_to_restricted_default_bindings() {
     assert_eq!(declaration.package, built.trusted_package);
     let mut imports = ilang_host::HostImports::default();
     imports
-        .context_service("i:io/v1", "print", |_, _| Ok(Ok(ilang_host::Value::Nil)))
+        .context_service("i:io/v1", "print", |_, _| Ok(Ok(ilang_host::Value::Unit)))
         .unwrap();
     let program = built.host_program().unwrap();
     assert!(

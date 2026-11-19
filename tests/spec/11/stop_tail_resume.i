@@ -10,14 +10,14 @@
 // A call of `control.resume` in tail position counts as a tail call: after
 // it, the resumed frames are on top of the place of the boundary.
 step = (b) {
-	control.suspend(b, (k) { control.resume(k, Nil) })
+	control.suspend(b, (k) { control.resume(k, ()) })
 	panic("after")
 }
 
 main = () {
 	control.boundary((b) {
 		step(b)
-		Nil
+		()
 	})
-	Nil
+	()
 }

@@ -1,4 +1,4 @@
-S(A, E, N, M) = ((A) <- (Fail(E), ..N) -> A, () <- M -> Nil)
+S(A, E, N, M) = ((A) <- (Fail(E), ..N) -> A, () <- M -> ())
 use = <A, E, N, M>(x : A) <- (s : S(A, E, N, M)) {
 	S(f, g) = s
 	g()

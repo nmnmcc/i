@@ -14,7 +14,7 @@ main = () {
 		task.scope((scope) {
 			task.go(scope, () { clock.sleep_ns(10000000) })
 			task.go(scope, () { clock.sleep_ns(10000000) })
-			Nil
+			()
 		})
 	})
 	stdio.print("clock ok")

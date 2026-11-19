@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.use : () <- (S(N), ..N) -> Nil\nprobe/main.wrap : (() <- N -> A) <- N -> A\nprobe/main.example : () -> Nil\n",
+      "stdout": "probe/main.use : () <- (S(N), ..N) -> ()\nprobe/main.wrap : (() <- N -> A) <- N -> A\nprobe/main.example : () -> ()\n",
       "stderr": "src/main.i:7:1: warning[W0504]: top-level binding `example` is not used\n"
     },
     "test0": {

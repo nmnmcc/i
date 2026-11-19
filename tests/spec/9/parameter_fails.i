@@ -6,5 +6,5 @@ second = ((1, x)) { x }
 
 main = () {
 	second((2, 3))
-	Nil
+	()
 }

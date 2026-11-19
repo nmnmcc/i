@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> Int) <- N -> Int\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> Int) <- N -> Int\napp/main.main : () -> ()\n",
       "stderr": ""
     },
     "test0": {

@@ -1,4 +1,4 @@
-S(N) = (() <- N -> Nil)
+S(N) = (() <- N -> ())
 use = <N>() <- (s : S(N)) {
 	S(f) = s
 	f()
@@ -6,6 +6,6 @@ use = <N>() <- (s : S(N)) {
 run = <A, N>(f : () <- N -> A) { f() }
 
 main = <N>() {
-	local : () <- (S(N), ..N) -> Nil = () { use() }
+	local : () <- (S(N), ..N) -> () = () { use() }
 	run(local)
 }

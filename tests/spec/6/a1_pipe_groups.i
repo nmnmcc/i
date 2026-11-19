@@ -13,5 +13,5 @@ main = () {
 	assert(-{ 3 |> (n) { n } } == -3)
 	assert({ 1 |> (_) { User(name = "Ada") } }.name == "Ada")
 	assert({ 1 |> (_) { (x) { x + 1 } } }(4) == 5)
-	Nil
+	()
 }

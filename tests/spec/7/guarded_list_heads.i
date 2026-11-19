@@ -6,12 +6,12 @@
 	testlib = (test) = std/test
 )
 
-probe = (xs : List(Int)) -> Nil {
+probe = (xs : List(Int)) -> () {
 	xs |>
-		([]) { Nil }
-		& ([37, a, b, ..tail] ? a >= 0 && b >= 0) { Nil }
-		& ([37, .._]) { Nil }
-		& ([x, ..tail]) { Nil }
+		([]) { () }
+		& ([37, a, b, ..tail] ? a >= 0 && b >= 0) { () }
+		& ([37, .._]) { () }
+		& ([x, ..tail]) { () }
 }
 
 test("all_paths", () {

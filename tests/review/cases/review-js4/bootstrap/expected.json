@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.make_config : () -> Config\napp/main.make_await : () <- (Config) -> Await\napp/main.body : () <- (Await) -> String\napp/main.fixed_order : () <- (Config) -> String\napp/main.dependencies_first : () -> String\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.make_config : () -> Config\napp/main.make_await : () <- (Config) -> Await\napp/main.body : () <- (Await) -> String\napp/main.fixed_order : () <- (Config) -> String\napp/main.dependencies_first : () -> String\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `fixed_order` is not used\n"
     },
     "test0": {

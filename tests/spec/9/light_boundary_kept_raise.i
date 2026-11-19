@@ -8,8 +8,8 @@
 // A closure that explicitly captures Fail still points at its ended catch.
 // E3 keep-env forwarding leaves Fail at the call (§2.10.8).
 main = () {
-	r : Result((Int) -> Nil, Int) = fail.catch(() <- (active : Fail(Int)) {
+	r : Result((Int) -> (), Int) = fail.catch(() <- (active : Fail(Int)) {
 		(x : Int) { active.raise(x) }
 	})
-	r |> (Ok(k)) { k(1) } & (Error(_)) { Nil }
+	r |> (Ok(k)) { k(1) } & (Error(_)) { () }
 }

@@ -71,7 +71,7 @@ fn syntax_library_round_trips_through_the_host() {
 @external("test:syntax", "source")
 source : () -> syntax.Syntax
 
-test("exercise", () -> Nil {
+test("exercise", () -> () {
 	value = source()
 	assert(source() == value)
 	{
@@ -118,7 +118,7 @@ test("exercise", () -> Nil {
 				assert(syntax.same_code(at, bad))
 			}
 			& (Ok(_)) { panic("invalid expression was accepted") }
-		Nil
+		()
 	} <- (syntax.Definitions(definition = (of) { of }))
 })
 "#
@@ -176,7 +176,7 @@ show = () { syntax.show(source()) }
     };
     std::fs::write(
         &main,
-        "(helper = app/helper)\nmain = () { helper.show()  Nil }\n",
+        "(helper = app/helper)\nmain = () { helper.show()\n() }\n",
     )
     .unwrap();
     let error = match ilang_cli::build(dir.path(), options) {
@@ -189,7 +189,7 @@ show = () { syntax.show(source()) }
     );
     std::fs::write(
         &main,
-        "(helper = app/helper)\nsnapshot = helper.show()\nmain = () { Nil }\n",
+        "(helper = app/helper)\nsnapshot = helper.show()\nmain = () { () }\n",
     )
     .unwrap();
     let error = match ilang_cli::build(dir.path(), options) {
@@ -200,7 +200,7 @@ show = () { syntax.show(source()) }
         matches!(&error, ilang_cli::BuildError::Program { codes, .. } if codes.contains(&"E0322")),
         "{error}"
     );
-    std::fs::write(&main, "(helper = app/helper)\napply = (f) { f() }\nsnapshot = apply(() { helper.show() })\nmain = () { Nil }\n").unwrap();
+    std::fs::write(&main, "(helper = app/helper)\napply = (f) { f() }\nsnapshot = apply(() { helper.show() })\nmain = () { () }\n").unwrap();
     let error = match ilang_cli::build(dir.path(), options) {
         Ok(_) => panic!("ordinary initialization called a compiler capability through a closure"),
         Err(e) => e,
@@ -211,7 +211,7 @@ show = () { syntax.show(source()) }
     );
     std::fs::write(
         &main,
-        "(helper = app/helper)\nunused = () { helper.show() }\nmain = () { Nil }\n",
+        "(helper = app/helper)\nunused = () { helper.show() }\nmain = () { () }\n",
     )
     .unwrap();
     ilang_cli::build(dir.path(), options).unwrap();
@@ -222,10 +222,10 @@ show = () { syntax.show(source()) }
 )
 @external("test:syntax", "source")
 source : () -> syntax.Syntax
-main = () -> Nil {
+main = () -> () {
 	{
 		syntax.definition(source())
-		Nil
+		()
 	} <- (syntax.Definitions(definition = (s) { s }))
 }
 "#,
@@ -241,7 +241,7 @@ main = () -> Nil {
     );
     std::fs::write(
         &main,
-        "@external(\"i:compiler/syntax/v1\", \"show\")\nforged : () -> String\nmain = () { Nil }\n",
+        "@external(\"i:compiler/syntax/v1\", \"show\")\nforged : () -> String\nmain = () { () }\n",
     )
     .unwrap();
     let error = match ilang_cli::build(dir.path(), options) {
@@ -344,7 +344,7 @@ test("exercise", () {
 	syntax.node(result) |>
 		(syntax.Node(syntax.Round([_, child]))) { assert(child == replacement) }
 		& (_) { panic("unexpected template") }
-	Nil
+	()
 })
 "#,
     )
@@ -411,7 +411,7 @@ test("exercise", () {
 		& (_) { panic("wrong splice captures") }
 	failed = syntax._match(pattern, syntax._template(2))
 	assert(syntax._match_ok(failed) == False)
-	Nil
+	()
 })
 "#,
     )
@@ -460,17 +460,17 @@ fn compiler_definition_service_returns_and_aborts_at_the_query() {
 	syntax = i/syntax
 )
 
-answer = () -> Nil {
+answer = () -> () {
 	{
 		answer = syntax.definition(syntax._template(0))
 		assert(syntax.show(answer) == "(= Box (, Int))")
-		Nil
+		()
 	} <- (syntax._definitions())
 }
 
 test("answer", () { answer() })
 
-test("catchable", () -> Nil {
+test("catchable", () -> () {
 	{
 		query = syntax._template(1)
 		fail.catch(() { syntax.definition(query) }) |>
@@ -479,40 +479,40 @@ test("catchable", () -> Nil {
 				assert(at == query)
 			}
 			& (Ok(_)) { panic("expected an error") }
-		Nil
+		()
 	} <- (syntax._definitions())
 })
 
-test("deferred", () -> Nil {
+test("deferred", () -> () {
 	{
 		fail.catch(() { syntax.definition(syntax._template(2)) })
-		Nil
+		()
 	} <- (syntax._definitions())
 })
 
-test("notes", () -> Nil {
+test("notes", () -> () {
 	diagnostics = syntax._diagnostics()
 	diagnostics.note("first")
 	diagnostics.note("second")
-	Nil
+	()
 })
 
-test("notes_failed", () -> Nil {
+test("notes_failed", () -> () {
 	diagnostics = syntax._diagnostics()
 	diagnostics.note("discard me")
 	syntax._report_error("failed after note", syntax._template(1))
-	Nil
+	()
 })
 
-test("macro_error", () -> Nil {
+test("macro_error", () -> () {
 	fail.catch(() { syntax._report_error("macro failed", syntax._template(1)) })
-	Nil
+	()
 })
 
-test("compile_error", () -> Nil {
+test("compile_error", () -> () {
 	{
 		fail.catch(() { syntax.definition(syntax._template(3)) })
-		Nil
+		()
 	} <- (syntax._definitions())
 })
 "#,
@@ -628,7 +628,7 @@ fn compiler_items_service_buffers_valid_requests_and_rejects_bad_ones() {
 	syntax = i/syntax
 )
 
-test("item", () -> Nil {
+test("item", () -> () {
 	service = syntax._items()
 	collection = syntax._template(0)
 	target = syntax._template(1)
@@ -646,15 +646,15 @@ test("item", () -> Nil {
 	fail.catch(() {
 		service.add(collection, target, [], syntax._template(3))
 	}) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("unrelated source location was accepted") }
-	Nil
+	()
 })
 
-test("not_item", () -> Nil {
+test("not_item", () -> () {
 	service = syntax._items()
 	fail.catch(() { service.expose(syntax._template(1)) })
-	Nil
+	()
 })
 "#,
     )
@@ -813,19 +813,19 @@ fn compiler_service_budgets_stop_before_observable_contributions() {
 note = () {
 	diagnostics = syntax._diagnostics()
 	diagnostics.note("abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz")
-	Nil
+	()
 }
 
 test("note", () { note() })
 
-test("query", () -> Nil {
+test("query", () -> () {
 	{
 		syntax.definition(syntax._template(0))
-		Nil
+		()
 	} <- (syntax._definitions())
 })
 
-test("item", () -> Nil {
+test("item", () -> () {
 	service = syntax._items()
 	service.add(
 		syntax._template(1),
@@ -833,7 +833,7 @@ test("item", () -> Nil {
 		[],
 		syntax._template(2),
 	)
-	Nil
+	()
 })
 "#,
     )
@@ -898,7 +898,7 @@ fn compiler_syntax_helpers_are_private_to_generated_code() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "(syntax = i/syntax)\nmain = () { syntax._template(0) Nil }\n",
+        "(syntax = i/syntax)\nmain = () { syntax._template(0)\n() }\n",
     )
     .unwrap();
     let error = match ilang_cli::build(

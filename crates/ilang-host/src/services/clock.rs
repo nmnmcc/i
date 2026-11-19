@@ -42,7 +42,7 @@ pub(super) fn register(imports: &mut HostImports) {
                 match deadline {
                     Ok(deadline) => {
                         tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)).await;
-                        Ok(Ok(Value::Nil))
+                        Ok(Ok(Value::Unit))
                     }
                     Err(code) => Ok(Err(Value::String(code.into()))),
                 }

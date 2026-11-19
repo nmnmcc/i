@@ -561,7 +561,7 @@ _compile_result = (pattern : String) -> Result(Regex, RegexError) {
 		(a, end) = parse_alternation(p)
 		{ peek(end) != -1 } |>
 			(True) { syntax_error(end, "unexpected closing group") }
-			& (False) { Nil }
+			& (False) { () }
 		(accept, b) = emit(Accept, Build(code = dict.new(), size = 0))
 		(pc, tail) = lower(Capture(0, a), accept, b)
 		Regex(code = tail.code, start = pc, names = end.names)

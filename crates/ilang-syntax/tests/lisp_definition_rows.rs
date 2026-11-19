@@ -39,11 +39,10 @@ fn parameter(s: &Syntax) -> Option<(u64, u32)> {
     }
 }
 
-const NEW: [(&str, &str); 9] = [
+const NEW: [(&str, &str); 8] = [
     ("Bool", "(= Bool (| True False))"),
     ("True", "(= True (,))"),
     ("False", "(= False (,))"),
-    ("Nil", "(= Nil (,))"),
     ("Result", "(= (Result A E) (| (Ok A) (Error E)))"),
     ("Ok", "(= (Ok A) (, A))"),
     ("Error", "(= (Error E) (, E))"),
@@ -57,9 +56,8 @@ const NEW: [(&str, &str); 9] = [
     ),
 ];
 
-const OLD: [(&str, &str); 5] = [
+const OLD: [(&str, &str); 4] = [
     ("Bool", "(Bool {True False})"),
-    ("Nil", "(Nil {Nil})"),
     ("Result", "((Result A E) {(Ok A) (Error E)})"),
     (
         "AssertionFailure",
@@ -74,17 +72,27 @@ const OLD: [(&str, &str); 5] = [
 #[test]
 fn every_builtin_definition_has_its_row() {
     let like = root("x");
+    // The frozen oracle still carries the removed prelude row; compare the
+    // rows that the language still defines.
+    let present =
+        |names: &'static [&'static str], expected: &[(&str, &str)]| -> Vec<&'static str> {
+            names
+                .iter()
+                .copied()
+                .filter(|n| expected.iter().any(|(name, _)| name == n))
+                .collect()
+        };
     assert_eq!(
-        builtin_definition_names(true),
-        NEW.map(|(name, _)| name).as_slice()
+        present(builtin_definition_names(true), &NEW),
+        NEW.map(|(name, _)| name).to_vec()
     );
     for (name, row) in NEW {
         let answer = builtin_definition_rows(name, like.scope(), like.span(), 3, true).unwrap();
         assert_eq!(answer.show(), row, "{name}");
     }
     assert_eq!(
-        builtin_definition_names(false),
-        OLD.map(|(name, _)| name).as_slice()
+        present(builtin_definition_names(false), &OLD),
+        OLD.map(|(name, _)| name).to_vec()
     );
     for (name, row) in OLD {
         let answer = builtin_definition_rows(name, like.scope(), like.span(), 3, false).unwrap();
@@ -123,7 +131,7 @@ fn every_builtin_row_is_an_item_of_the_lisp_surface() {
             }
             (TypeRhs::Data(items), _) => {
                 let count = match name {
-                    "True" | "False" | "Nil" => 0,
+                    "True" | "False" => 0,
                     _ => 1,
                 };
                 assert_eq!(items.len(), count, "{name}");

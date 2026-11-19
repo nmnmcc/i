@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- N -> A) <- N -> A\napp/main.forward : () <- (S(N), ..N) -> Nil\napp/main.example : () -> Nil\n",
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\napp/main.run : (() <- N -> A) <- N -> A\napp/main.forward : () <- (S(N), ..N) -> ()\napp/main.example : () -> ()\n",
       "stderr": "src/main.i:12:1: warning[W0504]: top-level binding `example` is not used\n"
     },
     "test0": {

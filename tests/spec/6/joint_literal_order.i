@@ -10,5 +10,5 @@ main = () {
 		_syn3_0 = panic("first written")
 		take(panic("second written"), _syn3_0)
 	}
-	Nil
+	()
 }

@@ -19,5 +19,5 @@ main = () {
 			"Bob",
 	)
 	assert(single(0) == 7)
-	Nil
+	()
 }

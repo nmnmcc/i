@@ -2,5 +2,5 @@
 // expect: compile-error E0501
 main = () {
 	(name = _) = (name = "Ada", age = 36)
-	Nil
+	()
 }

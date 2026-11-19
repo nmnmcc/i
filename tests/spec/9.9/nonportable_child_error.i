@@ -12,9 +12,9 @@ main = () {
 		fail.catch(() {
 			task.scope((s) {
 				task.go(s, () { fail.raise(b) })
-				Nil
+				()
 			})
 		})
-		Nil
+		()
 	})
 }

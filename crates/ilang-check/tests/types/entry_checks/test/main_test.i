@@ -1,4 +1,4 @@
-// §10.2: a test gives `Nil`, and its environment has only host services
+// §10.2: a test gives `()`, and its environment has only host services
 // and `Assert`.
 (
 	(Clock, Storage) = app/main

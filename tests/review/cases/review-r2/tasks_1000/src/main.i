@@ -10,9 +10,9 @@
 )
 many = (s, n : Int) {
 	{ n == 0 } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
-			task.go(s, () { Nil })
+			task.go(s, () { () })
 			many(s, n - 1)
 		}
 }

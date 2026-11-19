@@ -14,14 +14,14 @@ test("labelled data equality", () {
 	assert((a = 1) != (a = 2))
 	assert(pair((1, 2)) != pair((a = 1, b = 2)))
 	assert(pair((a = 1, b = 2)) == pair((b = 2, a = 1)))
-	Nil
+	()
 })
 
 test("labelled data text", () {
 	assert(core.inspect((a = 1)) == "(a = 1)")
 	assert(core.inspect((b = "x", a = (1, 2))) == "(a = (1, 2), b = \"x\")")
 	assert(core.inspect(()) == "()")
-	Nil
+	()
 })
 
 test("spread and access", () {
@@ -30,5 +30,5 @@ test("spread and access", () {
 	assert(older.age == 37)
 	assert(older.name == "ada")
 	assert(older == (age = 37, name = "ada"))
-	Nil
+	()
 })

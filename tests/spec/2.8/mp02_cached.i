@@ -4,4 +4,4 @@
 // keeping its original .hash sidecar. The check must reject the copy.
 (value)
 value = "changed in cache"
-main = () { Nil }
+main = () { () }

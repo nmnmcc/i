@@ -1,7 +1,7 @@
 Dep = (v = Int)
 get = () <- (d : Dep) { d.v }
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
-T(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
+T(N) = (f = () <- N -> Int, m = (N) -> ())
 us = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
 	f()
@@ -23,12 +23,12 @@ main = () {
 	w = () {
 		_syn3_0 : T(S(Never)) = T(
 			f = () { us() + h0() },
-			m = (_ : S(Never)) { Nil },
+			m = (_ : S(Never)) { () },
 		)
 		usa() + get() + run(() { us() }) <- (_syn3_0)
 	}
 	k() + usa() + w()
-	Nil
+	()
 }
 // src/main.i:21:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `Dep`, which must be given before it gets to the entry point
 // src/main.i:21:1: error[E0522]: `main` is an entry point, so its environment may only have host services and `Assert` (§10.2), but it needs `S(a)`, which must be given before it gets to the entry point

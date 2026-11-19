@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.f : (Bool) <- (Fail(\"a\" | \"b\")) -> Never\nprobe/main.g : (Bool) -> 0 | 1 | 2\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.f : (Bool) <- (Fail(\"a\" | \"b\")) -> Never\nprobe/main.g : (Bool) -> 0 | 1 | 2\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": "src/main.i:12:6: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "test0": {

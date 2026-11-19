@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.uset : () <- (T(N), ..N) -> Int\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.uset : () <- (T(N), ..N) -> Int\napp/main.main : () -> ()\n",
       "stderr": "src/main.i:16:2: error[E0501]: `S(_)` is not a subtype of `Never`\n1 error\n"
     }
   }

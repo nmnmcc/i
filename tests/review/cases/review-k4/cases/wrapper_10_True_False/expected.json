@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Nil\napp/main.run : (() <- N -> A) <- N -> A\napp/main.id : (A) -> A\napp/main.f : () <- (S(N), ..N) -> Nil\napp/main.main : () -> Nil\n",
-      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:45: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
+      "stdout": "app/main.use : () <- (S(N), ..N) -> ()\napp/main.run : (() <- N -> A) <- N -> A\napp/main.id : (A) -> A\napp/main.f : () <- (S(N), ..N) -> ()\napp/main.main : () -> ()\n",
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:44: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "test0": {
       "command": [
@@ -21,7 +21,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:45: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:44: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "run0": {
       "command": [
@@ -31,7 +31,7 @@
       ],
       "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:45: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:44: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "test2": {
       "command": [
@@ -41,7 +41,7 @@
       ],
       "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:45: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:44: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     },
     "run2": {
       "command": [
@@ -51,7 +51,7 @@
       ],
       "exit": 0,
       "stdout": "",
-      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:45: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
+      "stderr": "src/main.i:6:1: warning[W0504]: top-level binding `run` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `id` is not used\nsrc/main.i:8:44: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard\n"
     }
   }
 }

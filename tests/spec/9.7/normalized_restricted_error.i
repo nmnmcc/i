@@ -3,4 +3,4 @@
 
 // Adding an included value does not fill the missing zero (§10.3).
 @host("test:kv/v1")
-Kv = (check = (Int) <- (Fail(Nil | Int - 0 | 1 | String)) -> Int)
+Kv = (check = (Int) <- (Fail(() | Int - 0 | 1 | String)) -> Int)

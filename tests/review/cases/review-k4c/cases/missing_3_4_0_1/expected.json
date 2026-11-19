@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.get : () <- (Dep) -> Nil\napp/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> Nil\napp/main.helper : () <- (Fail(Never)) -> Nil\napp/main.main : () <- (Fail(Never)) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> ()\napp/main.run : (() <- N -> ()) <- N -> ()\napp/main.use : () <- (S(N, N2), ..N, ..N2) -> ()\napp/main.helper : () <- (Fail(Never)) -> ()\napp/main.main : () <- (Fail(Never)) -> ()\n",
       "stderr": "src/main.i:11:2: error[E0504]: a value of `S(_, _)` could go to more than one type variable of `Fail(Never) | _ | _`\n1 error\n"
     }
   }

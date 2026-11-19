@@ -1523,7 +1523,7 @@ impl<'a> Resolver<'a> {
                         _ => String::new(),
                     };
                     self.error(code::HOST_TYPE, f.ty.span,
-                        format!("a host field's parameters and result must use `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors{input_note}"));
+                        format!("a host field's parameters and result must use `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors{input_note}"));
                 }
             }
         }
@@ -1657,12 +1657,13 @@ impl<'a> Resolver<'a> {
                 BuiltinType::BitArray => Some(HostType::BitArray),
                 _ => None,
             },
+            // `()`, empty data.
+            Ty::Con(Head::Shape(shape), _, _) if shape.is_empty() => Some(HostType::Unit),
             Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) => {
                 let def = self.p.ty(*id);
                 let prelude = Some(def.module) == self.p.prelude;
                 match &def.body {
                     TypeBody::Custom(ctors) if ctors.is_empty() => Some(HostType::Opaque(*id)),
-                    TypeBody::Custom(_) if prelude && def.name == "Nil" => Some(HostType::Nil),
                     // One of the two members of `Bool`, as a value or an error.
                     TypeBody::Custom(_)
                         if prelude && outgoing && matches!(def.name.as_str(), "True" | "False") =>
@@ -1739,7 +1740,7 @@ impl<'a> Resolver<'a> {
                         self.error(
                             code::EXTERNAL_HOST_TYPE,
                             error.span,
-                            "the error of an external function must be `Never` or a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; opaque types cannot be errors",
+                            "the error of an external function must be `Never` or a union of `()`, `Bool`, `Int`, `Float`, `String`, and `BitArray`; opaque types cannot be errors",
                         );
                     }
                 }
@@ -1772,7 +1773,7 @@ impl<'a> Resolver<'a> {
                 self.error(
                     code::EXTERNAL_HOST_TYPE,
                     part.span,
-                    format!("the parameters and the value of an external function are types that the host can take: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors{}", if outgoing { String::new() } else { self.host_input_note(part) }),
+                    format!("the parameters and the value of an external function are types that the host can take: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or a custom type with no constructors{}", if outgoing { String::new() } else { self.host_input_note(part) }),
                 );
             }
         }

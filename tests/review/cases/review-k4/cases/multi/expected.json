@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.use : (A) <- (Fail(B), S(A, B, N), ..N) -> A\napp/main.run : (() <- N -> A) <- N -> A\napp/main.int : () <- (Fail(Never)) -> Int\napp/main.str : () <- (Fail(Never)) -> String\napp/main.main : () <- (Fail(Never)) -> Nil\n",
+      "stdout": "app/main.use : (A) <- (Fail(B), S(A, B, N), ..N) -> A\napp/main.run : (() <- N -> A) <- N -> A\napp/main.int : () <- (Fail(Never)) -> Int\napp/main.str : () <- (Fail(Never)) -> String\napp/main.main : () <- (Fail(Never)) -> ()\n",
       "stderr": ""
     },
     "test0": {

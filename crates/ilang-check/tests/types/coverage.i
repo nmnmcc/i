@@ -13,7 +13,7 @@ covered = (s : Shape) {
 
 missing_ctor = (s : Shape) { s |> (Circle(..)) { 1 } & (Square(..)) { 2 } }
 
-missing_nested = (r : Result(Bool, Nil)) {
+missing_nested = (r : Result(Bool, ())) {
 	r |> (Ok(True)) { 1 } & (Error(_)) { 2 }
 }
 

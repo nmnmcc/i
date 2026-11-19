@@ -12,7 +12,7 @@ Dep = (v = Int)
 closed = () {
 	_syn3_0 : T(Int, Dep) = T(
 		g = (x : Int) { x + get() },
-		m = (_ : Dep) { Nil },
+		m = (_ : Dep) { () },
 	)
 	_syn3_1 : S(Dep) = S(f = () { get() })
 	both() <- (Dep(v = 1), _syn3_0, _syn3_1)
@@ -38,10 +38,10 @@ loop = (x) { x(x) }
 
 main = () {
 	closed()
-	Nil
+	()
 }
 
-T(A, N) = (g = (A) <- N -> A, m = (N) -> Nil)
+T(A, N) = (g = (A) <- N -> A, m = (N) -> ())
 
 bad : <N>() <- (Fail(Never), ..N) -> Int = () <- (
 	s : S(N),

@@ -42,21 +42,21 @@ NetError = (operation = String, endpoint = String, code = String)
 @host("i:net/v1", "request")
 Net = (
 	bind = (String, Int) -> Request(Result(Int, String)),
-	send_to = (Int, String, Int, BitArray) -> Request(Result(Nil, String)),
+	send_to = (Int, String, Int, BitArray) -> Request(Result((), String)),
 	receive_from = (Int, Int) -> Request(Result(BitArray, String)),
 	local_address = (Int) -> Request(Result(String, String)),
 	datagram_port = (Int) -> Request(Result(Int, String)),
-	close_datagram = (Int) -> Request(Nil),
+	close_datagram = (Int) -> Request(()),
 	listen = (String, Int) -> Request(Result(Int, String)),
 	local_port = (Int) -> Request(Result(Int, String)),
 	accept = (Int) -> Request(Result(Int, String)),
 	connect = (String, Int) -> Request(Result(Int, String)),
 	resolve = (String) -> Request(Result(String, String)),
 	read = (Int, Int) -> Request(Result(BitArray, String)),
-	write = (Int, BitArray) -> Request(Result(Nil, String)),
-	shutdown_write = (Int) -> Request(Result(Nil, String)),
-	close_stream = (Int) -> Request(Nil),
-	close_listener = (Int) -> Request(Nil),
+	write = (Int, BitArray) -> Request(Result((), String)),
+	shutdown_write = (Int) -> Request(Result((), String)),
+	close_stream = (Int) -> Request(()),
+	close_listener = (Int) -> Request(()),
 )
 
 listen = (address, port) <- (raw : Net) {
@@ -80,7 +80,7 @@ listen = (address, port) <- (raw : Net) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close_listener(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -108,7 +108,7 @@ connect = (address, port) <- (raw : Net) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close_stream(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -136,7 +136,7 @@ accept = (Listener(number)) <- (raw : Net) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close_stream(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)
@@ -253,7 +253,7 @@ bind = (address, port) <- (raw : Net) {
 				(request.Ready(Ok(value))) {
 					request.await_owned(raw.close_datagram(value))
 				}
-				& (_) { Nil }
+				& (_) { () }
 			request.cancel(request.ticket(r))
 		},
 	)

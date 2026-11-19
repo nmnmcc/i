@@ -37,8 +37,8 @@ fn default_and_private_named_function_keep_the_existing_metadata_shape() {
     let dir = project(
         "name = \"app\"\n[entries]\nworker = \"tools.work\"\n",
         &[
-            ("src/main.i", "main = () { Nil }"),
-            ("src/tools.i", "work = () { Nil }\nmain = (x) { x }"),
+            ("src/main.i", "main = () { () }"),
+            ("src/tools.i", "work = () { () }\nmain = (x) { x }"),
         ],
     );
     assert_eq!(entry(dir.path(), None).as_deref(), Some("app/main.main"));
@@ -51,7 +51,7 @@ fn default_and_private_named_function_keep_the_existing_metadata_shape() {
 fn dotted_entry_path_is_relative_to_the_package() {
     let dir = project(
         "name = \"app\"\n[entries]\nworker = \"tools.jobs.work\"\n",
-        &[("src/tools/jobs.i", "work = () { Nil }")],
+        &[("src/tools/jobs.i", "work = () { () }")],
     );
     assert_eq!(
         entry(dir.path(), Some("worker")).as_deref(),
@@ -70,7 +70,7 @@ fn every_declared_target_is_checked_and_selection_must_exist() {
     let dir = project(
         "name = \"app\"\n[entries]\nbad = \"tools.work\"\n",
         &[
-            ("src/main.i", "main = () { Nil }"),
+            ("src/main.i", "main = () { () }"),
             ("src/tools.i", "work = (x) { x }"),
         ],
     );
@@ -81,7 +81,7 @@ fn every_declared_target_is_checked_and_selection_must_exist() {
             .to_string()
             .contains("no parameters")
     );
-    let dir = project("name = \"app\"\n", &[("src/main.i", "main = () { Nil }")]);
+    let dir = project("name = \"app\"\n", &[("src/main.i", "main = () { () }")]);
     assert!(
         build_entry(dir.path(), options(), Some("missing"))
             .err()
@@ -105,7 +105,7 @@ fn dependency_conventions_and_entry_tables_have_no_effect() {
         "name = \"app\"\n[dependencies]\ndep = { path = \"../dep\" }\n",
     )
     .unwrap();
-    std::fs::write(app.join("src/main.i"), "main = () { Nil }\n").unwrap();
+    std::fs::write(app.join("src/main.i"), "main = () { () }\n").unwrap();
     assert_eq!(entry(&app, None).as_deref(), Some("app/main.main"));
 }
 
@@ -242,7 +242,7 @@ fn unselected_computed_entry_types_are_still_validated() {
     let dir = project(
         "name = \"app\"\n[entries]\nbad = \"tools.target\"\n",
         &[
-            ("src/main.i", "main = () { Nil }\n"),
+            ("src/main.i", "main = () { () }\n"),
             ("src/tools.i", "make = () { (x) { x } }\ntarget = make()\n"),
         ],
     );

@@ -11,60 +11,60 @@
 
 test("from_list_size_test", () {
 	assert({ [(4, 0), (1, 0)] |> dict.from_list |> dict.size } == 2)
-	Nil
+	()
 })
 
 test("from_list_duplicate_key_test", () {
 	assert(dict.from_list([(1, 0), (1, 1)]) == dict.from_list([(1, 1)]))
-	Nil
+	()
 })
 
 test("from_list_inequality_value_test", () {
 	assert(dict.from_list([(1, 0), (2, 1)]) != dict.from_list([(1, 0), (2, 2)]))
-	Nil
+	()
 })
 
 test("from_list_inequality_key_test", () {
 	assert(dict.from_list([(1, 0), (2, 1)]) != dict.from_list([(1, 0), (3, 1)]))
-	Nil
+	()
 })
 
 test("has_key_empty_test", () {
 	assert(
 		core.not([] |> dict.from_list |> dict.has(1)),
 	)
-	Nil
+	()
 })
 
 test("has_key_present_test", () {
 	assert([(1, 0)] |> dict.from_list |> dict.has(1))
-	Nil
+	()
 })
 
 test("has_key_present_multiple_test", () {
 	assert([(4, 0), (1, 0)] |> dict.from_list |> dict.has(1))
-	Nil
+	()
 })
 
 test("has_key_absent_test", () {
 	assert(
 		core.not([(4, 0), (1, 0)] |> dict.from_list |> dict.has(0)),
 	)
-	Nil
+	()
 })
 
 test("new_size_test", () {
 	assert(
 		dict.size(dict.new()) == 0,
 	)
-	Nil
+	()
 })
 
 test("new_to_list_test", () {
 	assert(
 		dict.to_list(dict.new()) == [],
 	)
-	Nil
+	()
 })
 
 A = ()
@@ -77,7 +77,7 @@ test("get_int_key_first_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, 4) == Some(0))
-	Nil
+	()
 })
 
 test("get_int_key_second_test", () {
@@ -85,7 +85,7 @@ test("get_int_key_second_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, 1) == Some(1))
-	Nil
+	()
 })
 
 test("get_int_key_missing_test", () {
@@ -93,7 +93,7 @@ test("get_int_key_missing_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, 2) == None)
-	Nil
+	()
 })
 
 test("get_custom_key_a_test", () {
@@ -101,7 +101,7 @@ test("get_custom_key_a_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, A) == Some(0))
-	Nil
+	()
 })
 
 test("get_custom_key_b_test", () {
@@ -109,7 +109,7 @@ test("get_custom_key_b_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, B) == Some(1))
-	Nil
+	()
 })
 
 test("get_custom_key_missing_test", () {
@@ -117,7 +117,7 @@ test("get_custom_key_missing_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, C) == None)
-	Nil
+	()
 })
 
 test("get_bit_array_key_first_test", () {
@@ -125,7 +125,7 @@ test("get_bit_array_key_first_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, <<1, 2, 3>>) == Some(0))
-	Nil
+	()
 })
 
 test("get_bit_array_key_second_test", () {
@@ -133,7 +133,7 @@ test("get_bit_array_key_second_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, <<3, 2, 1>>) == Some(1))
-	Nil
+	()
 })
 
 test("get_bit_array_key_missing_test", () {
@@ -141,7 +141,7 @@ test("get_bit_array_key_missing_test", () {
 	m = dict.from_list(proplist)
 
 	assert(dict.get(m, <<1, 3, 2>>) == None)
-	Nil
+	()
 })
 
 test("insert_test", () {
@@ -154,7 +154,7 @@ test("insert_test", () {
 		} ==
 			dict.from_list([("a", 0), ("b", 1), ("c", 2)]),
 	)
-	Nil
+	()
 })
 
 test("map_values_test", () {
@@ -166,7 +166,7 @@ test("map_values_test", () {
 		} ==
 			dict.from_list([(1, 1), (2, 3), (3, 5)]),
 	)
-	Nil
+	()
 })
 
 test("keys_test", () {
@@ -179,7 +179,7 @@ test("keys_test", () {
 		} ==
 			["a", "b", "c"],
 	)
-	Nil
+	()
 })
 
 test("values_test", () {
@@ -192,7 +192,7 @@ test("values_test", () {
 		} ==
 			[0, 1, 2],
 	)
-	Nil
+	()
 })
 
 test("take_test", () {
@@ -204,7 +204,7 @@ test("take_test", () {
 		} ==
 			dict.from_list([("a", 0), ("b", 1)]),
 	)
-	Nil
+	()
 })
 
 test("drop_test", () {
@@ -216,7 +216,7 @@ test("drop_test", () {
 		} ==
 			dict.from_list([("c", 2)]),
 	)
-	Nil
+	()
 })
 
 test("merge_same_key_first_wins_test", () {
@@ -224,7 +224,7 @@ test("merge_same_key_first_wins_test", () {
 	b = dict.from_list([("a", 0)])
 
 	assert(dict.merge(a, b) == dict.from_list([("a", 0)]))
-	Nil
+	()
 })
 
 test("merge_same_key_second_wins_test", () {
@@ -232,7 +232,7 @@ test("merge_same_key_second_wins_test", () {
 	b = dict.from_list([("a", 0)])
 
 	assert(dict.merge(b, a) == dict.from_list([("a", 2)]))
-	Nil
+	()
 })
 
 test("merge_first_test", () {
@@ -243,7 +243,7 @@ test("merge_first_test", () {
 		dict.merge(a, b) ==
 			dict.from_list([("a", 0), ("b", 1), ("c", 2), ("d", 3)]),
 	)
-	Nil
+	()
 })
 
 test("merge_second_test", () {
@@ -254,7 +254,7 @@ test("merge_second_test", () {
 		dict.merge(b, a) ==
 			dict.from_list([("a", 2), ("b", 1), ("c", 4), ("d", 3)]),
 	)
-	Nil
+	()
 })
 
 test("delete_test", () {
@@ -267,7 +267,7 @@ test("delete_test", () {
 		} ==
 			dict.from_list([("b", 1), ("c", 2)]),
 	)
-	Nil
+	()
 })
 
 test("upsert_existing_test", () {
@@ -279,7 +279,7 @@ test("upsert_existing_test", () {
 		dict.upsert(d, "a", inc_or_zero) ==
 			dict.from_list([("a", 1), ("b", 1), ("c", 2)]),
 	)
-	Nil
+	()
 })
 
 test("upsert_existing_b_test", () {
@@ -291,7 +291,7 @@ test("upsert_existing_b_test", () {
 		dict.upsert(d, "b", inc_or_zero) ==
 			dict.from_list([("a", 0), ("b", 2), ("c", 2)]),
 	)
-	Nil
+	()
 })
 
 test("upsert_new_test", () {
@@ -303,7 +303,7 @@ test("upsert_new_test", () {
 		dict.upsert(d, "z", inc_or_zero) ==
 			dict.from_list([("a", 0), ("b", 1), ("c", 2), ("z", 0)]),
 	)
-	Nil
+	()
 })
 
 test("fold_sum_test", () {
@@ -312,7 +312,7 @@ test("fold_sum_test", () {
 	add = (acc, _, v) { v + acc }
 
 	assert(dict.fold(d, 0, add) == 6)
-	Nil
+	()
 })
 
 test("fold_keys_test", () {
@@ -324,7 +324,7 @@ test("fold_keys_test", () {
 		{ d |> dict.fold([], prepend) |> list.sort(string.compare) } ==
 			["a", "b", "c", "d"],
 	)
-	Nil
+	()
 })
 
 test("fold_empty_test", () {
@@ -333,7 +333,7 @@ test("fold_empty_test", () {
 	assert(
 		dict.fold(dict.from_list([]), 0, add) == 0,
 	)
-	Nil
+	()
 })
 
 test("each_test", () {
@@ -344,11 +344,11 @@ test("each_test", () {
 			True = (k, v) |>
 				(("a", 1) | ("b", 2) | ("c", 3) | ("d", 4)) { True }
 				& (_) { False }
-			Nil
+			()
 		}) ==
-			Nil,
+			(),
 	)
-	Nil
+	()
 })
 
 range = (start, end, a) {
@@ -371,17 +371,17 @@ grow_and_shrink_map = (initial_size, final_size) {
 // maps should be equal even if the insert/removal order was different
 test("insert_order_equality_small_test", () {
 	assert(grow_and_shrink_map(8, 2) == grow_and_shrink_map(4, 2))
-	Nil
+	()
 })
 
 test("insert_order_equality_medium_test", () {
 	assert(grow_and_shrink_map(17, 10) == grow_and_shrink_map(12, 10))
-	Nil
+	()
 })
 
 test("insert_order_equality_large_test", () {
 	assert(grow_and_shrink_map(2000, 1000) == grow_and_shrink_map(1000, 1000))
-	Nil
+	()
 })
 
 // ensure operations on a map don't mutate it
@@ -391,7 +391,7 @@ test("persistence_test", () {
 	_ = dict.insert(a, 1, 6)
 	_ = dict.delete(a, 0)
 	assert(dict.get(a, 0) == Some(0))
-	Nil
+	()
 })
 
 // using maps as keys should work (tests hash function)
@@ -422,7 +422,7 @@ test("map_as_key_test", () {
 	assert(
 		dict.get(dict.insert(map1, a3, "a3"), a) == Some("a3"),
 	)
-	Nil
+	()
 })
 
 test("large_n_get_test", () {
@@ -431,7 +431,7 @@ test("large_n_get_test", () {
 
 	m = list_to_map(l)
 	list.map(l, (i) { assert(dict.get(m, i) == Some(i)) })
-	Nil
+	()
 })
 
 test("large_n_after_shrink_test", () {
@@ -440,28 +440,28 @@ test("large_n_after_shrink_test", () {
 
 	m = grow_and_shrink_map(n, 0)
 	list.map(l, (i) { assert(dict.get(m, i) == None) })
-	Nil
+	()
 })
 
 test("size_basic_test", () {
 	n = 1000
 	m = list_to_map(range(0, n, []))
 	assert(dict.size(m) == n)
-	Nil
+	()
 })
 
 test("size_after_shrink_test", () {
 	n = 1000
 	m = grow_and_shrink_map(n, n / 2)
 	assert(dict.size(m) == n / 2)
-	Nil
+	()
 })
 
 test("size_empty_after_delete_test", () {
 	n = 1000
 	m = grow_and_shrink_map(n, 0) |> dict.delete(0)
 	assert(dict.size(m) == 0)
-	Nil
+	()
 })
 
 test("size_insert_existing_test", () {
@@ -470,7 +470,7 @@ test("size_insert_existing_test", () {
 	assert(
 		dict.size(dict.insert(m, 1, 99)) == 18,
 	)
-	Nil
+	()
 })
 
 test("size_insert_existing_2_test", () {
@@ -479,28 +479,28 @@ test("size_insert_existing_2_test", () {
 	assert(
 		dict.size(dict.insert(m, 2, 99)) == 18,
 	)
-	Nil
+	()
 })
 
 test("is_empty_new_test", () {
 	assert(
 		dict.is_empty(dict.new()),
 	)
-	Nil
+	()
 })
 
 test("is_empty_with_element_test", () {
 	assert(
 		core.not(dict.new() |> dict.insert(1, 10) |> dict.is_empty()),
 	)
-	Nil
+	()
 })
 
 test("is_empty_after_delete_test", () {
 	assert(
 		dict.new() |> dict.insert(1, 10) |> dict.delete(1) |> dict.is_empty(),
 	)
-	Nil
+	()
 })
 
 // https://github.com/gleam-lang/stdlib/issues/435
@@ -508,43 +508,43 @@ test("peters_bug_test", () {
 	assert(
 		{
 			dict.new()
-				|> dict.insert(22, Nil)
-				|> dict.insert(21, Nil)
-				|> dict.insert(23, Nil)
-				|> dict.insert(18, Nil)
-				|> dict.insert(17, Nil)
-				|> dict.insert(19, Nil)
-				|> dict.insert(14, Nil)
-				|> dict.insert(13, Nil)
-				|> dict.insert(15, Nil)
-				|> dict.insert(10, Nil)
-				|> dict.insert(9, Nil)
-				|> dict.insert(11, Nil)
-				|> dict.insert(6, Nil)
-				|> dict.insert(5, Nil)
-				|> dict.insert(7, Nil)
-				|> dict.insert(2, Nil)
-				|> dict.insert(1, Nil)
-				|> dict.insert(3, Nil)
+				|> dict.insert(22, ())
+				|> dict.insert(21, ())
+				|> dict.insert(23, ())
+				|> dict.insert(18, ())
+				|> dict.insert(17, ())
+				|> dict.insert(19, ())
+				|> dict.insert(14, ())
+				|> dict.insert(13, ())
+				|> dict.insert(15, ())
+				|> dict.insert(10, ())
+				|> dict.insert(9, ())
+				|> dict.insert(11, ())
+				|> dict.insert(6, ())
+				|> dict.insert(5, ())
+				|> dict.insert(7, ())
+				|> dict.insert(2, ())
+				|> dict.insert(1, ())
+				|> dict.insert(3, ())
 				|> dict.get(0)
 		} ==
 			None,
 	)
-	Nil
+	()
 })
 
 test("zero_must_be_contained_get_test", () {
-	map = dict.new() |> dict.insert(0, Nil)
+	map = dict.new() |> dict.insert(0, ())
 
-	assert(dict.get(map, 0) == Some(Nil))
-	Nil
+	assert(dict.get(map, 0) == Some(()))
+	()
 })
 
 test("zero_must_be_contained_has_key_test", () {
-	map = dict.new() |> dict.insert(0, Nil)
+	map = dict.new() |> dict.insert(0, ())
 
 	assert(dict.has(map, 0) == True)
-	Nil
+	()
 })
 
 test("empty_map_equality_first_test", () {
@@ -552,7 +552,7 @@ test("empty_map_equality_first_test", () {
 	map2 = dict.from_list([(1, 2)])
 
 	assert(map1 != map2)
-	Nil
+	()
 })
 
 test("empty_map_equality_second_test", () {
@@ -560,7 +560,7 @@ test("empty_map_equality_second_test", () {
 	map2 = dict.from_list([(1, 2)])
 
 	assert(map2 != map1)
-	Nil
+	()
 })
 
 test("extra_keys_equality_first_test", () {
@@ -568,7 +568,7 @@ test("extra_keys_equality_first_test", () {
 	map2 = dict.from_list([(1, 2), (3, 4), (4, 5)])
 
 	assert(map1 != map2)
-	Nil
+	()
 })
 
 test("extra_keys_equality_second_test", () {
@@ -576,7 +576,7 @@ test("extra_keys_equality_second_test", () {
 	map2 = dict.from_list([(1, 2), (3, 4), (4, 5)])
 
 	assert(map2 != map1)
-	Nil
+	()
 })
 
 test("combine_test", () {
@@ -587,7 +587,7 @@ test("combine_test", () {
 		dict.combine(map1, map2, (one, other) { one - other }) ==
 			dict.from_list([("a", 1), ("b", 2), ("c", 3), ("d", 4)]),
 	)
-	Nil
+	()
 })
 
 test("combine_with_empty_first_test", () {
@@ -596,7 +596,7 @@ test("combine_with_empty_first_test", () {
 	assert(
 		dict.combine(map1, dict.new(), (one, _) { one }) == map1,
 	)
-	Nil
+	()
 })
 
 test("combine_with_empty_second_test", () {
@@ -605,7 +605,7 @@ test("combine_with_empty_second_test", () {
 	assert(
 		dict.combine(dict.new(), map1, (one, _) { one }) == map1,
 	)
-	Nil
+	()
 })
 
 test("combine_with_no_overlapping_keys_test", () {
@@ -616,7 +616,7 @@ test("combine_with_no_overlapping_keys_test", () {
 		dict.combine(map1, map2, (one, _) { one }) ==
 			dict.from_list([("a", 1), ("b", 2), ("c", 3), ("d", 4)]),
 	)
-	Nil
+	()
 })
 
 CollidingKey1 = ()
@@ -634,7 +634,7 @@ test("hash_collision_size_test", () {
 		|> dict.insert(CollidingKey2, 2)
 
 	assert(dict.size(d) == 2)
-	Nil
+	()
 })
 
 test("hash_collision_get_first_test", () {
@@ -643,7 +643,7 @@ test("hash_collision_get_first_test", () {
 		|> dict.insert(CollidingKey2, 2)
 
 	assert(dict.get(d, CollidingKey1) == Some(1))
-	Nil
+	()
 })
 
 test("hash_collision_get_second_test", () {
@@ -652,7 +652,7 @@ test("hash_collision_get_second_test", () {
 		|> dict.insert(CollidingKey2, 2)
 
 	assert(dict.get(d, CollidingKey2) == Some(2))
-	Nil
+	()
 })
 
 test("hash_collision_equality_insert_order_test", () {
@@ -660,7 +660,7 @@ test("hash_collision_equality_insert_order_test", () {
 	d2 = dict.from_list([(CollidingKey2, 2), (CollidingKey1, 1)])
 
 	assert(d1 == d2)
-	Nil
+	()
 })
 
 test("hash_collision_map_as_key_test", () {
@@ -671,7 +671,7 @@ test("hash_collision_map_as_key_test", () {
 	outer = dict.new() |> dict.insert(d1, "inner") |> dict.insert(d3, "other")
 
 	assert(dict.get(outer, d2) == Some("inner"))
-	Nil
+	()
 })
 
 test("hash_collision_after_delete_size_test", () {
@@ -681,7 +681,7 @@ test("hash_collision_after_delete_size_test", () {
 	d = dict.delete(d, CollidingKey1)
 
 	assert(dict.size(d) == 1)
-	Nil
+	()
 })
 
 test("hash_collision_after_delete_get_first_test", () {
@@ -691,7 +691,7 @@ test("hash_collision_after_delete_get_first_test", () {
 	d = dict.delete(d, CollidingKey1)
 
 	assert(dict.get(d, CollidingKey1) == None)
-	Nil
+	()
 })
 
 test("hash_collision_after_delete_get_second_test", () {
@@ -701,7 +701,7 @@ test("hash_collision_after_delete_get_second_test", () {
 	d = dict.delete(d, CollidingKey1)
 
 	assert(dict.get(d, CollidingKey2) == Some(2))
-	Nil
+	()
 })
 
 Red = ()
@@ -714,7 +714,7 @@ test("hash_collision_fold_green_test", () {
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "green\n"))
-	Nil
+	()
 })
 
 test("hash_collision_fold_red_test", () {
@@ -722,7 +722,7 @@ test("hash_collision_fold_red_test", () {
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "red\n"))
-	Nil
+	()
 })
 
 test("hash_collision_fold_blue_test", () {
@@ -730,7 +730,7 @@ test("hash_collision_fold_blue_test", () {
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "blue\n"))
-	Nil
+	()
 })
 
 test("hash_collision_map_size_test", () {
@@ -741,7 +741,7 @@ test("hash_collision_map_size_test", () {
 	})
 
 	assert(dict.size(uppercase) == 3)
-	Nil
+	()
 })
 
 test("hash_collision_map_red_test", () {
@@ -752,7 +752,7 @@ test("hash_collision_map_red_test", () {
 	})
 
 	assert(dict.get(uppercase, Red) == Some("RED"))
-	Nil
+	()
 })
 
 test("hash_collision_map_green_test", () {
@@ -763,7 +763,7 @@ test("hash_collision_map_green_test", () {
 	})
 
 	assert(dict.get(uppercase, Green) == Some("GREEN"))
-	Nil
+	()
 })
 
 test("hash_collision_map_blue_test", () {
@@ -774,7 +774,7 @@ test("hash_collision_map_blue_test", () {
 	})
 
 	assert(dict.get(uppercase, Blue) == Some("BLUE"))
-	Nil
+	()
 })
 
 test("hash_collision_values_test", () {
@@ -784,7 +784,7 @@ test("hash_collision_values_test", () {
 		list.sort(dict.values(colours), string.compare) ==
 			["blue", "green", "red"],
 	)
-	Nil
+	()
 })
 
 test("hash_collision_keys_test", () {
@@ -798,7 +798,7 @@ test("hash_collision_keys_test", () {
 		} ==
 			["blue", "green", "red"],
 	)
-	Nil
+	()
 })
 
 // Random operations, checked against a list of pairs as a model. The
@@ -808,7 +808,7 @@ test_random_operations = (
 	num_ops : Int,
 	key_space : Int,
 	initial : dict.Dict(Int, Int)
-) -> Nil {
+) -> () {
 	test_random_operations_loop(
 		initial_seed,
 		prng(initial_seed),
@@ -826,7 +826,7 @@ test_random_operations_loop = (
 	key_space : Int,
 	proplist : List((Int, Int)),
 	d : dict.Dict(Int, Int)
-) -> Nil {
+) -> () {
 	{ remaining > 0 } |>
 		(False) { assert_dict_matches_proplist(d, proplist, initial_seed) }
 		& (True) {
@@ -868,10 +868,10 @@ run_many_random_tests = (
 	ops_per_test : Int,
 	key_space : Int,
 	initial : dict.Dict(Int, Int)
-) -> Nil {
+) -> () {
 	go = (n, seed) {
 		n |>
-			(0) { Nil }
+			(0) { () }
 			& (_) {
 				test_random_operations(seed, ops_per_test, key_space, initial)
 				go(n - 1, prng(seed + n))
@@ -904,9 +904,9 @@ assert_dict_matches_proplist = <K, V>(
 	d : dict.Dict(K, V),
 	proplist : List((K, V)),
 	seed : Int
-) -> Nil {
+) -> () {
 	{ dict.size(d) == list.length(proplist) } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			panic(
 				"Size mismatch with seed " <>
@@ -921,7 +921,7 @@ assert_dict_matches_proplist = <K, V>(
 		(key, value) = pair
 		got = dict.get(d, key)
 		{ got == Some(value) } |>
-			(True) { Nil }
+			(True) { () }
 			& (False) {
 				panic(
 					"Get mismatch with seed " <>
@@ -936,7 +936,7 @@ assert_dict_matches_proplist = <K, V>(
 			}
 	})
 	{ d == dict.from_list(proplist) } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			panic(
 				"Structural equality failed with seed " <> int.to_string(seed),

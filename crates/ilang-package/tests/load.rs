@@ -22,7 +22,7 @@ fn source_entries_do_not_load_test_dependencies() {
                 "i.toml",
                 "name = \"app\"\n[entries]\nrun = \"app.run\"\n[dev-dependencies]\nmissing = { path = \"missing\" }\n",
             ),
-            ("src/app.i", "run = () { Nil }\n"),
+            ("src/app.i", "run = () { () }\n"),
             ("test/broken.i", "not i source\n"),
             ("test/app.i", "also not i source\n"),
         ],
@@ -53,7 +53,7 @@ fn test_module_entries_load_test_dependencies() {
                 "i.toml",
                 "name = \"app\"\n[entries]\nrun = \"worker.run\"\n[dev-dependencies]\ndep = { path = \"dep\" }\n",
             ),
-            ("test/worker.i", "run = () { Nil }\n"),
+            ("test/worker.i", "run = () { () }\n"),
             ("dep/i.toml", "name = \"dep\"\n"),
             ("dep/src/value.i", "value = 1\n"),
         ],
@@ -254,10 +254,7 @@ fn dependency_defaults_cannot_replace_the_roots_explicit_entry() {
                 "dep/i.toml",
                 "name=\"dep\"\n[entries]\nnative=\"main.other\"\n[providers.\"dep/main.S\"]\njs=\"dep/main.js\"\nhost=\"dep/main.host\"\n",
             ),
-            (
-                "dep/src/main.i",
-                "(value)\nvalue = 42\nother = () { Nil }\n",
-            ),
+            ("dep/src/main.i", "(value)\nvalue = 42\nother = () { () }\n"),
         ],
     );
     let (graph, diagnostics) = load(&dir.path().join("app"));

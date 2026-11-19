@@ -2,7 +2,7 @@
 import (task = app/task, net = app/net, i/fail, i/resource)
 copy = (stream) {
   case net.read(stream, 65536) {
-    <<>> -> Nil
+    <<>> -> ()
     bytes -> { net.write(stream, bytes) copy(stream) }
   }
 }
@@ -13,7 +13,7 @@ serve_next = (scope, listener) {
     (stream) {
       task.go(scope, () { serve_next(scope, listener) })
       fail.catch(() { copy(stream) })
-      Nil
+      ()
     }
   )
 }
@@ -24,7 +24,7 @@ entry_body = () {
     (listener) {
       task.local_scope((scope) {
         task.go(scope, () { serve_next(scope, listener) })
-        Nil
+        ()
       })
     }
   )

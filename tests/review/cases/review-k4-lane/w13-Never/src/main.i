@@ -1,4 +1,4 @@
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
 
 use = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
@@ -11,5 +11,5 @@ wrap = (body, svc) {
 }
 
 main = () {
-	assert(wrap(() { use() }, S(f = () { 1 }, m = (_ : Never) { Nil })) == 1)
+	assert(wrap(() { use() }, S(f = () { 1 }, m = (_ : Never) { () })) == 1)
 }

@@ -22,7 +22,7 @@ test("identity", () {
 	assert(random.at_path(next, []) == next)
 	assert(random.split(next) != random.split(g))
 	assert(random.at_path(next, [1]) != random.at_path(g, [1]))
-	Nil
+	()
 })
 
 // §9.10: InvalidPath contains the whole input, including after a valid prefix.
@@ -44,7 +44,7 @@ test("invalid", () {
 	assert(
 		random.word(g) == random.word(random.from_seed(19)),
 	)
-	Nil
+	()
 })
 
 // §9.10: successive path components compose; P and S histories stay distinct.
@@ -78,7 +78,7 @@ test("paths", () {
 	assert(
 		random.word(q1) == random.word(random.word(q).1),
 	)
-	Nil
+	()
 })
 
 advance = (g : random.Generator, n : Int) -> random.Generator {
@@ -96,12 +96,12 @@ test("boundaries", () {
 	assert(random.int(g, w + 1) == ({ u + v * w } % { w + 1 }, next))
 	// Powers of W accept every group; the word order is least significant first.
 	assert(random.int(g, w * w) == (u + v * w, next))
-	Nil
+	()
 })
 
-check_range = (g : random.Generator, below : Int, count : Int) -> Nil {
+check_range = (g : random.Generator, below : Int, count : Int) -> () {
 	{ count == 0 } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			(value, next) = random.int(g, below)
 			assert(value >= 0 && value < below)
@@ -117,13 +117,13 @@ test("ranges", () {
 	check_range(g, 10, 1000)
 	check_range(g, core.shift_left(1, 63) + 1, 100)
 	check_range(g, core.shift_left(1, 193) + 123, 100)
-	Nil
+	()
 })
 
 // §9.10: exactly 53 high bits and exactly one draw are used for each Float.
-check_float = (g : random.Generator, count : Int) -> Nil {
+check_float = (g : random.Generator, count : Int) -> () {
 	{ count == 0 } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			(u, next) = random.word(g)
 			(f, after) = random.float(g)
@@ -161,7 +161,7 @@ test("small_bound_frequencies", () {
 	assert(a > 3600 && a < 4400)
 	assert(b > 3600 && b < 4400)
 	assert(c > 3600 && c < 4400)
-	Nil
+	()
 })
 
 walk = (g : random.Generator, count : Int) -> random.Generator {
@@ -176,5 +176,5 @@ test("deep_splits", () {
 		walk(walk(g, 64), 64) == walk(g, 128),
 	)
 	assert(walk(g, 128) != walk(g, 127))
-	Nil
+	()
 })

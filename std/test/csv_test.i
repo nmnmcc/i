@@ -18,33 +18,33 @@ config = (delimiter : String, fields : Int, crlf : Bool) -> csv.Options {
 		& (Error(_)) { panic("test options") }
 }
 
-PullProbe = (note = () -> Nil)
+PullProbe = (note = () -> ())
 
-note_pull = () <- (probe : PullProbe) -> Nil { probe.note() }
+note_pull = () <- (probe : PullProbe) -> () { probe.note() }
 
 test("parse_empty", () {
 	assert(fail.catch(() { csv.parse("") }) == Ok([]))
-	Nil
+	()
 })
 
 test("parse_one", () {
 	assert(fail.catch(() { csv.parse("a") }) == Ok([["a"]]))
-	Nil
+	()
 })
 
 test("parse_one_lf", () {
 	assert(fail.catch(() { csv.parse("a\n") }) == Ok([["a"]]))
-	Nil
+	()
 })
 
 test("parse_one_crlf", () {
 	assert(fail.catch(() { csv.parse("a\r\n") }) == Ok([["a"]]))
-	Nil
+	()
 })
 
 test("parse_row", () {
 	assert(fail.catch(() { csv.parse("a,b,c") }) == Ok([["a", "b", "c"]]))
-	Nil
+	()
 })
 
 test("parse_rows", () {
@@ -52,82 +52,82 @@ test("parse_rows", () {
 		fail.catch(() { csv.parse("a,b\nc,d\n") }) ==
 			Ok([["a", "b"], ["c", "d"]]),
 	)
-	Nil
+	()
 })
 
 test("parse_empty_fields", () {
 	assert(fail.catch(() { csv.parse(",,") }) == Ok([["", "", ""]]))
-	Nil
+	()
 })
 
 test("parse_trailing", () {
 	assert(fail.catch(() { csv.parse("a,") }) == Ok([["a", ""]]))
-	Nil
+	()
 })
 
 test("parse_leading", () {
 	assert(fail.catch(() { csv.parse(",b") }) == Ok([["", "b"]]))
-	Nil
+	()
 })
 
 test("parse_quoted_empty", () {
 	assert(fail.catch(() { csv.parse("\"\"") }) == Ok([[""]]))
-	Nil
+	()
 })
 
 test("parse_quoted", () {
 	assert(fail.catch(() { csv.parse("\"a\",b") }) == Ok([["a", "b"]]))
-	Nil
+	()
 })
 
 test("parse_quoted_delimiter", () {
 	assert(fail.catch(() { csv.parse("\"a,b\",c") }) == Ok([["a,b", "c"]]))
-	Nil
+	()
 })
 
 test("parse_escaped_quote", () {
 	assert(fail.catch(() { csv.parse("\"a\"\"b\"") }) == Ok([["a\"b"]]))
-	Nil
+	()
 })
 
 test("parse_just_quote", () {
 	assert(fail.catch(() { csv.parse("\"\"\"\"") }) == Ok([["\""]]))
-	Nil
+	()
 })
 
 test("parse_embedded_lf", () {
 	assert(fail.catch(() { csv.parse("\"a\nb\",c") }) == Ok([["a\nb", "c"]]))
-	Nil
+	()
 })
 
 test("parse_embedded_crlf", () {
 	assert(fail.catch(() { csv.parse("\"a\r\nb\",c") }) == Ok([["a\nb", "c"]]))
-	Nil
+	()
 })
 
 test("parse_bare_cr", () {
 	assert(fail.catch(() { csv.parse("a\rb") }) == Ok([["a\rb"]]))
-	Nil
+	()
 })
 
 test("parse_quoted_cr", () {
 	assert(fail.catch(() { csv.parse("\"a\rb\"") }) == Ok([["a\rb"]]))
-	Nil
+	()
 })
 
 test("parse_spaces", () {
 	assert(fail.catch(() { csv.parse(" a , b ") }) == Ok([[" a ", " b "]]))
-	Nil
+	()
 })
 
 test("parse_blank_lines", () {
 	assert(fail.catch(() { csv.parse("\n\r\na\n\n") }) == Ok([["a"]]))
-	Nil
+	()
 })
 
 test("parse_space_line", () {
 	assert(fail.catch(() { csv.parse(" \n") }) == Ok([[" "]]))
-	Nil
+	()
 })
 
 test("parse_unicode", () {
@@ -135,12 +135,12 @@ test("parse_unicode", () {
 		fail.catch(() { csv.parse("名字,值\n🦀,é") }) ==
 			Ok([["名字", "值"], ["🦀", "é"]]),
 	)
-	Nil
+	()
 })
 
 test("parse_nul", () {
 	assert(fail.catch(() { csv.parse("a\u{0000}b") }) == Ok([["a\u{0000}b"]]))
-	Nil
+	()
 })
 
 test("parse_no_final_lf", () {
@@ -148,37 +148,37 @@ test("parse_no_final_lf", () {
 		fail.catch(() { csv.parse("a,b\nc,d") }) ==
 			Ok([["a", "b"], ["c", "d"]]),
 	)
-	Nil
+	()
 })
 
 test("parse_crlf_empty", () {
 	assert(fail.catch(() { csv.parse("\r\n") }) == Ok([]))
-	Nil
+	()
 })
 
 test("parse_quoted_delimiter_only", () {
 	assert(fail.catch(() { csv.parse("\",\"") }) == Ok([[","]]))
-	Nil
+	()
 })
 
 test("parse_quote_after_delimiter", () {
 	assert(fail.catch(() { csv.parse("a,\"b\"") }) == Ok([["a", "b"]]))
-	Nil
+	()
 })
 
 test("parse_embedded_blank", () {
 	assert(fail.catch(() { csv.parse("\"\n\n\"") }) == Ok([["\n\n"]]))
-	Nil
+	()
 })
 
 test("parse_last_empty", () {
 	assert(fail.catch(() { csv.parse("\"\",") }) == Ok([["", ""]]))
-	Nil
+	()
 })
 
 test("parse_bom", () {
 	assert(fail.catch(() { csv.parse("﻿a,b") }) == Ok([["﻿a", "b"]]))
-	Nil
+	()
 })
 
 test("error_bare_quote", () {
@@ -186,7 +186,7 @@ test("error_bare_quote", () {
 		fail.catch(() { csv.parse("a\"b") }) ==
 			Error(csv.CsvError(line = 1, column = 2, reason = "bare quote")),
 	)
-	Nil
+	()
 })
 
 test("error_after_quote", () {
@@ -200,7 +200,7 @@ test("error_after_quote", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("error_space_after_quote", () {
@@ -214,7 +214,7 @@ test("error_space_after_quote", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("error_missing_quote", () {
@@ -228,7 +228,7 @@ test("error_missing_quote", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("error_multiline_quote", () {
@@ -242,7 +242,7 @@ test("error_multiline_quote", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("error_unicode_position", () {
@@ -250,56 +250,56 @@ test("error_unicode_position", () {
 		fail.catch(() { csv.parse("é\"") }) ==
 			Error(csv.CsvError(line = 1, column = 2, reason = "bare quote")),
 	)
-	Nil
+	()
 })
 
 test("invalid_delimiter_0", () {
 	fail.catch(() { csv.options("", 0, False) }) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
-	Nil
+	()
 })
 
 test("invalid_delimiter_1", () {
 	fail.catch(() { csv.options("ab", 0, False) }) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
-	Nil
+	()
 })
 
 test("invalid_delimiter_2", () {
 	fail.catch(() { csv.options("\n", 0, False) }) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
-	Nil
+	()
 })
 
 test("invalid_delimiter_3", () {
 	fail.catch(() { csv.options("\r", 0, False) }) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
-	Nil
+	()
 })
 
 test("invalid_delimiter_4", () {
 	fail.catch(() { csv.options("\"", 0, False) }) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
-	Nil
+	()
 })
 
 test("invalid_delimiter_5", () {
 	fail.catch(() { csv.options("\u{0000}", 0, False) }) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
-	Nil
+	()
 })
 
 test("invalid_delimiter_6", () {
 	fail.catch(() { csv.options("�", 0, False) }) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
-	Nil
+	()
 })
 
 test("delimiter_semicolon", () {
@@ -311,7 +311,7 @@ test("delimiter_semicolon", () {
 		} ==
 			Ok([["a", "b"], ["c", "d"]]),
 	)
-	Nil
+	()
 })
 
 test("delimiter_unicode", () {
@@ -323,7 +323,7 @@ test("delimiter_unicode", () {
 		} ==
 			Ok([["a", "b"], ["c", "d"]]),
 	)
-	Nil
+	()
 })
 
 test("delimiter_tab", () {
@@ -335,7 +335,7 @@ test("delimiter_tab", () {
 		} ==
 			Ok([["a", "b"]]),
 	)
-	Nil
+	()
 })
 
 test("width_infer_error", () {
@@ -344,7 +344,7 @@ test("width_infer_error", () {
 			assert(reason == "wrong number of fields")
 		}
 		& (Ok(_)) { panic("width") }
-	Nil
+	()
 })
 
 test("width_explicit", () {
@@ -356,7 +356,7 @@ test("width_explicit", () {
 		} ==
 			Ok([["a", "b"]]),
 	)
-	Nil
+	()
 })
 
 test("width_explicit_error", () {
@@ -365,9 +365,9 @@ test("width_explicit_error", () {
 		e4_call_arg_1 = config(",", 3, False)
 		fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
 	} |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("width") }
-	Nil
+	()
 })
 
 test("width_variable", () {
@@ -379,62 +379,62 @@ test("width_variable", () {
 		} ==
 			Ok([["a"], ["b", "c"]]),
 	)
-	Nil
+	()
 })
 
 test("print_plain", () {
 	assert(csv.print([["a", "b"]]) == "a,b\n")
-	Nil
+	()
 })
 
 test("print_quote", () {
 	assert(csv.print([["a\"b"]]) == "\"a\"\"b\"\n")
-	Nil
+	()
 })
 
 test("print_delimiter", () {
 	assert(csv.print([["a,b"]]) == "\"a,b\"\n")
-	Nil
+	()
 })
 
 test("print_lf", () {
 	assert(csv.print([["a\nb"]]) == "\"a\nb\"\n")
-	Nil
+	()
 })
 
 test("print_cr", () {
 	assert(csv.print([["a\rb"]]) == "\"a\rb\"\n")
-	Nil
+	()
 })
 
 test("print_spaces", () {
 	assert(csv.print([[" a "]]) == " a \n")
-	Nil
+	()
 })
 
 test("print_single_empty", () {
 	assert(csv.print([[""]]) == "\"\"\n")
-	Nil
+	()
 })
 
 test("print_empty_fields", () {
 	assert(csv.print([["", ""]]) == ",\n")
-	Nil
+	()
 })
 
 test("print_empty_rows", () {
 	assert(csv.print([[]]) == "\"\"\n")
-	Nil
+	()
 })
 
 test("print_none", () {
 	assert(csv.print([]) == "")
-	Nil
+	()
 })
 
 test("print_unicode", () {
 	assert(csv.print([["é", "🦀"]]) == "é,🦀\n")
-	Nil
+	()
 })
 
 test("print_crlf", () {
@@ -442,14 +442,14 @@ test("print_crlf", () {
 		csv.print_with([["a", "b"], ["c", "d"]], config(",", 0, True)) ==
 			"a,b\r\nc,d\r\n",
 	)
-	Nil
+	()
 })
 
 test("print_custom_delimiter", () {
 	assert(
 		csv.print_with([["a;b", "c"]], config(";", 0, False)) == "\"a;b\";c\n",
 	)
-	Nil
+	()
 })
 
 test("stream_boundaries_0", () {
@@ -461,9 +461,9 @@ test("stream_boundaries_0", () {
 			) ==
 				[],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_1", () {
@@ -475,9 +475,9 @@ test("stream_boundaries_1", () {
 			) ==
 				[Ok(["a"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_2", () {
@@ -489,9 +489,9 @@ test("stream_boundaries_2", () {
 			) ==
 				[Ok(["a"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_3", () {
@@ -503,9 +503,9 @@ test("stream_boundaries_3", () {
 			) ==
 				[Ok(["a"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_4", () {
@@ -524,9 +524,9 @@ test("stream_boundaries_4", () {
 			) ==
 				[Ok(["a", "b", "c"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_5", () {
@@ -548,9 +548,9 @@ test("stream_boundaries_5", () {
 			) ==
 				[Ok(["a", "b"]), Ok(["c", "d"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_6", () {
@@ -562,9 +562,9 @@ test("stream_boundaries_6", () {
 			) ==
 				[Ok(["", "", ""])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_7", () {
@@ -576,9 +576,9 @@ test("stream_boundaries_7", () {
 			) ==
 				[Ok(["a", ""])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_8", () {
@@ -590,9 +590,9 @@ test("stream_boundaries_8", () {
 			) ==
 				[Ok(["", "b"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_9", () {
@@ -604,9 +604,9 @@ test("stream_boundaries_9", () {
 			) ==
 				[Ok([""])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_10", () {
@@ -625,9 +625,9 @@ test("stream_boundaries_10", () {
 			) ==
 				[Ok(["a", "b"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_11", () {
@@ -648,9 +648,9 @@ test("stream_boundaries_11", () {
 			) ==
 				[Ok(["a,b", "c"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_12", () {
@@ -670,9 +670,9 @@ test("stream_boundaries_12", () {
 			) ==
 				[Ok(["a\"b"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_13", () {
@@ -690,9 +690,9 @@ test("stream_boundaries_13", () {
 			) ==
 				[Ok(["\""])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_14", () {
@@ -713,9 +713,9 @@ test("stream_boundaries_14", () {
 			) ==
 				[Ok(["a\nb", "c"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_15", () {
@@ -737,9 +737,9 @@ test("stream_boundaries_15", () {
 			) ==
 				[Ok(["a\nb", "c"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_16", () {
@@ -751,9 +751,9 @@ test("stream_boundaries_16", () {
 			) ==
 				[Ok(["a\rb"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_17", () {
@@ -772,9 +772,9 @@ test("stream_boundaries_17", () {
 			) ==
 				[Ok(["a\rb"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_18", () {
@@ -795,9 +795,9 @@ test("stream_boundaries_18", () {
 			) ==
 				[Ok([" a ", " b "])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_19", () {
@@ -817,9 +817,9 @@ test("stream_boundaries_19", () {
 			) ==
 				[Ok(["a"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_20", () {
@@ -831,9 +831,9 @@ test("stream_boundaries_20", () {
 			) ==
 				[Ok([" "])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_21", () {
@@ -855,9 +855,9 @@ test("stream_boundaries_21", () {
 			) ==
 				[Ok(["名字", "值"]), Ok(["🦀", "é"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_22", () {
@@ -874,9 +874,9 @@ test("stream_boundaries_22", () {
 			) ==
 				[Ok(["a\u{0000}b"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_boundaries_23", () {
@@ -897,9 +897,9 @@ test("stream_boundaries_23", () {
 			) ==
 				[Ok(["a", "b"]), Ok(["c", "d"])],
 		)
-		Nil
+		()
 	})
-	Nil
+	()
 })
 
 test("stream_scalar_chunks", () {
@@ -910,7 +910,7 @@ test("stream_scalar_chunks", () {
 		) ==
 			[Ok(["名字", "🦀\né"])],
 	)
-	Nil
+	()
 })
 
 test("stream_stops_on_error", () {
@@ -920,7 +920,7 @@ test("stream_stops_on_error", () {
 		) ==
 			[Error(csv.CsvError(line = 1, column = 2, reason = "bare quote"))],
 	)
-	Nil
+	()
 })
 
 test("stream_early_termination", () {
@@ -937,7 +937,7 @@ test("stream_early_termination", () {
 		) ==
 			[Ok(["a", "b"])],
 	)
-	Nil
+	()
 })
 
 test("stream_source_error", () {
@@ -952,13 +952,13 @@ test("stream_source_error", () {
 		}) ==
 			Error("source error"),
 	)
-	Nil
+	()
 })
 
 test("stream_replay", () {
 	rows = csv.rows(stream.from_list(["a,b\nc,d"]), csv.defaults())
 	assert(stream.to_list(rows) == stream.to_list(rows))
-	Nil
+	()
 })
 
 test("header", () {
@@ -968,7 +968,7 @@ test("header", () {
 		fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
 	}
 	assert(result == Ok([dict.from_list([("name", "i"), ("age", "1")])]))
-	Nil
+	()
 })
 
 test("header_empty", () {
@@ -980,7 +980,7 @@ test("header_empty", () {
 		} ==
 			Ok([]),
 	)
-	Nil
+	()
 })
 
 test("header_only", () {
@@ -992,7 +992,7 @@ test("header_only", () {
 		} ==
 			Ok([]),
 	)
-	Nil
+	()
 })
 
 test("header_duplicate", () {
@@ -1006,7 +1006,7 @@ test("header_duplicate", () {
 				csv.CsvError(line = 1, column = 1, reason = "duplicate header"),
 			),
 	)
-	Nil
+	()
 })
 
 test("header_width", () {
@@ -1015,9 +1015,9 @@ test("header_width", () {
 		e4_call_arg_1 = config(",", -1, False)
 		fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
 	} |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("header width") }
-	Nil
+	()
 })
 
 test("header_empty_name", () {
@@ -1029,7 +1029,7 @@ test("header_empty_name", () {
 		} ==
 			Ok([dict.from_list([("", "1"), ("b", "2")])]),
 	)
-	Nil
+	()
 })
 
 test("stream_records", () {
@@ -1039,14 +1039,14 @@ test("stream_records", () {
 		) ==
 			[Ok(dict.from_list([("a", "1"), ("b", "2")]))],
 	)
-	Nil
+	()
 })
 
 test("schema", () {
 	codec = schema.dict(schema.string)
 	row = dict.from_list([("a", "one"), ("b", "two")])
 	assert(fail.catch(() { csv.decode(codec, row) }) == Ok(row))
-	Nil
+	()
 })
 
 test("schema_error", () {
@@ -1056,9 +1056,9 @@ test("schema_error", () {
 		e4_call_arg_1 = dict.from_list([("a", "one")])
 		fail.catch(() { csv.decode(e4_call_arg_0, e4_call_arg_1) })
 	} |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("string must not coerce") }
-	Nil
+	()
 })
 
 test("large_roundtrip", () {
@@ -1070,7 +1070,7 @@ test("large_roundtrip", () {
 		} ==
 			Ok(rows),
 	)
-	Nil
+	()
 })
 
 test("width_error_record_line", () {
@@ -1084,7 +1084,7 @@ test("width_error_record_line", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("header_width_error_line", () {
@@ -1102,7 +1102,7 @@ test("header_width_error_line", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("duplicate_header_error_line", () {
@@ -1116,10 +1116,10 @@ test("duplicate_header_error_line", () {
 				csv.CsvError(line = 3, column = 1, reason = "duplicate header"),
 			),
 	)
-	Nil
+	()
 })
 
-test("bare_cr_lookahead_pulls_once", () -> Nil {
+test("bare_cr_lookahead_pulls_once", () -> () {
 	events = control.boundary((boundary) {
 		{
 			last = stream.make(() -> stream.Step(String, Never, PullProbe) {
@@ -1138,17 +1138,17 @@ test("bare_cr_lookahead_pulls_once", () -> Nil {
 			PullProbe(
 				note = () {
 					control.suspend(boundary, (continuation) {
-						[1, ..control.resume(continuation, Nil)]
+						[1, ..control.resume(continuation, ())]
 					})
 				},
 			),
 		)
 	})
 	assert(events == [1])
-	Nil
+	()
 })
 
-test("bare_cr_eof_pulls_once", () -> Nil {
+test("bare_cr_eof_pulls_once", () -> () {
 	events = control.boundary((boundary) {
 		{
 			last = stream.make(() -> stream.Step(String, Never, PullProbe) {
@@ -1167,12 +1167,12 @@ test("bare_cr_eof_pulls_once", () -> Nil {
 			PullProbe(
 				note = () {
 					control.suspend(boundary, (continuation) {
-						[1, ..control.resume(continuation, Nil)]
+						[1, ..control.resume(continuation, ())]
 					})
 				},
 			),
 		)
 	})
 	assert(events == [1])
-	Nil
+	()
 })

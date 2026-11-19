@@ -1,13 +1,13 @@
 @inline
-a = () { Nil }
+a = () { () }
 
-b = () { Nil }
+b = () { () }
 
 @external("only")
 c : (Int) -> Int
 
 @host("app:h/v1", "sync")
-H = (f = () -> Nil)
+H = (f = () -> ())
 
 @deprecated
 d = 1

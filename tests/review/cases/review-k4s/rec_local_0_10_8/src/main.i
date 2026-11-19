@@ -1,9 +1,9 @@
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
 }
-bad : <N>() <- (Fail(Never), ..N) -> Nil = () -> Nil {
-	f : () <- (S(N), ..N) -> Nil = () { use() }
+bad : <N>() <- (Fail(Never), ..N) -> () = () -> () {
+	f : () <- (S(N), ..N) -> () = () { use() }
 	f()
 }

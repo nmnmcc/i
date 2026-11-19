@@ -93,7 +93,7 @@ test("count_replacement_and_last_split", () {
 					string.replace(s, needle, "aaé"),
 			)
 			string.split_once_last(s, needle) |>
-				(None) { Nil }
+				(None) { () }
 				& (Some((left, right))) { assert(left <> needle <> right == s) }
 		})
 	})
@@ -124,9 +124,9 @@ test("scalar_traversals", () {
 	)
 })
 
-Calls = (call = (Int) -> Nil)
+Calls = (call = (Int) -> ())
 
-observe = (body : () <- (Calls, Assert) -> Nil) -> List(Int) {
+observe = (body : () <- (Calls, Assert) -> ()) -> List(Int) {
 	control.boundary((b) {
 		{
 			body()
@@ -134,7 +134,7 @@ observe = (body : () <- (Calls, Assert) -> Nil) -> List(Int) {
 		} <- (
 			Calls(
 				call = (n) {
-					control.suspend(b, (k) { [n, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [n, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -147,7 +147,7 @@ test("callbacks_run_once_in_order_and_stop_on_error", () {
 			Fail(String),
 			Calls,
 		) -> String
-	) -> Nil {
+	) -> () {
 		seen = observe(() {
 			result = fail.catch(() {
 				action((c) <- (calls : Calls) {

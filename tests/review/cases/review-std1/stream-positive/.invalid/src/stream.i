@@ -1,15 +1,15 @@
 // old-syntax-check: E0101,E0101,E0001,E0101,E0001,E0101,E0102,E0001,E0001,E0102,E0001,E0102,E0001,E0101,E0101,E0101,E0101,E0101,E0101,E0101,E0001,E0001,E0102,E0001,E0102,E0001
 import (i/fail, std/list)
 export (Stream, Step(..), new, wrap, make, pull, map, append, attempt, map_environment, to_list)
-Stream(a, e, n) { Stream(() -> Step(a, e, n) ? e ! n, (n) -> Nil) }
+Stream(a, e, n) { Stream(() -> Step(a, e, n) ? e ! n, (n) -> ()) }
 Step(a, e, n) { Done Next(a, Stream(a, e, n)) }
-make = (step: () -> Step(a, e, n) ? e ! n) -> Stream(a, e, n) { Stream(step, (_: n) { Nil }) }
+make = (step: () -> Step(a, e, n) ? e ! n) -> Stream(a, e, n) { Stream(step, (_: n) { () }) }
 pull = (stream: Stream(a, e, n)) -> Step(a, e, n) ? e ! n {
  Stream(step, _) = stream
  step()
 }
-new = () -> Stream(a, Never, n) { Stream(() -> Step(a, Never, n) ! n { Done }, (_: n) { Nil }) }
-wrap = (item: a) -> Stream(a, Never, n) { Stream(() -> Step(a, Never, n) ! n { Next(item, new()) }, (_: n) { Nil }) }
+new = () -> Stream(a, Never, n) { Stream(() -> Step(a, Never, n) ! n { Done }, (_: n) { () }) }
+wrap = (item: a) -> Stream(a, Never, n) { Stream(() -> Step(a, Never, n) ! n { Next(item, new()) }, (_: n) { () }) }
 map = (over: Stream(a, e, n), with: (a) -> b ? f ! n) -> Stream(b, e | f, n) {
  make(() {
   case pull(over) {

@@ -12,5 +12,5 @@ main = () {
 	assert(tail("a.txt") == "both:")
 	assert(tail("x") == "none")
 	assert({ "😀é" |> (r <> "é") { r } & (_) { "bad" } } == "😀")
-	Nil
+	()
 }

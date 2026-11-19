@@ -10,7 +10,7 @@ Whole = String - "error" | "error"
 Kv = (
 	get = (String & { String | Int }) <- (Fail(String | "error")) -> Whole,
 	check = ({ Int | String } & Int) <- (
-		Fail(Nil | Int - 0 | 0 | String | "error"),
+		Fail(() | Int - 0 | 0 | String | "error"),
 	) -> Int - 0 | 0,
 )
 

@@ -9,5 +9,5 @@ map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
 
 main = () {
 	assert(map([], (x) { x.name }) == [])
-	Nil
+	()
 }

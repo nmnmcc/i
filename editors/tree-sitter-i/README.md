@@ -35,7 +35,7 @@ Highlight mapping to the VS Code TextMate grammar:
 | names | variable | variable.other.i |
 | types and constructors | type | entity.name.type.i |
 | built-in types | type.builtin | support.type.builtin.i |
-| True, False, Nil | constant.builtin | constant.language.i |
+| True, False | constant.builtin | constant.language.i |
 | discard | variable.special | variable.language.discard.i |
 | function definition/call | function | entity.name.function.*.i |
 | fields | property | variable.other.property.i |

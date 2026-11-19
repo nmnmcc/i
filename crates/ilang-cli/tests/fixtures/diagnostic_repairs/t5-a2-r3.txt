@@ -79,17 +79,17 @@ first_lower = (chars : List(UtfCodepoint)) -> Bool {
 	& ([]) { False }
 }
 
-parse_integer_token = (text : String) -> Result(Int, Nil) {
+parse_integer_token = (text : String) -> Result(Int, ()) {
 	int.parse(text) |> (Ok(value)) {
 		canonical = int.to_string(value)
 		{ canonical == text || text == "+" <> canonical } |>
 			(True) { Ok(value) }
-			& (False) { Error(Nil) }
+			& (False) { Error(()) }
 	}
-	& (Error(_)) { Error(Nil) }
+	& (Error(_)) { Error(()) }
 }
 
-decode_response = (text : String) -> Result(Int, Nil) {
+decode_response = (text : String) -> Result(Int, ()) {
 	json.parse(text) |> (Ok(value)) {
 		value |> (json.Object(_)) {
 			json.field(value, "value") |>
@@ -97,28 +97,28 @@ decode_response = (text : String) -> Result(Int, Nil) {
 					parse_integer_token(token) |> (Ok(number)) {
 						{ number >= -1000 && number <= 1000 } |>
 							(True) { Ok(number) }
-							& (False) { Error(Nil) }
+							& (False) { Error(()) }
 					}
-					& (Error(_)) { Error(Nil) }
+					& (Error(_)) { Error(()) }
 				}
-				& (_) { Error(Nil) }
+				& (_) { Error(()) }
 		}
-		& (_) { Error(Nil) }
+		& (_) { Error(()) }
 	}
-	& (Error(_)) { Error(Nil) }
+	& (Error(_)) { Error(()) }
 }
 
 remove_part = (output : String, name : String) {
 	part_file = path.join([output, name <> ".part"])
 	fail.catch(() { fs.remove(part_file) })
-	Nil
+	()
 }
 
 process_job = (job : Job, output : String) -> Outcome {
 	part = path.join([output, job.name <> ".part"])
 	target = path.join([output, job.name <> ".txt"])
 	fail.catch(() {
-		job.url |> ("bad-url") { fail.raise(InputError) } & (_) { Nil }
+		job.url |> ("bad-url") { fail.raise(InputError) } & (_) { () }
 		fail.raise(InputError)
 	}) |>
 		(Ok(_)) { remove_part(output, job.name)  Failure }

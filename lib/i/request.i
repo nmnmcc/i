@@ -33,11 +33,11 @@
 	poll
 )
 
-Await = (wait = (Ticket) -> Nil)
+Await = (wait = (Ticket) -> ())
 
-Root = (key = Key(Nil))
+Root = (key = Key(()))
 
-Owner = (key = Key(Nil), root = Root)
+Owner = (key = Key(()), root = Root)
 
 Waiting = ()
 Ready(A) = (A)
@@ -46,34 +46,34 @@ Taken = ()
 RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 
 @external("ilang:request", "open_root")
-new_root : (Key(Nil)) -> Key(Nil)
+new_root : (Key(())) -> Key(())
 
 @external("ilang:request", "close_root")
-end_root : (Key(Nil)) -> Nil
+end_root : (Key(())) -> ()
 
 @external("ilang:request", "open_owner")
-new_owner : (Key(Nil)) -> Key(Nil)
+new_owner : (Key(())) -> Key(())
 
 @external("ilang:request", "close_owner")
-end_owner : (Key(Nil)) -> Nil
+end_owner : (Key(())) -> ()
 
 @external("ilang:request", "count")
-group_count : (Key(Nil)) -> Int
+group_count : (Key(())) -> Int
 
 @external("ilang:request", "count_root")
-root_count : (Key(Nil)) -> Int
+root_count : (Key(())) -> Int
 
 @external("ilang:request", "cancel_all")
-cancel_group : (Key(Nil)) -> Nil
+cancel_group : (Key(())) -> ()
 
 @external("ilang:request", "cancel_all_root")
-cancel_root : (Key(Nil)) -> Nil
+cancel_root : (Key(())) -> ()
 
 @external("ilang:request", "observe_owner")
-observe_owner : (Key(Nil)) -> Request(Nil)
+observe_owner : (Key(())) -> Request(())
 
 @external("ilang:request", "observe_root")
-observe_root : (Key(Nil)) -> Request(Nil)
+observe_root : (Key(())) -> Request(())
 
 open_root = () <- (parent : Root) -> Root { Root(key = new_root(parent.key)) }
 
@@ -125,7 +125,7 @@ take : <A>(Request(A)) -> A
 settled : (Ticket) -> Bool
 
 @external("ilang:request", "cancel")
-cancel : (Ticket) -> Nil
+cancel : (Ticket) -> ()
 
 state = <A>(r : Request(A)) -> RequestState(A) {
 	read_state(r) |>
@@ -149,19 +149,19 @@ await_owned = (r) { resource.ensure(() { await(r) }, () { cancel(ticket(r)) }) }
 
 /// Waits through answers of unlisted requests; terminal tickets return now.
 @external("ilang:request", "wait_any")
-wait_any : (List(Ticket)) -> Nil
+wait_any : (List(Ticket)) -> ()
 
 /// Gives the host a progress turn even when no request is outstanding.
 @external("ilang:request", "poll")
-poll : () -> Nil
+poll : () -> ()
 
 // Entry provision calls these ordinary i definitions. Initial registration is
 // the narrow entry bootstrap; public open_root always requires a live Root.
 @external("ilang:request", "entry_root")
-entry_root : () -> Key(Nil)
+entry_root : () -> Key(())
 
 @external("ilang:request", "entry_end")
-entry_end : () -> Nil
+entry_end : () -> ()
 
 _entry = (body) {
 	root = Root(key = entry_root())
@@ -175,7 +175,7 @@ _entry = (body) {
 }
 
 // Plan factories keep replacement values ordinary, including adapter seeds.
-_provider_root = (seeds : List(Root), key : Key(Nil)) -> Root {
+_provider_root = (seeds : List(Root), key : Key(())) -> Root {
 	seeds |>
 		([root]) { root }
 		& ([]) { Root(key = key) }

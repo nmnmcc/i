@@ -10,9 +10,9 @@ loop = (
 	b : task.Channel(Int),
 	c : task.Channel(Int),
 	n : Int
-) -> Nil {
+) -> () {
 	n |>
-		(0) { Nil }
+		(0) { () }
 		& (_) {
 			value = task.sync(
 				task.choose(
@@ -28,9 +28,9 @@ loop = (
 		}
 }
 
-send = (c : task.Channel(Int), n : Int) -> Nil {
+send = (c : task.Channel(Int), n : Int) -> () {
 	n |>
-		(0) { Nil }
+		(0) { () }
 		& (_) {
 			task.send(c, n)
 			send(c, n - 1)

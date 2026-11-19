@@ -12,5 +12,5 @@ root = (x : Float) { core.sqrt(x) }
 
 main = () {
 	root(-.1.0)
-	Nil
+	()
 }

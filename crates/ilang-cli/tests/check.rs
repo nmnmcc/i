@@ -131,10 +131,10 @@ fn front_end_project(source: &str) -> tempfile::TempDir {
 fn a_local_annotation_cannot_hide_an_entry_service() {
     // A local binding retains the service in its type, and the program requires
     // a provider before entry. Both annotations have the same finite type.
-    let annotated = "S(N) = (() <- N -> Nil)\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- (S(N), ..N) -> Nil = () { use() }\n\tlocal()\n}";
+    let annotated = "S(N) = (() <- N -> ())\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\n\nmain = <N>() {\n\tlocal : () <- (S(N), ..N) -> () = () { use() }\n\tlocal()\n}";
     for source in [
         annotated.to_string(),
-        annotated.replace("local : () <- (S(N), ..N) -> Nil", "local"),
+        annotated.replace("local : () <- (S(N), ..N) -> ()", "local"),
     ] {
         let dir = front_end_project(&source);
         let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -150,7 +150,7 @@ fn a_local_annotation_cannot_hide_an_entry_service() {
         assert!(
             // A need is printed as `<- (…)`, as in `(T) <- (Db, Log) -> R`.
             String::from_utf8_lossy(&out.stdout)
-                .contains("app/main.main : () <- (S(N), ..N) -> Nil"),
+                .contains("app/main.main : () <- (S(N), ..N) -> ()"),
             "{}",
             String::from_utf8_lossy(&out.stdout)
         );
@@ -176,7 +176,7 @@ fn a_captured_service_row_keeps_callback_dependencies() {
     // leave the callback's Dependency need unsatisfied.
     // Keep the old fixture's explicit provider contract: `! S(Dependency)
     // = S(...)` migrates to a typed local before the provide.
-    let source = "S(N) = (() <- N -> Nil)\nDependency = ()\nread = () <- (d : Dependency) { Nil }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- N -> Nil = () { use() }\n\tlocal()\n}\n\nmain = () {\n\tprovided : S(Dependency) = S(() { read() })\n\tapply() <- (provided)\n}";
+    let source = "S(N) = (() <- N -> ())\nDependency = ()\nread = () <- (d : Dependency) { () }\nuse = <N>() <- (s : S(N)) {\n\tS(f) = s\n\tf()\n}\napply = <N>() {\n\tlocal : () <- N -> () = () { use() }\n\tlocal()\n}\n\nmain = () {\n\tprovided : S(Dependency) = S(() { read() })\n\tapply() <- (provided)\n}";
     for supplied in [false, true] {
         let source = if supplied {
             // `Dependency = ()` makes the value `Dependency`.
@@ -191,10 +191,10 @@ fn a_captured_service_row_keeps_callback_dependencies() {
             .output()
             .unwrap();
         let main = if supplied {
-            "app/main.main : () -> Nil\n"
+            "app/main.main : () -> ()\n"
         } else {
             // Function type with a need: `(T) <- (Db, Log) -> R`.
-            "app/main.main : () <- (Dependency) -> Nil\n"
+            "app/main.main : () <- (Dependency) -> ()\n"
         };
         assert!(
             out.status.success(),
@@ -228,7 +228,7 @@ fn a_captured_service_row_keeps_callback_dependencies() {
 fn lowering_rejects_an_uncoalesced_partial_result() {
     // Type inference prohibits recursive types even when a caller of the compiler
     // API accidentally ignores the checker diagnostics.
-    let dir = front_end_project("bad = (x) { x(x) }\n\nmain = () { Nil }");
+    let dir = front_end_project("bad = (x) { x(x) }\n\nmain = () { () }");
     let (graph, _) = ilang_cli::load(dir.path(), false, true);
     let checked = ilang_check::check(&graph);
     assert!(checked.diags.iter().any(|d| d.code == "E0505"));
@@ -258,7 +258,7 @@ fn lowering_rejects_an_uncoalesced_partial_result() {
 fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
     // A top-level clause block is a known function,
     // and a failing one-clause match reports at p, adding no match frame.
-    let source = "f = (0) { 1 } & (_) { 2 }\nget = (o) { o |> (Ok(x)) { x } }\n\nmain = () {\n\tassert(f(1) == 2)\n\tget(Error(Nil))\n\tNil\n}\n";
+    let source = "f = (0) { 1 } & (_) { 2 }\nget = (o) { o |> (Ok(x)) { x } }\n\nmain = () {\n\tassert(f(1) == 2)\n\tget(Error(()))\n\t()\n}\n";
     let dir = front_end_project(source);
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
         .args(["build", "--wat", "--opt", "0", "--project"])
@@ -292,7 +292,7 @@ fn new_syntax_codegen_keeps_known_functions_and_pattern_stop_positions() {
         assert!(!out.status.success());
         let err = String::from_utf8(out.stderr).unwrap();
         assert!(
-            err.contains("pattern Ok(x) did not match Error(Nil)"),
+            err.contains("pattern Ok(x) did not match Error(())"),
             "{err}"
         );
         let (line, column) = ilang_syntax::span::LineIndex::new(source)

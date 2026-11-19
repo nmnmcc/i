@@ -81,7 +81,7 @@ pub(super) fn register(imports: &mut HostImports) {
                         Ok(stream
                             .write_all(&bits.bytes)
                             .await
-                            .map(|()| Value::Nil)
+                            .map(|()| Value::Unit)
                             .map_err(|e| {
                                 if $quiet_on_closed {
                                     exit_if_stdout_closed(&e);
@@ -99,7 +99,7 @@ pub(super) fn register(imports: &mut HostImports) {
                         let Ok(mut stream) = stream.try_lock() else {
                             return Ok(Err(Value::String("busy".into())));
                         };
-                        Ok(stream.flush().await.map(|()| Value::Nil).map_err(|e| {
+                        Ok(stream.flush().await.map(|()| Value::Unit).map_err(|e| {
                             if $quiet_on_closed {
                                 exit_if_stdout_closed(&e);
                             }

@@ -16,18 +16,18 @@ test("inspect_long_list", () {
 	core.byte_size(
 		core.inspect(build(100000, [])),
 	) |>
-		(300000) { Nil }
+		(300000) { () }
 		& (n) { panic(core.inspect(n)) }
 })
 
 test("hash_long_list", () {
 	{ core.hash(build(300000, [])) == core.hash(build(300000, [])) } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic("hash") }
 })
 
 test("inspect_nested", () {
 	core.inspect([(1, "a\n"), (-2, "b")]) |>
-		("[(1, \"a\\n\"), (-2, \"b\")]") { Nil }
+		("[(1, \"a\\n\"), (-2, \"b\")]") { () }
 		& (s) { panic(s) }
 })

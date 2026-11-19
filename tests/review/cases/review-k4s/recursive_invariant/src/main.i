@@ -1,2 +1,2 @@
-Cell(A) = (() -> A, (A) -> Nil)
-bad = (x) { bad(Cell(() { x }, (_) { Nil })) }
+Cell(A) = (() -> A, (A) -> ())
+bad = (x) { bad(Cell(() { x }, (_) { () })) }

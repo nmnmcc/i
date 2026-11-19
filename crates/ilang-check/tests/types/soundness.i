@@ -18,7 +18,7 @@ k = () -> String { with_int(() { get_s() }) }
 // §4.4: bounds that a variable has through other variables are put
 // together too: invariant arguments must be equal, and function types
 // must have the same number of parameters.
-Cell(A) = (get = () -> A, set = (A) -> Nil)
+Cell(A) = (get = () -> A, set = (A) -> ())
 
 use_int = (c : Cell(Int)) { c.get() + 1 }
 
@@ -49,8 +49,8 @@ use_state_int = () <- (st : State(Int)) { 1 }
 use_state_str = () <- (st : State(String)) { 1 }
 
 nested = [
-	Cell(get = () { () { use_state_int() } }, set = (f) { Nil }),
-	Cell(get = () { () { use_state_str() } }, set = (f) { Nil }),
+	Cell(get = () { () { use_state_int() } }, set = (f) { () }),
+	Cell(get = () { () { use_state_str() } }, set = (f) { () }),
 ]
 
 // Rule 11: a type test takes every value of its type constructor.

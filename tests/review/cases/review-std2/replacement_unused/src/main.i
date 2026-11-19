@@ -1,2 +1,2 @@
-S(E) = (() <- (Fail(E)) -> Nil)
-example = () { Nil <- (S(() { Nil }), S(() { Nil })) }
+S(E) = (() <- (Fail(E)) -> ())
+example = () { () <- (S(() { () }), S(() { () })) }

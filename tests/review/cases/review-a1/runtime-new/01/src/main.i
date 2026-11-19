@@ -12,5 +12,5 @@ f = () { a + b }
 
 main = () {
 	assert(f() == 42)
-	Nil
+	()
 }

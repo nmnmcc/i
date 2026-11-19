@@ -181,10 +181,10 @@ fold = <A, Acc, N>(
 }
 
 /// Calls a function on each item left to right and discards its result.
-each = <A, B, N>(over : Sequence(A), with : (A) <- N -> B) -> Nil {
-	fold(over, Nil, (_, x) {
+each = <A, B, N>(over : Sequence(A), with : (A) <- N -> B) -> () {
+	fold(over, (), (_, x) {
 		with(x)
-		Nil
+		()
 	})
 }
 

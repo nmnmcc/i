@@ -14,16 +14,16 @@ Sent = (log.Entry)
 
 Message = ()
 Event = Sent | Message
-Capture = (record = (Event) -> Nil)
+Capture = (record = (Event) -> ())
 
-record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }
+record = (event : Event) <- (capture : Capture) -> () { capture.record(event) }
 
 // Finite, closed instantiations retain service and error types.
 deliver : (log.Entry) <- (
 	Fail(String),
 	Capture,
 	log.Sink(String, Capture),
-) -> Nil = log.write
+) -> () = log.write
 
 query : (log.Level) <- (log.Sink(String, Capture)) -> Bool = log.enabled
 
@@ -31,7 +31,7 @@ defer_message : (log.Level, () <- (Fail(String), Capture) -> String) <- (
 	Fail(String),
 	Capture,
 	log.Sink(String, Capture),
-) -> Nil = log.lazy
+) -> () = log.lazy
 
 capture_sink = () -> log.Sink(String, Capture) {
 	log.make((_ : log.Level) { True }, (entry) { record(Sent(entry)) })
@@ -68,15 +68,13 @@ test("log_delivery", () {
 		} <- (log.silent()) <- (
 			Capture(
 				record = (event) {
-					control.suspend(b, (k) {
-						[event, ..control.resume(k, Nil)]
-					})
+					control.suspend(b, (k) { [event, ..control.resume(k, ())] })
 				},
 			),
 		)
 	})
 	assert(trace == [Sent(original), Sent(entry(log.Warning))])
-	Nil
+	()
 })
 
 // rejection suppresses both callbacks; eager arguments still evaluate.
@@ -110,9 +108,7 @@ test("log_lazy", () {
 		} <- (log.silent()) <- (
 			Capture(
 				record = (event) {
-					control.suspend(b, (k) {
-						[event, ..control.resume(k, Nil)]
-					})
+					control.suspend(b, (k) { [event, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -133,7 +129,7 @@ test("log_lazy", () {
 				Message,
 			],
 	)
-	Nil
+	()
 })
 
 // L4 and both filter laws: thresholds follow the four explicitly ordered levels.
@@ -155,7 +151,7 @@ test("log_filters", () {
 				Capture(
 					record = (event) {
 						control.suspend(b, (k) {
-							[event, ..control.resume(k, Nil)]
+							[event, ..control.resume(k, ())]
 						})
 					},
 				),
@@ -177,7 +173,7 @@ test("log_filters", () {
 					Capture(
 						record = (event) {
 							control.suspend(b, (k) {
-								[event, ..control.resume(k, Nil)]
+								[event, ..control.resume(k, ())]
 							})
 						},
 					),
@@ -199,9 +195,7 @@ test("log_filters", () {
 		} <- (log.filter(capture_sink(), (_ : log.Level) { True })) <- (
 			Capture(
 				record = (event) {
-					control.suspend(b, (k) {
-						[event, ..control.resume(k, Nil)]
-					})
+					control.suspend(b, (k) { [event, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -210,9 +204,9 @@ test("log_filters", () {
 	// Filter composition requires new_accept before old_accept and short-circuiting.
 	{
 		assert(query(log.Info) == False)
-		Nil
+		()
 	} <- (
-		log.filter(log.make(unreachable, (_ : log.Entry) -> Nil { Nil }), (
+		log.filter(log.make(unreachable, (_ : log.Entry) -> () { () }), (
 			_ : log.Level
 		) { False }),
 	)
@@ -224,7 +218,7 @@ broken_deliver : (log.Entry) <- (
 	Fail(DeliveryError),
 	Capture,
 	log.Sink(DeliveryError, Capture),
-) -> Nil = log.write
+) -> () = log.write
 
 // a custom error is preserved, with no retry or swallowed failure.
 test("log_errors", () {
@@ -246,15 +240,13 @@ test("log_errors", () {
 		) <- (
 			Capture(
 				record = (event) {
-					control.suspend(b, (k) {
-						[event, ..control.resume(k, Nil)]
-					})
+					control.suspend(b, (k) { [event, ..control.resume(k, ())] })
 				},
 			),
 		)
 	})
 	assert(trace == [Sent(entry(log.Info))])
-	Nil
+	()
 })
 
 // fixed expected bytes derive from the format rule, not core.inspect.
@@ -301,50 +293,50 @@ test("log_format", () {
 		) ==
 			"info \"\"",
 	)
-	Nil
+	()
 })
 
 GateSink(E, N) = (
 	(log.Level) -> Bool,
-	(log.Entry) <- (Fail(E), ..N) -> Nil,
-	(N) -> Nil,
+	(log.Entry) <- (Fail(E), ..N) -> (),
+	(N) -> (),
 )
 
-gate_write = <E, N>(event : log.Entry) <- (sink : GateSink(E, N)) -> Nil {
+gate_write = <E, N>(event : log.Entry) <- (sink : GateSink(E, N)) -> () {
 	GateSink(accept, send, _) = sink
-	accept(event.level) |> (True) { send(event) } & (False) { Nil }
+	accept(event.level) |> (True) { send(event) } & (False) { () }
 }
 
-GateS(N) = (() <- N -> Nil, (N) -> Nil)
+GateS(N) = (() <- N -> (), (N) -> ())
 
 gate_use = <N>() <- (s : GateS(N)) {
 	GateS(f, _) = s
 	f()
 }
 
-gate_run = <N>(body : () <- N -> Nil) { body() }
+gate_run = <N>(body : () <- N -> ()) { body() }
 
 test("gate_annotated_write", () {
 	{
 		assert(fail.catch(() { gate_write(entry(log.Info)) }) == Error("hello"))
-		Nil
+		()
 	} <- (
 		GateSink(
 			(_ : log.Level) { True },
 			(e) { fail.raise(e.message) },
-			(_ : Never) { Nil },
+			(_ : Never) { () },
 		),
 	)
 })
 
 test("gate_annotated_service", () {
-	gate_use() <- (GateS(() { Nil }, (_ : Never) { Nil }))
+	gate_use() <- (GateS(() { () }, (_ : Never) { () }))
 })
 
 test("gate_generic_write", () {
 	{
 		assert(fail.catch(() { log.write(entry(log.Info)) }) == Error("hello"))
-		Nil
+		()
 	} <- (log.make((_ : log.Level) { True }, (e) { fail.raise(e.message) }))
 })
 
@@ -354,14 +346,14 @@ test("gate_generic_lazy", () {
 			fail.catch(() {
 				log.lazy(log.Info, () -> String { fail.raise("bad") })
 			}) ==
-				Ok(Nil),
+				Ok(()),
 		)
-		Nil
+		()
 	} <- (log.silent())
 })
 
 test("gate_invariant_client", () {
-	gate_run(() { gate_use() }) <- (GateS(() { Nil }, (_ : Never) { Nil }))
+	gate_run(() { gate_use() }) <- (GateS(() { () }, (_ : Never) { () }))
 })
 
 test("stderr_sink_reports_failures", () {
@@ -375,14 +367,14 @@ test("stderr_sink_reports_failures", () {
 					),
 				),
 		)
-		Nil
+		()
 	} <- (log.stderr()) <- (
 		stdio.Stdio(
 			read = (_) { request.ready(Ok(<<>>)) },
-			write = (_) { request.ready(Ok(Nil)) },
+			write = (_) { request.ready(Ok(())) },
 			write_error = (_) { request.ready(Error("failed")) },
-			flush = () { request.ready(Ok(Nil)) },
-			flush_error = () { request.ready(Ok(Nil)) },
+			flush = () { request.ready(Ok(())) },
+			flush_error = () { request.ready(Ok(())) },
 		),
 	)
 })

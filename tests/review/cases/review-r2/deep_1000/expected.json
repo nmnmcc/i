@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.deep : (Int) <- (Fail(Never), task.Scheduler) -> Nil\napp/main.main : () <- (Fail(Never), Io, task.Scheduler) -> Nil\n",
+      "stdout": "app/main.deep : (Int) <- (Fail(Never), task.Scheduler) -> ()\napp/main.main : () <- (Fail(Never), Io, task.Scheduler) -> ()\n",
       "stderr": ""
     },
     "test0": {

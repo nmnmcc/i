@@ -1,9 +1,9 @@
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
 }
 run = <A, N>(f : () <- N -> A) { f() }
-forward : <N>() <- (S(N), ..N) -> Nil = () <- (s : S(N)) -> Nil {
+forward : <N>() <- (S(N), ..N) -> () = () <- (s : S(N)) -> () {
 	run(() { use() })
 }

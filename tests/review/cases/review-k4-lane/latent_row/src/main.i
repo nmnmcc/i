@@ -1,6 +1,6 @@
 S(A) = (A)
 
-T(N) = (f = () <- N -> Nil)
+T(N) = (f = () <- N -> ())
 
 merge = <N, M>(a : T(N), b : T(M)) {
 	T(
@@ -11,11 +11,11 @@ merge = <N, M>(a : T(N), b : T(M)) {
 	)
 }
 
-one = () <- (s : S(Int)) { Nil }
+one = () <- (s : S(Int)) { () }
 
-two = () <- (s : S(String)) { Nil }
+two = () <- (s : S(String)) { () }
 
 main = () {
 	unused = merge(T(f = one), T(f = two))
-	Nil
+	()
 }

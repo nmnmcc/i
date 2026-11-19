@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.read : () <- (S(String)) -> String\napp/main.read_int : () <- (S(Int)) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.with : (A, () <- N -> B) <- (N - S(A)) -> B\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.read : () <- (S(String)) -> String\napp/main.read_int : () <- (S(Int)) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.with : (A, () <- N -> B) <- (N - S(A)) -> B\napp/main.main : () -> ()\n",
       "stderr": "src/main.i:3:1: warning[W0504]: top-level binding `read_int` is not used\nsrc/main.i:4:1: warning[W0504]: top-level binding `run` is not used\n"
     },
     "test0": {

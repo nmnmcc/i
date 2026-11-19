@@ -1,5 +1,5 @@
-Cell(A) = (get = () -> A, put = (A) -> Nil)
-mk = <A>(x : A) { Cell(get = () { x }, put = (_ : A) { Nil }) }
+Cell(A) = (get = () -> A, put = (A) -> ())
+mk = <A>(x : A) { Cell(get = () { x }, put = (_ : A) { () }) }
 f = () {
 	c = mk(0)
 	c.put(1)
@@ -8,5 +8,5 @@ f = () {
 
 main = () {
 	assert(f() == 0)
-	Nil
+	()
 }

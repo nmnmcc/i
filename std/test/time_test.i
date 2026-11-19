@@ -38,7 +38,7 @@ test("time_units", () {
 	assert(
 		time.to_nanoseconds(time.seconds(-2)) == -2000000000,
 	)
-	Nil
+	()
 })
 
 // Duration arithmetic uses truncating division, for either sign of the divisor.
@@ -130,7 +130,7 @@ test("time_arithmetic", () {
 	assert(
 		time.compare(time.seconds(1), time.nanoseconds(1)) == Greater,
 	)
-	Nil
+	()
 })
 
 // The epoch and inverse laws apply to negative and arbitrarily large counts.
@@ -173,7 +173,7 @@ test("time_instants", () {
 	assert(
 		time.compare_instants(time.from_unix_nanoseconds(1), epoch) == Greater,
 	)
-	Nil
+	()
 })
 
 // Durations from huge counts such as hours(10^100) must not overflow, since Int
@@ -205,6 +205,6 @@ test("time_huge_counts", () {
 		) ==
 			9223372036854775808,
 	)
-	Nil
+	()
 })
 // Duration and Instant stay nominally distinct, with private constructors.

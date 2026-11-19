@@ -14,5 +14,5 @@ call = (text : String) -> Int { value(text) }
 main = () {
 	assert(fail.catch(() { call("bad") }) == Error("from-host"))
 	assert(call("good") == 42)
-	Nil
+	()
 }

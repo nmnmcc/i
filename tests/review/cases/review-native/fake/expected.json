@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "review/main.now : () <- (Clock) -> Int\nreview/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "review/main.now : () <- (Clock) -> Int\nreview/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

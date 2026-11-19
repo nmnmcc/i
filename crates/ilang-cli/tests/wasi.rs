@@ -237,7 +237,7 @@ fn stops_write_the_message_and_exit_with_1() {
 #[test]
 fn long_output_survives_short_writes() {
     let dir = package(&format!(
-        "{IO}\ndouble = (s : String, n : Int) {{\n  n\n  |> (0) {{ s }}\n  & (_) {{ double(s <> s, n - 1) }}\n}}\n\nlines = (n : Int) <- (io : Io) {{\n  n\n  |> (0) {{ Nil }}\n  & (_) {{\n    io.print(\"ünïcödé ✓\")\n    lines(n - 1)\n  }}\n}}\n\n\nmain = () <- (io : Io) {{\n  io.print(double(\"héllo ✓ \", 14))\n  lines(1000)\n}}\n"
+        "{IO}\ndouble = (s : String, n : Int) {{\n  n\n  |> (0) {{ s }}\n  & (_) {{ double(s <> s, n - 1) }}\n}}\n\nlines = (n : Int) <- (io : Io) {{\n  n\n  |> (0) {{ () }}\n  & (_) {{\n    io.print(\"ünïcödé ✓\")\n    lines(n - 1)\n  }}\n}}\n\n\nmain = () <- (io : Io) {{\n  io.print(double(\"héllo ✓ \", 14))\n  lines(1000)\n}}\n"
     ));
     let mut want = "héllo ✓ ".repeat(1 << 14);
     want.push('\n');
@@ -318,7 +318,7 @@ fn host_references_keep_the_reference_id_import() {
     let wasm = wasi(dir.path(), Level::O0);
     assert!(imports(&wasm).contains(&("ilang:host/v1".into(), "reference_id".into())));
     // Without host references, `reference_id` is defined in the module.
-    let dir = package("\nmain = () { Nil }\n");
+    let dir = package("\nmain = () { () }\n");
     let wasm = wasi(dir.path(), Level::O0);
     assert!(
         !imports(&wasm).iter().any(|(m, _)| m == "ilang:host/v1"),
@@ -346,7 +346,7 @@ fn needs_an_entry() {
 /// another field is a normal host service, and stays an import.
 #[test]
 fn the_standard_service_is_the_one_of_i_io() {
-    let twice = "@host(\"i:io/v1\")\nMine = (print = (String) -> Nil)\n\nmain = () <- (io : Mine) { io.print(\"x\") }\n";
+    let twice = "@host(\"i:io/v1\")\nMine = (print = (String) -> ())\n\nmain = () <- (io : Mine) { io.print(\"x\") }\n";
     let e = build_error(twice);
     assert!(
         e.contains("E0311") && e.contains("the host service `Io` of `i/io`"),
@@ -363,7 +363,7 @@ fn the_standard_service_is_the_one_of_i_io() {
 /// declaration in the program, not in the library.
 #[test]
 fn an_import_that_does_not_agree_with_the_library_is_told_in_the_program() {
-    let source = "(\n\t(Io) = i/io\n)\n@external(\"i:io/v1\", \"print\")\np : (String) -> Nil\n\nmain = () <- (io : Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
+    let source = "(\n\t(Io) = i/io\n)\n@external(\"i:io/v1\", \"print\")\np : (String) -> ()\n\nmain = () <- (io : Io) {\n\tio.print(\"a\")\n\tp(\"b\")\n}\n";
     for target in [Target::Wasi, Target::Native] {
         let dir = package(source);
         let e = match build(dir.path(), options(Level::O0, target)) {
@@ -383,12 +383,12 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     let wasi_module = "wasi_snapshot_preview1";
     for name in ["fd_write", "proc_exit"] {
         let external = format!(
-            "@external(\"{wasi_module}\", \"{name}\")\nf : (String) -> Nil\n\nmain = () {{ f(\"x\") }}\n"
+            "@external(\"{wasi_module}\", \"{name}\")\nf : (String) -> ()\n\nmain = () {{ f(\"x\") }}\n"
         );
         let e = build_error(&external);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
         let service = format!(
-            "@host(\"{wasi_module}\")\nW = ({name} = (Bool) -> Nil)\n\nmain = () <- (w : W) {{ w.{name}(True) }}\n"
+            "@host(\"{wasi_module}\")\nW = ({name} = (Bool) -> ())\n\nmain = () <- (w : W) {{ w.{name}(True) }}\n"
         );
         let e = build_error(&service);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
@@ -401,14 +401,14 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
     assert!(imports(&wasm).contains(&(wasi_module.into(), "sched_yield".into())));
     // On the target of the binary interface they are normal imports.
     let dir = package(&format!(
-        "@external(\"{wasi_module}\", \"proc_exit\")\nexit : (Int) -> Nil\n\nmain = () {{ exit(0) }}\n"
+        "@external(\"{wasi_module}\", \"proc_exit\")\nexit : (Int) -> ()\n\nmain = () {{ exit(0) }}\n"
     ));
     assert!(build(dir.path(), options(Level::O0, Target::Native)).is_ok());
 }
 
 #[test]
 fn only_wasi_modules_name_their_target() {
-    let dir = package("\nmain = () { Nil }\n");
+    let dir = package("\nmain = () { () }\n");
     let ilang = build(dir.path(), options(Level::O0, Target::Native))
         .unwrap()
         .wasm;
@@ -438,9 +438,9 @@ const CANCEL_OUT: &str = r#"(
 )
 
 // Hands k2 out of the cancel, to the boundary `b0` around it.
-Out = (put = (Inner) -> Nil)
-Inner = (Continuation(Nil, Int, Out))
-Paused = (Continuation(Nil, Outer, Out))
+Out = (put = (Inner) -> ())
+Inner = (Continuation((), Int, Out))
+Paused = (Continuation((), Outer, Out))
 Done = ()
 Outer = Paused | Done
 Handed = (Inner)
@@ -523,14 +523,14 @@ const MAIN_OUT: &str = r#"// The resumed final function ends, and the `$cancel` 
 main = () {
 	// The computations need `Out`. This one is never called.
 	{
-		control.resume(paused(), Nil)
-		Nil
-	} <- (Out(put = (k2) { Nil }))
+		control.resume(paused(), ())
+		()
+	} <- (Out(put = (k2) { () }))
 }
 "#;
 
 /// Test 13: k2 is resumed from frames that a resume of k3 entered.
-const THIRD: &str = r#"Third = (Continuation(Nil, ThirdSum, Out))
+const THIRD: &str = r#"Third = (Continuation((), ThirdSum, Out))
 Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 ThirdSum = Third | Over
@@ -538,7 +538,7 @@ ThirdSum = Third | Over
 keep = (t) { t |> (Over) { Over } & (t) { t } }
 
 // Not in tail position, so the frame waits.
-inner = (k2) { control.resume(k2, Nil) + 1 }
+inner = (k2) { control.resume(k2, ()) + 1 }
 
 h = (b3, k2) {
 	control.suspend(b3, (k3) { Third(k3) })
@@ -569,9 +569,9 @@ main = () {
 		k3 = { control.boundary((b3) { o1(b3, k2) }) } |>
 			(Third(k3)) { k3 }
 			& (Over) { panic("not paused") }
-		control.resume(k3, Nil)
-		Nil
-	} <- (Out(put = (k2) { Nil }))
+		control.resume(k3, ())
+		()
+	} <- (Out(put = (k2) { () }))
 }
 "#;
 
@@ -583,7 +583,7 @@ const ENV_TAIL_RESUME: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, PausedSum, Name))
+Paused = (Continuation((), PausedSum, Name))
 Done = ()
 PausedSum = Paused | Done
 
@@ -609,8 +609,8 @@ main = () {
 			(Paused(k)) { k }
 			& (Done) { panic("not paused") }
 		{
-			control.resume(k, Nil)
-			Nil
+			control.resume(k, ())
+			()
 		} <- (Name(text = "resumer"))
 	} <- (Name(text = "start"))
 }
@@ -623,7 +623,7 @@ const ENV_TAIL_CANCEL: &str = r#"(
 )
 
 Name = (text = String)
-Paused = (Continuation(Nil, PausedSum, Name))
+Paused = (Continuation((), PausedSum, Name))
 Done = ()
 PausedSum = Paused | Done
 
@@ -633,7 +633,7 @@ g = (b) {
 	resource.ensure(
 		() {
 			control.suspend(b, (k) { Paused(k) })
-			Nil
+			()
 		},
 		() { panic(name()) },
 	)
@@ -655,7 +655,7 @@ main = () {
 			& (Done) { panic("not paused") }
 		{
 			control.cancel(k)
-			Nil
+			()
 		} <- (Name(text = "resumer"))
 	} <- (Name(text = "start"))
 }
@@ -668,7 +668,7 @@ const CANCEL_INNER: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, PausedSum, Io))
+Paused = (Continuation((), PausedSum, Io))
 Done = ()
 PausedSum = Paused | Done
 
@@ -700,7 +700,7 @@ main = () <- (io : Io) {
 		& (Done) { panic("not paused") }
 	say("cancel")
 	control.cancel(k)
-	say("cancel gave Nil")
+	say("cancel gave ()")
 }
 "#;
 
@@ -716,10 +716,10 @@ const ERROR_THROUGH_FINAL: &str = r#"(
 	(Io) = i/io
 )
 
-Paused = (Continuation(Nil, PausedSum, Fail(Int)))
+Paused = (Continuation((), PausedSum, Fail(Int)))
 Done = ()
 PausedSum = Paused | Done
-Held = (Continuation(Nil, HeldSum, Fail(Int)))
+Held = (Continuation((), HeldSum, Fail(Int)))
 Over = ()
 HeldSum = Held | Over
 
@@ -732,9 +732,9 @@ paused = () {
 				resource.ensure(
 					() {
 						control.suspend(outer, (k) { Paused(k) })
-						Nil
+						()
 					},
-					() { control.suspend(inner, (k2) { Nil }) },
+					() { control.suspend(inner, (k2) { () }) },
 				)
 			})
 			fail.raise(7)
@@ -760,7 +760,7 @@ main = () <- (io : Io) {
 			Over
 		})
 		held |>
-			(Held(k2)) { control.resume(k2, Nil) }
+			(Held(k2)) { control.resume(k2, ()) }
 			& (Over) { panic("not held") }
 	})
 	io.print(core.inspect(r))
@@ -809,7 +809,7 @@ fn eager(name: &str) -> (String, &'static str, &'static str, i32) {
         ),
         "cancel_suspends_to_inner_boundary" => (
             CANCEL_INNER.to_string(),
-            "cancel\nfinal\nafter inner: f of inner\ncancel gave Nil\n",
+            "cancel\nfinal\nafter inner: f of inner\ncancel gave ()\n",
             "",
             0,
         ),

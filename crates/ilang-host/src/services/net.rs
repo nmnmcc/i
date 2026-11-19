@@ -280,7 +280,7 @@ pub(super) fn register(imports: &mut HostImports) {
                         .await
                         .write_all(&bytes.bytes)
                         .await
-                        .map(|_| Value::Nil)
+                        .map(|_| Value::Unit)
                         .map_err(error)
                 };
                 let result = match select(Box::pin(work), Box::pin(lease.closed())).await {
@@ -307,7 +307,7 @@ pub(super) fn register(imports: &mut HostImports) {
                 let stream = Arc::clone(lease.resource());
                 let work = async move {
                     if stream.shutdown.load(Ordering::SeqCst) {
-                        return Ok(Value::Nil);
+                        return Ok(Value::Unit);
                     }
                     stream
                         .write
@@ -317,7 +317,7 @@ pub(super) fn register(imports: &mut HostImports) {
                         .await
                         .map(|_| {
                             stream.shutdown.store(true, Ordering::SeqCst);
-                            Value::Nil
+                            Value::Unit
                         })
                         .map_err(error)
                 };
@@ -344,7 +344,7 @@ pub(super) fn register(imports: &mut HostImports) {
                 let receipt = ctx.close(id, kind);
                 async move {
                     receipt.await;
-                    Ok(Ok(Value::Nil))
+                    Ok(Ok(Value::Unit))
                 }
             })
             .expect(super::ONE);
@@ -431,7 +431,7 @@ fn register_datagrams(imports: &mut HostImports) {
                         match socket.send_to(&bytes.bytes, address).await {
                             Ok(n) => {
                                 assert_eq!(n, bytes.bytes.len(), "UDP send is atomic");
-                                return Ok(Value::Nil);
+                                return Ok(Value::Unit);
                             }
                             Err(e) => last = error(e),
                         }

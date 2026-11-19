@@ -1,4 +1,4 @@
-S(A, N) = (() <- N -> A, (N) -> Nil)
+S(A, N) = (() <- N -> A, (N) -> ())
 use = <A, N>() <- (s : S(A, N)) {
 	S(f, _) = s
 	f()
@@ -6,12 +6,12 @@ use = <A, N>() <- (s : S(A, N)) {
 
 main = () {
 	run = (body) { body() }
-	_syn3_0 : S(Int, Never) = S(() -> Int { 7 }, (_ : Never) { Nil })
+	_syn3_0 : S(Int, Never) = S(() -> Int { 7 }, (_ : Never) { () })
 	{
 		x : Int = run(() { use() })
 		_syn3_1 : S(String, Never) = S(
 			() -> String { "yes" },
-			(_ : Never) { Nil },
+			(_ : Never) { () },
 		)
 		{
 			y : String = run(() { use() })

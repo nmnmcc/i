@@ -8,8 +8,8 @@
 
 Read(A) = (read = () -> A)
 read_int = () <- (r : Read(Int)) { r.read() }
-use = (k : Continuation(Nil, Int, Read(Int | String))) {
-	control.resume(k, Nil) <- (Read(read = () { "oops" }))
+use = (k : Continuation((), Int, Read(Int | String))) {
+	control.resume(k, ()) <- (Read(read = () { "oops" }))
 }
 
 main = () {
@@ -17,5 +17,5 @@ main = () {
 		control.suspend(b, (k) { use(k) })
 		read_int() + 1
 	}) <- (Read(read = () { 1 }))
-	Nil
+	()
 }

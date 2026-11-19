@@ -7,7 +7,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 

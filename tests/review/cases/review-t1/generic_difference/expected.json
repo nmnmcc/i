@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.drop : (A | 0) -> A - 0\nprobe/main.f : (Int) -> Int - 0\nprobe/main.g : (\"a\" | \"b\") -> \"a\" | \"b\"\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.drop : (A | 0) -> A - 0\nprobe/main.f : (Int) -> Int - 0\nprobe/main.g : (\"a\" | \"b\") -> \"a\" | \"b\"\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

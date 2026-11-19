@@ -58,7 +58,7 @@ of the metadata in a new instance (spec §10.2), giving `{ name, passed, error? 
 
 | i type | JavaScript value | Wasm values |
 | --- | --- | --- |
-| `Nil` | `undefined` or `null` | none |
+| `()` | `undefined` or `null` | none |
 | `Bool` | `boolean` | `i32` 0 or 1 |
 | `Int` | `bigint` | sign, address or inline signed i32, count |
 | `Float` | finite `number` | `f64` |
@@ -67,7 +67,7 @@ of the metadata in a new instance (spec §10.2), giving `{ name, passed, error? 
 | custom type with no constructors | any JavaScript value | `externref` |
 
 When a function has errors, its results start with an `i32` tag: 0 for the
-value, i for the i-th member of `E` in the canonical order Nil, Bool, Int, Float,
+value, i for the i-th member of `E` in the canonical order `()`, Bool, Int, Float,
 String, BitArray. A host service or an ABI5 synchronous external gives an error by throwing
 `GuestError(value)`; the type of the value selects the member declared by
 `Fail(E)`. ABI3/4 externals retain their error-free contract.

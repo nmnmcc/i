@@ -7,7 +7,7 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
@@ -80,12 +80,12 @@ test("collections", () {
 test("custom", () {
 	check(show(True), "True")
 	check(show(False), "False")
-	check(show(Nil), "Nil")
+	check(show(()), "()")
 	check(show(Ok(1)), "Ok(1)")
 	check(show(Error("e")), "Error(\"e\")")
 	check(show(User(name = "ann", age = 3)), "User(age = 3, name = \"ann\")")
 	check(show(Unit), "Unit")
-	check(show(Ok(Error(Ok(Nil)))), "Ok(Error(Ok(Nil)))")
+	check(show(Ok(Error(Ok(())))), "Ok(Error(Ok(())))")
 })
 
 test("bit_arrays", () {

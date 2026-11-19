@@ -4,4 +4,4 @@ import (i/core)
 f = () { 2 |> { x -> core.inspect(x) } }
 
 
-main = () { assert(f() == "2") Nil }
+main = () { assert(f() == "2") () }

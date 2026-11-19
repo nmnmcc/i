@@ -6,4 +6,4 @@
 
 name = (b : Bool) { b |> (True) { "yes" } & (_) { "no" } & (False) { "never" } }
 
-test("names", () { name(False) |> ("no") { Nil } & (_) { panic("no") } })
+test("names", () { name(False) |> ("no") { () } & (_) { panic("no") } })

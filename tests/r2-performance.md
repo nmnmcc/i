@@ -21,7 +21,7 @@ loop E, subtract K(0) and L*(E(n)-E(0)) from K(n), then divide by n operations.
 L is one for spawn/join and two for switch/channel because both peers count
 loops. Switch uses 2*n operations: each yield transfers between two ready
 tasks. Channel uses n complete send+receive rendezvous transfers; an endpoint
-cost is half that. Spawn uses an empty Nil child, joins it, and reuses one scope.
+cost is half that. Spawn uses an empty () child, joins it, and reuses one scope.
 Every returned result is checked. The separate 513-child spec case checks all
 retained child results and repeated late joins before retirement.
 

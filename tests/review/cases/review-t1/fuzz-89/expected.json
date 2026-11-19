@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.f : ((\"\" | \"a\" | \"ab\" | \"b\" | \"c\", Bool)) -> 0 | 1 | 2 | 3 | 4 | 5 | 6\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.f : ((\"\" | \"a\" | \"ab\" | \"b\" | \"c\", Bool)) -> 0 | 1 | 2 | 3 | 4 | 5 | 6\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

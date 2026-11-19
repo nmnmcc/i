@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.g : ((Int, Int)) -> (Int) -> Int\napp/main.f : () -> Int\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.g : ((Int, Int)) -> (Int) -> Int\napp/main.f : () -> Int\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

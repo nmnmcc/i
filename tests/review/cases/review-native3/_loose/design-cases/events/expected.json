@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.event : task.Event(1, Never, Never)\napp/main.main : () <- (Assert, Fail(Never), task.Runner) -> Nil\n",
+      "stdout": "app/main.event : task.Event(1, Never, Never)\napp/main.main : () <- (Assert, Fail(Never), task.Runner) -> ()\n",
       "stderr": ""
     },
     "test0": {

@@ -26,11 +26,11 @@ if_negative = (value : Int, negative : Bool) -> Int {
 	negative |> (True) { -value } & (False) { value }
 }
 
-parse_integer_digits = (cps : List(UtfCodepoint), value : Int, index : Int, negative : Bool) -> Result(Int, Nil) {
+parse_integer_digits = (cps : List(UtfCodepoint), value : Int, index : Int, negative : Bool) -> Result(Int, ()) {
 	cps |>
 		([]) {
 			{ index > 0 } |> (True) { Ok(if_negative(value, negative)) }
-				& (False) { Error(Nil) }
+				& (False) { Error(()) }
 		}
 		& ([c, ..rest]) {
 			d = digit_value(c)
@@ -39,13 +39,13 @@ parse_integer_digits = (cps : List(UtfCodepoint), value : Int, index : Int, nega
 			} |> (True) {
 				parse_integer_digits(rest, value * 10 + d, index + 1, negative)
 			}
-				& (False) { Error(Nil) }
+				& (False) { Error(()) }
 		}
 }
 
-parse_integer_token = (text : String) -> Result(Int, Nil) {
+parse_integer_token = (text : String) -> Result(Int, ()) {
 	core.codepoints(text) |>
-		([]) { Error(Nil) }
+		([]) { Error(()) }
 		& ([first, ..rest]) {
 			n = core.codepoint_to_int(first)
 			{
@@ -54,7 +54,7 @@ parse_integer_token = (text : String) -> Result(Int, Nil) {
 				(True) {
 					{
 						rest == []
-					} |> (True) { Error(Nil) }
+					} |> (True) { Error(()) }
 						& (False) {
 							parse_integer_digits(rest, 0, 0, n == 45)
 						}
@@ -111,7 +111,7 @@ name_length_ok = (name : String) -> Bool {
 		& (_) { True }
 }
 
-parse_jobs = (values : List(json.Json), seen : List(String), jobs : List(Job)) -> Result(List(Job), Nil) {
+parse_jobs = (values : List(json.Json), seen : List(String), jobs : List(Job)) -> Result(List(Job), ()) {
 	values |>
 		([]) { Ok(jobs) }
 		& ([value, ..rest]) {
@@ -129,13 +129,13 @@ parse_jobs = (values : List(json.Json), seen : List(String), jobs : List(Job)) -
 								[Job(name = name, url = url), ..jobs],
 							)
 						}
-							& (False) { Error(Nil) }
+							& (False) { Error(()) }
 					}
-						& (_) { Error(Nil) }
+						& (_) { Error(()) }
 				}
-					& (_) { Error(Nil) }
+					& (_) { Error(()) }
 			}
-				& (_) { Error(Nil) }
+				& (_) { Error(()) }
 		}
 }
 

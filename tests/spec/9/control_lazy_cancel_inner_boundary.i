@@ -9,13 +9,13 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-Paused(B) = (Continuation(Nil, PausedSum(B), Never), B)
+Paused(B) = (Continuation((), PausedSum(B), Never), B)
 Done = ()
 PausedSum(B) = Paused(B) | Done
 
@@ -34,7 +34,7 @@ main = () {
 					},
 					() {
 						control.suspend(top, (k) {
-							"final, " <> control.resume(k, Nil)
+							"final, " <> control.resume(k, ())
 						})
 					},
 				)
@@ -56,5 +56,5 @@ main = () {
 			control.suspend(inner, (k2) { 1 })
 		}
 		& (Done) { panic("not paused") }
-	Nil
+	()
 }

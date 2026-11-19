@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.tell : (Int) -> \"four\" | \"many\" | \"one\" | \"three\" | \"two\" | \"zero\"\napp/main.main : () <- (Io) -> Nil\n",
+      "stdout": "app/main.get : () <- (Dep) -> Int\napp/main.use : () <- (S(N), ..N) -> Int\napp/main.run : (() <- N -> A) <- N -> A\napp/main.fw : () <- (S(N), ..N) -> Int\napp/main.fr : () <- (S(N), ..N) -> Int\napp/main.tell : (Int) -> \"four\" | \"many\" | \"one\" | \"three\" | \"two\" | \"zero\"\napp/main.main : () <- (Io) -> ()\n",
       "stderr": ""
     },
     "test0": {

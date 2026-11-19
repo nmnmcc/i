@@ -23,7 +23,7 @@ test("fake_capabilities", () {
 				assert(process.entropy(7) == <<7>>)
 				{
 					assert(process.cwd() == "/fake")
-					Nil
+					()
 				} <- (
 					process.WorkingDirectory(
 						cwd = () { request.ready(Ok("/fake")) },
@@ -60,5 +60,5 @@ test("host_capabilities", () {
 		fail.catch(() { process.wait(child) }) ==
 			Error(process.ProcessError(operation = "wait", code = "closed")),
 	)
-	Nil
+	()
 })

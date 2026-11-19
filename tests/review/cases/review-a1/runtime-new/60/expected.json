@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.outer : (A) -> A\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.outer : (A) -> A\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

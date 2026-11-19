@@ -72,7 +72,6 @@ const WASI_RUNTIME: [&str; 2] = ["fd_write", "proc_exit"];
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CtorRepr {
     Bool(bool),
-    Nil,
     Record { ctor: u32, ty: u32 },
 }
 
@@ -87,7 +86,6 @@ struct CtorInfo {
 enum TypeRepr {
     /// The prelude's `True` or `False`: the two values of `Bool = True | False`.
     Bool(bool),
-    Nil,
     Record(u32),
     /// The prelude's `Ok` or `Error`: one constructor of the run-time type
     /// of `Result = Ok | Error`, which the host also makes.
@@ -1117,7 +1115,6 @@ impl<'a> Lowerer<'a> {
                 match t.name.as_str() {
                     "True" => Some(TypeRepr::Bool(true)),
                     "False" => Some(TypeRepr::Bool(false)),
-                    "Nil" => Some(TypeRepr::Nil),
                     "Ok" => Some(TypeRepr::Ctor(0, 0)),
                     "Error" => Some(TypeRepr::Ctor(0, 1)),
                     "AssertionFailure" => Some(TypeRepr::Record(1)),
@@ -1142,7 +1139,6 @@ impl<'a> Lowerer<'a> {
                 let repr = match (special, c.name.as_str()) {
                     (Some(TypeRepr::Bool(b)), _) => CtorRepr::Bool(b),
                     (Some(TypeRepr::Ctor(ty, ctor)), _) => CtorRepr::Record { ctor, ty },
-                    (Some(TypeRepr::Nil), _) => CtorRepr::Nil,
                     (Some(TypeRepr::Record(ty)), name) => CtorRepr::Record {
                         ctor: match name {
                             "AssertionFailure" => 2,
@@ -1425,7 +1421,7 @@ impl<'a> Lowerer<'a> {
                 }
             }
         }
-        out.push(Stmt::Return(Atom::Nil));
+        out.push(Stmt::Return(Atom::Unit));
         self.out.start = Some(Func {
             name: "ilang_start".into(),
             arity: 0,
@@ -1802,7 +1798,7 @@ impl<'a> Lowerer<'a> {
             out,
             Value::Call {
                 callee: Callee::Value(kept),
-                args: vec![Atom::Nil],
+                args: vec![Atom::Unit],
                 env,
             },
             None,
@@ -2000,7 +1996,7 @@ impl<'a> Lowerer<'a> {
             self.error(
                 d.module,
                 def.span,
-                "an external function needs a fully written function type with positional parameters. Parameters and results may use only `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types. Its only allowed need is `Fail(E)`, where `E` contains only the six built-in types",
+                "an external function needs a fully written function type with positional parameters. Parameters and results may use only `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types. Its only allowed need is `Fail(E)`, where `E` contains only the six built-in types",
             );
             return None;
         };
@@ -2747,14 +2743,14 @@ impl<'a> Lowerer<'a> {
                             self.constants.insert(f);
                             Atom::Func(f)
                         }
-                        None => Atom::Nil,
+                        None => Atom::Unit,
                     }
                 }
                 DefKind::External { .. } => match self.external_op(d) {
                     Ok((op, arity)) => Atom::Func(self.op_func(op, arity)),
                     Err(message) => {
                         self.error(fx.module, e.span, message);
-                        Atom::Nil
+                        Atom::Unit
                     }
                 },
                 DefKind::Binding { .. } => {
@@ -2771,7 +2767,6 @@ impl<'a> Lowerer<'a> {
                 let info = &self.ctors[&c];
                 match info.repr {
                     CtorRepr::Bool(b) => Atom::Bool(b),
-                    CtorRepr::Nil => Atom::Nil,
                     CtorRepr::Record { ctor, ty } if info.labels.is_empty() => {
                         Atom::Ctor { ctor, ty }
                     }
@@ -2815,6 +2810,8 @@ impl<'a> Lowerer<'a> {
                     .unwrap_or(*r);
                 self.name(fx, e, r)
             }
+            // `()`, empty data, is the null reference.
+            ExprKind::Tuple(items) if items.is_empty() => Atom::Unit,
             ExprKind::Tuple(items) => {
                 let parts = items.iter().map(|x| self.expr(fx, out, x)).collect();
                 let_value(fx, out, Value::Tuple(parts), None)
@@ -2874,12 +2871,17 @@ impl<'a> Lowerer<'a> {
                         }
                     });
                 }
-                let value = if shape.has_labels() {
-                    Value::Data(self.shape_set(shape), parts)
+                if shape.is_empty() {
+                    // `()`, empty data, is the null reference.
+                    Atom::Unit
                 } else {
-                    Value::Tuple(parts)
-                };
-                let_value(fx, out, value, None)
+                    let value = if shape.has_labels() {
+                        Value::Data(self.shape_set(shape), parts)
+                    } else {
+                        Value::Tuple(parts)
+                    };
+                    let_value(fx, out, value, None)
+                }
             }
             ExprKind::List { items, rest } => {
                 let parts: Vec<Atom> = items.iter().map(|x| self.expr(fx, out, x)).collect();
@@ -2973,7 +2975,7 @@ impl<'a> Lowerer<'a> {
             }
             ExprKind::Error => {
                 out.push(Stmt::Unreachable);
-                Atom::Nil
+                Atom::Unit
             }
         };
         finish(out, tail, a)
@@ -3056,7 +3058,7 @@ impl<'a> Lowerer<'a> {
             }
         }
         // A block always ends with an expression.
-        finish(out, tail, Atom::Nil)
+        finish(out, tail, Atom::Unit)
     }
 
     /// A binding in a block. The names of a direct value may be used
@@ -3362,7 +3364,7 @@ impl<'a> Lowerer<'a> {
         let mut later = Vec::new();
         for (i, v) in captures.iter().enumerate() {
             if fx.pending.as_ref().is_some_and(|p| p.contains(v)) {
-                atoms.push(Atom::Nil);
+                atoms.push(Atom::Unit);
                 later.push((i as u32, *v));
             } else {
                 atoms.push(Atom::Local(fx.var(*v)));
@@ -3692,7 +3694,6 @@ impl<'a> Lowerer<'a> {
                 let info = &self.ctors[&c];
                 let a = match info.repr {
                     CtorRepr::Bool(b) => Atom::Bool(b),
-                    CtorRepr::Nil => Atom::Nil,
                     CtorRepr::Record { ctor, ty } if args.is_empty() => Atom::Ctor { ctor, ty },
                     CtorRepr::Record { ctor, ty } => let_value(
                         fx,
@@ -4048,7 +4049,6 @@ impl<'a> Lowerer<'a> {
                 let info = self.ctors[ctor].clone();
                 let cond = match info.repr {
                     CtorRepr::Bool(b) => Cond::Bool(v.clone(), b),
-                    CtorRepr::Nil => Cond::Tag(v.clone(), 0),
                     CtorRepr::Record { ctor, .. } => Cond::Ctor(v.clone(), ctor),
                 };
                 guard(out, cond, fail);
@@ -4150,6 +4150,8 @@ impl<'a> Lowerer<'a> {
             Head::Shape(shape) if shape.has_labels() => {
                 Cond::Data(v, self.shape_set(shape), shape.len() as u32)
             }
+            // `()`, empty data, is the null reference: tag 0.
+            Head::Shape(shape) if shape.is_empty() => Cond::Tag(v, 0),
             Head::Shape(shape) => Cond::Tuple(v, shape.positions()),
             Head::Fn => Cond::Tag(v, 7),
             Head::Named(TypeRef::Builtin(b)) => Cond::Tag(
@@ -4175,7 +4177,6 @@ impl<'a> Lowerer<'a> {
                     Box::new(Cond::Tag(v.clone(), 1)),
                     Box::new(Cond::Bool(v, *b)),
                 ),
-                Some(TypeRepr::Nil) => Cond::Tag(v, 0),
                 Some(TypeRepr::Record(id)) => Cond::Type(v, *id),
                 Some(TypeRepr::Ctor(id, ctor)) => Cond::And(
                     Box::new(Cond::Type(v.clone(), *id)),
@@ -4546,10 +4547,10 @@ impl<'a> Lowerer<'a> {
 }
 
 /// The ABI type of a type that the host can take. `Never`
-/// has no values, so it is passed as nothing, like `Nil`.
+/// has no values, so it is passed as nothing, like `()`.
 fn abi_type(t: HostType) -> AbiType {
     match t {
-        HostType::Nil => AbiType::Nil,
+        HostType::Unit => AbiType::Unit,
         HostType::Bool => AbiType::Bool,
         HostType::Int => AbiType::Int,
         HostType::Float => AbiType::Float,

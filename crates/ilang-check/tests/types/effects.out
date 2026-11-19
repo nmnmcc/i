@@ -4,7 +4,7 @@ logged : () <- (Clock, Log) -> Int
 half : () <- (Log) -> Int
 given : (Clock) -> Int
 fetch : (String) <- (Fail(Int), Http) -> String
-two : () <- (Fail(Int | Nil), Http) -> (String, String)
+two : () <- (Fail(Int | ()), Http) -> (String, String)
 first : (Result(A, B)) <- (Assert) -> A
 pair : ((A, B)) -> A
 head : (List(A)) <- (Assert) -> A

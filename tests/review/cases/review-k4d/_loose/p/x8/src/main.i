@@ -1,6 +1,6 @@
 Dep = (v = Int)
 get = () <- (d : Dep) { d.v }
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f = f, ..) = s
 	f()
@@ -16,9 +16,9 @@ wrap : <N>(() <- N -> Int, S(Dep)) <- (Fail(Never), ..N) -> Int = (
 ) <- (fail : Fail(Never)) -> Int { inner(body, svc) }
 
 main = () {
-	_syn3_1 : S(Never) = S(f = () { 1 }, m = (_ : Never) { Nil })
+	_syn3_1 : S(Never) = S(f = () { 1 }, m = (_ : Never) { () })
 	{
-		wrap(() { use() }, S(f = () { get() }, m = (_ : Dep) { Nil }))
-		Nil
+		wrap(() { use() }, S(f = () { get() }, m = (_ : Dep) { () }))
+		()
 	} <- (_syn3_1)
 }

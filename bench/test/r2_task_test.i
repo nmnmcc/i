@@ -26,9 +26,9 @@ switches = (n : Int, total : Int) -> Int {
 		}
 }
 
-sends = (c : task.Channel(Int), n : Int) -> Nil {
+sends = (c : task.Channel(Int), n : Int) -> () {
 	n |>
-		(0) { Nil }
+		(0) { () }
 		& (_) {
 			task.send(c, n)
 			sends(c, n - 1)

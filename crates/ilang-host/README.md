@@ -18,7 +18,7 @@ fn main() -> anyhow::Result<()> {
         if let [Value::String(text)] = arguments {
             print!("{text}");
         }
-        Ok(Ok(Value::Nil))
+        Ok(Ok(Value::Unit))
     })?;
 
     let mut instance = program.instantiate(HostOptions::new(imports))?;
@@ -53,7 +53,7 @@ and gives an `Outcome`:
 
 - `Outcome::Ok(value)`;
 - `Outcome::Err(GuestError(value))` when the function gave an error of its
-  `^ E`; the tag selects the member of `E` in the canonical order Nil, Bool, Int,
+  `^ E`; the tag selects the member of `E` in the canonical order `()`, Bool, Int,
   Float, String, BitArray;
 - `Outcome::Stop(Stop { message, trap })` when the program stopped. `message` is
   the stop message given to `panic` (spec §11.7): the reason, then the source
@@ -71,7 +71,7 @@ unusable.
 
 | Type | Wasm values | Rust value |
 | --- | --- | --- |
-| `nil` | none | `Value::Nil` |
+| `nil` | none | `Value::Unit` |
 | `bool` | `i32` 0 or 1 | `Value::Bool` |
 | `int` | sign, address or inline signed value, count (`i32`) | `Value::Int(BigInt)` |
 | `float` | finite `f64` | `Value::Float` |

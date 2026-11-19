@@ -366,7 +366,7 @@
     },
     "constants": {
       "name": "constant.language.i",
-      "match": "\\b(?:True|False|Nil)\\b"
+      "match": "\\b(?:True|False)\\b"
     },
     "builtin-types": {
       "comment": "§4.2, §9.4, §9.6, §12.",

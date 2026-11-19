@@ -1,6 +1,6 @@
 S(A) = (A)
 
-T(N) = (f = () <- N -> Nil)
+T(N) = (f = () <- N -> ())
 
 merge = <N, M>(a : T(N), b : T(M)) {
 	T(
@@ -11,9 +11,9 @@ merge = <N, M>(a : T(N), b : T(M)) {
 	)
 }
 
-one = () <- (s : S(Int)) { Nil }
+one = () <- (s : S(Int)) { () }
 
-two = () <- (s : S(Int)) { Nil }
+two = () <- (s : S(Int)) { () }
 
 main = () {
 	_syn3_0 : S(Int) = S(1)

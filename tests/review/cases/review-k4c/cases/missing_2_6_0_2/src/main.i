@@ -1,12 +1,12 @@
 Dep = ()
-get = () <- (d : Dep) { Nil }
-run = <N>(body : () <- N -> Nil) { body() }
-S(E, N) = (f = () <- (Fail(E), ..N) -> Nil)
+get = () <- (d : Dep) { () }
+run = <N>(body : () <- N -> ()) { body() }
+S(E, N) = (f = () <- (Fail(E), ..N) -> ())
 use = <E, N>() <- (s : S(E, N)) { s.f() }
 
 main = <E, N>() {
 	local2 = () {
-		local : () <- (Fail(E), S(E, N), ..N) -> Nil = () { run(() { use() }) }
+		local : () <- (Fail(E), S(E, N), ..N) -> () = () { run(() { use() }) }
 		run(local)
 	}
 	run(local2)

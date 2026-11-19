@@ -13,5 +13,5 @@ make = (n : Int) {
 
 main = () {
 	make(-3)
-	Nil
+	()
 }

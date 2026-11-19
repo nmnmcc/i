@@ -69,7 +69,7 @@ fn run(wasm: &[u8], limits: Limits) -> (Result<Outcome, anyhow::Error>, MacroBud
 
 #[test]
 fn charges_are_identical_before_and_after_optimization() {
-    let source = "f = (n) { n |> (0) { [\"end\"] } & (_) { [\"x\", ..f(n - 1)] } }\n\nmain = () {\n\tf(5)\n\tNil\n}\n";
+    let source = "f = (n) { n |> (0) { [\"end\"] } & (_) { [\"x\", ..f(n - 1)] } }\n\nmain = () {\n\tf(5)\n\t()\n}\n";
     let a = compile(source, false);
     let b = compile(source, true);
     let (out_a, count_a) = run(&a, Limits::default());
@@ -102,7 +102,7 @@ fn the_same_export_counts_longer_paths_and_ignores_the_program_target() {
 
 #[test]
 fn work_and_allocation_stop_before_crossing_the_limit() {
-    let wasm = compile("\nmain = () { [1, 2, 3] Nil }\n", false);
+    let wasm = compile("\nmain = () { [1, 2, 3]\n() }\n", false);
     let (_, work) = run(
         &wasm,
         Limits {
@@ -125,11 +125,11 @@ fn work_and_allocation_stop_before_crossing_the_limit() {
 
 #[test]
 fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
-    let tail_source = "f = (n) { n |> (0) { Nil } & (_) { f(n - 1) } }\n\nmain = () { f(40) }\n";
+    let tail_source = "f = (n) { n |> (0) { () } & (_) { f(n - 1) } }\n\nmain = () { f(40) }\n";
     let baseline = compile(&tail_source.replace("f(40)", "f(0)"), false);
     let tail = compile(tail_source, false);
     let non_tail = compile(
-        "f = (n) { n |> (0) { 0 } & (_) { f(n - 1) + 1 } }\n\nmain = () {\n\tf(40)\n\tNil\n}\n",
+        "f = (n) { n |> (0) { 0 } & (_) { f(n - 1) + 1 } }\n\nmain = () {\n\tf(40)\n\t()\n}\n",
         false,
     );
     // Entries include ordinary library catch/provider frames. Find the
@@ -176,7 +176,7 @@ fn tail_frames_leave_before_call_and_non_tail_frames_accumulate() {
 #[test]
 fn data_dependent_work_and_allocation_grow_with_values() {
     let program =
-        |content: &str| format!("f = (s) {{ s <> s }}\n\nmain = () {{ f(\"{content}\") Nil }}\n");
+        |content: &str| format!("f = (s) {{ s <> s }}\n\nmain = () {{ f(\"{content}\")\n() }}\n");
     let small = compile(&program("a"), false);
     let large = compile(&program(&"a".repeat(512)), false);
     let (a, small_budget) = run(&small, Limits::default());
@@ -189,7 +189,7 @@ fn data_dependent_work_and_allocation_grow_with_values() {
 
 #[test]
 fn frame_accounting_restores_after_errors_and_continuation_resume() {
-    let source = "(\n\ti/fail\n\ti/control\n)\ninner = (n) { n |> (0) { fail.raise(\"err\") } & (_) { inner(n - 1) + 1 } }\n\nmain = () {\n\tfail.catch(() { inner(5) })\n\tcontrol.boundary((b) { control.suspend(b, (k) { control.resume(k, 1) }) })\n\tNil\n}\n";
+    let source = "(\n\ti/fail\n\ti/control\n)\ninner = (n) { n |> (0) { fail.raise(\"err\") } & (_) { inner(n - 1) + 1 } }\n\nmain = () {\n\tfail.catch(() { inner(5) })\n\tcontrol.boundary((b) { control.suspend(b, (k) { control.resume(k, 1) }) })\n\t()\n}\n";
     for optimized in [false, true] {
         let wasm = compile(source, optimized);
         let (outcome, budget) = run(&wasm, Limits::default());
@@ -275,7 +275,7 @@ fn guest_and_syntax_host_share_one_size_sensitive_budget() {
         x = source()
         assert(syntax.same_code(x, x))
         assert(syntax.show(x) != "")
-        Nil
+        ()
       })
     "#;
     let dir = tempfile::tempdir().unwrap();
@@ -349,7 +349,7 @@ fn logical_frame_limit_precedes_native_stack_exhaustion_for_large_expressions() 
         .collect::<Vec<_>>()
         .join(", ");
     let source = format!(
-        "many = ({parameters}, last : Int) -> Int {{ last }}\nf = (n : Int) -> Int {{ n |> (0) {{ 0 }} & (_) {{ many({arguments}, f(n - 1)) }} }}\nmain = () {{ f(3300) Nil }}\n"
+        "many = ({parameters}, last : Int) -> Int {{ last }}\nf = (n : Int) -> Int {{ n |> (0) {{ 0 }} & (_) {{ many({arguments}, f(n - 1)) }} }}\nmain = () {{ f(3300)\n() }}\n"
     );
     let mut usage = Vec::new();
     for optimized in [false, true] {

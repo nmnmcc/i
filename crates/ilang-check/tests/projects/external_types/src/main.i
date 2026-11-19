@@ -8,7 +8,7 @@ Wrap = (Int)
 
 // Types the host can take (§10.3), also through aliases.
 @external("a", "ok1")
-ok1 : (Int, Float, String, BitArray, Nil, Bool) -> Nil
+ok1 : (Int, Float, String, BitArray, (), Bool) -> ()
 
 @external("a", "ok2")
 ok2 : (H, Id(Int)) -> Id(Handle)
@@ -32,7 +32,7 @@ f7 : (List(_)) -> Int
 f1 : (List(Int)) -> Int
 
 @external("a", "f6")
-f6 : ((Int) -> Int) -> Result(Int, Nil)
+f6 : ((Int) -> Int) -> Result(Int, ())
 
 @external("a", "f8")
 f8 : (Wrap, UtfCodepoint, Never) -> Id(List(Int))

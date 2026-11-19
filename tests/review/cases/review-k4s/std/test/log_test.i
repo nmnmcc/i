@@ -12,16 +12,16 @@ Sent = (log.Entry)
 
 Message = ()
 Event = Sent | Message
-Capture = (record = (Event) -> Nil)
+Capture = (record = (Event) -> ())
 
-record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }
+record = (event : Event) <- (capture : Capture) -> () { capture.record(event) }
 
 // std-2 §7: finite, closed instantiations retain service and error types.
 deliver : (log.Entry) <- (
 	Fail(String),
 	Capture,
 	log.Sink(String, Capture),
-) -> Nil = log.write
+) -> () = log.write
 
 query : (log.Level) <- (log.Sink(String, Capture)) -> Bool = log.enabled
 
@@ -29,7 +29,7 @@ defer_message : (log.Level, () <- (Fail(String), Capture) -> String) <- (
 	Fail(String),
 	Capture,
 	log.Sink(String, Capture),
-) -> Nil = log.lazy
+) -> () = log.lazy
 
 capture_sink = () -> log.Sink(String, Capture) {
 	log.make((_ : log.Level) { True }, (entry) { record(Sent(entry)) })
@@ -71,14 +71,14 @@ test("log_delivery", () {
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {
-						[event, ..control.resume(k, Nil)]
+						[event, ..control.resume(k, ())]
 					})
 				},
 			),
 		)
 	})
 	assert(trace == [Sent(original), Sent(entry(log.Warning))])
-	Nil
+	()
 })
 
 // L3: rejection suppresses both callbacks; eager arguments still evaluate.
@@ -117,7 +117,7 @@ test("log_lazy", () {
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {
-						[event, ..control.resume(k, Nil)]
+						[event, ..control.resume(k, ())]
 					})
 				},
 			),
@@ -139,7 +139,7 @@ test("log_lazy", () {
 				Message,
 			],
 	)
-	Nil
+	()
 })
 
 // L4 and both filter laws: thresholds follow L1's four explicitly ordered levels.
@@ -167,7 +167,7 @@ test("log_filters", () {
 				Capture(
 					record = (event) {
 						control.suspend(b, (k) {
-							[event, ..control.resume(k, Nil)]
+							[event, ..control.resume(k, ())]
 						})
 					},
 				),
@@ -190,7 +190,7 @@ test("log_filters", () {
 					Capture(
 						record = (event) {
 							control.suspend(b, (k) {
-								[event, ..control.resume(k, Nil)]
+								[event, ..control.resume(k, ())]
 							})
 						},
 					),
@@ -218,7 +218,7 @@ test("log_filters", () {
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {
-						[event, ..control.resume(k, Nil)]
+						[event, ..control.resume(k, ())]
 					})
 				},
 			),
@@ -227,12 +227,12 @@ test("log_filters", () {
 	assert(trace == list.map(levels, (level) { Sent(entry(level)) }))
 	_syn3_7 : log.Sink(String, Capture) = log.filter(
 		// L4 requires new_accept before old_accept and short-circuiting.
-		log.make(unreachable, (_ : log.Entry) -> Nil { Nil }),
+		log.make(unreachable, (_ : log.Entry) -> () { () }),
 		(_ : log.Level) { False },
 	)
 	{
 		assert(query(log.Info) == False)
-		Nil
+		()
 	} <- (_syn3_7)
 })
 
@@ -242,7 +242,7 @@ broken_deliver : (log.Entry) <- (
 	Fail(DeliveryError),
 	Capture,
 	log.Sink(DeliveryError, Capture),
-) -> Nil = log.write
+) -> () = log.write
 
 // L2/L5: a custom error is preserved, with no retry or swallowed failure.
 test("log_errors", () {
@@ -266,14 +266,14 @@ test("log_errors", () {
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) {
-						[event, ..control.resume(k, Nil)]
+						[event, ..control.resume(k, ())]
 					})
 				},
 			),
 		)
 	})
 	assert(trace == [Sent(entry(log.Info))])
-	Nil
+	()
 })
 
 // L6: fixed expected bytes derive from the format rule, not core.inspect.
@@ -320,7 +320,7 @@ test("log_format", () {
 		) ==
 			"info \"\"",
 	)
-	Nil
+	()
 })
 // The compiler gate and negative service cases are executable checks, kept out
 // of the ordinary passing test suite per std-2 §7. The harness appends each
@@ -335,45 +335,45 @@ test("log_format", () {
 //| original = path.read_text()
 //| positive = {
 //|     'annotated logging body (std-2 section 7)': '''
-//| GateSink(E, N) { GateSink((log.Level) -> Bool, (log.Entry) -> Nil ? E ! N, (N) -> Nil) }
-//| gate_write(E, N) = (event: log.Entry, sink ! GateSink(E, N)) -> Nil ? E ! N | GateSink(E, N) {
+//| GateSink(E, N) { GateSink((log.Level) -> Bool, (log.Entry) -> () ? E ! N, (N) -> ()) }
+//| gate_write(E, N) = (event: log.Entry, sink ! GateSink(E, N)) -> () ? E ! N | GateSink(E, N) {
 //|   GateSink(accept, send, _) = sink
-//|   accept(event.level) |> { True -> send(event) False -> Nil }
+//|   accept(event.level) |> { True -> send(event) False -> () }
 //| }
 //| ''',
 //|     'annotated body (review F1/spec 4.7)': '''
-//| GateS(N) { GateS(() -> Nil ! N) }
-//| gate_use(N) = (s ! GateS(N)) -> Nil ! N | GateS(N) { GateS(f) = s f() }
+//| GateS(N) { GateS(() -> () ! N) }
+//| gate_use(N) = (s ! GateS(N)) -> () ! N | GateS(N) { GateS(f) = s f() }
 //| ''',
 //|     'generic write client (std-2 section 7)': '''
 //| @test
 //| gate_client = () {
 //|   ! log.Sink(String, Never) = log.make((_: log.Level) { True }, (e) { fail.raise(e.message) })
 //|   assert(fail.catch(() { log.write(entry(log.Info)) }) == Error("hello"))
-//|   Nil
+//|   ()
 //| }
 //| ''',
 //|     'generic lazy client (L3/section 7)': '''
 //| @test
 //| gate_lazy = () {
 //|   ! log.Sink(String, Never) = log.silent()
-//|   assert(fail.catch(() { log.lazy(log.Info, () -> String ? String { fail.raise("bad") }) }) == Ok(Nil))
-//|   Nil
+//|   assert(fail.catch(() { log.lazy(log.Info, () -> String ? String { fail.raise("bad") }) }) == Ok(()))
+//|   ()
 //| }
 //| ''',
 //|     'minimal invariant client (review F1)': '''
-//| GateS(N) { GateS(() -> Nil ! N, (N) -> Nil) }
+//| GateS(N) { GateS(() -> () ! N, (N) -> ()) }
 //| gate_use(N) = (s ! GateS(N)) { GateS(f, _) = s f() }
-//| gate_run(N) = (body: () -> Nil ! N) { body() }
+//| gate_run(N) = (body: () -> () ! N) { body() }
 //| @test
 //| gate_client = () {
-//|   ! GateS(Never) = GateS(() { Nil }, (_: Never) { Nil })
+//|   ! GateS(Never) = GateS(() { () }, (_: Never) { () })
 //|   gate_run(() { gate_use() })
 //| }
 //| ''',
 //| }
 //| negative = {
-//|     'invariant stored environment (L5)': ('''Consumer(A) { Consumer((A) -> Nil) }
+//|     'invariant stored environment (L5)': ('''Consumer(A) { Consumer((A) -> ()) }
 //| bad = (s: log.Sink(Never, Consumer(Int))) -> log.Sink(Never, Consumer(Never)) { s }
 //| ''', 'E0501'),
 //|     'unequal service arguments (L5/spec 9.2)': ('''bad = (s ! log.Sink(String, Never)) -> Bool ! log.Sink(Int, Never) { True }''', 'E0515'),

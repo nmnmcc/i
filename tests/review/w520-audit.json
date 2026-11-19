@@ -185,7 +185,7 @@
           "path": "src/main.i",
           "line": 4,
           "column": 20,
-          "source": "main = () { assert(f(api.last) == \"v19\") Nil }"
+          "source": "main = () { assert(f(api.last) == \"v19\") () }"
         }
       ]
     },
@@ -1407,6 +1407,6 @@
     "review-t2/valuechain2048",
     "review-t2/valuechain4096"
   ],
-  "startup_source": "docs/spec.md §2.5: Its value is worked out once, when the program starts, before any entry point runs. An added Nil test now exercises startup; this is a harness change, not a W520 runtime-equivalence assertion.",
+  "startup_source": "docs/spec.md §2.5: Its value is worked out once, when the program starts, before any entry point runs. An added () test now exercises startup; this is a harness change, not a W520 runtime-equivalence assertion.",
   "failures": []
 }

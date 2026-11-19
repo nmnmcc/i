@@ -1,12 +1,12 @@
 // §4.5 rule 4: a provided Sink must be a subtype of the needed Sink.
 // Sink(Never) cannot accept the Int that needs_int sends.
-Sink(A) = (put = (A) -> Nil)
+Sink(A) = (put = (A) -> ())
 
-needs_int : () <- (Sink(Int)) -> Nil = () <- (s : Sink(Int)) { s.put(1) }
+needs_int : () <- (Sink(Int)) -> () = () <- (s : Sink(Int)) { s.put(1) }
 
 // Generalization must not turn the required Sink(Int) into Sink(Never).
 unsound = () {
-	_syn3_0 : Sink(Never) = Sink(put = (x : Never) { Nil })
+	_syn3_0 : Sink(Never) = Sink(put = (x : Never) { () })
 	needs_int() <- (_syn3_0)
 }
 
@@ -16,6 +16,6 @@ Cell(A) = (run = (A) -> A)
 wrong_cell = (c : Cell(Int)) -> Cell(Never) { c }
 
 // A computation requiring Sink(Int) cannot replace one requiring Sink(Never).
-run_never = (body : () <- (Sink(Never)) -> Nil) { Nil }
+run_never = (body : () <- (Sink(Never)) -> ()) { () }
 
 bad_computation = () { run_never(needs_int) }

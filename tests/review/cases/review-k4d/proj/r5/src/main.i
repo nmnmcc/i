@@ -21,5 +21,5 @@ tell = (x : Int) {
 main = <N>() {
 	local : () <- (S(N), ..N) -> Int = () { fw() }
 	local()
-	Nil
+	()
 }

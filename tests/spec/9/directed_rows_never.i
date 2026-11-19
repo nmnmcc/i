@@ -2,7 +2,7 @@
 // expect: compile-error E0515
 
 // Rule A: a provider `Yield(Never)` does not meet a need `Yield(Int)`.
-Yield(A) = (emit = (A) -> Nil)
+Yield(A) = (emit = (A) -> ())
 
 emit = <A>(x : A) <- (y : Yield(A)) { y.emit(x) }
 

@@ -1,8 +1,8 @@
 // §4.5 rule 6: A goes in the other direction in Sink(A).
-Sink(A) = (put = (A) -> Nil)
+Sink(A) = (put = (A) -> ())
 
 // §4.7: a variable only in input places has no effect on the meaning.
-new = () { Sink(put = (_) { Nil }) }
+new = () { Sink(put = (_) { () }) }
 
 int_sink = () -> Sink(Int) { new() }
 

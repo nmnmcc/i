@@ -11,6 +11,6 @@ pair = (
 
 main = () {
 	assertion.catch(pair.1) |>
-		(Error(_)) { Nil }
+		(Error(_)) { () }
 		& (Ok(_)) { panic("missed Assert") }
 }

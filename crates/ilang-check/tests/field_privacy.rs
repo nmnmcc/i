@@ -131,7 +131,7 @@ fn generic_value_use_and_public_constructor_fields_keep_their_types() {
             // and is shown by its expansion.
             "app/main.pass : (secret.Pack(A)) -> secret.Pack(A)",
             "app/main.public : (secret.Open) -> Int",
-            "app/main.allowed : () <- (Assert) -> Nil",
+            "app/main.allowed : () <- (Assert) -> ()",
         ]
     );
 }

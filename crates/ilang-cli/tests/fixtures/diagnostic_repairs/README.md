@@ -16,7 +16,7 @@ After merging E4, `t5-a1-r3.stderr` also retains W0505 at 162:7 and W0501 at
 166:8. The original program binds `Ok(source) = bit_array.to_string(bytes)`
 and later matches nested `Ok` values. The E4 table in
 `docs/design/effects-e4.md` changes `bit_array.to_string` to return `String`
-through `Fail(Nil)`, and `json.parse` to return `Json` through `Fail(JsonError)`.
+through `Fail(())`, and `json.parse` to return `Json` through `Fail(JsonError)`.
 Its controlling paragraph says: “An operation that may fail reports through
 `Fail`; `Result` is data used after `catch`.” The input and both grouping
 errors are preserved; these extra warnings pin the current API's behavior.

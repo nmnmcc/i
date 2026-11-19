@@ -12,5 +12,5 @@ with = <A, R, N>(x : A, f : () <- N -> R) {
 main = () {
 	f = with("ok", read)
 	f()
-	Nil
+	()
 }

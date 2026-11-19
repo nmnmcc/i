@@ -9,5 +9,5 @@ main = () {
 	new = (name = "Ada")
 	assert(read(old) == read(new))
 	assert((1, 2).0 == 1)
-	Nil
+	()
 }

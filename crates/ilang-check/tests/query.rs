@@ -502,7 +502,7 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
         "one = (x) {\n  y = x\n  1\n}\n\
          drop = (x, g) {\n  y = x\n  g(1)\n}\n\
          drop2 = (x, g, h) {\n  y = (x, h)\n  g(1)\n}\n\
-         effonly = (f, x) {\n  r = f(x)\n  Nil\n}\n",
+         effonly = (f, x) {\n  r = f(x)\n  ()\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     assert_eq!(f.hover("app/main", "one", 0), "one : (A) -> 1");
@@ -527,11 +527,11 @@ fn local_types_name_one_sided_variables_as_the_scheme() {
     assert_eq!(f.hover("app/main", "h)\n", 0), "h : C");
     assert_eq!(
         f.hover("app/main", "effonly", 0),
-        "effonly : ((A) <- N -> B, A) <- N -> Nil"
+        "effonly : ((A) <- N -> B, A) <- N -> ()"
     );
     assert_eq!(f.hover("app/main", "f, x) {\n  r", 0), "f : (A) <- N -> B");
     assert_eq!(f.hover("app/main", "x) {\n  r", 0), "x : A");
-    assert_eq!(f.hover("app/main", "f(x)\n  Nil", 0), "f : (A) <- N -> B");
+    assert_eq!(f.hover("app/main", "f(x)\n  ()", 0), "f : (A) <- N -> B");
     assert_eq!(f.hover("app/main", "r = ", 0), "r : B");
 }
 

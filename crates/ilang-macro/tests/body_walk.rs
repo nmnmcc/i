@@ -95,7 +95,7 @@ fn outer_call_sees_unexpanded_arguments_and_result_is_expanded() {
 #[test]
 fn local_parameter_and_earlier_binding_shadow_imported_macro() {
     let (mut module, errors) = ilang_syntax::parse_module(
-        "a = (m) { m(1) }\nb = () { m = () { Nil } m(2) }\nc = () { m(3) }",
+        "a = (m) { m(1) }\nb = () { m = () { () } m(2) }\nc = () { m(3) }",
     );
     assert!(errors.is_empty(), "{errors:?}");
     let mut hook = TestHook::default();
@@ -192,7 +192,7 @@ fn deep_mixed_bodies_patterns_and_types_do_not_use_the_host_stack() {
     std::thread::Builder::new()
         .stack_size(256 * 1024)
         .spawn(|| {
-            let (mut module, errors) = ilang_syntax::parse_module("f = () { Nil }\nx : Int");
+            let (mut module, errors) = ilang_syntax::parse_module("f = () { () }\nx : Int");
             assert!(errors.is_empty(), "{errors:?}");
             let span = Span::default();
             let mut value = expression("m()");

@@ -403,7 +403,6 @@ fn prelude_types() {
         ("Error", vec!["Error"]),
         ("Fail", vec!["Fail"]),
         ("False", vec!["False"]),
-        ("Nil", vec!["Nil"]),
         ("Ok", vec!["Ok"]),
         ("True", vec!["True"]),
     ];

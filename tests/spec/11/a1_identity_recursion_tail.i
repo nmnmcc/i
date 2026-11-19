@@ -17,5 +17,5 @@ main = () {
 	local = (0) { 0 } & (n) { local(n - 1) }
 	assert(local(1000000) == 0)
 	assert(via_match(1000000) == 0)
-	Nil
+	()
 }

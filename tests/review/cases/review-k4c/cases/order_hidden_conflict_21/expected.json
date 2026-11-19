@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.run : (() <- N -> Nil) <- N -> Nil\napp/main.one : () <- (S(Int)) -> Nil\napp/main.two : () <- (S(String)) -> Nil\napp/main.bad : () <- (S(Never)) -> Nil\n",
+      "stdout": "app/main.run : (() <- N -> ()) <- N -> ()\napp/main.one : () <- (S(Int)) -> ()\napp/main.two : () <- (S(String)) -> ()\napp/main.bad : () <- (S(Never)) -> ()\n",
       "stderr": "src/main.i:5:7: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied\n1 error\n"
     },
     "run0": {

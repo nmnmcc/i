@@ -361,7 +361,7 @@ A top-level value name bound by a binding (§2.5) gives warning W0504 when it is
 A name is used when it is referenced in its module, exported from a module outside `test/`, an entry of its package (§10.2), a test, or named in `[wasm].exports`. References inside any binding, including unused bindings, function bodies, patterns, and written types, count. Merely importing a name does not use it. In test modules, an export is used when referenced by a module of the same package. Each name in a binding is checked separately; using one name does not make its other names used. A name starting with `_` suppresses its own warning.
 
 
-This warning does not apply to type definitions, names, service definitions, constructors, or declarations (`@external` and `@js`). References in their written types count as uses. For an unused function in a test module, whose parameter group is `()` and whose result type is `Nil`, the warning adds: "did you forget to register this function with `test`?" The hint is not given outside test modules.
+This warning does not apply to type definitions, names, service definitions, constructors, or declarations (`@external` and `@js`). References in their written types count as uses. For an unused function in a test module, whose parameter is of type `()` and whose result type is `()`, the warning adds: "did you forget to register this function with `test`?" The hint is not given outside test modules.
 
 
 ### 2.5 Top-level bindings
@@ -440,7 +440,7 @@ exports = ["app/math.add"]                     # host exports (§10.2): module p
 The optional `[entries]` table maps entry names (ordinary `name`s) to
 strings `"module.path.function"`. The module path is relative to this package;
 its components name directories below `src` or `test`, followed by the function. Targets must be top-level functions of this package;
-they need not be exported. Each has the parameter group `()`. All declarations are checked even when unselected.
+they need not be exported. Each has one parameter of type `()`. All declarations are checked even when unselected.
 Names are unique as TOML keys; several names may select the same function.
 `main` in `src/main.i` is the default entry, if present; `[entries]` does
 not replace it. A package without that function has no default entry.
@@ -627,7 +627,6 @@ These prelude types are normal type definitions (§4.3):
 True = ()
 False = ()
 Bool = True | False
-Nil = ()
 Ok(A) = (A)
 Error(E) = (E)
 Result(A, E) = Ok(A) | Error(E)
@@ -723,8 +722,8 @@ Here `Pair(Int, Int)` is a labelled type, not `(Int, Int)`; `Point` is `(Int, In
   - `{ A | B } - C` is `A - C | B - C`, and `A - { B | C }` is `A - B - C`.
   - When `T` and `U` are not type variables: `T - U` is `T` when they have different type constructors. When they are both `Int` or both `String`, `T - U` has the values of the value set of `T` that are not in the value set of `U`, and is `Never` when none are left: `String - "a"` is every string but `"a"`, `{"a" | "b"} - "a"` is `"b"`, and `"a" - String` is `Never`. For every other type constructor that is the same in both, `T - U` is `Never`.
   - The right side of a written `-` may not have a type variable as a member. Every type argument of a named member there, and every part of a data member there, must be a hole `_`, after aliases are expanded. `List(_)` can remove lists; `List(Int)` cannot select just lists of Int. The holes describe the constructor or shape being removed and impose no new bound on the left side's arguments. Inferred exclusions use this same constructor-only operation; their arguments do not add constraints. `a - U`, with a type variable `a`, stays as it is until `a` is known.
-- So `{ Int | String | Nil } - String` is `Int | Nil`, `List(A) - List(_)` is `Never`, and `{ Yield(a) | n } - Yield(_)` is `n - Yield(_)`.
-- `{ Int | String | Nil } - "a" - 1` is `Int - 1 | String - "a" | Nil`.
+- So `{ Int | String | () } - String` is `Int | ()`, `List(A) - List(_)` is `Never`, and `{ Yield(a) | n } - Yield(_)` is `n - Yield(_)`.
+- `{ Int | String | () } - "a" - 1` is `Int - 1 | String - "a" | ()`.
 - Unions, intersections, and differences may be used in every place where a type may be used. In a written type, a union with two or more type variables as members may only be in an output place, and an intersection with a type variable only in an input place (§4.5 rule 6), because inference cannot choose between them in the other places. The parameter of a function is an input place; its `->` part, the type at the top of a binding pattern, and the data of a type are output places. An entry of a need is an input place of its function type. The parts of data keep the direction of the place of the data. The restrictions on variable members apply to expanded annotations and shown types, including after substitution and completion.
 
 Merging loses correlations between parts of data of one shape and between arguments of one type constructor. Thus `(Int, String) | (String, Int)` is `(Int | String, Int | String)`, which also contains `(1, 2)`. If `Pair(A, B) = (A, B)`, then `Pair(Int, String) | Pair(String, Int)` likewise admits `Pair(1, 2)`. `List(Int) | List(String)` admits `[1, "a"]`, even though neither original list type does.
@@ -767,7 +766,7 @@ propagates neither. Repeat for all definitions until no variance changes,
 retaining only directions allowed by their data. Opaque parameters and
 parameters not used in the written data remain invariant throughout. An unused
 parameter of a labelled type is legal (§4.3); it is not a reason to reject the
-definition. For example, `Chain(A) = (next = Chain(A) | Nil)` is bivariant in
+definition. For example, `Chain(A) = (next = Chain(A) | ())` is bivariant in
 `A`, while `Phantom(A) = ()` has the explicitly unused, invariant parameter.
 
 Two types are **equal** when each is a subtype of the other. A value of a subtype may be used in every place where a value of the type is needed.
@@ -831,7 +830,7 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 - On a function expression, the type parameters may be used in its parameter group, its service pattern, its `->` part and its body, also in nested functions and annotations there. On a function type, they may be used in the rest of that type.
 - A type parameter used where a need is written (`<- N`, `<- (..N, …)`) is a **row variable**: it stands for a whole set of services. Any other use makes it an ordinary type variable. Using one name both ways is a compile error.
 - On a function expression, a type parameter is a type variable of that function, and it is generalized with it. Inference may make it more exact: `id = <A>(x : A) -> A { 1 }` is correct.
-- A written function type with type parameters in a parameter, in the data of a type, in a type definition, or in an annotation is a **polymorphic type**, as `Show = (write = <A>(A) -> Nil)`. Its comparisons and quantified lattice operations use §4.6; each use instantiates it again. Inference never guesses a polymorphic type: a parameter gets one only from a written type.
+- A written function type with type parameters in a parameter, in the data of a type, in a type definition, or in an annotation is a **polymorphic type**, as `Show = (write = <A>(A) -> ())`. Its comparisons and quantified lattice operations use §4.6; each use instantiates it again. Inference never guesses a polymorphic type: a parameter gets one only from a written type.
 - An `UpName` in a type that is neither a type nor a type parameter in scope is a compile error. The message says how to declare it.
 - A bound on a type variable is written as an intersection where it is used, as `x : A & Show`. Capabilities are passed as parameters or as services; none is passed implicitly.
 
@@ -929,7 +928,7 @@ The **known type** `K(e)` of an expression is found from the parts of the expres
 - A name used inside the value of its own binding, and a top-level name of the same group, get their known types only from what is written, because their values are not yet known there: from `x : T` at the top of the binding's pattern when it is there, or else from what is written in the value, with `_` for the rest. So a function that uses its own result in `.f` or `.k` needs a written `->` part. Every other name bound by a pattern gets its known type as below.
 - A known type may have `_` in it, for a part that is not known. A part that is `_` has no known type, but the rest of the type is still known. So the shape of a function is known even when its types are not.
 - A call `f(d)`, also when written with `|>`, has a known type when `f` has a known function type, and every type variable of its result gets a type when its parameter type is matched with the known type of the argument data (below). Then it has the result type with those types put in. A constructor with data is a call.
-- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a data type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the parts at each key, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the other members of `P` (§4.4). A type variable in `P` that is matched with a `_` in `K`, or with a type variable that is generalized in `K`, gets `_`, because that part may be any value. When `P` is an intersection, each of its members is matched with `K`. Before matching, a difference in `K` is replaced by its members (§4.4), and an intersection `a & T` by `T`. When a type variable gets more than one type, it gets their union. So matching `(a | Nil)` with `(User | Nil)` gives `a` the type `User`.
+- To **match** a type `P` with a known type `K`: when `P` is a type variable, `K` is one of its types. When `P` is a named type, a data type, or a function type, and `K` has one member with the same type constructor, the parts are matched: the type arguments, the parts at each key, or the parameter and result types. When `P` is a union, each member of `P` that is not a type variable is matched with the member of `K` that has its type constructor, if there is one, and each type variable in `P` is matched with `K` less the other members of `P` (§4.4). A type variable in `P` that is matched with a `_` in `K`, or with a type variable that is generalized in `K`, gets `_`, because that part may be any value. When `P` is an intersection, each of its members is matched with `K`. Before matching, a difference in `K` is replaced by its members (§4.4), and an intersection `a & T` by `T`. When a type variable gets more than one type, it gets their union. So matching `(a | ())` with `(User | ())` gives `a` the type `User`.
 - **Expected types.** An expression may have an **expected type** from its place, as in TypeScript:
   - An item of the argument data of a call (also with `|>`) whose callee has a known function type has the type of the parameter data at that key. Its type variables are put in when matching the parameter type with the known types of the items before it fixes them. Function expressions that have a parameter with no written type, and names with a selection table of more than one branch, are left out of this matching, and come last: their expected types use all the other items. A function given as an argument may give values to the called function that the other arguments do not show: as its result, as the argument of a function it is given (a parameter of a parameter), or to a service of its need. A service in the called function's own need gives it values that come from the caller's provide. And a function that the called function gives back may get values from a later caller. Walk the type of the called function, also its own need: its parameter is given to it, its result is given by it, and every type variable in its own need is given to it, and the direction turns at each parameter of a function type and at each contravariant argument of a constructor; an argument of a constructor that is invariant or bivariant counts as both directions; an entry of a need is an input place of its function type. A type variable at a place given to the called function, other than a place in the parameter reached from its top only through parts of data and covariant arguments of constructors (the argument shows the values there), is a **hidden input**. Its match is `_` in the expected type of every item: the hidden values may have different type constructors from the other shown arguments. For the call's known result, match the facts of all its arguments, including the results of callbacks after they have been checked. A hidden input not described by those arguments, in the callee's need or supplied by a later caller of its result, still has match `_`. Unknown argument parts remain unknown in matching; proven hidden matches may be made whole as above. Thus `list.map(users, (u) { u.name })` can have known result `List(String)` when the checked callback has known result `String`. Thus in `list.fold(xs, 0, (n, x) { … })`, `n` has no factual known type; the initial value does not determine every accumulator value. The same holds for values read from a service or an invariant cell and values supplied by a later caller.
 
@@ -1027,6 +1026,19 @@ The type of `[e1, …, en]` is `List(T)`, where every part has the type `T`. `T`
 
 `f(…)` calls the function `f` with the data in the brackets. Every function is called in this way, whatever expression gives it. The data must have a shape that `f` takes (§4.6). There are no labels outside data and no default parameters: every key is given exactly once, by the data. `f()` passes `()`, and `f(x)` passes the one-position data `(x)`.
 
+`f ()` is the same call as `f()`: spaces do not separate a callee from its call, and a `(` that follows an expression on the same line continues that expression. Only a new line starts a new statement. A unit value that is a statement of its own therefore begins a new line:
+
+```i
+zero = () -> Int { 8 }
+
+main = () {
+	zero
+	()
+}
+```
+
+Writing `main = () { zero () }` is a call of `zero`, not two statements. The same applies after any expression: `assert(check()) ()` is a call of the result of `assert`, whose type is `()`, so it is a compile error; write the unit value on a new line.
+
 ### 6.7 Constructors and keys
 
 `C(…)` makes a value of the labelled type `C` (§4.3). It is a call of the constructor with the data in the brackets, which must be in the data type of `C`. `C` alone is the value of a labelled type whose data is `()`; `C()` is a compile error. `C(..v, label = e)` is an ordinary call whose data has a spread.
@@ -1071,7 +1083,7 @@ The unary operators `-` (Int) and `-.` (Float) are stronger than all binary oper
 - `a |> f` is `f(a)`, passing the one-position data `(a)`. `a |> f(b, port = 1)` is `f(a, b, port = 1)`: `a` is put in as position 0. `a |> f(..t)` is `f(a, ..t)`. The right side of `|>` must be a name, a call, or a chain (§6.12); anything else is a compile error that suggests a group. `|>` is weaker than every operator but `<-`, so its whole left side is its left operand: `a == b |> f` is `{ a == b } |> f`, and `x |> g == 2` is a compile error.
 - `e |> C`, where `C` is a chain, is a match (§6.12).
 - `e <- s` works out `e` with the services `s` provided (§9.2). Its left operand is the whole expression to its left, and its right operand is one postfix expression: `a + f(x) <- (s)` provides to `a + f(x)`, `x |> g <- (s)` provides to `x |> g`, and `e <- (s) + 1` is a compile error. A group provides to a part: `a + { f(x) <- (s) }`.
-- When both sides of `==` or `!=` have known types (§4.8), and these are disjoint (§4.5 rule 3), the compiler gives warning W0503, showing both types: the two sides can never be equal. The comparison is well defined and has type `Bool`: `==` is always `False` and `!=` is always `True`. A member of a known type that is `_` or a type variable is never disjoint from anything. Literal types count. So `1 == "a"`, `1 == 2`, `1 != 2`, `"a" == "b"`, `x == "b"` after `x = "a"`, and `(s : String) { s == 1 }` give the warning, but `(s : String) { s == "a" }`, `(m : { "a" | "b" }) { m == "b" }`, `x == Nil` with `x : { Int | Nil }`, `[1] == []`, `a == b` with a type variable, and `(s) { s == 1 }` do not. Only the top members of the two types are compared (§4.5 rule 3), so `(1, 2) == (3, 4)` and `Some(1) == Some(2)` give no warning, though they are always `False`. Literal types are not widened. The warning adds no narrowing fact. A guard `? x == 2` with `x : 1` is always false; coverage treats it as any guard (§7.4). What `==` does is in §11.4.
+- When both sides of `==` or `!=` have known types (§4.8), and these are disjoint (§4.5 rule 3), the compiler gives warning W0503, showing both types: the two sides can never be equal. The comparison is well defined and has type `Bool`: `==` is always `False` and `!=` is always `True`. A member of a known type that is `_` or a type variable is never disjoint from anything. Literal types count. So `1 == "a"`, `1 == 2`, `1 != 2`, `"a" == "b"`, `x == "b"` after `x = "a"`, and `(s : String) { s == 1 }` give the warning, but `(s : String) { s == "a" }`, `(m : { "a" | "b" }) { m == "b" }`, `x == ()` with `x : { Int | () }`, `[1] == []`, `a == b` with a type variable, and `(s) { s == 1 }` do not. Only the top members of the two types are compared (§4.5 rule 3), so `(1, 2) == (3, 4)` and `Some(1) == Some(2)` give no warning, though they are always `False`. Literal types are not widened. The warning adds no narrowing fact. A guard `? x == 2` with `x : 1` is always false; coverage treats it as any guard (§7.4). What `==` does is in §11.4.
 
 ### 6.10 Blocks and bindings
 
@@ -1081,7 +1093,7 @@ An expression statement that is not the last, and whose working out can do nothi
 
 `p = e` is a binding. It works out `e` and matches it with the pattern `p`. The names in `p` may be used from the next statement. `e` is a whole expression, so `u = find_user(id) <- (db)` binds the result of the provide.
 
-- The type of `e` must be a subtype of the pattern type of `p` (§4.8 rule 10). So `x : Int = e` says that `e` has the type `Int`, and `(a, b) = v` with `v : { (Int, Int) | Nil }` is a compile error; a match is used for this.
+- The type of `e` must be a subtype of the pattern type of `p` (§4.8 rule 10). So `x : Int = e` says that `e` has the type `Int`, and `(a, b) = v` with `v : { (Int, Int) | () }` is a compile error; a match is used for this.
 - If `p` can not fail for the type of `e` (§7.3), the binding needs no service.
 - If not, as in `Ok(v) = r`, when it runs, the binding works like the match `e |> (p) { … } & (_) { a.fail(AssertionFailure(message = m)) }`, where the first branch goes on with the rest of the block. The binding is still typed by §4.8 rule 10, not by rule 11. Here `a` is the `Assert` service, and `m` is the text `pattern `, then the source text of `p`, then ` did not match `, then the text form (§11.8) of the value. So `Assert` is in the need of the binding (§9.6).
 - A pattern is a conjunction of parts, `p1 = … = pk`: `a = (x, y) = e` binds `e` to `a` and to `(x, y)`, and `a = b = c = d` binds `a`, `b` and `c` to `d`.
@@ -1284,11 +1296,11 @@ A bit array pattern matches the segments in order from the start. It matches onl
 
 ## 9. Effects
 
-i has no special effect definitions. Effects are made from normal things: functions with no parameters (§9.1), services (§9.2), errors as the service `Fail` (§9.3), and the control operations of `i/control` (§9.4). There is no error channel, no implicit capability and no layer concept.
+i has no special effect definitions. Effects are made from normal things: functions that take `()` (§9.1), services (§9.2), errors as the service `Fail` (§9.3), and the control operations of `i/control` (§9.4). There is no error channel, no implicit capability and no layer concept.
 
 ### 9.1 Computations
 
-A function with no parameters, `() <- N -> A`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS, which is `() <- (..R, Fail(E)) -> A` in i. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
+A function whose parameter is `()`, `() <- N -> A`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS, which is `() <- (..R, Fail(E)) -> A` in i. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
 
 ```i
 retry = <A, E, N>(times : Int, body : () <- (..N, Fail(E)) -> A) -> A {
@@ -1432,7 +1444,7 @@ The module `i/control` pauses a computation and goes on with it later:
 | `control.boundary` | `<R, N>((Boundary(R, N)) <- N -> R) <- N -> R` |
 | `control.suspend` | `<A, R, N>(Boundary(R, N), (Continuation(A, R, N)) <- N -> R) -> A` |
 | `control.resume` | `<A, R, N>(Continuation(A, R, N), A) <- N -> R` |
-| `control.cancel` | `<A, R, N>(Continuation(A, R, N)) <- N -> Nil` |
+| `control.cancel` | `<A, R, N>(Continuation(A, R, N)) <- N -> ()` |
 | `control.escape` | `<R, N>(Boundary(R, N), R) -> Never` |
 
 `Boundary` and `Continuation` are built-in types. Their values are made only by `control.boundary` and `control.suspend`, and the host cannot take them (§10.3).
@@ -1440,7 +1452,7 @@ The module `i/control` pauses a computation and goes on with it later:
 1. `boundary(body)` makes a boundary `b` and does `body(b)`. The value of `body` is the value of `boundary`. `b` is **active** while the computation between it and the running code is on the stack: from the start of `body` until `body` ends, but not while that part is paused in a continuation or after an escape to `b` has begun unwinding. After `resume`, it is active again only if no escape to `b` has begun unwinding.
 2. `suspend(b, f)` pauses the computation from this point back to the boundary `b`. That paused part is a **continuation** `k`. Then `f(k)` is done in the place of the boundary, with the services of that place, and its value is the value of `boundary`. If `b` is not active, the program stops.
 3. `resume(k, v)` goes on with the paused computation, with `v` as the value of `suspend`. It goes on on top of the place where `resume` is called, and the value that the computation has when it gets to the boundary is the value of `resume`. The paused part keeps the services provided inside it; for the rest, it gets the services of the place where `resume` is called. So an error raised after `resume` goes to the `Fail` of the place of `resume`, unless the paused part provided its own. The services that a function made by `keep` keeps (below) count, for the code inside that function, like services provided inside the paused part.
-4. `cancel(k)` unwinds the paused computation (§9.5) and gives `Nil`. While it unwinds, the boundary stays not active, and the final functions get the services as in rule 3, from the place where `cancel` is called; inside a function made by `keep`, they get the kept services.
+4. `cancel(k)` unwinds the paused computation (§9.5) and gives `()`. While it unwinds, the boundary stays not active, and the final functions get the services as in rule 3, from the place where `cancel` is called; inside a function made by `keep`, they get the kept services.
 5. `escape(b, v)` ends the computation back to the boundary `b` at once, unwinding it (§9.5), and `v` is the value of `boundary`. It is `suspend(b, (k) { cancel(k)  v })` with no continuation made. The boundary becomes inactive before unwinding starts and stays inactive if cleanup is paused and resumed. If `b` is not active, the program stops with the message `boundary not active`.
 6. **One use only**: `resume` and `cancel` together may be used one time for a continuation. A second use stops the program.
 7. If a continuation is never resumed or cancelled, its final functions are not run.
@@ -1461,14 +1473,14 @@ An error raised inside the kept function goes to the `catch` of its caller.
 Generators, async code, and schedulers are libraries made from services and these operations. For example, a generator:
 
 ```i
-Yield(A) = (emit = (A) -> Nil)
+Yield(A) = (emit = (A) -> ())
 
-collect = <A, N>(body : () <- (..N, Yield(A)) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (..N, Yield(A)) -> ()) -> List(A) {
 	control.boundary((b) {
 		body() <- (
 			Yield(
 				emit = (x) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -1492,8 +1504,8 @@ The module `i/resource` puts final functions in place. `Scope` is a service of `
 
 | Function | Type | What it does |
 |---|---|---|
-| `resource.ensure` | `<A, N>(() <- N -> A, () <- N -> Nil) <- N -> A` | Runs the second function after the first, whether the first ends normally, ends with an error, or is unwound |
-| `resource.acquire` | `<A, N>(() <- N -> A, (A) -> Nil) <- (..N, Scope) -> A` | Opens a resource and attaches its release to the current `Scope` |
+| `resource.ensure` | `<A, N>(() <- N -> A, () <- N -> ()) <- N -> A` | Runs the second function after the first, whether the first ends normally, ends with an error, or is unwound |
+| `resource.acquire` | `<A, N>(() <- N -> A, (A) -> ()) <- (..N, Scope) -> A` | Opens a resource and attaches its release to the current `Scope` |
 | `resource.scoped` | `<A, N>(() <- (..N, Scope) -> A) <- N -> A` | Runs the body with a new `Scope`, and runs the attached releases in reverse order when the body ends, also by an error, an escape or a cancel |
 
 A `Scope` starts **open**. `acquire` checks that state before calling
@@ -1524,12 +1536,12 @@ Assert = (fail = (AssertionFailure) -> Never)
 An `Assert` service is where failures are reported. Its `fail` never gives back a value. The built-in function `assert` is a normal function, which may be written in i:
 
 ```i
-assert = (c : Bool) <- (a : Assert) -> Nil {
+assert = (c : Bool) <- (a : Assert) -> () {
 	c |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { a.fail(AssertionFailure(message = "assert")) }
 }
-// assert : (Bool) <- (Assert) -> Nil
+// assert : (Bool) <- (Assert) -> ()
 ```
 
 A binding whose pattern may fail also reports to `Assert` (§6.10).
@@ -1562,7 +1574,7 @@ Storage = (read = (String) <- (Fail(String)) -> String)
 - It is a labelled type whose data has only labels, each with a function type. The parameter data of these functions has positions only. Their parameters and values must be types that the host can take (§10.3). A function type there may have no need, or exactly `<- (Fail(E))` with an `E` that the host can take: the host's error is raised through the caller's `Fail`. Two host services may not have the same namespace and a field with the same label.
 - With `@host("namespace", "async")`, the host does the functions **later**: the program waits at the call, and goes on from the call when the host gives a value or an error. In i code, such a call is a normal call.
 - A host service that the platform provides at an entry (§10.2) is given by the host. Every field is the Wasm import with the import module `namespace` and the field label as its name, encoded as in Appendix B. i code may also provide a host service, for example to put a fake in its place in a test; then no import is used for it.
-- The library module `i/io` declares and exports the **standard service** `@host("i:io/v1") Io = (print = (String) -> Nil)`. `print` writes the text and a line feed to the standard output, and gives `Nil`, also after an output error. A program that prints imports it, for example `((Io) = i/io)`. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
+- The library module `i/io` declares and exports the **standard service** `@host("i:io/v1") Io = (print = (String) -> ())`. `print` writes the text and a line feed to the standard output, and gives `()`, also after an output error. A program that prints imports it, for example `((Io) = i/io)`. A host service declared in another module with the namespace `i:io/v1` is a normal host service, and the rule above about namespaces and labels is true for it as for any other: with a field `print`, it is a compile error.
 
 **Targets and platform services.**
 
@@ -1676,15 +1688,15 @@ Each type below writes its type parameters before its parameter part. `N` is the
 | `local_scope` | The type of `scope` |
 | `go` | `<A, E, N>(Group(E), () <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A) <- (..N, Scheduler) -> Task(A, E)` |
 | `join` | `<A, E>(Task(A, E)) <- (Fail(E), Scheduler) -> A` |
-| `yield` | `() <- (Scheduler) -> Nil` |
+| `yield` | `() <- (Scheduler) -> ()` |
 | `path` | `() <- (Scheduler) -> List(Int)` |
 | `random` | `() <- (Scheduler) -> random.Generator` |
 | `keep` | `<S, A, E, N>((S) <- (..N, Fail(E), Scheduler, Runner, request.Await) -> A) <- (..N, Scheduler) -> (S) <- (Fail(E), Scheduler) -> A` |
 | `channel` | `<A>() <- (Scheduler) -> Channel(A)` |
 | `local_channel` | `<A>() <- (Scheduler) -> Channel(A)` |
-| `send` | `<A>(Channel(A), A) <- (Scheduler) -> Nil` |
+| `send` | `<A>(Channel(A), A) <- (Scheduler) -> ()` |
 | `receive` | `<A>(Channel(A)) <- (Scheduler) -> A` |
-| `send_event` | `<A>(Channel(A), A) -> Event(Nil, Never, Never)` |
+| `send_event` | `<A>(Channel(A), A) -> Event((), Never, Never)` |
 | `receive_event` | `<A>(Channel(A)) -> Event(A, Never, Never)` |
 | `join_event` | `<A, E>(Task(A, E)) -> Event(A, E, Never)` |
 | `always` | `<A>(A) -> Event(A, Never, Never)` |
@@ -2112,9 +2124,9 @@ functions; it does not redeclare or re-export the primitive types.
 
 
 ```i
-Await = (wait = (Ticket) -> Nil)
-Root = (key = Key(Nil))
-Owner = (key = Key(Nil), root = Root)
+Await = (wait = (Ticket) -> ())
+Root = (key = Key(()))
+Owner = (key = Key(()), root = Root)
 Waiting = ()
 Ready(A) = (A)
 Cancelled = ()
@@ -2127,28 +2139,28 @@ RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 |---|---|---|
 
 | `open_root` | `() <- (Root) -> Root` | Open an independent request run within the current entry context |
-| `close_root` | `(Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+| `close_root` | `(Root) -> ()` | Close every live group of this root and the root itself; idempotent |
 | `open_owner` | `() <- (Root) -> Owner` | Register a group at the current root; changing Owner does not change that root |
-| `close_owner` | `(Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+| `close_owner` | `(Owner) -> ()` | Cancel its outstanding work and remove the live group; idempotent |
 | `count` | `(Owner) -> Int` | Number of outstanding requests in this group |
 | `count_root` | `(Root) -> Int` | Number of outstanding requests in all groups of this root |
 | `settled_owner` | `(Owner) -> Bool` | True exactly when count(owner) is zero |
 | `settled_root` | `(Root) -> Bool` | True exactly when count_root(root) is zero |
-| `cancel_all` | `(Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
-| `cancel_all_root` | `(Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
-| `wait_none` | `(Owner) <- (Await) -> Nil` | Await until this group's count is zero |
-| `wait_none_root` | `(Root) <- (Await) -> Nil` | Await until this root's count is zero |
+| `cancel_all` | `(Owner) -> ()` | Cancel the group's outstanding work at this step; leave the group open |
+| `cancel_all_root` | `(Root) -> ()` | Cancel outstanding work in all its groups at this step; leave them open |
+| `wait_none` | `(Owner) <- (Await) -> ()` | Await until this group's count is zero |
+| `wait_none_root` | `(Root) <- (Await) -> ()` | Await until this root's count is zero |
 | `within` | `<A, N>(() <- (..N, Owner) -> A) <- (..N, Root) -> A` | Fresh Owner; ensure close_owner on exit |
 | `ready` | `<A>(A) -> Request(A)` | A fresh completed request; available in pure fakes |
 | `ticket` | `<A>(Request(A)) -> Ticket` | The same underlying request identity; no answer access |
 | `state` | `<A>(Request(A)) -> RequestState(A)` | Reads do not consume the answer |
 | `take` | `<A>(Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
 | `settled` | `(Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-| `cancel` | `(Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+| `cancel` | `(Ticket) -> ()` | Idempotent; cancels only Waiting, discards a Ready answer |
 | `await` | `<A>(Request(A)) <- (Await) -> A` | Borrow the producer, wait, then take the Ready value |
 | `await_owned` | `<A>(Request(A)) <- (Await) -> A` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
-| `wait_any` | `(List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
-| `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+| `wait_any` | `(List(Ticket)) -> ()` | Root wait; return when any listed ticket settles |
+| `poll` | `() -> ()` | Root hand-off with status 2, even with no requests |
 
 
 `cancel` makes every alias observe Cancelled, even for a previously Ready cell.
@@ -2197,7 +2209,7 @@ and delivery operation observes that terminal state. A host id is retired once.
 
 wait_none/wait_none_root use Await, so a task waits without pausing runnable
 siblings. They return immediately on zero, including for a closed group.
-Otherwise a private local Request(Nil) observation cell subscribes to the group
+Otherwise a private local Request(()) observation cell subscribes to the group
 and settles on its next zero observation. It has no host id, producer operation
 or Owner membership: a wait is not work that can complete itself. Its Ticket
 never leaves the observer's worker. Check-and-subscribe shares the registration
@@ -2243,7 +2255,7 @@ is explicit control use, like suspending to an outer boundary, and does not
 create multiple scheduler histories.
 
 Root and Owner are ordinary services, not primitive types or built-in names.
-They use Key(Nil) and are portable; outstanding request values remain non-portable.
+They use Key(()) and are portable; outstanding request values remain non-portable.
 Root/group registration and observation use internal accounting. Local Ticket
 cancel uses v3 cancel on its home worker; MC group cancellation uses the
 registered host cancellation actions above and retires the home id once. MC
@@ -2467,8 +2479,8 @@ The generated artifact and loader metadata are specified in §B.6.1. Host export
 
 These functions are **entry points**:
 
-- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. Its parameter group is `()`, and its result is unused. The binding may be an alias or an expression that computes a function value; its inferred function type determines the parameter group. After ordinary module initialization, the entry invokes that initialized value through the ordinary call rules (§6.6). A missing default means no program entry.
-- **Tests**: the entries of the collection named by `[test] collection` in `i.toml` (§14.5). `std/test` provides ordinary imported item macros `test`, `skip`, `only`, `fails`, `suite`, and `each`, which contribute private functions and display metadata to `std/test.tests`. For example, `(testlib = (test) = std/test)` makes `test("addition", () { assert(1 + 1 == 2) })` available. These names have no special language meaning. Each selected function has the parameter group `()` and gives `Nil` or `Never`. A test **passes** when it gives `Nil`. It **fails** on a stop (§11.7) or an error that reaches the platform's `Fail`. `fails` reverses that expectation; `skip` reports an entry without running it, and `only` selects focused entries. `suite` prefixes names and provides the services written in it to its test bodies; `each` contributes one test for each written case. The runner compiles the collection once and runs each selected test in a fresh started instance (§B.1). With no configured collection, no tests run.
+- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. Its parameter is of type `()`, and its result is unused. The binding may be an alias or an expression that computes a function value; its inferred function type determines the parameter group. After ordinary module initialization, the entry invokes that initialized value through the ordinary call rules (§6.6). A missing default means no program entry.
+- **Tests**: the entries of the collection named by `[test] collection` in `i.toml` (§14.5). `std/test` provides ordinary imported item macros `test`, `skip`, `only`, `fails`, `suite`, and `each`, which contribute private functions and display metadata to `std/test.tests`. For example, `(testlib = (test) = std/test)` makes `test("addition", () { assert(1 + 1 == 2) })` available. These names have no special language meaning. Each selected function has one parameter of type `()` and gives `()` or `Never`. A test **passes** when it gives `()`. It **fails** on a stop (§11.7) or an error that reaches the platform's `Fail`. `fails` reverses that expectation; `skip` reports an entry without running it, and `only` selects focused entries. `suite` prefixes names and provides the services written in it to its test bodies; `each` contributes one test for each written case. The runner compiles the collection once and runs each selected test in a fresh started instance (§B.1). With no configured collection, no tests run.
 - **Host exports**: the functions named in `[wasm].exports` (§2.6) of the package that is compiled. The `[wasm]` of other packages is not used. They must be in the exports of their module. A host export has one shape, its parameter data has positions only, and its parameters and value must be types that the host can take (§10.3).
 
 **Platform services.** At an entry the platform of the target provides its services (§9.7): the host services of its table, `Assert`, `Scope`, `Root`, `Owner`, `Await`, `Runner`, `Scheduler`, `Target`, and a top-level `Fail`. For the program entry and tests, that `Fail` takes any error, and an error that reaches it stops the program or fails the test. For a host export, it takes only an error type that the host can take, and the error is given to the host (Appendix B).
@@ -2485,7 +2497,7 @@ Open the primitive entry context first, enabling async admission exactly for an 
 
 ### 10.3 Types the host can take
 
-`Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`, and opaque types (§4.3). Values of opaque types go to the host as opaque references. No other type may go to the host: data, labelled types with data, and functions do not cross. An error type that the host can take is a union of `Nil`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, with no two the same.
+`()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, and opaque types (§4.3). Values of opaque types go to the host as opaque references. No other type may go to the host: data, labelled types with data, and functions do not cross. An error type that the host can take is a union of `()`, `Bool`, `Int`, `Float`, `String`, and `BitArray`, with no two the same.
 
 Where i code gives a value to the host, an `Int` or `String` member counts as `Int` or `String`, whatever its value set (§4.2): a literal type, a union of literal types of one type constructor (also through a name), or all the values but a finite set, such as `Int - 0`. Where the host gives the value (the value of an external function, the value and errors of a host-service function, and the parameters of a host export), an `Int` or `String` member must have all its values, because the host's values are checked only for their form (§B.2).
 
@@ -2493,7 +2505,7 @@ Where i code gives a value to the host, an `Int` or `String` member counts as `I
 @external("app", "mode")
 mode : () -> { "on" | "off" } // compile error: the host gives the value
 @external("app", "log")
-log : ("info" | "warn") -> Nil // correct: i code gives the value
+log : ("info" | "warn") -> () // correct: i code gives the value
 ```
 
 The outer `Request` and optional `Result` in a request-mode host declaration describe how work is obtained; they are not additional boundary types. Requests, tickets, tasks, groups, channels and events cannot cross the interface. IO types over Int and constructed `Thrown` and `Mismatch` values are not boundary types; their libraries pass Int or an opaque outcome and decode in i. JavaScript value declarations do not change the value and error lists above. No library-specific exception is added.
@@ -2638,13 +2650,13 @@ These names may be used in every module. Other names may cover them.
 |---|---|---|
 | `Int` `Float` `String` `List` `BitArray` `UtfCodepoint` `Never` | Types | §4.2 |
 | `Bool` `Result` | Names | §4.2 |
-| `True` `False` `Nil` `Ok` `Error` | Labelled types and their constructors | §4.2 |
+| `True` `False` `Ok` `Error` | Labelled types and their constructors | §4.2 |
 | `Assert` `AssertionFailure` `Fail` | Labelled types and their constructors | §9.3, §9.6 |
 | `Boundary` `Continuation` | Built-in types made by `i/control` | §9.4 |
 | `Key` `Keyed` | Built-in types made by `i/key` | §9.8 |
 | `Request` `Ticket` | Built-in types operated on by `i/request` | §9.11 |
 | `panic` | `(String) -> Never` | §11.7 |
-| `assert` | `(Bool) <- (Assert) -> Nil` | §9.6 |
+| `assert` | `(Bool) <- (Assert) -> ()` | §9.6 |
 
 
 
@@ -2679,16 +2691,16 @@ These are normal functions: they are called, given, and compared like any other 
 | `shift_right` | `(Int, Int) -> Int` | `x` ÷ 2^n, rounded down. A negative n is `shift_left` by −n. |
 | `concat` | `(List(String)) -> String` | The strings one after the other |
 | `byte_size` | `(String) -> Int` | The number of UTF-8 bytes |
-| `byte_slice` | `(String, Int, Int) -> Result(String, Nil)` | The bytes from `start` (counting from 0), `length` of them. `Error(Nil)` when they are not all in the string, or when the start or the end is inside a character. |
+| `byte_slice` | `(String, Int, Int) -> Result(String, ())` | The bytes from `start` (counting from 0), `length` of them. `Error(())` when they are not all in the string, or when the start or the end is inside a character. |
 | `codepoints` | `(String) -> List(UtfCodepoint)` | The characters in order |
 | `from_codepoints` | `(List(UtfCodepoint)) -> String` | The string of these characters |
 | `codepoint_to_int` | `(UtfCodepoint) -> Int` | The number of the character |
-| `int_to_codepoint` | `(Int) -> Result(UtfCodepoint, Nil)` | The character with this number, or `Error(Nil)` when it is not a Unicode scalar value |
+| `int_to_codepoint` | `(Int) -> Result(UtfCodepoint, ())` | The character with this number, or `Error(())` when it is not a Unicode scalar value |
 | `to_upper` | `(String) -> String` | The string with each character changed to its simple uppercase mapping in Unicode 18.0.0 (UnicodeData.txt). This is one character for one character, and no language changes it. A character with no simple uppercase mapping, such as `ß`, stays the same. |
 | `to_lower` | `(String) -> String` | The string with each character changed to its simple lowercase mapping in Unicode 18.0.0, in the same way |
-| `index_of` | `(String, String, Int) -> Result(Int, Nil)` | The byte offset (counting from 0) of the first `find` in `in` that starts at `from` or after it. An empty `find` is at `from`. `Error(Nil)` when there is no such `find`, when `from` is less than 0 or greater than the byte size of `in`, or when `from` is inside a character. |
+| `index_of` | `(String, String, Int) -> Result(Int, ())` | The byte offset (counting from 0) of the first `find` in `in` that starts at `from` or after it. An empty `find` is at `from`. `Error(())` when there is no such `find`, when `from` is less than 0 or greater than the byte size of `in`, or when `from` is inside a character. |
 | `bit_size` | `(BitArray) -> Int` | The number of bits |
-| `bit_array_to_string` | `(BitArray) -> Result(String, Nil)` | The string, when the bits are whole bytes of correct UTF-8; `Error(Nil)` when not |
+| `bit_array_to_string` | `(BitArray) -> Result(String, ())` | The string, when the bits are whole bytes of correct UTF-8; `Error(())` when not |
 | `bit_array_concat` | `(List(BitArray)) -> BitArray` | The bit arrays one after the other. Their sizes may be any number of bits. |
 | `inspect` | `<A>(A) -> String` | The text form of the value (§11.8) |
 | `hash` | `<A>(A) -> Int` | A number from 0 to 2^32 − 1. Values that are the same (§11.4) give the same number. Which number is not fixed outside macros; macro execution uses §14.9. |
@@ -2870,7 +2882,7 @@ A **syntax macro** is a top-level binding in a `.is` file with the attribute `@m
 (@ macro
   (= unless
     (-> (, cond body) _
-      `(|> ~cond (& (-> (, True) _ Nil) (-> (, False) _ ~body))))))
+      `(|> ~cond (& (-> (, True) _ (,)) (-> (, False) _ ~body))))))
 ```
 
 A **macro call** is written in these ways in both surfaces, where `m` is a name, or `a.m` with a module name `a`, that is a macro there:
@@ -2962,13 +2974,13 @@ cannot change whether these logical limits are exceeded.
 Items = (
 	add = (Syntax, Syntax, List((String, String)), Syntax) <- (
 		Fail(SyntaxError),
-	) -> Nil,
-	expose = (Syntax) <- (Fail(SyntaxError)) -> Nil,
+	) -> (),
+	expose = (Syntax) <- (Fail(SyntaxError)) -> (),
 )
-Diagnostics = (note = (String) -> Nil)
+Diagnostics = (note = (String) -> ())
 ```
 
-`add(collection, target, data, at)` records that the function `target`, a binding of this module whose parameter group is `()`, belongs to the **collection** named by the exported binding `collection`, with string metadata `data` (unique keys) and source position `at`. The target is checked by its inferred function type; aliases and computed function values are allowed. Selecting a target invokes its initialized value by the ordinary call rules (§6.6). A pair of collection and target may be added once. `expose` adds a name of the module to its exports. Requests of a run take effect only when the run succeeds. A tool reads a collection after checking and chooses which targets become entries (§10.2); importing a module runs none of them. `Diagnostics.note` adds a compiler note, given once for a successful run.
+`add(collection, target, data, at)` records that the function `target`, a binding of this module whose parameter is of type `()`, belongs to the **collection** named by the exported binding `collection`, with string metadata `data` (unique keys) and source position `at`. The target is checked by its inferred function type; aliases and computed function values are allowed. Selecting a target invokes its initialized value by the ordinary call rules (§6.6). A pair of collection and target may be added once. `expose` adds a name of the module to its exports. Requests of a run take effect only when the run succeeds. A tool reads a collection after checking and chooses which targets become entries (§10.2); importing a module runs none of them. `Diagnostics.note` adds a compiler note, given once for a successful run.
 
 ### 14.6 Names in expanded code
 
@@ -2988,7 +3000,7 @@ Labels are compared by text only. Every rule that compares names (§2.2, §2.3, 
 Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
 ```
 
-`definition(of)` gives the written type definition named by `of`, an `UpName` or `(. a U)`, with its attributes and parameters, as the `Syntax` of the item. A name bound by a type variable, a type of another module that is not exported or whose constructors are not exported, and a built-in type are `SyntaxError`s; `Bool`, `Nil`, `Result`, `Assert` and `AssertionFailure` give the definitions this document gives them. A value-dependent alias gives its written item. An unresolved name in the current module is not ready while other pending item runs could introduce it. Its absence is a compile error at `of` only after those runs settle. Imported modules are already complete, so an absent imported name is an immediate compile error. The definition of a binding cannot be asked for.
+`definition(of)` gives the written type definition named by `of`, an `UpName` or `(. a U)`, with its attributes and parameters, as the `Syntax` of the item. A name bound by a type variable, a type of another module that is not exported or whose constructors are not exported, and a built-in type are `SyntaxError`s; `Bool`, `Result`, `Assert` and `AssertionFailure` give the definitions this document gives them. A value-dependent alias gives its written item. An unresolved name in the current module is not ready while other pending item runs could introduce it. Its absence is a compile error at `of` only after those runs settle. Imported modules are already complete, so an absent imported name is an immediate compile error. The definition of a binding cannot be asked for.
 
 In the first step of expansion, a definition of the module being expanded is given only when it is **ready**: present in the module with no macro call left in it. A name that may still be introduced by another pending item run is not ready even when no binding for it is present yet. A run that asks for a definition that is not ready is put off and done again later as a new run. When every run left has been put off, they are done one at a time in source order, each answered from the module as it is then; at the end of the step each such answer is asked again of the complete module, and a different answer is a compile error naming the name and the two runs. Runs that wait for one another in a circle are compile errors. So the result does not depend on the order in which runs are done.
 
@@ -3040,7 +3052,7 @@ An error in expanded code is reported at the span of the code; code from a templ
 
 | Value | Word stream |
 |---|---|
-| `Nil` | `0` |
+| `()` | `0` |
 | `False`, `True` | `1, b, 0, 0`, with `b = 0` or `1` |
 | `Int` | `8, sign, n`, then the `n` base-2^32 digits of the absolute value, least significant first; `sign` is -1, 0 or 1; zero has no digits |
 | `Float` | `2, low, high` of its IEEE 754 binary64 bits; either zero uses all-zero bits |
@@ -3084,7 +3096,7 @@ A value of a type that the host can take (§10.3) is passed as zero or more Wasm
 
 | Type | Wasm values |
 |---|---|
-| `Nil` | none |
+| `()` | none |
 | `Bool` | `i32`: 0 is `False`, 1 is `True` |
 | `Float` | `f64` |
 | `Int` | `i32` sign, `i32` address or inline value, `i32` count. The sign is −1, 0, or 1. When count is 0 and sign is not 0, the second `i32` is the signed 32-bit value, its sign must match, and there is no buffer. Otherwise the size of the number is `count` unsigned 32-bit parts at the address, lowest part first, each part little-endian. The last part is not 0. Zero is sign 0 and count 0. Values outside the signed 32-bit range use parts; receivers also accept parts for nonzero values inside that range. |
@@ -3101,7 +3113,7 @@ A function `(P1, …, Pn) <- (Fail(E)) -> A`, or `(P1, …, Pn) -> A` with `E` =
 
 - **Parameters**: the values of `P1`, then `P2`, and so on.
 - **Results**, when `E` is `Never`: the values of `A`.
-- **Results**, when `E` has members: first an `i32` **tag**, then the values of `A`, then the values of each member of `E` in the **canonical order**: `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray`. Tag 0 means a normal value; tag i means an error of the i-th member. The values that are not used are 0, or null for an `externref`.
+- **Results**, when `E` has members: first an `i32` **tag**, then the values of `A`, then the values of each member of `E` in the **canonical order**: `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`. Tag 0 means a normal value; tag i means an error of the i-th member. The values that are not used are 0, or null for an `externref`.
 
 When the host gives a value that is not correct (a `String` that is not UTF-8, an `Int` with a wrong sign or a last part of 0, a `BitArray` whose bits after the end are not 0, a `Float` that is not finite, a `Bool` that is not 0 or 1, a buffer that is not inside `memory`, also an empty one, or a tag that is too big), the program stops (§11.7).
 
@@ -3211,10 +3223,10 @@ Js service; a custom outgoing converter cannot change an export's ABI.
 
 - It imports `fd_write` and `proc_exit` from `wasi_snapshot_preview1`, and not `panic` from `ilang:host/v1`. The stop message (§11.7) and a line feed are written to file descriptor 2, then the process ends with exit code 1. `reference_id` is imported from `ilang:host/v1` only when a type of an import or export is a custom type with no constructors, because only the host can make such a value.
 
-- The platform's `Io` writes UTF-8 text plus LF to file descriptor 1 through the checked Wasi adapter (§B.7.1). Positive short writes are retried; zero progress or errors give up that write; print gives `Nil`. It attempts the text first, then LF even if writing the text gave up, and frees buffers on every returning path. It is absent from required-import metadata because it is internally provided. Another host service with the namespace `i:io/v1` is an import like any other.
+- The platform's `Io` writes UTF-8 text plus LF to file descriptor 1 through the checked Wasi adapter (§B.7.1). Positive short writes are retried; zero progress or errors give up that write; print gives `()`. It attempts the text first, then LF even if writing the text gave up, and frees buffers on every returning path. It is absent from required-import metadata because it is internally provided. Another host service with the namespace `i:io/v1` is an import like any other.
 
 - Because the runtime imports `fd_write` and `proc_exit`, an import (§B.4) with the import module `wasi_snapshot_preview1` and one of these names is a compile error. Such an import is an external function, or a required host-registration field in the entry provider graph (§9.7). Other functions of `wasi_snapshot_preview1` may be imported.
-- Every other required host-registration function and external function is an import as in §B.4, so a host that has them can give them. A module that the host makes before the program, such as one given with `wasmtime run --preload`, cannot use the program's `memory` or `ilang_alloc`, so it can only give functions whose parameters, values, and errors are `Nil`, `Bool`, or `Float`. An import with an `Int`, `String`, or `BitArray` needs a host that defines it with the exports of the instance, such as an embedder, or a module linked in statically. An import with a host reference needs such a host too, because only the host makes host references, and the module then imports `reference_id`.
+- Every other required host-registration function and external function is an import as in §B.4, so a host that has them can give them. A module that the host makes before the program, such as one given with `wasmtime run --preload`, cannot use the program's `memory` or `ilang_alloc`, so it can only give functions whose parameters, values, and errors are `()`, `Bool`, or `Float`. An import with an `Int`, `String`, or `BitArray` needs a host that defines it with the exports of the instance, such as an embedder, or a module linked in statically. An import with a host reference needs such a host too, because only the host makes host references, and the module then imports `reference_id`.
 - A function of an async host service is a blocking import, with the results of a function that is not async (§B.2). Nothing is async, and there are no `ilang_resume:…` and `ilang_result:…` exports.
 - It exports `_start`, which calls `ilang_start` and then the program entry. The program must have a selected entry; if not, it is a compile error. When `_start` returns, the exit code is 0.
 - Tests are not compiled: a test needs a new instance (§10.2), and a command runs one entry.
@@ -3264,11 +3276,11 @@ wraps it. Root APIs expose operations, not the table.
 | Field | Type |
 |---|---|
 | alloc | `(Int) <- (Fail(String)) -> Int` |
-| free | `(Int) <- (Fail(String)) -> Nil` |
-| store | `(Int, Int, BitArray) <- (Fail(String)) -> Nil` |
+| free | `(Int) <- (Fail(String)) -> ()` |
+| store | `(Int, Int, BitArray) <- (Fail(String)) -> ()` |
 | load | `(Int, Int, Int) <- (Fail(String)) -> BitArray` |
 | fd_write | `(Int, Int, Int, Int) <- (Fail(String)) -> Int` |
-| proc_exit | `(Int) <- (Fail(String)) -> Nil` |
+| proc_exit | `(Int) <- (Fail(String)) -> ()` |
 
 
 `Wasi` is an ordinary service type with this checked signature. Its implementation is a checked adapter, not generic Int ABI lowering. Library helpers
@@ -3305,8 +3317,8 @@ then free scratch on every returning path. On errno != 0, raise String
 pointer-bearing bytes are ever passed as an iovec. Other preview-1 functions require separately specified pointer/length/output layouts and raw signatures before an adapter is added.
 
 proc_exit validates its unsigned code, runs context teardown, then calls the
-existing raw `(i32) -> ()` import. Its i signature is Nil because §10.3 has no
-Never result; successful execution never returns an i Nil. If the host returns
+existing raw `(i32) -> ()` import. Its i result type is `()` because §10.3 has no
+Never result; successful execution never returns an i value. If the host returns
 unexpectedly, trap and retire the instance. Invalid code raises `invalid`
 before teardown or exit. There is no fabricated errno/result from a void
 Wasm call. Teardown does not run i finals; explicit process exit is termination,

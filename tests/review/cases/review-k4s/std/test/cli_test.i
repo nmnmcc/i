@@ -95,7 +95,7 @@ test("cli_options", () {
 	assert(
 		cli.parse(verbose(), []) == Ok(False),
 	)
-	Nil
+	()
 })
 
 // A1: validate spelling before duplicate names, then positional placement.
@@ -224,7 +224,7 @@ test("cli_definition_errors", () {
 		) ==
 			Ok(Pair(3, "x")),
 	)
-	Nil
+	()
 })
 
 // A2/A3: token spelling, separator ownership and values independent of readers.
@@ -313,7 +313,7 @@ test("cli_token_ownership", () {
 		cli.parse(cli.argument("number", "", cli.integer), ["--", "-2"]) ==
 			Ok(-2),
 	)
-	Nil
+	()
 })
 
 // A4: repetition precedes arity checking and aliases identify the same leaf.
@@ -351,7 +351,7 @@ test("cli_repetition", () {
 	assert(
 		cli.parse(m, ["-n", "a", "--name=", "-n", "é"]) == Ok(["a", "", "é"]),
 	)
-	Nil
+	()
 })
 
 // A5/A6: allocation is completed before any missing/conversion callback runs.
@@ -462,7 +462,7 @@ test("cli_error_order", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 // A5: optional absence and caller-supplied defaults; ordered positional rest.
@@ -499,7 +499,7 @@ test("cli_allocation", () {
 		) ==
 			Error(cli.ExtraArgument(index = 2, token = "c")),
 	)
-	Nil
+	()
 })
 
 // A7: exactly std/int.parse's signed ASCII decimal grammar, with fixed error.
@@ -529,7 +529,7 @@ test("cli_converters", () {
 	list.each(["", "é", " a b ", "\u{0}"], (value) {
 		assert(cli.text(value) == Ok(value))
 	})
-	Nil
+	()
 })
 
 // A6 and the observation laws: heterogeneous types and every bucket consumed.
@@ -590,7 +590,7 @@ test("cli_composition_laws", () {
 	assert(
 		cli.parse(mixed, ["--jobs=3", "-v"]) == Ok(Triple(3, "prefix", True)),
 	)
-	Nil
+	()
 })
 
 // A8: byte-exact help, all display forms, verbatim content, no callbacks.
@@ -678,7 +678,7 @@ test("cli_help", () {
 		) ==
 			Ok(True),
 	)
-	Nil
+	()
 })
 
 // A2/A4 and §5.4: reverse accumulators preserve large inputs without suffix copies.
@@ -701,7 +701,7 @@ test("cli_long_inputs", () {
 				}),
 			),
 	)
-	Nil
+	()
 })
 // §5.4: check the private decoder by compiling the production source as this
 // test module, with an internal test appended. This checks supplied empty
@@ -723,7 +723,7 @@ test("cli_long_inputs", () {
 //|   sentinel = [Token(9, "unused")]
 //|   assert(decode([[Token(0, "--verbose")], [Token(1, "4")], sentinel]) == Ok(((2, True, Some(4)), [sentinel])))
 //|   assert(parse(p, []) == Ok((2, False, None)))
-//|   Nil
+//|   ()
 //| }
 //| '''
 //| try:

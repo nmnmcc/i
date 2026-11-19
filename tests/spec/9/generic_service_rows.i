@@ -5,14 +5,14 @@
 	i/fail
 )
 
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
 }
 
-annotated = <N>() <- (s : S(N)) -> Nil {
+annotated = <N>() <- (s : S(N)) -> () {
 	S(f, _) = s
 	f()
 }
@@ -22,23 +22,23 @@ run = <A, N>(body : () <- N -> A) { body() }
 // §4.8 rules 3–5 instantiate N with Never; rule 9 removes S(Never).
 test("finite", () {
 	{
-		assert(run(() { use() }) == Nil)
-		assert(run(() { annotated() }) == Nil)
-	} <- (S(() { Nil }, (_ : Never) { Nil }))
+		assert(run(() { use() }) == ())
+		assert(run(() { annotated() }) == ())
+	} <- (S(() { () }, (_ : Never) { () }))
 })
 
 Dependency = (value = Int)
 
 get = () <- (d : Dependency) { d.value }
 
-Inner(N) = (() <- N -> Int, (N) -> Nil)
+Inner(N) = (() <- N -> Int, (N) -> ())
 
 read = <N>() <- (s : Inner(N)) {
 	Inner(f, _) = s
 	f()
 }
 
-Outer(N) = (() <- N -> Int, (N) -> Nil)
+Outer(N) = (() <- N -> Int, (N) -> ())
 
 read_outer = <N>() <- (s : Outer(N)) -> Int {
 	Outer(f, _) = s
@@ -51,8 +51,8 @@ test("nested", () {
 		assert(run(() { read_outer() }) == 7)
 		assert(run(() { read_outer() }) == 11) <- (Dependency(value = 11))
 	} <- (
-		Inner(() { get() }, (_ : Dependency) { Nil }),
-		Outer(() { read() }, (_ : { Dependency | Inner(Dependency) }) { Nil }),
+		Inner(() { get() }, (_ : Dependency) { () }),
+		Outer(() { read() }, (_ : { Dependency | Inner(Dependency) }) { () }),
 		Dependency(value = 7),
 	)
 })
@@ -60,10 +60,10 @@ test("nested", () {
 // Std-2 §7's logging example, including its original error and marker.
 Entry = (message = String)
 
-Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> (), (N) -> ())
 
-make = <E, N>(send : (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
-	Sink(send, (_ : N) { Nil })
+make = <E, N>(send : (Entry) <- (Fail(E), ..N) -> ()) -> Sink(E, N) {
+	Sink(send, (_ : N) { () })
 }
 
 write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
@@ -71,7 +71,7 @@ write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	send(entry)
 }
 
-write_annotated = <E, N>(entry : Entry) <- (sink : Sink(E, N)) -> Nil {
+write_annotated = <E, N>(entry : Entry) <- (sink : Sink(E, N)) -> () {
 	Sink(send, _) = sink
 	send(entry)
 }

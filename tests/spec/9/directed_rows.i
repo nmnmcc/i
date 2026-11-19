@@ -13,8 +13,8 @@ show = (x) { core.inspect(x) }
 
 // Rule A: a need is met by a form that is a subtype of it as a value, and
 // two forms of one service in a row are one entry.
-need_int = () -> Nil { fail.raise(1) }
-need_string = () -> Nil { fail.raise("s") }
+need_int = () -> () { fail.raise(1) }
+need_string = () -> () { fail.raise("s") }
 
 Syn3ServiceFail(E) = Fail(E)
 
@@ -22,9 +22,9 @@ both = () <- (f : Syn3ServiceFail(Int | String)) { need_int() }
 
 either = (n : Int) { n |> (0) { need_int() } & (_) { need_string() } }
 
-Yield(A) = (emit = (A) -> Nil)
+Yield(A) = (emit = (A) -> ())
 
-collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> ()) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
@@ -32,7 +32,7 @@ collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 		} <- (
 			Yield(
 				emit = (x : A) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -42,13 +42,13 @@ collect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {
 emit = <A>(x : A) <- (y : Yield(A)) { y.emit(x) }
 
 test("a wider Fail meets a narrower need", () {
-	r : Result(Nil, Int | String) = fail.catch(() { both() })
+	r : Result((), Int | String) = fail.catch(() { both() })
 	check(show(r), "Error(1)")
 })
 
 test("two needs of Fail are one entry", () {
-	a : Result(Nil, Int | String) = fail.catch(() { either(0) })
-	b : Result(Nil, Int | String) = fail.catch(() { either(1) })
+	a : Result((), Int | String) = fail.catch(() { either(0) })
+	b : Result((), Int | String) = fail.catch(() { either(1) })
 	check(show(a), "Error(1)")
 	check(show(b), "Error(\"s\")")
 })

@@ -16,6 +16,6 @@ main = () {
 	_syn3_0 : S(Dep) = S(() { get() })
 	{
 		bad()
-		Nil
+		()
 	} <- (_syn3_0)
 }

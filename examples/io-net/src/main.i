@@ -20,7 +20,7 @@ main = () {
 			net.write(stream, <<"hello":utf8>>)
 			assert(net.read(stream, 100) == <<"hello":utf8>>)
 			net.close_stream(stream)
-			Nil
+			()
 		})
 	})
 	assert(net.resolve("localhost") != [])

@@ -9,5 +9,5 @@ positive = (n) {
 
 main = () {
 	positive(0)
-	Nil
+	()
 }

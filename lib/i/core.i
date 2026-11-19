@@ -98,7 +98,7 @@ byte_size : (String) -> Int
 
 /// The bytes from `start`, `length` of them.
 @external("ilang:core", "byte_slice")
-byte_slice : (String, Int, Int) -> Result(String, Nil)
+byte_slice : (String, Int, Int) -> Result(String, ())
 
 /// The characters in order.
 @external("ilang:core", "codepoints")
@@ -114,7 +114,7 @@ codepoint_to_int : (UtfCodepoint) -> Int
 
 /// The character with this number.
 @external("ilang:core", "int_to_codepoint")
-int_to_codepoint : (Int) -> Result(UtfCodepoint, Nil)
+int_to_codepoint : (Int) -> Result(UtfCodepoint, ())
 
 /// Each character by its simple uppercase mapping in Unicode.
 @external("ilang:core", "to_upper")
@@ -126,7 +126,7 @@ to_lower : (String) -> String
 
 /// The byte offset of the first `find` at or after byte `from`.
 @external("ilang:core", "index_of")
-index_of : (String, String, Int) -> Result(Int, Nil)
+index_of : (String, String, Int) -> Result(Int, ())
 
 /// The number of bits.
 @external("ilang:core", "bit_size")
@@ -134,7 +134,7 @@ bit_size : (BitArray) -> Int
 
 /// The string, when the bits are whole bytes of correct UTF-8.
 @external("ilang:core", "bit_array_to_string")
-bit_array_to_string : (BitArray) -> Result(String, Nil)
+bit_array_to_string : (BitArray) -> Result(String, ())
 
 /// The bit arrays one after the other.
 @external("ilang:core", "bit_array_concat")

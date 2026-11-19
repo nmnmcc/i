@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.read : () <- (Target) -> 1 | 2\napp/main.probe : () <- (Target) -> (1 | 2, 1 | 2)\napp/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "app/main.read : () <- (Target) -> 1 | 2\napp/main.probe : () <- (Target) -> (1 | 2, 1 | 2)\napp/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

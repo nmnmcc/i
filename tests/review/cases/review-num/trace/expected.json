@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "trace/main.g : (Boundary(A, B), Float) -> Float\ntrace/main.f : (Boundary(A, B), Float) -> Float\ntrace/main.h : (Boundary(A, B), Float) -> Float\ntrace/main.main : () -> Nil\n",
+      "stdout": "trace/main.g : (Boundary(A, B), Float) -> Float\ntrace/main.f : (Boundary(A, B), Float) -> Float\ntrace/main.h : (Boundary(A, B), Float) -> Float\ntrace/main.main : () -> ()\n",
       "stderr": ""
     },
     "test0": {

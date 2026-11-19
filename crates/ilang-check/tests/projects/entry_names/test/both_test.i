@@ -1,3 +1,3 @@
-both = () { Nil }
+both = () { () }
 
-only = () { Nil }
+only = () { () }

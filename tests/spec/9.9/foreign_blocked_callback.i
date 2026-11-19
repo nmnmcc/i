@@ -11,7 +11,7 @@
 )
 
 @host("test:io/v1")
-Out = (print = (String) -> Nil)
+Out = (print = (String) -> ())
 
 print = (text : String) <- (out : Out) { out.print(text) }
 
@@ -21,26 +21,26 @@ without_fail = <A, N>(body : () <- (Fail(Never), ..N) -> A) -> A {
 }
 
 main = () {
-	callback = control.keep((work : (() -> Nil, () -> Nil) -> Nil) {
+	callback = control.keep((work : (() -> (), () -> ()) -> ()) {
 		task.scope((s) {
-			gate : task.Channel(Nil) = task.channel()
-			parked : task.Channel(Nil) = task.channel()
+			gate : task.Channel(()) = task.channel()
+			parked : task.Channel(()) = task.channel()
 			task.go(s, () {
 				task.receive(gate)
 				task.yield()
 				fail.raise("callback")
 			})
-			arm = control.keep((_ : Nil) { task.send(gate, Nil) })
-			park = control.keep((_ : Nil) { task.send(parked, Nil) })
+			arm = control.keep((_ : ()) { task.send(gate, ()) })
+			park = control.keep((_ : ()) { task.send(parked, ()) })
 			work(
-				() { without_fail(() { arm(Nil) }) },
-				() { without_fail(() { park(Nil) }) },
+				() { without_fail(() { arm(()) }) },
+				() { without_fail(() { park(()) }) },
 			)
 		})
 	})
 	assert(
 		task.run(() {
-			work = control.keep((callbacks : (() -> Nil, () -> Nil)) {
+			work = control.keep((callbacks : (() -> (), () -> ())) {
 				(arm, park) = callbacks
 				task.scope((inner) {
 					child = task.go(inner, () {

@@ -24,7 +24,7 @@ test("sha256_0", () {
 		) ==
 			"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
 	)
-	Nil
+	()
 })
 
 test("sha256_1", () {
@@ -34,7 +34,7 @@ test("sha256_1", () {
 		) ==
 			"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
 	)
-	Nil
+	()
 })
 
 test("sha256_2", () {
@@ -48,7 +48,7 @@ test("sha256_2", () {
 		) ==
 			"248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
 	)
-	Nil
+	()
 })
 
 test("sha256_3", () {
@@ -62,7 +62,7 @@ test("sha256_3", () {
 		) ==
 			"cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1",
 	)
-	Nil
+	()
 })
 
 test("sha256_4", () {
@@ -72,7 +72,7 @@ test("sha256_4", () {
 		) ==
 			"6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
 	)
-	Nil
+	()
 })
 
 test("sha256_5", () {
@@ -82,7 +82,7 @@ test("sha256_5", () {
 		) ==
 			"57355ac3303c148f11aef7cb179456b9232cde33a818dfda2c2fcb9325749a6b",
 	)
-	Nil
+	()
 })
 
 test("sha256_6", () {
@@ -96,7 +96,7 @@ test("sha256_6", () {
 		) ==
 			"463eb28e72f82e0a96c0a4cc53690c571281131f672aa229e0d45ae59b598b59",
 	)
-	Nil
+	()
 })
 
 test("sha256_7", () {
@@ -110,7 +110,7 @@ test("sha256_7", () {
 		) ==
 			"da2ae4d6b36748f2a318f23e7ab1dfdf45acdc9d049bd80e59de82a60895f562",
 	)
-	Nil
+	()
 })
 
 test("sha256_8", () {
@@ -124,7 +124,7 @@ test("sha256_8", () {
 		) ==
 			"29af2686fd53374a36b0846694cc342177e428d1647515f078784d69cdb9e488",
 	)
-	Nil
+	()
 })
 
 test("sha256_9", () {
@@ -138,7 +138,7 @@ test("sha256_9", () {
 		) ==
 			"fdeab9acf3710362bd2658cdc9a29e8f9c757fcf9811603a8c447cd1d9151108",
 	)
-	Nil
+	()
 })
 
 test("sha256_10", () {
@@ -152,7 +152,7 @@ test("sha256_10", () {
 		) ==
 			"4bfd2c8b6f1eec7a2afeb48b934ee4b2694182027e6d0fc075074f2fabb31781",
 	)
-	Nil
+	()
 })
 
 test("sha256_11", () {
@@ -166,7 +166,7 @@ test("sha256_11", () {
 		) ==
 			"60780e9451bdc43cf4530ffc95cbb0c4eb24dae2c39f55f334d679e076c08065",
 	)
-	Nil
+	()
 })
 
 test("sha256_12", () {
@@ -180,7 +180,7 @@ test("sha256_12", () {
 		) ==
 			"09373f127d34e61dbbaa8bc4499c87074f2ddb10e1b465f506d7d70a15011979",
 	)
-	Nil
+	()
 })
 
 test("sha256_13", () {
@@ -194,7 +194,7 @@ test("sha256_13", () {
 		) ==
 			"92ca0fa6651ee2f97b884b7246a562fa71250fedefe5ebf270d31c546bfea976",
 	)
-	Nil
+	()
 })
 
 test("sha256_14", () {
@@ -208,7 +208,7 @@ test("sha256_14", () {
 		) ==
 			"471fb943aa23c511f6f72f8d1652d9c880cfa392ad80503120547703e56a2be5",
 	)
-	Nil
+	()
 })
 
 test("sha256_15", () {
@@ -222,7 +222,7 @@ test("sha256_15", () {
 		) ==
 			"5099c6a56203f9687f7d33f4bfdf576d31dc91f6b695ecea38b2770c87631135",
 	)
-	Nil
+	()
 })
 
 test("sha256_16", () {
@@ -236,7 +236,7 @@ test("sha256_16", () {
 		) ==
 			"3f8591112c6bbe5c963965954e293108b7208ed2af893e500d859368c654eabe",
 	)
-	Nil
+	()
 })
 
 test("sha256_17", () {
@@ -250,7 +250,7 @@ test("sha256_17", () {
 		) ==
 			"40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880",
 	)
-	Nil
+	()
 })
 
 test("sha256_million_a", () {
@@ -259,7 +259,7 @@ test("sha256_million_a", () {
 		hex(crypto.sha256(<<message:utf8>>)) ==
 			"cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
 	)
-	Nil
+	()
 })
 
 test("sha512_0", () {
@@ -269,7 +269,7 @@ test("sha512_0", () {
 		) ==
 			"cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e",
 	)
-	Nil
+	()
 })
 
 test("sha512_1", () {
@@ -279,7 +279,7 @@ test("sha512_1", () {
 		) ==
 			"ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
 	)
-	Nil
+	()
 })
 
 test("sha512_2", () {
@@ -293,7 +293,7 @@ test("sha512_2", () {
 		) ==
 			"204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c33596fd15c13b1b07f9aa1d3bea57789ca031ad85c7a71dd70354ec631238ca3445",
 	)
-	Nil
+	()
 })
 
 test("sha512_3", () {
@@ -307,7 +307,7 @@ test("sha512_3", () {
 		) ==
 			"8e959b75dae313da8cf4f72814fc143f8f7779c6eb9f7fa17299aeadb6889018501d289e4900f7e4331b99dec4b5433ac7d329eeb6dd26545e96e55b874be909",
 	)
-	Nil
+	()
 })
 
 test("sha512_4", () {
@@ -317,7 +317,7 @@ test("sha512_4", () {
 		) ==
 			"b8244d028981d693af7b456af8efa4cad63d282e19ff14942c246e50d9351d22704a802a71c3580b6370de4ceb293c324a8423342557d4e5c38438f0e36910ee",
 	)
-	Nil
+	()
 })
 
 test("sha512_5", () {
@@ -327,7 +327,7 @@ test("sha512_5", () {
 		) ==
 			"b7c0b47f42f7202bf7d28d6834bee365fc01ce3f0c8c8df24b4d940406c2e9c230ba88854e946ebcd786c18c748969fdf012362b7c96400604b6058950feaad4",
 	)
-	Nil
+	()
 })
 
 test("sha512_6", () {
@@ -341,7 +341,7 @@ test("sha512_6", () {
 		) ==
 			"6856647f269c2ee3d8128f0b25427659d880641ef343300dd3cd4679168f58d6527fda70b4ebc854e2065e172b7d58c1536992c0810599259ba84a2b40c65414",
 	)
-	Nil
+	()
 })
 
 test("sha512_7", () {
@@ -355,7 +355,7 @@ test("sha512_7", () {
 		) ==
 			"8b12b2f6fe400a51d29656e2b8c42a1bbfe6fcf3e425da430db05d1a2dda14790dee20fa8b22d8762afffe4988a5c98a4430d22a17e41e23d90fa61ab75671a9",
 	)
-	Nil
+	()
 })
 
 test("sha512_8", () {
@@ -369,7 +369,7 @@ test("sha512_8", () {
 		) ==
 			"9dc9c5598e55dc42955695320839788e353f1d7f6ba74df74c80a8a52f463c0697f57f68835d1418f4ce9b6530cd79bd0f4c6f7e13c93feb1218c0b65c2c0561",
 	)
-	Nil
+	()
 })
 
 test("sha512_9", () {
@@ -383,7 +383,7 @@ test("sha512_9", () {
 		) ==
 			"ee4320ebaf3fdb4f2c832b137200c08e235e0fa7bbd0eb1740c7063ba8a0d151da77e003398e1714a955d475b05e3e950b639503b452ec185de4229bc4873949",
 	)
-	Nil
+	()
 })
 
 test("sha512_10", () {
@@ -397,7 +397,7 @@ test("sha512_10", () {
 		) ==
 			"02856cef735f9acec6b9e33f0fbc8f9804d2aa54187f382b8ae842e5d3696c07459aad2a5aed25ea5e117eb1c7ba35da6a7a8adce9e6afe3ad79e9fa42d5bba8",
 	)
-	Nil
+	()
 })
 
 test("sha512_11", () {
@@ -411,7 +411,7 @@ test("sha512_11", () {
 		) ==
 			"a1a111449b198d9b1f538bad7f3fc1022b3a5b1a5e90a0bc860de8512746cbc31599e6c834de3a3235327af0b51ff57bf7acf1974a73014d9c3953812edc7c8d",
 	)
-	Nil
+	()
 })
 
 test("sha512_12", () {
@@ -425,7 +425,7 @@ test("sha512_12", () {
 		) ==
 			"c5fbd731d19d2ae1180f001be72c2c1aaba1d7b094b3748880e24593b8e117a750e11c1bd867cc2f96dace8c8b74abd2d5c4f236be444e77d30d1916174070b9",
 	)
-	Nil
+	()
 })
 
 test("sha512_13", () {
@@ -439,7 +439,7 @@ test("sha512_13", () {
 		) ==
 			"eab89674feaa34e27aebeeff3c0a4d70070bb872d5e9f186cf1dbbdee517b6e35724d629ff025a5b07185e911ada7e3c8acf830aa0e4f71777bd2d44f504f7f0",
 	)
-	Nil
+	()
 })
 
 test("sha512_14", () {
@@ -453,7 +453,7 @@ test("sha512_14", () {
 		) ==
 			"1dffd5e3adb71d45d2245939665521ae001a317a03720a45732ba1900ca3b8351fc5c9b4ca513eba6f80bc7b1d1fdad4abd13491cb824d61b08d8c0e1561b3f7",
 	)
-	Nil
+	()
 })
 
 test("sha512_15", () {
@@ -467,7 +467,7 @@ test("sha512_15", () {
 		) ==
 			"1d9da57fbbdab09afb3506ab2d223d06109d65c1c8ad197f50138f714bc4c3f2fe5787922639c680acad1c651f955990425954ce2cba0c5cc83f2667d878eb0f",
 	)
-	Nil
+	()
 })
 
 test("sha512_16", () {
@@ -481,7 +481,7 @@ test("sha512_16", () {
 		) ==
 			"15025c9d135861ff5a549df0bfd6c398fd126613496d4e97627651e68b7b1f80407f187d7978464f0f78bfeea787600faaebbe991eddb60671cd0ce874f0a744",
 	)
-	Nil
+	()
 })
 
 test("sha512_17", () {
@@ -495,7 +495,7 @@ test("sha512_17", () {
 		) ==
 			"1e7b80bc8edc552c8feeb2780e111477e5bc70465fac1a77b29b35980c3f0ce4a036a6c9462036824bd56801e62af7e9feba5c22ed8a5af877bf7de117dcac6d",
 	)
-	Nil
+	()
 })
 
 test("sha512_million_a", () {
@@ -504,7 +504,7 @@ test("sha512_million_a", () {
 		hex(crypto.sha512(<<message:utf8>>)) ==
 			"e718483d0ce769644e2e42c7bc15b4638e1f98b13b2044285632a803afa973ebde0ff244877ea60a4cb0432ce577c31beb009c5c2c49aa2e4eadb217ad8cc09b",
 	)
-	Nil
+	()
 })
 
 test("hmac_sha256_rfc4231_1", () {
@@ -520,7 +520,7 @@ test("hmac_sha256_rfc4231_1", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha256_rfc4231_2", () {
@@ -538,7 +538,7 @@ test("hmac_sha256_rfc4231_2", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha256_rfc4231_3", () {
@@ -556,7 +556,7 @@ test("hmac_sha256_rfc4231_3", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha256_rfc4231_4", () {
@@ -576,7 +576,7 @@ test("hmac_sha256_rfc4231_4", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha256_rfc4231_5", () {
@@ -592,7 +592,7 @@ test("hmac_sha256_rfc4231_5", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha256_rfc4231_6", () {
@@ -612,7 +612,7 @@ test("hmac_sha256_rfc4231_6", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha256_rfc4231_7", () {
@@ -632,7 +632,7 @@ test("hmac_sha256_rfc4231_7", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha512_rfc4231_1", () {
@@ -648,7 +648,7 @@ test("hmac_sha512_rfc4231_1", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha512_rfc4231_2", () {
@@ -666,7 +666,7 @@ test("hmac_sha512_rfc4231_2", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha512_rfc4231_3", () {
@@ -684,7 +684,7 @@ test("hmac_sha512_rfc4231_3", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha512_rfc4231_4", () {
@@ -704,7 +704,7 @@ test("hmac_sha512_rfc4231_4", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha512_rfc4231_5", () {
@@ -720,7 +720,7 @@ test("hmac_sha512_rfc4231_5", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha512_rfc4231_6", () {
@@ -740,7 +740,7 @@ test("hmac_sha512_rfc4231_6", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hmac_sha512_rfc4231_7", () {
@@ -760,7 +760,7 @@ test("hmac_sha512_rfc4231_7", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hkdf_sha256_rfc5869_1", () {
@@ -803,7 +803,7 @@ test("hkdf_sha256_rfc5869_1", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hkdf_sha256_rfc5869_2", () {
@@ -852,7 +852,7 @@ test("hkdf_sha256_rfc5869_2", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hkdf_sha256_rfc5869_3", () {
@@ -895,7 +895,7 @@ test("hkdf_sha256_rfc5869_3", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hkdf_sha512_rfc5869_1", () {
@@ -938,7 +938,7 @@ test("hkdf_sha512_rfc5869_1", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hkdf_sha512_rfc5869_2", () {
@@ -987,7 +987,7 @@ test("hkdf_sha512_rfc5869_2", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("hkdf_sha512_rfc5869_3", () {
@@ -1030,7 +1030,7 @@ test("hkdf_sha512_rfc5869_3", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("pbkdf2_rfc6070_sha256_1", () {
@@ -1055,7 +1055,7 @@ test("pbkdf2_rfc6070_sha256_1", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("pbkdf2_rfc6070_sha256_2", () {
@@ -1080,7 +1080,7 @@ test("pbkdf2_rfc6070_sha256_2", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("pbkdf2_rfc6070_sha256_3", () {
@@ -1105,7 +1105,7 @@ test("pbkdf2_rfc6070_sha256_3", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("pbkdf2_rfc6070_sha256_4", () {
@@ -1134,7 +1134,7 @@ test("pbkdf2_rfc6070_sha256_4", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("pbkdf2_rfc6070_sha256_5", () {
@@ -1155,7 +1155,7 @@ test("pbkdf2_rfc6070_sha256_5", () {
 		} ==
 			Ok(unhex("89b69d0516f829893c696226650a8687")),
 	)
-	Nil
+	()
 })
 
 test("pbkdf2_rfc6070_sha256_6", () {
@@ -1180,7 +1180,7 @@ test("pbkdf2_rfc6070_sha256_6", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("pbkdf2_rfc6070_sha256_7", () {
@@ -1201,7 +1201,7 @@ test("pbkdf2_rfc6070_sha256_7", () {
 		} ==
 			Ok(unhex("")),
 	)
-	Nil
+	()
 })
 
 test("pbkdf2_rfc6070_sha256_8", () {
@@ -1228,47 +1228,47 @@ test("pbkdf2_rfc6070_sha256_8", () {
 				),
 			),
 	)
-	Nil
+	()
 })
 
 test("equal_empty", () {
 	assert(crypto.constant_time_equal(<<>>, <<>>) == True)
-	Nil
+	()
 })
 
 test("equal_bytes", () {
 	assert(crypto.constant_time_equal(<<1, 2, 255>>, <<1, 2, 255>>) == True)
-	Nil
+	()
 })
 
 test("equal_first", () {
 	assert(crypto.constant_time_equal(<<0, 2>>, <<1, 2>>) == False)
-	Nil
+	()
 })
 
 test("equal_last", () {
 	assert(crypto.constant_time_equal(<<1, 2>>, <<1, 3>>) == False)
-	Nil
+	()
 })
 
 test("equal_length", () {
 	assert(crypto.constant_time_equal(<<1>>, <<1, 0>>) == False)
-	Nil
+	()
 })
 
 test("equal_bits", () {
 	assert(crypto.constant_time_equal(<<5:u3>>, <<5:u3>>) == True)
-	Nil
+	()
 })
 
 test("unequal_bits", () {
 	assert(crypto.constant_time_equal(<<4:u3>>, <<5:u3>>) == False)
-	Nil
+	()
 })
 
 test("unequal_bitlength", () {
 	assert(crypto.constant_time_equal(<<0:u3>>, <<0:u4>>) == False)
-	Nil
+	()
 })
 
 test("hmac_alignment", () {
@@ -1276,7 +1276,7 @@ test("hmac_alignment", () {
 		fail.catch(() { crypto.hmac_sha256(<<1:u1>>, <<>>) }) ==
 			Error(crypto.UnalignedInput),
 	)
-	Nil
+	()
 })
 
 test("hmac512_alignment", () {
@@ -1284,7 +1284,7 @@ test("hmac512_alignment", () {
 		fail.catch(() { crypto.hmac_sha512(<<>>, <<1:u1>>) }) ==
 			Error(crypto.UnalignedInput),
 	)
-	Nil
+	()
 })
 
 test("hkdf_negative", () {
@@ -1292,7 +1292,7 @@ test("hkdf_negative", () {
 		fail.catch(() { crypto.hkdf_sha256(<<>>, <<>>, <<>>, -1) }) ==
 			Error(crypto.InvalidLength),
 	)
-	Nil
+	()
 })
 
 test("hkdf_limit", () {
@@ -1300,7 +1300,7 @@ test("hkdf_limit", () {
 		fail.catch(() { crypto.hkdf_sha256(<<>>, <<>>, <<>>, 8161) }) ==
 			Error(crypto.InvalidLength),
 	)
-	Nil
+	()
 })
 
 test("hkdf512_limit", () {
@@ -1308,7 +1308,7 @@ test("hkdf512_limit", () {
 		fail.catch(() { crypto.hkdf_sha512(<<>>, <<>>, <<>>, 16321) }) ==
 			Error(crypto.InvalidLength),
 	)
-	Nil
+	()
 })
 
 test("hkdf_short_prk", () {
@@ -1316,7 +1316,7 @@ test("hkdf_short_prk", () {
 		fail.catch(() { crypto.hkdf_expand_sha256(<<1>>, <<>>, 1) }) ==
 			Error(crypto.InvalidLength),
 	)
-	Nil
+	()
 })
 
 test("pbkdf_zero_iterations", () {
@@ -1324,7 +1324,7 @@ test("pbkdf_zero_iterations", () {
 		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, 0, 1) }) ==
 			Error(crypto.InvalidIterations),
 	)
-	Nil
+	()
 })
 
 test("pbkdf_negative_iterations", () {
@@ -1332,7 +1332,7 @@ test("pbkdf_negative_iterations", () {
 		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, -1, 1) }) ==
 			Error(crypto.InvalidIterations),
 	)
-	Nil
+	()
 })
 
 test("pbkdf_negative_length", () {
@@ -1340,7 +1340,7 @@ test("pbkdf_negative_length", () {
 		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, 1, -1) }) ==
 			Error(crypto.InvalidLength),
 	)
-	Nil
+	()
 })
 
 test("pbkdf_limit", () {
@@ -1348,7 +1348,7 @@ test("pbkdf_limit", () {
 		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, 1, 137438953441) }) ==
 			Error(crypto.InvalidLength),
 	)
-	Nil
+	()
 })
 
 test("pbkdf_alignment", () {
@@ -1356,14 +1356,14 @@ test("pbkdf_alignment", () {
 		fail.catch(() { crypto.pbkdf2_sha256(<<1:u1>>, <<>>, 1, 1) }) ==
 			Error(crypto.UnalignedInput),
 	)
-	Nil
+	()
 })
 
 test("random_bytes_fake", () {
 	{
 		assert(fail.catch(() { crypto.random_bytes(3) }) == Ok(<<0, 0, 7>>))
 		assert(fail.catch(() { crypto.random_bytes(0) }) == Ok(<<>>))
-		Nil
+		()
 	} <- (process.Entropy(entropy = (n) { request.ready(Ok(<<7:u(n * 8)>>)) }))
 })
 
@@ -1373,7 +1373,7 @@ test("random_bytes_negative", () {
 			fail.catch(() { crypto.random_bytes(-1) }) ==
 				Error(crypto.InvalidLength),
 		)
-		Nil
+		()
 	} <- (
 		process.Entropy(
 			entropy = (_) { panic("must not request negative entropy") },
@@ -1392,7 +1392,7 @@ test("random_bytes_service_error", () {
 					),
 				),
 		)
-		Nil
+		()
 	} <- (
 		process.Entropy(
 			entropy = (_) { request.ready(Error("entropy failed")) },

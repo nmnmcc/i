@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.needs : () <- (Missing) -> Int\napp/main.main : () <- (Fail(Never), Io, Missing, task.Scheduler) -> Nil\n",
+      "stdout": "app/main.needs : () <- (Missing) -> Int\napp/main.main : () <- (Fail(Never), Io, Missing, task.Scheduler) -> ()\n",
       "stderr": ""
     },
     "test0": {

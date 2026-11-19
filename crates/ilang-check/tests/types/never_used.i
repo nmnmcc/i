@@ -22,7 +22,7 @@ no_values = (v : Int) { v |> (_ : Int) { 1 } & (_ : String) { 2 } }
 
 choices = (r) { r |> (Ok(_) | Error(_)) { 1 } & (Ok(1)) { 2 } }
 
-nested = (r : Result(Bool, Nil)) {
+nested = (r : Result(Bool, ())) {
 	r |> (Ok(True)) { 1 } & (Ok(False)) { 2 } & (Error(_)) { 3 } & (Ok(_)) { 4 }
 }
 

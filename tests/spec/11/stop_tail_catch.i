@@ -11,5 +11,5 @@ safe = () { fail.catch(() { 1 + panic("boom") }) }
 
 main = () {
 	safe()
-	Nil
+	()
 }

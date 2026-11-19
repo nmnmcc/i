@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.merge : (T(A), T(B)) -> T(A | B)\napp/main.one : () <- (S(Int)) -> Nil\napp/main.two : () <- (S(String)) -> Nil\napp/main.main : () -> Nil\n",
+      "stdout": "app/main.merge : (T(A), T(B)) -> T(A | B)\napp/main.one : () <- (S(Int)) -> ()\napp/main.two : () <- (S(String)) -> ()\napp/main.main : () -> ()\n",
       "stderr": "src/main.i:19:29: error[E0515]: the service requirements `S(String)` and `S(Int)` have an empty intersection and cannot be satisfied (the type at 19:11 needs it)\n1 error\n"
     },
     "run0": {

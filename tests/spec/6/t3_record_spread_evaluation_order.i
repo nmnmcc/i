@@ -10,5 +10,5 @@ base = () -> (a = Int, b = Int) { panic("base") }
 
 main = () {
 	(..base(), a = panic("field"))
-	Nil
+	()
 }

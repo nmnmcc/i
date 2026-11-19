@@ -7,7 +7,7 @@
 Later = (echo = (String) -> Request(String))
 cycle = (n : Int) <- (later : Later) {
 	{ n == 0 } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) {
 			owner = request.open_owner()
 			{

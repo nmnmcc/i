@@ -4,11 +4,11 @@
 )
 
 test("repeats", () {
-	main.repeat("a", 3, "-") |> ("a-a-a") { Nil } & (other) { panic(other) }
+	main.repeat("a", 3, "-") |> ("a-a-a") { () } & (other) { panic(other) }
 })
 
 test("greets_by_label", () {
 	main.greet(main.Greeting(times = 1, name = "i")) |>
-		("hello i!") { Nil }
+		("hello i!") { () }
 		& (other) { panic(other) }
 })

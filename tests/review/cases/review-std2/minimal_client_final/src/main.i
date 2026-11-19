@@ -1,7 +1,7 @@
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
 }
-run = <N>(body : () <- N -> Nil) { body() }
-example = () { run(() { use() }) <- (S(() { Nil }, (_ : Never) { Nil })) }
+run = <N>(body : () <- N -> ()) { body() }
+example = () { run(() { use() }) <- (S(() { () }, (_ : Never) { () })) }

@@ -1,17 +1,17 @@
-S(N) = (() <- N -> Nil, (N) -> Nil)
+S(N) = (() <- N -> (), (N) -> ())
 use = <N>() <- (s : S(N)) {
 	S(f, _) = s
 	f()
 }
-make = <N>(f : () <- N -> Nil) {
-	result : () <- N -> Nil = () -> Nil {
-		_syn3_0 : S(N) = S(f, (_ : N) { Nil })
+make = <N>(f : () <- N -> ()) {
+	result : () <- N -> () = () -> () {
+		_syn3_0 : S(N) = S(f, (_ : N) { () })
 		use() <- (_syn3_0)
 	}
 	result
 }
 
 main = () {
-	f = make(() { Nil })
+	f = make(() { () })
 	f()
 }

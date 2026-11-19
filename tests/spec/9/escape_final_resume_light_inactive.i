@@ -11,11 +11,11 @@ main = () {
 			resource.ensure(
 				() { control.escape(b, 1) },
 				() {
-					control.suspend(outer, (k) { control.resume(k, Nil) })
+					control.suspend(outer, (k) { control.resume(k, ()) })
 					control.escape(b, 2)
 				},
 			)
 		})
 	})
-	Nil
+	()
 }

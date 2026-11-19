@@ -128,7 +128,7 @@ test("calendar_validation", () {
 		fail.catch(() { calendar.days_in_month(2000, 13) }) ==
 			Error(calendar.BadMonth),
 	)
-	Nil
+	()
 })
 
 // The independent day table uses the same epoch and weekday origin.
@@ -163,7 +163,7 @@ test("calendar_known_days", () {
 		) ==
 			1,
 	)
-	Nil
+	()
 })
 
 // Independent January-based oracle from the review. The production algorithm
@@ -246,7 +246,7 @@ test("calendar_day_laws", () {
 		calendar.days_between(last, first) ==
 			-calendar.days_between(first, last),
 	)
-	Nil
+	()
 })
 
 // floor splitting for negative epoch nanoseconds and extreme offsets.
@@ -300,7 +300,7 @@ test("calendar_civil_boundaries", () {
 			)
 		})
 	})
-	Nil
+	()
 })
 
 // canonical expanded years, fractions, and zero offsets.
@@ -379,6 +379,6 @@ test("calendar_text", () {
 			fail.catch(() { calendar.parse(text) }) == Error(calendar.BadText),
 		)
 	})
-	Nil
+	()
 })
 // Invalid components are rejected in component order without normalization.

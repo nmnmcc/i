@@ -7,9 +7,9 @@
 )
 
 // A call of `resource.ensure` in tail position counts as a tail call.
-guarded = () { resource.ensure(() { 1 + panic("body") }, () { Nil }) }
+guarded = () { resource.ensure(() { 1 + panic("body") }, () { () }) }
 
 main = () {
 	guarded()
-	Nil
+	()
 }

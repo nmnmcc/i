@@ -42,7 +42,7 @@ test("http_messages", () {
 
 test("http_incremental", () {
 	input = <<"POST / HTTP/1.1\r\nContent-Length: 4\r\n\r\ntest":utf8>>
-	go = (rest : BitArray, buffered : BitArray) -> Nil {
+	go = (rest : BitArray, buffered : BitArray) -> () {
 		rest |>
 			(<<x, tail:bytes>>) {
 				http.feed_request(buffered, <<x>>) |>
@@ -139,7 +139,7 @@ test("http_incremental_chunked_response", () {
 	input = <<
 		"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n0\r\nX: y\r\n\r\n":utf8,
 	>>
-	go = (rest : BitArray, buffered : BitArray) -> Nil {
+	go = (rest : BitArray, buffered : BitArray) -> () {
 		rest |>
 			(<<x, tail:bytes>>) {
 				http.feed_response(buffered, <<x>>) |>
@@ -673,7 +673,7 @@ test("http_response_connect", () {
 test("http_limit_head", () {
 	input = <<"GET / HTTP/1.1\r\n\r\n":utf8>>
 	http.Invalid(_) = http.feed_request_limit(<<>>, input, 8)
-	Nil
+	()
 })
 
 test("http_equal_content_lengths", () {
@@ -689,7 +689,7 @@ test("http_bad_chunk_extension", () {
 		"POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n1;=x\r\na\r\n0\r\n\r\n":utf8,
 	>>
 	http.Invalid(_) = http.feed_request(<<>>, input)
-	Nil
+	()
 })
 
 test("http_obs_text_round_trip", () {
@@ -743,7 +743,7 @@ test("http_forbidden_trailer", () {
 		"POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n0\r\nContent-Length: 1\r\n\r\n":utf8,
 	>>
 	http.Invalid(_) = http.feed_request(<<>>, input)
-	Nil
+	()
 })
 
 test("http_content_length_list", () {
@@ -788,7 +788,7 @@ test("http_reject_chunk_size_leading_space", () {
 		"POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n 1\r\na\r\n0\r\n\r\n":utf8,
 	>>
 	http.Invalid(_) = http.feed_request(<<>>, input)
-	Nil
+	()
 })
 
 test("http_reject_chunk_extension_trailing_space", () {
@@ -796,7 +796,7 @@ test("http_reject_chunk_extension_trailing_space", () {
 		"POST / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n1;x \r\na\r\n0\r\n\r\n":utf8,
 	>>
 	http.Invalid(_) = http.feed_request(<<>>, input)
-	Nil
+	()
 })
 
 test("provider_and_route", () {

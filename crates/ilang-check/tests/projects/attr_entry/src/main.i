@@ -5,9 +5,9 @@ main = 1
 
 c = (x) { x }
 
-d = () <- (env : Assert) { Nil }
+d = () <- (env : Assert) { () }
 
-e = { () { Nil } }
+e = { () { () } }
 
 @test
-t = () { Nil }
+t = () { () }

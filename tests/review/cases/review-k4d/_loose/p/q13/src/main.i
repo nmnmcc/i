@@ -1,4 +1,4 @@
-S(N) = (f = () <- N -> Int, m = (N) -> Nil)
+S(N) = (f = () <- N -> Int, m = (N) -> ())
 use = <N>() <- (s : S(N)) { s.f() }
 run = <A, N>(body : () <- N -> A) { body() }
 fw = () { run(() { use() }) }

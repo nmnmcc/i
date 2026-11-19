@@ -27,5 +27,5 @@
                       (= message "typed to_text expects Int or String")
                       (= at value)))))))))})))
 /// Compare two checked arguments using ordinary runtime assertion code.
-(@ macro (: assert_eq (-> [A] (, A A) (<- Nil (, Assert)))))
+(@ macro (: assert_eq (-> [A] (, A A) (<- (,) (, Assert)))))
 (@ macro (= assert_eq (-> (, left right) _ `(assert (== ~left ~right)))))

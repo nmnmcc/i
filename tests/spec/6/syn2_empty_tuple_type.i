@@ -9,5 +9,5 @@ Unit = { () }
 main = () {
 	u : Unit = { () }
 	assert(u == ())
-	Nil
+	()
 }

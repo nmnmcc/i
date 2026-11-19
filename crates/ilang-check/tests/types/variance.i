@@ -1,9 +1,9 @@
 // §4.5 rules 6 and 7: variance from the definitions.
 Box(A) = (value = A)
 
-Sink(A) = (put = (A) -> Nil)
+Sink(A) = (put = (A) -> ())
 
-Cell(A) = (get = () -> A, set = (A) -> Nil)
+Cell(A) = (get = () -> A, set = (A) -> ())
 
 Wrap(A) = (inner = Box(A))
 

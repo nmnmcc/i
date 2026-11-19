@@ -1,13 +1,13 @@
 // §4.5 rules 4 and 6: N goes in and comes out, so it does not change.
 // §4.7: simplification must preserve the principal type of this factory.
-Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> Nil)
+Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> ())
 
 Done = ()
 Next(A, E, N) = (A, Stream(A, E, N))
 Step(A, E, N) = Done | Next(A, E, N)
 
 new = <A, N>() -> Stream(A, Never, N) {
-	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { Nil })
+	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { () })
 }
 
 Bias = (value = Int)
@@ -19,7 +19,7 @@ make = <A, E, N>(pull : () <- (Fail(E), ..N) -> Step(A, E, N)) -> Stream(
 	A,
 	E,
 	N,
-) { Stream(pull, (_ : N) { Nil }) }
+) { Stream(pull, (_ : N) { () }) }
 
 biased = () -> Stream(Int, Never, Bias) {
 	make(() <- (b : Bias) { Next(b.value, new()) })

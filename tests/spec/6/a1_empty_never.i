@@ -7,5 +7,5 @@ _empty : (Never) -> Int = core.never
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

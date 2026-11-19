@@ -31,9 +31,9 @@ fixed = () { elapsed(40) <- (Clock(now = () { 42 })) }
 // type: () -> Int
 
 // §9.4
-Yield(A) = (emit = (A) -> Nil)
+Yield(A) = (emit = (A) -> ())
 
-collect = <A, N>(body : () <- (Yield(A), ..N) -> Nil) -> List(A) {
+collect = <A, N>(body : () <- (Yield(A), ..N) -> ()) -> List(A) {
 	control.boundary((b) {
 		{
 			body()
@@ -41,7 +41,7 @@ collect = <A, N>(body : () <- (Yield(A), ..N) -> Nil) -> List(A) {
 		} <- (
 			Yield(
 				emit = (x : A) {
-					control.suspend(b, (k) { [x, ..control.resume(k, Nil)] })
+					control.suspend(b, (k) { [x, ..control.resume(k, ())] })
 				},
 			),
 		)
@@ -58,11 +58,11 @@ numbers = () {
 // §9.6
 my_assert = (c : Bool) <- (a : Assert) {
 	c |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { a.fail(AssertionFailure(message = "assert")) }
 }
 
-// type: (c: Bool) -> Nil ! Assert
+// type: (c: Bool) -> () ! Assert
 catch = (body) {
 	control.boundary((b) {
 		Ok(body()) <- (

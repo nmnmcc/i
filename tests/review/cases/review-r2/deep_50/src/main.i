@@ -8,12 +8,12 @@
 	rng = i/random
 	(Io) = i/io
 )
-deep = (n : Int) -> Nil {
+deep = (n : Int) -> () {
 	{ n == 0 } |>
 		(True) { task.yield() }
 		& (False) {
 			task.scope((s) {
-				task.go(s, () { Nil })
+				task.go(s, () { () })
 				deep(n - 1)
 			})
 		}

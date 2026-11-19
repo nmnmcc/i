@@ -6,9 +6,9 @@
 
 Handle = Opaque
 
-// An error type that the host can take is a union of `Nil`, `Bool`, `Int`,
+// An error type that the host can take is a union of `()`, `Bool`, `Int`,
 // `Float`, `String`, and `BitArray`.
 @host("test:kv/v1")
 Kv = (get = (String) <- (Fail(Handle)) -> String)
 
-test("t", () { Nil })
+test("t", () { () })

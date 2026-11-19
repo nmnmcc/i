@@ -1,11 +1,11 @@
 // old-syntax-check: E0101
 Dep = (v = Int)
 get = () <- (d: Dep) { d.v }
-Svc(A) = (f = () -> A, m = (A) -> Nil)
+Svc(A) = (f = () -> A, m = (A) -> ())
 ask = <A>() <- (s: Svc(A)) { s.f() }
 Cov(A) = (f = () -> A)
 askc = <A>() <- (s: Cov(A)) { s.f() }
-Cb(N) = (f = () <- N -> Int, m = (N) -> Nil)
+Cb(N) = (f = () <- N -> Int, m = (N) -> ())
 call = <N>(c: Cb(N)) {
 	Cb(f = f, ..) = c
 	f()
@@ -13,7 +13,7 @@ call = <N>(c: Cb(N)) {
 run = <A, N>(body: () <- N -> A) { body() }
 twice = <N>(body: () <- N -> Int) { body() + body() }
 with_int = (body) {
-	_syn3_0: Svc(Int) = Svc(f = () { 1 }, m = (_: Int) { Nil })
+	_syn3_0: Svc(Int) = Svc(f = () { 1 }, m = (_: Int) { () })
 	body() <- (_syn3_0)
 }
 with_dep = (body) { body() <- (Dep(v = 5)) }
@@ -25,7 +25,7 @@ pick = (a, b) { [a, b] }
 h0 = () { run(h0) }
 h1 = () {
 	{
-		x6 = 1 + call(Cb(f = () { ask() }, m = (_) { Nil }))
+		x6 = 1 + call(Cb(f = () { ask() }, m = (_) { () }))
 		run(() { ask() })
 	} <- (Dep(v = 1))
 }
@@ -34,7 +34,7 @@ main = () {
 	p6 = pick(
 		() {
 			with_int(() { run(() { ask() + 1 }) }) +
-				call(Cb(f = () { get() }, m = (_: Dep) { Nil })) +
+				call(Cb(f = () { get() }, m = (_: Dep) { () })) +
 				1
 		},
 		() { with_int(() { ask() }) },
@@ -42,7 +42,7 @@ main = () {
 	_syn3_2: Cov(Int) = Cov(f = () { 2 })
 	{
 		askc() + 1 + askc()
-		Nil
+		()
 	} <- (Dep(v = 1), _syn3_2, Dep(v = 1))
 }
 /* LANE
@@ -58,7 +58,7 @@ main = () {
 // app/main.pick : (a: A, b: A) -> List(A)
 // app/main.h0 : () -> Never
 // app/main.h1 : () -> A ! Svc(B & Int & A)
-// app/main.main : () -> Nil
+// app/main.main : () -> ()
 //
 // BASE
 // app/main.get : () -> Int ! Dep
@@ -73,5 +73,5 @@ main = () {
 // app/main.pick : (a: A, b: A) -> List(A)
 // app/main.h0 : () -> Never
 // app/main.h1 : () -> A ! Svc(B & Int) | Svc(C & A)
-// app/main.main : () -> Nil
+// app/main.main : () -> ()
 */

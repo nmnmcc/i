@@ -9,5 +9,5 @@ pick = (n : Int) -> (Int) -> Int { panic("callee") }
 main = () {
 	n = 1
 	{ pick(n) }(panic("argument"))
-	Nil
+	()
 }

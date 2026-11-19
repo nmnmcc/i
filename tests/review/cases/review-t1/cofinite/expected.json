@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.g : (String) -> 1 | 2 | 3\nprobe/main.h : (Int | String) -> 1 | 2 | 3 | 4\nprobe/main.main : () <- (Assert) -> Nil\n",
+      "stdout": "probe/main.g : (String) -> 1 | 2 | 3\nprobe/main.h : (Int | String) -> 1 | 2 | 3 | 4\nprobe/main.main : () <- (Assert) -> ()\n",
       "stderr": ""
     },
     "test0": {

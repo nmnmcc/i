@@ -12,5 +12,5 @@ take = () <- (bad : Bad) { bad.bits() }
 
 main = () {
 	take()
-	Nil
+	()
 }

@@ -9,13 +9,13 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { Nil }
+		(True) { () }
 		& (False) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
-nothing = () { Nil }
+nothing = () { () }
 
 test("values_and_errors_go_through", () {
 	check(
@@ -39,10 +39,10 @@ test("values_and_errors_go_through", () {
 })
 
 acquire = () {
-	v = resource.acquire(() { 10 }, (r) { Nil }, (r) { r + 1 })
+	v = resource.acquire(() { 10 }, (r) { () }, (r) { r + 1 })
 	check(show(v), "11")
 	e = fail.catch(() {
-		resource.acquire(() { 10 }, (r) { Nil }, (r) { fail.raise(r) })
+		resource.acquire(() { 10 }, (r) { () }, (r) { fail.raise(r) })
 	})
 	check(show(e), "Error(10)")
 	// An error of `open` runs no `release`.

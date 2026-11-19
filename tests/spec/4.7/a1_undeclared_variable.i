@@ -7,5 +7,5 @@ id = (x : Missing) { x }
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

@@ -10,5 +10,5 @@ bad = (s : Shape) { s |> (Circle(..)) { s.r } }
 
 main = () {
 	assert(True)
-	Nil
+	()
 }

@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.spawn : (task.Group(A), task.Channel(B), Int) <- (task.Scheduler) -> Nil\napp/main.receive_all : (task.Channel(A & Int), Int, Int) <- (Assert, Fail(Never), task.Scheduler) -> Int\napp/main.main : () <- (Assert, Fail(Never), Io, task.Scheduler) -> Nil\n",
+      "stdout": "app/main.spawn : (task.Group(A), task.Channel(B), Int) <- (task.Scheduler) -> ()\napp/main.receive_all : (task.Channel(A & Int), Int, Int) <- (Assert, Fail(Never), task.Scheduler) -> Int\napp/main.main : () <- (Assert, Fail(Never), Io, task.Scheduler) -> ()\n",
       "stderr": ""
     },
     "test0": {

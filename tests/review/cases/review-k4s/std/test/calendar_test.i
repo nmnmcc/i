@@ -80,7 +80,7 @@ test("calendar_validation", () {
 	})
 	assert(calendar.days_in_month(2000, -1) == Error(calendar.BadMonth))
 	assert(calendar.days_in_month(2000, 13) == Error(calendar.BadMonth))
-	Nil
+	()
 })
 
 // Review's independent day table follows C1/C3 and C4's weekday origin.
@@ -115,7 +115,7 @@ test("calendar_known_days", () {
 		) ==
 			1,
 	)
-	Nil
+	()
 })
 
 // Independent January-based oracle from the review. The production algorithm
@@ -198,7 +198,7 @@ test("calendar_day_laws", () {
 		calendar.days_between(last, first) ==
 			-calendar.days_between(first, last),
 	)
-	Nil
+	()
 })
 
 // C4: floor splitting for negative epoch nanoseconds and extreme offsets.
@@ -249,7 +249,7 @@ test("calendar_civil_boundaries", () {
 			)
 		})
 	})
-	Nil
+	()
 })
 
 // C5/C6: canonical expanded years, fractions, and zero offsets.
@@ -322,7 +322,7 @@ test("calendar_text", () {
 	list.each(invalid, (text) {
 		assert(calendar.parse(text) == Error(calendar.BadText))
 	})
-	Nil
+	()
 })
 // C1 and spec §2.4 require constructor and constructor-update
 // privacy. Run these negative checks with the exact lane compiler, restoring

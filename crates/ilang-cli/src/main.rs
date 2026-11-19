@@ -125,9 +125,9 @@ enum Command {
         tests: bool,
         #[arg(long, default_value_t = 2)]
         opt: u8,
-        /// Require the selected function to give Nil.
+        /// Require the selected function to give `()`.
         #[arg(long)]
-        require_nil: bool,
+        require_unit: bool,
         handle: String,
     },
     /// Build and run the tests of a package.
@@ -251,9 +251,9 @@ fn main() -> ExitCode {
             offline,
             tests,
             opt,
-            require_nil,
+            require_unit,
             handle,
-        } => cmd_run_collection(&project, opt, offline, tests, &handle, require_nil),
+        } => cmd_run_collection(&project, opt, offline, tests, &handle, require_unit),
         Command::Test {
             project,
             offline,
@@ -522,10 +522,10 @@ fn cmd_run_collection(
     offline: bool,
     tests: bool,
     handle: &str,
-    require_nil: bool,
+    require_unit: bool,
 ) -> anyhow::Result<ExitCode> {
-    let result = if require_nil {
-        ilang_cli::CollectionResult::Nil
+    let result = if require_unit {
+        ilang_cli::CollectionResult::Unit
     } else {
         ilang_cli::CollectionResult::Any
     };

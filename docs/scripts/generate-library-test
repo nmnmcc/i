@@ -14,9 +14,9 @@ spec.loader.exec_module(library)
 
 class LibraryPages(unittest.TestCase):
     def test_multiline_type_is_complete(self):
-        source = '/// A stream.\nStdio = (\n\twrite = (String) <- (Fail(String)) -> Nil,\n)\nnext = 1\n'
+        source = '/// A stream.\nStdio = (\n\twrite = (String) <- (Fail(String)) -> (),\n)\nnext = 1\n'
         self.assertEqual(library.declaration(source, 'Stdio')[1],
-                         'Stdio = (\n\twrite = (String) <- (Fail(String)) -> Nil,\n)')
+                         'Stdio = (\n\twrite = (String) <- (Fail(String)) -> (),\n)')
 
     def test_comments_and_strings_do_not_close_type_definitions(self):
         source = 'Settings = (\n\tdefault = ")", // )\n\ttext = String,\n)\nnext = 1\n'

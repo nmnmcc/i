@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "probe/main.use : (S(A)) <- A -> Nil\nprobe/main.example : () -> Nil\n",
+      "stdout": "probe/main.use : (S(A)) <- A -> ()\nprobe/main.example : () -> ()\n",
       "stderr": ""
     },
     "test0": {

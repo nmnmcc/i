@@ -6,7 +6,7 @@
 // §9.2: environment parameters and environment statements (rule 9).
 Clock = (now = () -> Int)
 
-Log = (write = (String) -> Nil)
+Log = (write = (String) -> ())
 
 elapsed = (start : Int) <- (clock : Clock) { clock.now() - start }
 
