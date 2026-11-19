@@ -112,6 +112,20 @@ rustPlatform.buildRustPackage {
   # whole 1.7 GB toolchain at install time.
   postFixup = ''
     remove-references-to -t ${rustToolchain} "$out/bin/i"
+  '' + lib.optionalString stdenv.hostPlatform.isDarwin ''
+    # nixpkgs' stdenv links libiconv from the store on Darwin. macOS ships
+    # the same ABI as a system library, and a single /nix/store dependency
+    # would make the release archive unusable on a machine that does not have
+    # that path. Rewrite it, then sign the binary again (arm64 needs this).
+    for dep in $(otool -L "$out/bin/i" | awk '/\/nix\/store\/.*\/libiconv[^ ]*\.dylib/ {print $1}'); do
+      install_name_tool -change "$dep" /usr/lib/libiconv.2.dylib "$out/bin/i"
+    done
+    if otool -L "$out/bin/i" | tail -n +2 | grep -q '/nix/store'; then
+      echo "i still links a Nix store library:" >&2
+      otool -L "$out/bin/i" >&2
+      exit 1
+    fi
+    /usr/bin/codesign --force --sign - "$out/bin/i"
   '';
 
   # The nested build of the musl runner inherits this. nixpkgs sets the Cargo
