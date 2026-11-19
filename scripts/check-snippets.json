@@ -445,7 +445,7 @@
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
   "crates/ilang-cli/src/commands/package.rs:826bab0a71cc61a4": {
-    "suffix": "f: () -> Nil\n",
+    "suffix": "f: () -> ()\n",
     "substitutions": [
       [
         "{module}",
@@ -1255,7 +1255,7 @@
     "not_source": true
   },
   "crates/ilang-syntax/tests/lex.rs:ddde3fac3dd9ded9": {
-    "suffix": "\nf = () { Nil }\n",
+    "suffix": "\nf = () { () }\n",
     "reason": "An annotation token tested by the lexer, with its item"
   },
   "crates/ilang-check/tests/expansion_origins.rs:180e6929bae4a332": {
@@ -1960,11 +1960,11 @@
     "reason": "Render the Rust format string with a representative intersection and call; the runtime test checks the full generator."
   },
   "crates/ilang-cli/tests/http.rs:5d670fc264ba0466": {
-    "suffix": "() { Nil }\n",
+    "suffix": "() { () }\n",
     "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
   },
   "crates/ilang-cli/tests/http.rs:df75d3c57754e19a": {
-    "suffix": "() { Nil }\n",
+    "suffix": "() { () }\n",
     "reason": "HTTP binding-name replacement fragment completed with an empty function body; runtime HTTP tests compile and execute the complete sources."
   },
   "crates/ilang-cli/tests/http.rs:ef4fa58b5b0b6bad": {
@@ -1979,7 +1979,7 @@
       ],
       [
         "{source}",
-        "(http = i/http)\n_http_test_body = () { Nil }\n"
+        "(http = i/http)\n_http_test_body = () { () }\n"
       ]
     ],
     "reason": "Render the HTTP wrapper format string with a minimal imported body; runtime HTTP tests exercise the actual assembled programs."
@@ -2063,7 +2063,7 @@
       ],
       [
         "{invariant_head}",
-        "Dep = ()\nS(N) = (() <- N -> Nil, (N) -> Nil)\nT(N) = (() <- N -> Nil)\nAlias(N) = T(N)\n"
+        "Dep = ()\nS(N) = (() <- N -> (), (N) -> ())\nT(N) = (() <- N -> ())\nAlias(N) = T(N)\n"
       ],
       [
         "{row}",
@@ -2123,7 +2123,7 @@
       ],
       [
         "{waiter}",
-        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
+        "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, ())\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n"
       ]
     ],
     "suffix": "fail.raise(\"outer\")\n })\n}\n",
@@ -2147,7 +2147,7 @@
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
   "crates/ilang-cli/tests/multicore.rs:6327b0b7252cc7e5": {
-    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, Nil)\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(Nil) = task.channel()\n",
+    "prefix": "// spec: 9.9\n// expect: stop \"panic: task: join of a cancelled task\"\n// runtime.md R4a: accepting cancellation publishes the outcome before cleanup;\n// two shielded finals joining each other stop instead of creating a wait cycle.\n(\n\ti/task\n\ti/resource\n\ti/fail\n)\n\n// Which of the two tasks stops first is not fixed when the program runs on\n// several workers (spec §9.9: timing may choose which failures precede\n// cancellation), so both run the same code: the stop names the same place.\nwaiter = (inbox, armed) {\n\t() {\n\t\tother = task.receive(inbox)\n\t\tresource.ensure(() {\n\t\t\ttask.send(armed, ())\n\t\t\ttask.sync(task.never())\n\t\t}, () {\n\t\t\tfail.catch(() { task.join(other) })\n\t\t\tNil\n\t\t})\n\t}\n}\n\nmain = () {\n task.scope((s) {\n armed: task.Channel(()) = task.channel()\n",
     "suffix": "fail.raise(\"outer\")\n })\n}\n",
     "reason": "A per-pair stress-generator block inside its actual main/scope header and closing tail."
   },
