@@ -116,7 +116,7 @@ i() {
     cargo build --release --locked -p ilang-cli
     i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
   fi
-  "$i" fmt --check lib std bench examples
+  "$i" fmt --check lib stdlib bench examples
   ./scripts/dev-new-machine "$i"
   for level in 0 2; do
     "$i" test --project stdlib --opt "$level"

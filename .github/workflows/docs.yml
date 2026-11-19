@@ -6,7 +6,7 @@ on:
     paths:
       - 'docs/**'
       - 'lib/**'
-      - 'std/**'
+      - 'stdlib/**'
       - 'docs/spec.md'
       - 'SPEC.md'
       - '.github/workflows/docs.yml'

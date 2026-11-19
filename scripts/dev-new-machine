@@ -177,7 +177,19 @@ inner() {
   step "$work/bin/i" test --project app
 
   echo
-  echo "== a package named std =="
+  echo "== a package named i is reserved =="
+  echo "\$ $work/bin/i new i"
+  if out=$("$work/bin/i" new i 2>&1); then
+    echo "$out"
+    echo "  <-- FAILED (a package named i was made)"
+    status=1
+  else
+    echo "$out"
+    echo "  exit $? (as it should be)"
+  fi
+
+  echo
+  echo "== a package named std is ordinary =="
   step "$work/bin/i" new std
   if [[ -f std/i.toml ]]; then
     echo "\$ cat std/i.toml"
@@ -186,21 +198,27 @@ inner() {
     echo "  std/i.toml is missing  <-- FAILED"
     status=1
   fi
-  step "$work/bin/i" check --offline --project stdlib
-  step "$work/bin/i" run --offline --project stdlib
-  step "$work/bin/i" test --offline --project stdlib
+  step "$work/bin/i" check --offline --project std
+  step "$work/bin/i" run --offline --project std
+  step "$work/bin/i" test --offline --project std
 
   echo
-  echo "== the copied std carries the Unicode licence, as the repository's =="
+  echo "== no project carries a copied library =="
   for path in app/std std/std; do
-    echo "\$ cmp $work/UNICODE-LICENSE $path/UNICODE-LICENSE"
-    if cmp -s -- "$work/UNICODE-LICENSE" "$path/UNICODE-LICENSE"; then
-      echo "  the same file as the repository's"
-    else
-      echo "  missing or different  <-- FAILED"
+    echo "\$ test -d $path"
+    if [[ -e $path ]]; then
+      echo "  a library copy was made  <-- FAILED"
       status=1
+    else
+      echo "  absent, as it should be"
     fi
   done
+  if grep -q '^github.com/nmnmcc/i//stdlib 0.1.0 ' app/i.lock; then
+    echo "  the lock pins the library version"
+  else
+    echo "  the lock does not pin the library  <-- FAILED"
+    status=1
+  fi
 
   echo
   echo "== README's first example, the one it says prints 42 =="
@@ -364,6 +382,7 @@ root_side() {
   cd /
   local run=(env "HOME=$work/home" "XDG_CACHE_HOME=$work/cache"
     "I_CACHE_DIR=$work/cache/i" "TMPDIR=$work/tmp" "PATH=$path"
+    "ILANG_GIT_URLS=github.com/nmnmcc/i=file://$work/library"
     bash "$work/new-machine" --inside "$work" "$root")
   if [[ -n $uid ]]; then
     echo "dev-new-machine: running i as uid $uid, gid $gid"
@@ -590,6 +609,18 @@ for path in /tmp/*; do
   [[ -f $path/Cargo.toml && -d $path/crates/ilang-cli ]] || continue
   add_mask "$path"
 done
+# The standard library is a versioned dependency now, not a copy in the
+# binary or the source tree. Give the sandbox a local package repository with
+# the release tag, as a user's cache would get from the network.
+mkdir -p "$work/library"
+cp -a "$root/stdlib/." "$work/library/"
+rm -rf "$work/library/build" "$work/library/bench/build"
+git -C "$work/library" init -q
+git -C "$work/library" -c user.email=i@example.invalid -c user.name=i add -A
+git -C "$work/library" -c user.email=i@example.invalid -c user.name=i \
+  commit -q -m "library 0.1.0"
+git -C "$work/library" tag stdlib-v0.1.0
+
 printf '%s\n' "${masks[@]}" | sort -u > "$work/masked"
 
 # Only the least set is mounted: a path under another one is inside the tmpfs
