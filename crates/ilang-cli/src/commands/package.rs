@@ -2290,7 +2290,18 @@ mod value_type_interfaces {
     fn interface(source: &str) -> Interface {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
-        fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../stdlib")
+            .canonicalize()
+            .unwrap();
+        fs::write(
+            dir.path().join("i.toml"),
+            format!(
+                "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+                library.to_str().unwrap()
+            ),
+        )
+        .unwrap();
         fs::write(dir.path().join("src/api.i"), source).unwrap();
         interface_of(dir.path(), false).unwrap().unwrap()
     }

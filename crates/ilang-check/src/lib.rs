@@ -204,17 +204,11 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             }
         }
     }
-    // A test build needs the library's test collection module parsed so that
-    // its macros can install the collection entries.
-    if graph.packages[root]
-        .modules
-        .iter()
-        .any(|m| m.kind == ModuleKind::Test)
-    {
-        for package in 0..graph.packages.len() {
-            if let Some(&i) = index.get(&(package, "i/test")) {
-                queue.push_back((package, i));
-            }
+    // The library's test collection module is always parsed: test builds need
+    // its macros, and the driver expands them before resolution.
+    for package in 0..graph.packages.len() {
+        if let Some(&i) = index.get(&(package, "i/test")) {
+            queue.push_back((package, i));
         }
     }
     let pkg = &graph.packages[root];

@@ -109,11 +109,22 @@
         in {
           i-runs = pkgs.runCommand "i-runs-${version}" {
             meta.description = "i reports its version and runs a new package";
+            nativeBuildInputs = [ pkgs.git ];
           } ''
             set -eu
             export HOME="$TMPDIR/home"
             mkdir -p "$HOME"
             cd "$TMPDIR"
+
+            # A local package repository with the library tag, as a user's
+            # cache would get from the network.
+            cp -a ${../stdlib} "$TMPDIR/library"
+            chmod -R u+w "$TMPDIR/library"
+            git -C "$TMPDIR/library" init -q
+            git -C "$TMPDIR/library" -c user.email=i@example.invalid -c user.name=i add -A
+            git -C "$TMPDIR/library" -c user.email=i@example.invalid -c user.name=i commit -qm "library ${version}"
+            git -C "$TMPDIR/library" tag stdlib-v${version}
+            export ILANG_GIT_URLS="github.com/nmnmcc/i=file://$TMPDIR/library"
 
             test "$(${i}/bin/i --version)" = "i ${version}"
 

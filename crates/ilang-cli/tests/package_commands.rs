@@ -512,7 +512,7 @@ fn new_package_named_std_is_an_ordinary_package() {
     );
     let test = read(&dir.join("test/main_test.i"));
     assert!(test.contains("i/test"), "{test}");
-    assert!(test.contains("i/main"), "{test}");
+    assert!(test.contains("std/main"), "{test}");
 
     let project = dir.display().to_string();
     w.ok(&["check", "--project", &project]);

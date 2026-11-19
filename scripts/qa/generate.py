@@ -205,7 +205,9 @@ def save_failure(args, case, reason, observation, project):
     source = '\n'.join(minimal['declarations']) + '\n'
     path = CORPUS / 'generated-failures' / (reason + '-' + sha(source.encode())[:12])
     path.joinpath('src').mkdir(parents=True, exist_ok=True)
-    path.joinpath('i.toml').write_text('name = "generated"\n')
+    path.joinpath('i.toml').write_text(
+        f'name = "generated"\n[dependencies]\ni = {{ path = "{ROOT / "stdlib"}" }}\n'
+    )
     path.joinpath('src/main.i').write_text(source)
     dump(path / 'requirement.json', {'origin': case['name'], 'reason': reason, 'sources': RULES, 'model': minimal.get('model'), 'accept': minimal['accept'], 'minimality': label})
     dump(path / 'actual.json', observation)
@@ -237,7 +239,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='i-generation-', dir=work) as temp:
         project = Path(temp)
         project.joinpath('src').mkdir()
-        project.joinpath('i.toml').write_text('name = "generated"\n')
+        project.joinpath('i.toml').write_text(
+            f'name = "generated"\n[dependencies]\ni = {{ path = "{ROOT / "stdlib"}" }}\n'
+        )
         # Keep T1's original sequential random stream as well as independent new seeds.
         t1_rng = random.Random(args.seed)
         for i in range(count):
