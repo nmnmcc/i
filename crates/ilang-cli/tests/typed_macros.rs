@@ -155,7 +155,7 @@ fn typed_macro_signature_query_is_reflexive() {
 fn typed_macro_members_preserve_finite_scalar_order() {
     let m = declared(
         "m (-> (, Int) Int)",
-        "(-> (, value) _ (|> ((. syntax members) `(| 2 10 (,))) (-> (, [a b c]) _ (|> (== ((. syntax show) a) \"10\") (& (-> (, True) _ value) (-> (, False) _ ((. fail raise) ((. syntax SyntaxError) (= message \"wrong member order\") (= at value)))))))))",
+        "(-> (, value) _ (|> ((. syntax members) `(| 2 10 True)) (-> (, [a b c]) _ (|> (== ((. syntax show) a) \"10\") (& (-> (, True) _ value) (-> (, False) _ ((. fail raise) ((. syntax SyntaxError) (= message \"wrong member order\") (= at value)))))))))",
     );
     checked(&m, "(m = app/macros)\nmain = () { m.m(1) }").unwrap();
 }

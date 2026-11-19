@@ -85,7 +85,7 @@ def alias_case(seed):
     n = rng.randint(3, 20)
     declarations = ["value : Int = 1", 'A0 = value']
     declarations += [f'A{i} = A{i-1}' for i in range(1, n)]
-    declarations += [f'pass = (x : A{n-1}) -> Int {{ x }}', 'main = () { assert(pass(2) == 2) () }']
+    declarations += [f'pass = (x : A{n-1}) -> Int {{ x }}', 'main = () { assert(pass(2) == 2)\n() }']
     return {'name': f't2-alias-{seed}', 'declarations': declarations, 'accept': True,
             'annotation': (f'pass = (x : A{n-1}) -> Int {{ x }}', 'pass = (x) { x }')}
 

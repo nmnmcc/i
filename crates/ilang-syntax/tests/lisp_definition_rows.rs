@@ -74,19 +74,26 @@ fn every_builtin_definition_has_its_row() {
     let like = root("x");
     // The frozen oracle still carries the removed prelude row; compare the
     // rows that the language still defines.
-    let present = |names: &'static [&'static str], expected: &[(&str, &str)]| -> Vec<&'static str> {
-        names
-            .iter()
-            .copied()
-            .filter(|n| expected.iter().any(|(name, _)| name == n))
-            .collect()
-    };
-    assert_eq!(present(builtin_definition_names(true), &NEW), NEW.map(|(name, _)| name).to_vec());
+    let present =
+        |names: &'static [&'static str], expected: &[(&str, &str)]| -> Vec<&'static str> {
+            names
+                .iter()
+                .copied()
+                .filter(|n| expected.iter().any(|(name, _)| name == n))
+                .collect()
+        };
+    assert_eq!(
+        present(builtin_definition_names(true), &NEW),
+        NEW.map(|(name, _)| name).to_vec()
+    );
     for (name, row) in NEW {
         let answer = builtin_definition_rows(name, like.scope(), like.span(), 3, true).unwrap();
         assert_eq!(answer.show(), row, "{name}");
     }
-    assert_eq!(present(builtin_definition_names(false), &OLD), OLD.map(|(name, _)| name).to_vec());
+    assert_eq!(
+        present(builtin_definition_names(false), &OLD),
+        OLD.map(|(name, _)| name).to_vec()
+    );
     for (name, row) in OLD {
         let answer = builtin_definition_rows(name, like.scope(), like.span(), 3, false).unwrap();
         assert_eq!(answer.show(), row, "{name}");

@@ -819,10 +819,7 @@ fn an_error_alias_uses_an_ordinary_value_parameter_after_e3() {
     let value = row.replace("Row(N) = () <- N -> ()", "Row(N) = () <- (Fail(N)) -> ()");
     let shown = types(&value);
     assert!(shown["app/main.bad"].contains("Fail("), "{shown:?}");
-    assert!(
-        shown["app/main.bad"].contains("Svc(Int | ())"),
-        "{shown:?}"
-    );
+    assert!(shown["app/main.bad"].contains("Svc(Int | ())"), "{shown:?}");
     let (graph, _, diags) = common::check_files(&[("src/main.i", row)]);
     assert!(
         diags.iter().any(|d| d.code == "E0515"),

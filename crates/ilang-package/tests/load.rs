@@ -254,10 +254,7 @@ fn dependency_defaults_cannot_replace_the_roots_explicit_entry() {
                 "dep/i.toml",
                 "name=\"dep\"\n[entries]\nnative=\"main.other\"\n[providers.\"dep/main.S\"]\njs=\"dep/main.js\"\nhost=\"dep/main.host\"\n",
             ),
-            (
-                "dep/src/main.i",
-                "(value)\nvalue = 42\nother = () { () }\n",
-            ),
+            ("dep/src/main.i", "(value)\nvalue = 42\nother = () { () }\n"),
         ],
     );
     let (graph, diagnostics) = load(&dir.path().join("app"));

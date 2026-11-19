@@ -51,11 +51,11 @@ fn macro_argument_type_notes_use_written_source() {
     );
     assert!(stderr.contains("error[E0515]"), "{stderr}");
     assert!(
-        stderr.contains("src/main.i:16:61: error[E0501]"),
+        stderr.contains("src/main.i:16:60: error[E0501]"),
         "{stderr}"
     );
     assert!(
-        stderr.contains("(the type at src/main.i:16:55 needs it)"),
+        stderr.contains("(the type at src/main.i:16:54 needs it)"),
         "{stderr}"
     );
     assert!(!stderr.contains("18:88"), "{stderr}");

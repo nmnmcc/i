@@ -508,7 +508,8 @@ fn alias_formals_and_written_holes_are_instantiated_per_use() {
     good(
         "port : Int = 1\nT = { (port, _) }\nf = () {\n\ta : T = (1, \"s\")\n\tb : T = (2, 3)\n\t(a, b)\n}",
     );
-    let prefix = "Cell(A) = (get = () -> A, set = (A) -> ())\nport : Int = 1\nT(A) = Cell(A) | Cell(port)\n";
+    let prefix =
+        "Cell(A) = (get = () -> A, set = (A) -> ())\nport : Int = 1\nT(A) = Cell(A) | Cell(port)\n";
     // Invariant same-head union still requires equal arguments after substitution.
     bad(
         &[prefix, "f = (x : T(String)) {x}"].concat(),

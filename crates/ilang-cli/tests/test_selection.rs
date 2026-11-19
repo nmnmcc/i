@@ -109,7 +109,7 @@ fn sharded() -> (tempfile::TempDir, std::path::PathBuf) {
     let mut test = String::from("(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n");
     for name in ["a", "b", "c", "d", "e"] {
         test.push_str(&format!(
-            "\ntest(\"{name}\", () {{ lib.twice(2) |> (4) {{ Nil }} & (_) {{ panic(\"no\") }} }})\n"
+            "\ntest(\"{name}\", () {{ lib.twice(2) |> (4) {{ () }} & (_) {{ panic(\"no\") }} }})\n"
         ));
     }
     let dir = package(&[
