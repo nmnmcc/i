@@ -361,7 +361,7 @@ A top-level value name bound by a binding (§2.5) gives warning W0504 when it is
 A name is used when it is referenced in its module, exported from a module outside `test/`, an entry of its package (§10.2), a test, or named in `[wasm].exports`. References inside any binding, including unused bindings, function bodies, patterns, and written types, count. Merely importing a name does not use it. In test modules, an export is used when referenced by a module of the same package. Each name in a binding is checked separately; using one name does not make its other names used. A name starting with `_` suppresses its own warning.
 
 
-This warning does not apply to type definitions, names, service definitions, constructors, or declarations (`@external` and `@js`). References in their written types count as uses. For an unused function in a test module, whose parameter group is `()` and whose result type is `()`, the warning adds: "did you forget to register this function with `test`?" The hint is not given outside test modules.
+This warning does not apply to type definitions, names, service definitions, constructors, or declarations (`@external` and `@js`). References in their written types count as uses. For an unused function in a test module, whose parameter is of type `()` and whose result type is `()`, the warning adds: "did you forget to register this function with `test`?" The hint is not given outside test modules.
 
 
 ### 2.5 Top-level bindings
@@ -440,7 +440,7 @@ exports = ["app/math.add"]                     # host exports (§10.2): module p
 The optional `[entries]` table maps entry names (ordinary `name`s) to
 strings `"module.path.function"`. The module path is relative to this package;
 its components name directories below `src` or `test`, followed by the function. Targets must be top-level functions of this package;
-they need not be exported. Each has the parameter group `()`. All declarations are checked even when unselected.
+they need not be exported. Each has one parameter of type `()`. All declarations are checked even when unselected.
 Names are unique as TOML keys; several names may select the same function.
 `main` in `src/main.i` is the default entry, if present; `[entries]` does
 not replace it. A package without that function has no default entry.
@@ -1026,6 +1026,19 @@ The type of `[e1, …, en]` is `List(T)`, where every part has the type `T`. `T`
 
 `f(…)` calls the function `f` with the data in the brackets. Every function is called in this way, whatever expression gives it. The data must have a shape that `f` takes (§4.6). There are no labels outside data and no default parameters: every key is given exactly once, by the data. `f()` passes `()`, and `f(x)` passes the one-position data `(x)`.
 
+`f ()` is the same call as `f()`: spaces do not separate a callee from its call, and a `(` that follows an expression on the same line continues that expression. Only a new line starts a new statement. A unit value that is a statement of its own therefore begins a new line:
+
+```i
+zero = () -> Int { 8 }
+
+main = () {
+	zero
+	()
+}
+```
+
+Writing `main = () { zero () }` is a call of `zero`, not two statements. The same applies after any expression: `assert(check()) ()` is a call of the result of `assert`, whose type is `()`, so it is a compile error; write the unit value on a new line.
+
 ### 6.7 Constructors and keys
 
 `C(…)` makes a value of the labelled type `C` (§4.3). It is a call of the constructor with the data in the brackets, which must be in the data type of `C`. `C` alone is the value of a labelled type whose data is `()`; `C()` is a compile error. `C(..v, label = e)` is an ordinary call whose data has a spread.
@@ -1283,11 +1296,11 @@ A bit array pattern matches the segments in order from the start. It matches onl
 
 ## 9. Effects
 
-i has no special effect definitions. Effects are made from normal things: functions with no parameters (§9.1), services (§9.2), errors as the service `Fail` (§9.3), and the control operations of `i/control` (§9.4). There is no error channel, no implicit capability and no layer concept.
+i has no special effect definitions. Effects are made from normal things: functions that take `()` (§9.1), services (§9.2), errors as the service `Fail` (§9.3), and the control operations of `i/control` (§9.4). There is no error channel, no implicit capability and no layer concept.
 
 ### 9.1 Computations
 
-A function with no parameters, `() <- N -> A`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS, which is `() <- (..R, Fail(E)) -> A` in i. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
+A function whose parameter is `()`, `() <- N -> A`, is a **computation** that has not been done yet. It is the same idea as an `Effect<A, E, R>` value in Effect-TS, which is `() <- (..R, Fail(E)) -> A` in i. It may be stored, given to other functions, and put together with other computations. Calling it does it. Retrying, time limits, and running at the same time are normal functions:
 
 ```i
 retry = <A, E, N>(times : Int, body : () <- (..N, Fail(E)) -> A) -> A {
@@ -2466,8 +2479,8 @@ The generated artifact and loader metadata are specified in §B.6.1. Host export
 
 These functions are **entry points**:
 
-- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. Its parameter group is `()`, and its result is unused. The binding may be an alias or an expression that computes a function value; its inferred function type determines the parameter group. After ordinary module initialization, the entry invokes that initialized value through the ordinary call rules (§6.6). A missing default means no program entry.
-- **Tests**: the entries of the collection named by `[test] collection` in `i.toml` (§14.5). `std/test` provides ordinary imported item macros `test`, `skip`, `only`, `fails`, `suite`, and `each`, which contribute private functions and display metadata to `std/test.tests`. For example, `(testlib = (test) = std/test)` makes `test("addition", () { assert(1 + 1 == 2) })` available. These names have no special language meaning. Each selected function has the parameter group `()` and gives `()` or `Never`. A test **passes** when it gives `()`. It **fails** on a stop (§11.7) or an error that reaches the platform's `Fail`. `fails` reverses that expectation; `skip` reports an entry without running it, and `only` selects focused entries. `suite` prefixes names and provides the services written in it to its test bodies; `each` contributes one test for each written case. The runner compiles the collection once and runs each selected test in a fresh started instance (§B.1). With no configured collection, no tests run.
+- **The program entry**: the selected top-level function of the compiled package (§2.6). The default is `main` in `src/main.i`; the name `main` in any other module is ordinary. With `i run NAME` or `i build NAME`, use that `[entries]` target instead. Its parameter is of type `()`, and its result is unused. The binding may be an alias or an expression that computes a function value; its inferred function type determines the parameter group. After ordinary module initialization, the entry invokes that initialized value through the ordinary call rules (§6.6). A missing default means no program entry.
+- **Tests**: the entries of the collection named by `[test] collection` in `i.toml` (§14.5). `std/test` provides ordinary imported item macros `test`, `skip`, `only`, `fails`, `suite`, and `each`, which contribute private functions and display metadata to `std/test.tests`. For example, `(testlib = (test) = std/test)` makes `test("addition", () { assert(1 + 1 == 2) })` available. These names have no special language meaning. Each selected function has one parameter of type `()` and gives `()` or `Never`. A test **passes** when it gives `()`. It **fails** on a stop (§11.7) or an error that reaches the platform's `Fail`. `fails` reverses that expectation; `skip` reports an entry without running it, and `only` selects focused entries. `suite` prefixes names and provides the services written in it to its test bodies; `each` contributes one test for each written case. The runner compiles the collection once and runs each selected test in a fresh started instance (§B.1). With no configured collection, no tests run.
 - **Host exports**: the functions named in `[wasm].exports` (§2.6) of the package that is compiled. The `[wasm]` of other packages is not used. They must be in the exports of their module. A host export has one shape, its parameter data has positions only, and its parameters and value must be types that the host can take (§10.3).
 
 **Platform services.** At an entry the platform of the target provides its services (§9.7): the host services of its table, `Assert`, `Scope`, `Root`, `Owner`, `Await`, `Runner`, `Scheduler`, `Target`, and a top-level `Fail`. For the program entry and tests, that `Fail` takes any error, and an error that reaches it stops the program or fails the test. For a host export, it takes only an error type that the host can take, and the error is given to the host (Appendix B).
@@ -2967,7 +2980,7 @@ Items = (
 Diagnostics = (note = (String) -> ())
 ```
 
-`add(collection, target, data, at)` records that the function `target`, a binding of this module whose parameter group is `()`, belongs to the **collection** named by the exported binding `collection`, with string metadata `data` (unique keys) and source position `at`. The target is checked by its inferred function type; aliases and computed function values are allowed. Selecting a target invokes its initialized value by the ordinary call rules (§6.6). A pair of collection and target may be added once. `expose` adds a name of the module to its exports. Requests of a run take effect only when the run succeeds. A tool reads a collection after checking and chooses which targets become entries (§10.2); importing a module runs none of them. `Diagnostics.note` adds a compiler note, given once for a successful run.
+`add(collection, target, data, at)` records that the function `target`, a binding of this module whose parameter is of type `()`, belongs to the **collection** named by the exported binding `collection`, with string metadata `data` (unique keys) and source position `at`. The target is checked by its inferred function type; aliases and computed function values are allowed. Selecting a target invokes its initialized value by the ordinary call rules (§6.6). A pair of collection and target may be added once. `expose` adds a name of the module to its exports. Requests of a run take effect only when the run succeeds. A tool reads a collection after checking and chooses which targets become entries (§10.2); importing a module runs none of them. `Diagnostics.note` adds a compiler note, given once for a successful run.
 
 ### 14.6 Names in expanded code
 
