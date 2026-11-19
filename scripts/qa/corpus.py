@@ -366,6 +366,9 @@ def run_corpus(args):
                 for k, v in outcome.items()
                 if k in ('check',) or (k[-1].isdigit() and int(k[-1]) in chosen)}
     def completed_phases_match(before, after):
+        chosen = levels()
+        keep = lambda outcome: {k: v for k, v in outcome.items() if k == 'check' or (k[-1].isdigit() and int(k[-1]) in chosen)}
+        before, after = keep(before), keep(after)
         checker_censored = before['check']['exit'] == 'timeout' or after['check']['exit'] == 'timeout'
         for phase in before.keys() | after.keys():
             left, right = before.get(phase), after.get(phase)
