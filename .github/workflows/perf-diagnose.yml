@@ -12,6 +12,7 @@ on:
     paths:
       - .github/workflows/perf-diagnose.yml
       - bench/test/diag_test.i
+      - bench/test/diag2_test.i
       - diag/**
 
 permissions:
@@ -20,6 +21,7 @@ permissions:
 env:
   # The run that built i-release-current; override when re-running.
   BASELINE_RUN: "44503007673"
+  SPEC_RUN: "44524349990"
   RAYON_NUM_THREADS: 1
   REPEATS: "3"
 
@@ -178,6 +180,47 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: diag-service-env-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+
+  three:
+    name: three slowest, and their costs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-spec
+          path: target/release
+          run-id: ${{ env.SPEC_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of i
+        run: |
+          chmod +x target/release/i
+          xargs nix-store --realise < target/release/i.nix-paths > /dev/null
+          target/release/i --version
+      - name: Run each filter three times
+        run: |
+          mkdir -p out
+          { uname -a; nproc; lscpu | head -20; free -h; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+          for f in list_merge dict_insert equality diag_; do
+            for r in 1 2 3; do
+              /usr/bin/time -v -o "out/time-$f-$r.txt" \
+                target/release/i test --project bench --opt 2 --time "$f" \
+                > "out/run-$f-$r.log" 2> "out/stderr-$f-$r.log"
+              grep -hE "^pass bench/(bench|diag2)_test" "out/run-$f-$r.log"
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diag-three-${{ github.run_id }}
           path: out/
           if-no-files-found: error
           retention-days: 14
