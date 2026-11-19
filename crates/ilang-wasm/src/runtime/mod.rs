@@ -32,7 +32,8 @@
 //!
 //! Every value is an `eqref`. Apart from `()`, Int and host references, it is a
 //! struct of a subtype of `$val`, whose field 0 is the value tag: a `$cons`
-//! for a list that is not empty, else an `$obj`:
+//! for a list that is not empty, a `$plain` for an ordinary value, else the
+//! private cell kinds below:
 //!
 //! | Tag | Value | Representation |
 //! |---|---|---|
@@ -61,9 +62,13 @@
 //! object where an `$obj` with a `$values` array would be two big ones:
 //! programs make many of them.
 //!
-//! `$obj` is not final, so the code generator may declare subtypes of it, for
-//! example closures with a typed function reference of their own after the
-//! eight `$obj` fields. Functions, boundaries, continuations and host
+//! //! Ordinary values are `$plain`, a **final** subtype of `$obj`: a type test or
+//! cast against a final type is an exact type-index comparison in Wasmtime,
+//! while one against the non-final `$val` or `$obj` calls the engine's
+//! `is_subtype`. Closures, requests, boundaries and continuations stay
+//! `$obj` subtypes and keep the general path. `$obj` is not final, so the code
+//! generator may declare subtypes of it, for example closures with a typed
+//! function reference of their own after the eight `$obj` fields. Functions, boundaries, continuations and host
 //! references compare by identity (`ref.eq`; host references by their
 //! `reference_id`). Their hash depends only on the tag.
 //!

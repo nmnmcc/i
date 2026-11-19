@@ -100,8 +100,15 @@ const CORE: &str = r#"
 (func $list_cons (param $head eqref) (param $tail eqref) (result eqref)
   (struct.new $cons (i32.const 6) (local.get $head) (local.get $tail)))
 (func $field (param $v eqref) (param $index i32) (result eqref)
+  ;; An ordinary value, or a closure whose capture was inlined by the numeric
+  ;; inliner: both keep their parts in field 5. The test on the final type is
+  ;; an exact type-index check; the fallback was already a subtype check.
+  (if (ref.test (ref $plain) (local.get $v))
+    (then (return (array.get $values
+      (ref.as_non_null (struct.get $plain 5 (ref.cast (ref $plain) (local.get $v))))
+      (local.get $index)))))
   (array.get $values
-    (ref.as_non_null (struct.get $plain 5 (ref.cast (ref $plain) (local.get $v))))
+    (ref.as_non_null (struct.get $obj 5 (ref.cast (ref $obj) (local.get $v))))
     (local.get $index)))
 (func $record (param $ctor i32) (param $type i64) (param $fields (ref $values)) (result eqref)
   (struct.new $plain (i32.const 5) (local.get $ctor) (local.get $type) (f64.const 0)
@@ -238,12 +245,14 @@ const CORE: &str = r#"
         (local.set $a (local.get $ha))
         (local.set $b (local.get $hb))
         (br $again)))
+      ;; Equal tags mean the same representation, so one test decides both.
       (if (ref.test (ref $plain) (local.get $a))
-        (then (local.set $oa (ref.cast (ref $plain) (local.get $a))))
-        (else (local.set $oa (ref.cast (ref $obj) (local.get $a)))))
-      (if (ref.test (ref $plain) (local.get $b))
-        (then (local.set $ob (ref.cast (ref $plain) (local.get $b))))
-        (else (local.set $ob (ref.cast (ref $obj) (local.get $b)))))
+        (then
+          (local.set $oa (ref.cast (ref $plain) (local.get $a)))
+          (local.set $ob (ref.cast (ref $plain) (local.get $b))))
+        (else
+          (local.set $oa (ref.cast (ref $obj) (local.get $a)))
+          (local.set $ob (ref.cast (ref $obj) (local.get $b)))))
       (if (i32.eq (local.get $ka) (i32.const 2)) (then
         (local.set $c (i32.sub
           (f64.gt (struct.get $obj 3 (local.get $oa)) (struct.get $obj 3 (local.get $ob)))
