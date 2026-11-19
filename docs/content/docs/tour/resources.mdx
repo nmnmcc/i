@@ -12,11 +12,13 @@ Release acquired values after use, including when a computation raises an error.
 )
 
 main = () <- (io : Io) {
-	resource.acquire(
-		() { "handle" },
-		(name) { io.print("release " <> name) },
-		(name) { io.print("use " <> name) },
-	)
+	resource.scoped(() {
+		name = resource.acquire(
+			() { "handle" },
+			(name) { io.print("release " <> name) },
+		)
+		io.print("use " <> name)
+	})
 }
 ```
 
@@ -25,7 +27,10 @@ use handle
 release handle
 ```
 
-Strings stand in for handles so these examples need no files. `resource.scoped` and the resource `Scope` type are not available yet.
+Strings stand in for handles so these examples need no files. `resource.scoped`
+gives its body a `Scope`, and every `resource.acquire` in that body attaches a
+release to it. The releases run when the body ends, in reverse order, also by
+an error or a cancellation.
 
 ## A returned value
 
@@ -37,11 +42,12 @@ Strings stand in for handles so these examples need no files. `resource.scoped` 
 )
 
 main = () <- (io : Io) {
-	answer = resource.acquire(
-		() { 40 },
-		(_) { io.print("released") },
-		(n) { n + 2 },
-	)
+	answer = resource.scoped(() {
+		resource.acquire(
+			() { 40 },
+			(_) { io.print("released") },
+		) + 2
+	})
 	io.print(core.inspect(answer))
 }
 ```
@@ -60,23 +66,23 @@ released
 )
 
 main = () <- (io : Io) {
-	resource.acquire(
-		() {
-			io.print("open outer")
-			"outer"
-		},
-		(name) { io.print("close " <> name) },
-		(_) {
-			resource.acquire(
-				() {
-					io.print("open inner")
-					"inner"
-				},
-				(name) { io.print("close " <> name) },
-				(_) { io.print("use both") },
-			)
-		},
-	)
+	resource.scoped(() {
+		outer = resource.acquire(
+			() {
+				io.print("open outer")
+				"outer"
+			},
+			(name) { io.print("close " <> name) },
+		)
+		inner = resource.acquire(
+			() {
+				io.print("open inner")
+				"inner"
+			},
+			(name) { io.print("close " <> name) },
+		)
+		io.print("use " <> outer <> " and " <> inner)
+	})
 	io.print("done")
 }
 ```
@@ -84,7 +90,7 @@ main = () <- (io : Io) {
 ```text
 open outer
 open inner
-use both
+use outer and inner
 close inner
 close outer
 done
@@ -126,14 +132,16 @@ main = () <- (io : Io) {
 	answer = fail.catch(() {
 		resource.ensure(
 			() {
-				resource.acquire(
-					() {
-						io.print("open")
-						"handle"
-					},
-					(name) { io.print("release " <> name) },
-					(_) { fail.raise("failed") },
-				)
+				resource.scoped(() {
+					name = resource.acquire(
+						() {
+							io.print("open")
+							"handle"
+						},
+						(name) { io.print("release " <> name) },
+					)
+					fail.raise("failed")
+				})
 			},
 			() { io.print("final") },
 		)
@@ -163,11 +171,13 @@ Error("failed")
 
 main = () <- (io : Io) {
 	answer = fail.catch(() {
-		resource.acquire(
-			() -> String { fail.raise("cannot open") },
-			(name) { io.print("release " <> name) },
-			(name) { io.print("use " <> name) },
-		)
+		resource.scoped(() {
+			name = resource.acquire(
+				() -> String { fail.raise("cannot open") },
+				(name) { io.print("release " <> name) },
+			)
+			io.print("use " <> name)
+		})
 	})
 	io.print(core.inspect(answer))
 }
@@ -177,6 +187,6 @@ main = () <- (io : Io) {
 Error("cannot open")
 ```
 
-Release is installed only after acquisition succeeds.
+Release is attached only after acquisition succeeds.
 
 Continue with [concurrency](/docs/tour/concurrency).

@@ -192,19 +192,17 @@ read_chunks = (file) {
 }
 
 read_file = (path) {
-	resource.acquire(
-		() { open(path, ReadOnly) },
-		(f) { close(f) },
-		(f) { read_chunks(f) },
-	)
+	resource.scoped(() {
+		f = resource.acquire(() { open(path, ReadOnly) }, (f) { close(f) })
+		read_chunks(f)
+	})
 }
 
 write_file = (path, bytes) {
-	resource.acquire(
-		() { open(path, WriteTruncate) },
-		(f) { close(f) },
-		(f) { write(f, bytes) },
-	)
+	resource.scoped(() {
+		f = resource.acquire(() { open(path, WriteTruncate) }, (f) { close(f) })
+		write(f, bytes)
+	})
 }
 
 line_parts = (text : String, start : Int) -> List(String) {

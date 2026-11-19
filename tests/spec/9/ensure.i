@@ -39,19 +39,26 @@ test("values_and_errors_go_through", () {
 })
 
 acquire = () {
-	v = resource.acquire(() { 10 }, (r) { () }, (r) { r + 1 })
+	v = resource.scoped(() {
+		r = resource.acquire(() { 10 }, (r) { () })
+		r + 1
+	})
 	check(show(v), "11")
 	e = fail.catch(() {
-		resource.acquire(() { 10 }, (r) { () }, (r) { fail.raise(r) })
+		resource.scoped(() {
+			r = resource.acquire(() { 10 }, (r) { () })
+			fail.raise(r)
+		})
 	})
 	check(show(e), "Error(10)")
-	// An error of `open` runs no `release`.
+	// An error of `open` runs no release.
 	o = fail.catch(() {
-		resource.acquire(
-			() { fail.raise("open") },
-			(r) { panic("released") },
-			(r) { r },
-		)
+		resource.scoped(() {
+			resource.acquire(
+				() { fail.raise("open") },
+				(r) { panic("released") },
+			)
+		})
 	})
 	check(show(o), "Error(\"open\")")
 }

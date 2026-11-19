@@ -5,13 +5,15 @@
 	i/resource
 )
 
-// `release` gets the resource when `use` ends with an error.
+// The release gets the resource when the scoped body ends with an error.
 main = () {
 	fail.catch(() {
-		resource.acquire(
-			() { 5 },
-			(r) { r |> (5) { panic("released 5") } & (_) { () } },
-			(r) { fail.raise(r) },
-		)
+		resource.scoped(() {
+			r = resource.acquire(
+				() { 5 },
+				(r) { r |> (5) { panic("released 5") } & (_) { () } },
+			)
+			fail.raise(r)
+		})
 	})
 }

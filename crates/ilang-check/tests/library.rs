@@ -102,7 +102,7 @@ fn library_names() {
                 "poll",
             ],
         ),
-        ("i/resource", &["ensure", "acquire"]),
+        ("i/resource", &["acquire", "ensure", "scoped"]),
         ("i/assertion", &["catch"]),
         (
             "i/core",
