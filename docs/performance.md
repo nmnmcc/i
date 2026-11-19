@@ -229,8 +229,8 @@ still needed for the performance acceptance gate, especially for the short
 Horner and tuple kernels. These measurements do not establish the std/float
 release gates or a full-range worst case. Raw batch medians from a new
 quiet run, std check/build cost and benchmark Wasm size acceptance also
-remain to be checked. See [the step-3 report](design/numeric-step3-report.md)
-for the per-step measurements, fuel counts and surviving allocations.
+remain to be checked. The per-step measurements, fuel counts and surviving
+allocations were recorded in a step report that is not kept in the tree.
 
 ### Numeric follow-up: list-cell cast reuse
 

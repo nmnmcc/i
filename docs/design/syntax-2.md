@@ -920,13 +920,13 @@ record formatter must land together with T3's syntax consumers.
 | `ilang-syntax/tests/{lex,parse,golden,format,spec}.rs` and fixture directories | New boundary matrix; reparse/canonical-tree and idempotence properties; reviewed new diagnostic goldens. Current properties are in `tests/format.rs:1–9` and `tests/spec.rs:29–54`. |
 | `crates/ilang-check/src/hir.rs:221–260`, `resolve.rs:810,1418,1795,2514`; `types/display.rs:1357` and T3's shown types | Normal `Record` name, no empty tuple surface, record display, preserved single-clause lowering, and scoped pipe/or diagnostic. Use T3's existing structural type representation. |
 | `crates/ilang-wasm/src/lower.rs:1562–1580,2289,2342`; T3 runtime record inspector | Check tuple arity removal at the source boundary; retain existing Case lowering; print record delimiters. Existing nominal `Record` names are unrelated. |
-| `scripts/old-syntax-check : 105–125,143–185`, its JSON, tests and docs; `scripts/a2-meaning`; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
+| `scripts/old-syntax-check : 105–125,143–185`, its JSON, tests and docs; the removed `a2-meaning` finder; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
 | `docs/spec.md`, `docs/design/{syntax,records,meta}.md` | Apply §5 together. Do not leave two accepted contradictory grammars. |
 | `editors/vscode`, package templates, Rust/JS embedded sources, all changed `.i`, comments and text/type expectations | Inventory by source role; update highlighting for caret, bar and match dot; preserve CR/CRLF and layout-sensitive tests. |
 
 The plan locates the first migration's one-off A2 programs in the shared cache,
 not `scripts/`, and at :411–429 says only two partitions were replayable. The checked-in
-`scripts/a2-meaning : 1–80` is an audit of changed one-clause semantics that calls
+The removed `a2-meaning` finder (lines 1–80 then) was an audit of changed one-clause semantics that called
 an old formatter-report interface; it is not a general second migrator. The current formatter command takes only project, check and paths
 (`crates/ilang-cli/src/commands/fmt.rs:15–43`), with no old-source conversion
 mode to reuse.

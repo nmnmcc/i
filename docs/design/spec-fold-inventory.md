@@ -199,8 +199,7 @@ a staged syntax-three version of §14 beside it.
 | tls.md | `i/tls` connect/accept/dial, options, `TlsError` | USER L 11-11 (TLS delivered) | partly §9.12 `i/tls` | no |
 | http.md | `std/http` client, `Client` service via provider-plan cells | USER L 11-11; provider selection superseded by O32 | n/a (std library) | — |
 | std-1/2/3.md | pure std modules, time/log, property tests, strings | coord | n/a (std library, not `lib/i`) | — |
-| str-report.md | string interpolation, raw and multi-line strings | coord (landed STR) | yes §1.6 | no |
-| a1-front-end.md, reports (`*-report.md`, `dev-checks-report.md`, `test-migrate-report.md`), prior-art-*.md, macro-status.md | historical, studies and status | n/a | — | — |
+| a1-front-end.md, historical step reports (removed), prior-art-*.md, macro-status.md | historical, studies and status | n/a | — | — |
 
 ## For the owner
 

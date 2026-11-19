@@ -5,9 +5,9 @@ formatting and snippet discovery. The CLI regression test supplies `src/main.i`
 and a manifest pointing at this worktree’s std; the program text is unchanged
 but for one edit: since `&` replaced `|` as the separator of value-level
 chains, each such `|` byte was changed to `&` (and nothing else), so the
-programs still reach the errors they were archived for. The offsets come from
-the chain-separators example of `scripts/and-chain-migrate`, run with the
-parser that still read `|`; in `t5-a1-r1.txt`, which does not parse, two
+programs still reach the errors they were archived for. The offsets came from
+the chain-separators example of the one-shot `and-chain-migrate` script, run
+with the parser that still read `|`; in `t5-a1-r1.txt`, which does not parse, two
 branch separators at 116:10 and 117:10 lie where that parser recovers, and
 were changed by hand. The SHA-256 below are of the archived files,
 before that edit.
