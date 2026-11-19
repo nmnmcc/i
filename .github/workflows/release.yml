@@ -1,0 +1,184 @@
+# Builds `i` with Nix for every platform of the matrix, packages it as the
+# archive that `packages.<system>.i-bin` installs, and checks that archive end
+# to end through the `i-bin` package.
+#
+# Pushing a `v*` tag is the only way to publish: only then does the `publish`
+# job run and create (or update) the GitHub release. Pull-request runs are dry
+# runs; they build, package, verify and upload Actions artifacts, nothing more.
+#
+# After a successful tag run, copy the entries of the `i-bin-fragment`
+# artifact (also shown in the run summary) into `nix/release.nix`.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'nix/package.py'
+      - 'nix/release.nix'
+  workflow_dispatch:
+
+# Read only for the build jobs; `publish` raises it for the tag run.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      # Adding a platform is adding an entry to the NIX_RELEASE_MATRIX
+      # repository variable (JSON, same keys); the default is the Linux leg.
+      # An entry needs a runner in this repository's configuration.
+      matrix:
+        include: ${{ fromJSON(vars.NIX_RELEASE_MATRIX || '[{"platform":"x86_64-linux","system":"x86_64-linux","runner":"ubuntu-24.04"}]') }}
+    steps:
+      - name: Free disk space
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
+            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
+            /usr/local/share/chromium /usr/lib/jvm
+          df -h /
+      # Binaryen is fetched by Nix, not from the submodule.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: false
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Read the version
+        run: echo "VERSION=$(nix eval --raw .#packages.${{ matrix.system }}.i.version)" >> "$GITHUB_ENV"
+      - name: Build i
+        shell: bash
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          out=$(nix build --print-out-paths .#packages.${{ matrix.system }}.i -L)
+          ln -sfn "$out" result-i
+          echo "Built \`i\` $VERSION for ${{ matrix.platform }} in $(( $(date +%s) - start )) s." >> "$GITHUB_STEP_SUMMARY"
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          i="$PWD/result-i/bin/i"
+          test "$("$i" --version)" = "i $VERSION"
+          work="$RUNNER_TEMP/smoke"
+          mkdir -p "$work/home"
+          cd "$work"
+          export HOME="$work/home"
+          "$i" new demo
+          out=$("$i" run --project demo)
+          echo "$out"
+          test "$out" = "Hello, demo!"
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 nix/package.py --binary result-i/bin/i --version "$VERSION" \
+            --platform "${{ matrix.platform }}" --output dist | tee package.out
+          name=$(sed -n 's/^url-name: //p' package.out)
+          sri=$(sed -n 's/^hash: //p' package.out)
+          mkdir -p checksums
+          (cd dist && shasum -a 256 "$name") > "checksums/$name.sha256"
+          # Tag runs publish under the pushed tag; dry runs show the tag a release would use.
+          if [ "${{ github.ref_type }}" = tag ]; then tag="$GITHUB_REF_NAME"; else tag="v$VERSION"; fi
+          url="https://github.com/${{ github.repository }}/releases/download/$tag/$name"
+          printf 'version=%s\nurl=%s\nhash=%s\n' "$VERSION" "$url" "$sri" > "dist/i-bin-${{ matrix.platform }}.txt"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+          echo "URL=$url" >> "$GITHUB_ENV"
+          { echo "### ${{ matrix.platform }}"; echo '```'; cat "dist/i-bin-${{ matrix.platform }}.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify the archive as i-bin
+        shell: bash
+        run: |
+          set -euo pipefail
+          extracted="$RUNNER_TEMP/extracted"
+          mkdir -p "$extracted"
+          tar -xzf "dist/$NAME" -C "$extracted"
+          test "$("$extracted/bin/i" --version)" = "i $VERSION"
+          # The fetchurl output path is the hash and the file name, so the
+          # add-file copy resolves the release url without a download.
+          nix store add-file "dist/$NAME" >/dev/null
+          sri=$(nix hash file --type sha256 --sri "dist/$NAME")
+          grep -qx "hash=$sri" "dist/i-bin-${{ matrix.platform }}.txt"
+          # --impure only for builtins.getFlake on the local checkout.
+          nix build --impure -L --out-link result-i-bin --expr "let f = builtins.getFlake (toString ./.); in (f.packages.\"${{ matrix.system }}\".i-bin).override { artifact = { version = \"$VERSION\"; url = \"$URL\"; hash = \"$sri\"; }; }"
+          test "$(./result-i-bin/bin/i --version)" = "i $VERSION"
+          test "$(./result-i-bin/bin/i --version)" = "$(./result-i/bin/i --version)"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: i-${{ matrix.platform }}
+          path: |
+            dist/i-*-${{ matrix.platform }}.tar.gz
+            dist/i-bin-${{ matrix.platform }}.txt
+            checksums/i-*-${{ matrix.platform }}.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Runs after every build leg succeeded; a failed build must not publish a
+    # partial release.
+    if: startsWith(github.ref, 'refs/tags/v') && needs.build.result == 'success'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: false
+      # The artifacts hold dist/ and checksums/, so they are merged into the workspace root.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: i-*
+          merge-multiple: true
+          path: .
+      - name: Create the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -l dist checksums
+          # The tag must name the version that was built.
+          for f in dist/i-bin-*.txt; do grep -qx "version=${GITHUB_REF_NAME#v}" "$f"; done
+          if ! gh release create "$GITHUB_REF_NAME" dist/*.tar.gz checksums/*.sha256 \
+              --verify-tag --title "i ${{ github.ref_name }}" --generate-notes; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz checksums/*.sha256 --clobber
+          fi
+      - name: Write the nix/release.nix fragment
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > i-bin-fragment.nix
+          for f in dist/i-bin-*.txt; do
+            platform=$(basename "$f" .txt); platform=${platform#i-bin-}
+            version=$(sed -n 's/^version=//p' "$f")
+            url=$(sed -n 's/^url=//p' "$f")
+            hash=$(sed -n 's/^hash=//p' "$f")
+            printf '"%s" = {\n  version = "%s";\n  url = "%s";\n  hash = "%s";\n};\n' \
+              "$platform" "$version" "$url" "$hash" >> i-bin-fragment.nix
+          done
+          cat i-bin-fragment.nix
+          { echo '### Entries for nix/release.nix'; echo '```nix'; cat i-bin-fragment.nix; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: i-bin-fragment
+          path: i-bin-fragment.nix
+          if-no-files-found: error
