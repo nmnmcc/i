@@ -149,6 +149,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
     e.start();
     e.exports();
     e.resume_exports();
+    e.out.push_str(&eq_plans_text(p));
     // The worker operations bring the multicore codec and transport imports.
     let uses_workers = e.out.contains("(call $worker_");
     // `$call0` and `$call1` of the runtime dispatch too.
@@ -410,6 +411,47 @@ fn dispatcher(n: u32) -> String {
            (br $scan))\n\
          (unreachable))\n"
     )
+}
+
+/// The functions of the specialized structural comparison plans. Each is a
+/// closed type: scalars compare directly, lists walk their cells and tuples
+/// their parts, and anything else never gets a plan.
+fn eq_plans_text(p: &Program) -> String {
+    let mut out = String::new();
+    for (i, plan) in p.eq_plans.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "(func $eq_plan_{i} (param $a eqref) (param $b eqref) (result i32)
+  (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))"
+        );
+        match plan {
+            EqPlan::Int => out.push_str(
+                "\n  (i32.eqz (call $int_compare (local.get $a) (local.get $b))))\n",
+            ),
+            EqPlan::Float => out.push_str(
+                "\n  (f64.eq (call $float_get (local.get $a)) (call $float_get (local.get $b))))\n",
+            ),
+            EqPlan::String => out.push_str(
+                "\n  (i32.eqz (call $string_compare (local.get $a) (local.get $b))))\n",
+            ),
+            EqPlan::List(child) => {
+                let _ = writeln!(
+                    out,
+                    "\n  (loop $each\n    (if (call $list_is_empty (local.get $a)) (then (return (call $list_is_empty (local.get $b)))))\n    (if (call $list_is_empty (local.get $b)) (then (return (i32.const 0))))\n    (if (i32.eqz (call $eq_plan_{child} (call $list_head (local.get $a)) (call $list_head (local.get $b)))) (then (return (i32.const 0))))\n    (local.set $a (call $list_tail (local.get $a)))\n    (local.set $b (call $list_tail (local.get $b)))\n    (br $each))\n  (i32.const 1))\n"
+                );
+            }
+            EqPlan::Tuple(parts) => {
+                for (n, child) in parts.iter().enumerate() {
+                    let _ = writeln!(
+                        out,
+                        "  (if (i32.eqz (call $eq_plan_{child} (call $field (local.get $a) (i32.const {n})) (call $field (local.get $b) (i32.const {n})))) (then (return (i32.const 0))))"
+                    );
+                }
+                out.push_str("  (i32.const 1))\n");
+            }
+        }
+    }
+    out
 }
 
 struct Emitter<'p> {
@@ -1344,6 +1386,10 @@ impl<'p> Emitter<'p> {
             Op::FloatGe => compare_float("f64.ge"),
             Op::Equal => format!("(call $bool_new (call $equal {a} {b}))"),
             Op::NotEqual => format!("(call $bool_new (i32.eqz (call $equal {a} {b})))"),
+            Op::EqualPlan(i) => format!("(call $bool_new (call $eq_plan_{i} {a} {b}))"),
+            Op::NotEqualPlan(i) => {
+                format!("(call $bool_new (i32.eqz (call $eq_plan_{i} {a} {b})))")
+            }
             Op::StringAppend => format!("(call $string_append {a} {b})"),
             Op::Panic => format!("(call $panic {a}) (unreachable)"),
             Op::Runtime { name, .. } => format!("(call ${name} {})", args.join(" ")),

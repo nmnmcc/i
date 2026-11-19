@@ -40,7 +40,7 @@ use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
 use ilang_check::platform::{self, Stub};
-use ilang_check::types::{Access, Head, HostType, LitValue, TestMember, TestValues, Typed};
+use ilang_check::types::{Access, Head, HostType, LitValue, ShownType, TestMember, TestValues, Typed};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast::{BinOp, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
@@ -796,6 +796,7 @@ pub(crate) fn lower_tests_numeric(
         return Err(errors);
     }
     let mut l = Lowerer::new(graph, program, typed, options, None);
+    l.specialize_equality = numeric == crate::Numeric::Scalars;
     l.install_stubs(stubs);
     l.extra_tests = tests.to_vec();
     l.run();
@@ -857,6 +858,7 @@ pub(crate) fn lower_selected_numeric(
         Some((target, export.to_owned())),
     );
     let stub = platform::stub(program, typed, target, options.target.platform())?;
+    l.specialize_equality = numeric == crate::Numeric::Scalars;
     l.install_stubs(std::collections::BTreeMap::from([(target, stub)]));
     l.run();
     let is_async = l.selected_async;
@@ -917,6 +919,9 @@ struct Lowerer<'a> {
     /// a twentieth of a test build.
     package_hashes: HashMap<PackageId, String>,
     module_hashes: HashMap<ilang_package::SourceId, String>,
+    /// Whether structural equality may be specialized for closed types
+    /// (O2/O3). O0 keeps the generic comparison as the reference lowering.
+    specialize_equality: bool,
     /// The services that an environment statement may provide lazily
     /// (`lazy_provide`), found before lowering: a call `x.f(…)` of an
     /// environment parameter of one of them is a `Callee::Lazy`.
@@ -964,6 +969,7 @@ impl<'a> Lowerer<'a> {
             package_hashes: HashMap::new(),
             module_hashes: HashMap::new(),
             lazy_candidates: HashSet::new(),
+            specialize_equality: false,
             out: ir::Program::default(),
             diags: Vec::new(),
         };
@@ -3440,6 +3446,71 @@ impl<'a> Lowerer<'a> {
     }
 
     #[allow(clippy::too_many_arguments)]
+    /// Registers a comparison plan (children first) and gives its index.
+    fn eq_plan(&mut self, plan: EqPlan) -> u32 {
+        if let Some(i) = self.out.eq_plans.iter().position(|p| p == &plan) {
+            return i as u32;
+        }
+        self.out.eq_plans.push(plan);
+        (self.out.eq_plans.len() - 1) as u32
+    }
+
+    /// A plan for a closed structural type, or `None` when the type has an
+    /// unsupported part. Caps: nesting depth 6, 32 plans. Over a cap, or for
+    /// a function, host reference, opaque value or custom type, the generic
+    /// comparison stays.
+    fn build_eq_plan(&mut self, ty: &ShownType, depth: u32, nodes: &mut u32) -> Option<u32> {
+        if depth > 6 || *nodes >= 32 {
+            return None;
+        }
+        *nodes += 1;
+        let plan = match ty {
+            ShownType::Named(TypeRef::Builtin(BuiltinType::Int), args) if args.is_empty() => {
+                EqPlan::Int
+            }
+            ShownType::Named(TypeRef::Builtin(BuiltinType::Float), args) if args.is_empty() => {
+                EqPlan::Float
+            }
+            ShownType::Named(TypeRef::Builtin(BuiltinType::String), args) if args.is_empty() => {
+                EqPlan::String
+            }
+            ShownType::Named(TypeRef::Builtin(BuiltinType::List), args) if args.len() == 1 => {
+                let part = self.build_eq_plan(&args[0], depth + 1, nodes)?;
+                EqPlan::List(part)
+            }
+            ShownType::Lit(text) => {
+                if text.starts_with('"') {
+                    EqPlan::String
+                } else if text.contains('.') || text.contains('e') || text.contains('E') {
+                    EqPlan::Float
+                } else {
+                    EqPlan::Int
+                }
+            }
+            ShownType::Union(items) if !items.is_empty() => {
+                let mut plans = Vec::with_capacity(items.len());
+                for item in items {
+                    plans.push(self.build_eq_plan(item, depth, nodes)?);
+                }
+                if plans.iter().all(|p| *p == plans[0]) {
+                    let plan = self.out.eq_plans[plans[0] as usize].clone();
+                    plan
+                } else {
+                    return None;
+                }
+            }
+            ShownType::Tuple(parts) if !parts.is_empty() => {
+                let mut ids = Vec::with_capacity(parts.len());
+                for part in parts {
+                    ids.push(self.build_eq_plan(part, depth + 1, nodes)?);
+                }
+                EqPlan::Tuple(ids)
+            }
+            _ => return None,
+        };
+        Some(self.eq_plan(plan))
+    }
+
     fn binary(
         &mut self,
         fx: &mut Fx,
@@ -3511,9 +3582,37 @@ impl<'a> Lowerer<'a> {
         }
         let a = self.expr(fx, out, lhs);
         let b = self.expr(fx, out, rhs);
+        let plan = if self.specialize_equality && matches!(op, BinOp::Eq | BinOp::NotEq) {
+            let types = self
+                .typed
+                .comparison_types
+                .get(&(fx.module, e.span))
+                .cloned();
+            match types {
+                Some((left, right)) if left == right => {
+                    let mut nodes = 0;
+                    match self.build_eq_plan(&left, 0, &mut nodes) {
+                        // A bare scalar comparison keeps the generic (and
+                        // numeric-plan) path; this pass is for structure.
+                        Some(i)
+                            if !matches!(
+                                self.out.eq_plans[i as usize],
+                                EqPlan::Int | EqPlan::Float | EqPlan::String
+                            ) =>
+                        {
+                            Some(i)
+                        }
+                        _ => None,
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
         let o = match op {
-            BinOp::Eq => Op::Equal,
-            BinOp::NotEq => Op::NotEqual,
+            BinOp::Eq => plan.map(Op::EqualPlan).unwrap_or(Op::Equal),
+            BinOp::NotEq => plan.map(Op::NotEqualPlan).unwrap_or(Op::NotEqual),
             BinOp::Lt => Op::IntLt,
             BinOp::LtEq => Op::IntLe,
             BinOp::Gt => Op::IntGt,

@@ -444,6 +444,11 @@ pub struct Typed {
     pub typed_expansions: HashMap<(ModuleId, Span), crate::typed_macro::Output>,
     /// Numeric expression facts, frozen after completion and deferred checks.
     pub numeric: HashMap<(ModuleId, Span), NumericFact>,
+    /// The two operand types of each `==`/`!=`, by the span of the binary
+    /// expression, when both completed to a shown type. The code generator
+    /// uses it to specialize structural equality; anything not stored here
+    /// keeps the generic comparison.
+    pub comparison_types: HashMap<(ModuleId, Span), (ShownType, ShownType)>,
     /// Parameter-pattern facts from the same completed inference lifecycle.
     pub numeric_params: HashMap<(ModuleId, Span), NumericFact>,
     /// Spans of empty record expressions reached by type inference.
