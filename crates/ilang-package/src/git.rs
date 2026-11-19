@@ -19,9 +19,6 @@
 //!   Unix, and as files with their target as bytes elsewhere. Submodules are
 //!   left out. The directory is written next to it and then renamed, so it
 //!   is either all there or not there.
-//! - `pkg/<escaped location>/<commit>.hash` is the hash of those files
-//!   (see [`crate::lock::hash`]), worked out from the git objects. This is
-//!   advisory: every use rechecks all materialized paths and bytes.
 //!
 //! An escaped name keeps the bytes `a-z`, `0-9`, `.`, `_` and `-`, and writes
 //! every other byte as `%` and two lowercase hex digits, so
@@ -554,7 +551,6 @@ impl Git {
     ) -> Result<(PathBuf, String, Vec<PackageFile>)> {
         let base = self.cache.join("pkg").join(escape(place));
         let target = base.join(commit);
-        let hash_file = base.join(format!("{commit}.hash"));
         let files = self.files(repository, commit, dir)?;
         check_source_links(&files)?;
         let hash = crate::lock::hash(&files);
@@ -599,9 +595,6 @@ impl Git {
                 ),
             ));
         }
-        let tmp = temp_name(&hash_file);
-        std::fs::write(&tmp, format!("{hash}\n")).map_err(cache_err)?;
-        std::fs::rename(&tmp, &hash_file).map_err(cache_err)?;
         Ok((target, hash, snapshot))
     }
 }

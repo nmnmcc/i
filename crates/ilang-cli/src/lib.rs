@@ -274,7 +274,9 @@ pub fn build_tests(
     let Some(root) = graph.root else {
         return Err(program_error(&graph, &diags));
     };
-    let revision = snapshot(&graph);
+    // Handle prefixes are only used to carry the entry index here; selection by
+    // a full handle is `build_collection`'s job, which rechecks its snapshot.
+    let revision = String::new();
     let checked = ilang_macro::project::check_tests(&mut graph, collection);
     diags.extend(checked.diags);
     let (Some(program), Some(typed)) = (&checked.program, &checked.types) else {

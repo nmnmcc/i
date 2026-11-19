@@ -1652,7 +1652,7 @@ fn add_rejects_dependency_with_source_link() {
 }
 
 #[test]
-fn package_commands_reject_tampered_cache_with_original_sidecar() {
+fn package_commands_reject_tampered_cache() {
     let w = World::new();
     w.repo(
         "dep",
@@ -1679,7 +1679,6 @@ fn package_commands_reject_tampered_cache_with_original_sidecar() {
     let locked = read(&app.join("i.lock"));
     let commit = locked.split_whitespace().nth(2).unwrap();
     let cache = w.path().join("cache/pkg/example.com%2fdep").join(commit);
-    let sidecar = read(&cache.with_extension("hash"));
     fs::remove_file(cache.join("src/lib.i")).unwrap();
     fs::write(
         cache.join("src/lib.i"),
@@ -1693,7 +1692,6 @@ fn package_commands_reject_tampered_cache_with_original_sidecar() {
             "{err}"
         );
         assert_eq!(read(&app.join("i.lock")), locked);
-        assert_eq!(read(&cache.with_extension("hash")), sidecar);
     }
 }
 

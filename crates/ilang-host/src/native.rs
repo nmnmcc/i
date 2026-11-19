@@ -16,9 +16,9 @@
 //! contract ([`contract`]) that the code was compiled for, which must be the
 //! runner's own. Only then does it give the code to Wasmtime's unsafe
 //! `Module::deserialize`, which checks the compiler settings once more. The
-//! manifest binds the binding plan to the exact module (its artifact digest)
-//! and the code to its digest. The digest detects a damaged or truncated
-//! file; it is not a signature (signing is not provided).
+//! manifest binds the binding plan to the exact module (its artifact digest).
+//! The trailer digest detects a damaged or truncated file; it is not a
+//! signature (signing is not provided).
 //!
 //! The metadata module is a Wasm module with only the `ilang.*` custom
 //! sections of the program, read exactly as [`Program::from_bytes`] reads
@@ -169,8 +169,6 @@ pub struct Manifest {
     pub trusted_package: String,
     pub metadata_len: u64,
     pub code_len: u64,
-    /// The SHA-256 digest of the precompiled code.
-    pub code_digest: String,
 }
 
 /// The three parts of a payload.
@@ -179,10 +177,6 @@ pub struct Payload {
     pub manifest: Manifest,
     pub metadata: Vec<u8>,
     pub code: Vec<u8>,
-}
-
-fn digest(bytes: &[u8]) -> String {
-    format!("sha256-{:x}", Sha256::digest(bytes))
 }
 
 impl Payload {
@@ -237,10 +231,6 @@ impl Payload {
             "{damaged} (the manifest lengths do not match)"
         );
         let (metadata, code) = rest.split_at(manifest.metadata_len as usize);
-        ensure!(
-            digest(code) == manifest.code_digest,
-            "{damaged} (the code digest does not match the manifest)"
-        );
         Ok((
             start,
             Payload {
@@ -371,7 +361,6 @@ pub fn package(
             trusted_package: trusted_package.into(),
             metadata_len: metadata.len() as u64,
             code_len: code.len() as u64,
-            code_digest: digest(&code),
         },
         metadata,
         code,

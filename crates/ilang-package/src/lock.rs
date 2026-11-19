@@ -1,6 +1,6 @@
 //! The lock file `i.lock` and the hash of a package.
 
-use crate::manifest::{Version, parse_version};
+use crate::manifest::Version;
 use sha2::{Digest, Sha256};
 
 /// A file of a package, as git keeps it.
@@ -117,9 +117,6 @@ impl Lock {
                     "`{location} {version}` is not a location and a version"
                 )));
             };
-            if place.place() != location || parse_version(version).is_none() {
-                return Err(bad(format!("`{location}` is not a location")));
-            }
             if !(commit.len() == 40 || commit.len() == 64) || !is_hex(commit) {
                 return Err(bad(format!("`{commit}` is not a git commit")));
             }

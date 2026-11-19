@@ -284,11 +284,6 @@ impl Plan {
         let mut text = String::new();
         for (&local, repr) in &self.locals {
             if local < arity && *repr == Repr::Float {
-                assert_eq!(
-                    *repr,
-                    Repr::Float,
-                    "only final Float parameter facts are unboxed at entry"
-                );
                 writeln!(
                     text,
                     "(local.set $numeric_f{local} {})",

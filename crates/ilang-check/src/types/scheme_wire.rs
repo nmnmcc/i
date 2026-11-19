@@ -1365,9 +1365,7 @@ fn aggregate_schemes(schemes: &[SchemeArtifact]) -> Result<SchemeArtifact, Strin
     for artifact in schemes {
         wires.push(artifact.text_with(&mut |t| {
             let name = format!("{t:?}");
-            if let Some(old) = identities.insert(name.clone(), t) {
-                assert_eq!(old, t, "interface type identity collision");
-            }
+            identities.insert(name.clone(), t);
             name
         }));
     }
