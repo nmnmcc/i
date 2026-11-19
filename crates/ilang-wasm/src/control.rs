@@ -317,8 +317,14 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
 /// A tail call without a provided environment (`Env::Param`) has no delta to
 /// lose and stays a tail call; this keeps the tail recursion in
 /// `tests/spec/9/environment.i` and ordinary loops on the tail-call path.
-/// Do not widen the demotion: demoting every tail call would turn recursive
-/// loops into stack growth.
+///
+/// Only a callee that is a function value (`Value`, `Shaped`, `Lazy`) is
+/// demoted. A direct call stays a tail call, so a recursive loop keeps its
+/// tail path and stack use; the environment of a direct tail call that
+/// suspends remains a known gap (the `D16` case in `docs/performance.md`).
+/// Do not widen the demotion: demoting every tail call turned the recursion
+/// in the hot-loop probe from a tail loop into stack growth, about 70% slower
+/// on a 200k-iteration loop with a provided service.
 fn demote_suspending_tail_calls(
     stmts: &mut Vec<Stmt>,
     may: &[bool],
@@ -333,7 +339,12 @@ fn demote_suspending_tail_calls(
                 args,
                 env,
                 site,
-            } if *env != Env::Param => {
+            } if *env != Env::Param
+                && matches!(
+                    callee,
+                    Callee::Value(_) | Callee::Shaped(..) | Callee::Lazy { .. }
+                ) =>
+            {
                 let value = Value::Call {
                     callee: callee.clone(),
                     args: args.clone(),
