@@ -1271,3 +1271,56 @@ filter that matches no test (the whole std collection build) took 233.8 and
 small probe package in both. About 0.1-0.2% of the std build, not a
 measurable cost. (The +1.8 s quoted earlier in this document is the
 always-inline change, which is a different change.)
+
+### Type-directed structural equality (2026-11-20)
+
+After the method-call and frame work, `equality` was 0.245 s for 20
+comparisons of two 100k `(Int, String)` lists. Int-list elements cost 39.5 ns
+and tuple elements 90 ns; the ~50 ns gap was per-element tag, cast and scan,
+not allocation.
+
+The checker now records the two operand types of `==`/`!=`
+(`Typed::comparison_types`). At `--opt 2/3`, when both are the same closed
+structural type, lowering builds a comparison plan and emit generates a
+`$eq_plan_N` function: Int through `$int_compare`, Float through `f64.eq`
+(Float values are always finite, so no NaN reaches it), String through
+`$string_compare`, lists walk their cells and tuples their parts. No
+`value_tag`, cast or frame per element.
+
+Everything else keeps the generic `$equal`: functions, host references,
+opaque values, custom types, unions whose members need different plans, and
+anything over the caps — nesting depth 6 and 32 plans. A bare scalar
+comparison also stays generic so the numeric plan keeps seeing it. `--opt 0`
+never specializes, so the reference lowering and the differential corpus stay
+independent.
+
+Paired, one Xeon 6975P-C, five alternating rounds, `--opt 2`:
+
+| Benchmark | main | type-directed | |
+|---|---:|---:|---:|
+| `equality` | 0.180 | 0.116 | **-35.6%** |
+| `list_sort` | 1.254 | 1.251 | -0.2% |
+| `dict_insert` | 0.488 | 0.484 | -0.8% |
+| `list_merge` | 0.561 | 0.563 | +0.4% |
+| `closures` | 0.065 | 0.065 | 0.0% |
+| `list_build` | 0.069 | 0.070 | +1.4% |
+| `list_map` | 0.110 | 0.112 | +1.8% |
+| `list_reverse` | 0.170 | 0.173 | +1.8% |
+| `inspect` | 0.109 | 0.112 | +2.8% |
+
+The equality probes agree: 20x lists -37.2%, tuple lists -38.9%, Int lists
+-31.6%. The small increases are in paths that compare only Ints or Options
+(build, map, reverse, inspect) and their sample ranges overlap; they are code
+layout, not a plan on the path.
+
+Compile time and size: paired on one runner, the warm `std` test build (a
+filter that matches no test) took 148.1 s of CPU before and 149.9 s after
+(**+1.2%**). A probe with one list-of-tuples equality grew from 271,952 to
+272,189 bytes (**+0.09%**); the sort-and-map probe, which has no structural
+equality, is byte-identical.
+
+Tests: specialization and the fallbacks (function inside a structure, record,
+mixed union, depth over the cap); float boundaries (`-0.0 == 0.0`,
+`0.1 +. 0.2 != 0.3`); and a stop case showing that a NaN cannot become a
+Float value, so `NaN == NaN` is unreachable rather than defined. The full CI
+gate passes, and corpus output is unchanged at O0 and O2.
