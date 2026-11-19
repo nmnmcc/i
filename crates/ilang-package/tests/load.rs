@@ -95,7 +95,7 @@ fn graph_with_path_dependencies() {
         &[
             (
                 "app/i.toml",
-                "name = \"app\"\n[dependencies]\nu = { path = \"../util\" }\nv = { path = \"../util\" }\n[dev-dependencies]\nt = { path = \"../tools\" }\ni = { path = \"../stdlib\" }\n",
+                "name = \"app\"\n[dependencies]\nu = { path = \"../util\" }\nv = { path = \"../util\" }\ni = { path = \"../stdlib\" }\n[dev-dependencies]\nt = { path = \"../tools\" }\n",
             ),
             ("app/src/main.i", "x = 1\n"),
             ("app/src/a/b.i", "x = 1\n"),
@@ -116,7 +116,13 @@ fn graph_with_path_dependencies() {
     // `i`. One package for one directory.
     assert_eq!(graph.packages.len(), 5);
     let root = &graph.packages[graph.root.unwrap()];
-    assert_eq!(root.dependencies[0].1, root.dependencies[1].1);
+    let dependency = |name: &str| {
+        root.dependencies
+            .iter()
+            .find(|(n, _)| n == name)
+            .and_then(|(_, id)| *id)
+    };
+    assert_eq!(dependency("u"), dependency("v"));
     let paths: Vec<(&str, ModuleKind)> = root
         .modules
         .iter()
@@ -131,7 +137,7 @@ fn graph_with_path_dependencies() {
         ]
     );
     // Dependencies: no test modules and no dev-dependencies.
-    let util = &graph.packages[root.dependencies[0].1.unwrap()];
+    let util = &graph.packages[dependency("u").unwrap()];
     assert_eq!(util.modules.len(), 1);
     assert!(util.dev_dependencies.is_empty());
     assert_eq!(
@@ -145,11 +151,7 @@ fn graph_with_path_dependencies() {
     assert!(builtin.dir.is_none());
     let paths: Vec<&str> = builtin.modules.iter().map(|m| m.path.as_str()).collect();
     assert_eq!(paths, ["$prelude"]);
-    let (name, library) = root
-        .dev_dependencies
-        .iter()
-        .find(|(n, _)| n == "i")
-        .unwrap();
+    let (name, library) = root.dependencies.iter().find(|(n, _)| n == "i").unwrap();
     assert_eq!(name, "i");
     let library = library.unwrap();
     assert!(graph.is_standard_library(library));
@@ -405,14 +407,22 @@ fn the_standard_library_as_a_path_dependency() {
         );
         let app = dir.path().join("app");
         let (graph, diags) = load(&app);
+        if table == "dev-dependencies" {
+            // The runtime modules are part of every compiled program, so a
+            // dev-dependency alone does not resolve the library for `src/`.
+            assert!(
+                diags
+                    .iter()
+                    .any(|d| d.code == ilang_package::code::NO_LIBRARY),
+                "{:?}",
+                graph.sources.render_all(&diags)
+            );
+            continue;
+        }
         let rendered = graph.sources.render_all(&diags);
         assert!(rendered.is_empty(), "{table}: {rendered:#?}");
         let root = &graph.packages[graph.root.unwrap()];
-        let deps = if table == "dependencies" {
-            &root.dependencies
-        } else {
-            &root.dev_dependencies
-        };
+        let deps = &root.dependencies;
         let (name, id) = &deps[0];
         assert_eq!(name, "i");
         let library = &graph.packages[id.unwrap()];

@@ -866,7 +866,15 @@ const LEGACY_HASH: &str = "d579e9b74a1a230209535b5244f77e444c7918e2f440e11b5c026
 fn legacy_library(dir: &Path, manifest: &Manifest) -> bool {
     let dependency = manifest.dependencies.iter().any(|d| {
         (d.name == "std" || d.name == "stdlib")
-            && matches!(d.source, DependencySource::Path(_))
+            && match &d.source {
+                DependencySource::Path(path) => {
+                    let path = Path::new(path);
+                    !path.is_absolute()
+                        && !path.components().any(|c| matches!(c, Component::ParentDir))
+                        && dir.join(path).starts_with(dir)
+                }
+                DependencySource::Location(_) => false,
+            }
     });
     dependency || dir.join("std").join("i.toml").is_file()
 }

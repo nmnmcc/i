@@ -140,16 +140,13 @@ impl World {
         if !text.is_empty() && !text.ends_with('\n') {
             text.push('\n');
         }
-        let last = text.lines().filter(|l| l.starts_with('[')).last();
-        if matches!(last, Some("[dependencies]" | "[dev-dependencies]")) {
-        } else if !text.contains("[dependencies]") {
-            text.push_str("[dependencies]\n");
-        } else if !text.contains("[dev-dependencies]") {
-            text.push_str("[dev-dependencies]\n");
+        if let Some(at) = text.find("[dependencies]\n") {
+            let at = at + "[dependencies]\n".len();
+            text.insert_str(at, &line);
         } else {
-            panic!("no table for the dependency `i` in {text:?}");
+            text.push_str("[dependencies]\n");
+            text.push_str(&line);
         }
-        text.push_str(&line);
         fs::write(toml, text).unwrap();
     }
 }
@@ -680,7 +677,7 @@ fn dir_packages() {
     let (graph, diags) = w.load(&app, true);
     assert_eq!(errors(&diags), [code::NO_PACKAGE]);
     let line = graph.sources.render(&diags[0]);
-    assert!(line.starts_with("i.toml:3:1: error[E0621]: "), "{line}");
+    assert!(line.starts_with("i.toml:4:1: error[E0621]: "), "{line}");
 }
 
 #[test]
@@ -971,9 +968,11 @@ fn dev_dependencies_only_with_tests() {
     no_errors(&graph, &diags);
     assert_eq!(located(&graph), ["example.com/alice/json@1.4.0"]);
     let root = &graph.packages[graph.root.unwrap()];
-    assert_eq!(
-        root.dev_dependencies,
-        [("check".to_string(), None), ("i".to_string(), None)]
+    assert_eq!(root.dev_dependencies, [("check".to_string(), None)]);
+    assert!(
+        root.dependencies
+            .iter()
+            .any(|(name, id)| name == "i" && id.is_some())
     );
     assert!(root.modules.iter().all(|m| m.kind == ModuleKind::Src));
     // The lines are for the program with and without its tests.
@@ -1105,7 +1104,7 @@ fn offline() {
     let (graph, diags) = w.load_with(&app, &offline);
     assert_eq!(errors(&diags), [code::OFFLINE]);
     let line = graph.sources.render(&diags[0]);
-    assert!(line.starts_with("i.toml:3:1: error[E0634]: "), "{line}");
+    assert!(line.starts_with("i.toml:4:1: error[E0634]: "), "{line}");
     assert!(!app.join("i.lock").exists());
 
     let (graph, diags) = w.load(&app, true);
