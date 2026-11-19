@@ -76,6 +76,6 @@ else
       homepage = "https://i.nmnm.cc";
       license = lib.licenses.asl20;
       mainProgram = "i";
-      platforms = [ "x86_64-linux" ];
+      platforms = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
     };
   }

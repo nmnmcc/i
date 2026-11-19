@@ -166,7 +166,7 @@ nix build .#i-bin
 
 `i` builds the compiler from the source in the flake, so `github:nmnmcc/i` follows the repository's current commit and `nix build .#i` in a local clone follows that checkout. It needs the pinned Rust toolchain, CMake and the vendored Binaryen, all supplied by the flake.
 
-`i-bin` downloads the prebuilt archive of the pinned version from the GitHub release (`i-<version>-<platform>.tar.gz`), so it needs no compiler toolchain and is fixed to the version recorded in [nix/release.nix](nix/release.nix); it lags a source change until a release is published. Both `i` and `i-bin` report the same version for the same release; `nix flake check` asserts that once an archive is pinned. Before the first release there is no entry in `nix/release.nix`, so `nix build .#i-bin` stops with a message naming the missing entry; `nix build .#i` builds from source.
+`i-bin` downloads the prebuilt archive of the pinned version from the GitHub release (`i-<version>-<platform>.tar.gz`, for `x86_64-linux`, `aarch64-linux` and `aarch64-darwin`), so it needs no compiler toolchain and is fixed to the version recorded in [nix/release.nix](nix/release.nix); it lags a source change until a release is published. Both `i` and `i-bin` report the same version for the same release; `nix flake check` asserts that once an archive is pinned. Before the first release there is no entry in `nix/release.nix`, so `nix build .#i-bin` stops with a message naming the missing entry; `nix build .#i` builds from source.
 
 `nix run .#i` and `nix run .#i-bin` run either package without installing it.
 

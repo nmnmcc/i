@@ -4,6 +4,10 @@ name: Nix
 # `packages.i-bin` installed from a prebuilt archive. Binaryen is fetched by
 # the flake, so the checkout does not need submodules. Nothing here is
 # published; the `release` workflow owns tags and releases.
+#
+# The three platform legs are independent matrix jobs: a slow macOS queue does
+# not hold the Linux legs, and a failure on one platform does not hide the
+# others (fail-fast is off; no continue-on-error).
 
 on:
   pull_request:
@@ -16,14 +20,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  linux:
-    name: build and verify (x86_64-linux)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 180
+  build:
+    name: build and verify (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: x86_64-linux, system: x86_64-linux, runner: ubuntu-24.04 }
+          - { platform: aarch64-linux, system: aarch64-linux, runner: ubuntu-24.04-arm }
+          - { platform: aarch64-darwin, system: aarch64-darwin, runner: macos-15 }
     steps:
       # The Rust toolchain, Wasmtime and the Cargo builds do not fit in the
-      # free space of the runner.
+      # free space of the Linux runner.
       - name: Free disk space
+        if: runner.os == 'Linux'
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
             /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
@@ -39,18 +51,16 @@ jobs:
             always-allow-substitutes = true
 
       # The store paths built by a run are exported and kept in the Actions
-      # cache. On the next run (the same commit, or after a rebase) they are
-      # imported before the build, so `nix build` only does the work whose
-      # inputs changed. An exact hit makes the build below a no-op.
+      # cache, keyed by platform: the three systems never share an entry.
       - name: Restore the Nix store cache
         id: nix-cache
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: /tmp/nix-store-cache
-          key: nix-store-${{ runner.os }}-${{ github.sha }}-${{ hashFiles('flake.lock') }}
+          key: nix-store-${{ matrix.platform }}-${{ github.sha }}-${{ hashFiles('flake.lock') }}
           restore-keys: |
-            nix-store-${{ runner.os }}-${{ github.sha }}-
-            nix-store-${{ runner.os }}-
+            nix-store-${{ matrix.platform }}-${{ github.sha }}-
+            nix-store-${{ matrix.platform }}-
       - name: Import the cached store paths
         shell: bash
         run: |
@@ -59,30 +69,38 @@ jobs:
             nix-store --import < /tmp/nix-store-cache/store.nar
           fi
 
-      - name: Show the flake outputs
-        run: nix flake show
+      - name: Show the machine and the flake outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -m
+          nix --version
+          nix flake show
 
       - name: Build i from source
         shell: bash
         run: |
           set -euo pipefail
           start=$(date +%s)
-          nix build --print-out-paths --out-link result-i .#i -L | tee i-path
+          nix build --print-out-paths --out-link result-i .#packages.${{ matrix.system }}.i -L | tee i-path
           elapsed=$(( $(date +%s) - start ))
           echo "build .#i: ${elapsed}s" | tee -a "$GITHUB_STEP_SUMMARY"
           ./result-i/bin/i --version
 
-      - name: Show the runtime closure of i
+      # Independent evidence for Darwin: the compiler must link only the
+      # system libraries, never a path in the Nix store.
+      - name: Check the Darwin dependencies of i
+        if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
-          nix-store -qR ./result-i | sed 's|/nix/store/[a-z0-9]*-||' | sort > closure.txt
-          echo "runtime closure: $(wc -l < closure.txt) paths" | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "toolchain-like paths:"
-          grep -E 'rustc|rust-std|cargo|rust-analyzer|rust-src|gcc-wrapper|binutils' closure.txt || true
-          rustc_path=$(nix-store -qR ./result-i | grep -m1 -- '-rustc-' || true)
-          if [ -n "$rustc_path" ]; then
-            nix why-depends ./result-i "$rustc_path" || true
+          otool -L result-i/bin/i | tee otool-i.txt
+          deps=$(tail -n +2 otool-i.txt | awk '{print $1}')
+          bad=$(echo "$deps" | grep -vE '^(/usr/lib/|/System/Library/)' || true)
+          if [ -n "$bad" ]; then
+            echo "i links non-system libraries:" >&2
+            echo "$bad" >&2
+            exit 1
           fi
 
       - name: Run a package with the compiler that was built
@@ -100,34 +118,31 @@ jobs:
           echo "i new + i run: $output"
 
       # `i-bin` needs an archive. This run has no published release, so build
-      # the same archive the release workflow would upload, pin it in
-      # nix/release.nix, and then build `.#i-bin` through the production path.
+      # the archive the release workflow would upload for this platform, pin
+      # it in nix/release.nix, and then build `.#i-bin` through the real
+      # fetchurl path (the fixed output is already in the store, so nothing is
+      # downloaded; a wrong hash would go to the release URL and fail).
       - name: Package the archive and verify i-bin installs it
         shell: bash
         run: |
           set -euo pipefail
-          version=$(nix eval --raw .#packages.x86_64-linux.i.version)
+          version=$(nix eval --raw .#packages.${{ matrix.system }}.i.version)
           python3 nix/package.py \
             --binary result-i/bin/i \
             --version "$version" \
-            --platform x86_64-linux \
+            --platform "${{ matrix.platform }}" \
             --output dist
-          archive=$(ls dist/i-*.tar.gz)
+          archive=$(ls "dist/i-$version-${{ matrix.platform }}.tar.gz")
           name=$(basename "$archive")
           hash=$(nix hash file --type sha256 --sri "$archive")
-          # The fetchurl output path is the hash and the file name, so adding
-          # the file to the store lets Nix resolve the url below without a
-          # download. A published release resolves it from GitHub instead.
           nix store add-file "$archive" >/dev/null
           url="https://github.com/$GITHUB_REPOSITORY/releases/download/v$version/$name"
           echo "archive: $url ($hash)" | tee -a "$GITHUB_STEP_SUMMARY"
 
-          # Pin the archive exactly as a published one is pinned, then install
-          # it through the same fetchurl path a user gets.
           cat > nix/release.nix <<EOF
           {
             artifacts = {
-              x86_64-linux = {
+              ${{ matrix.system }} = {
                 version = "$version";
                 url = "$url";
                 hash = "$hash";
@@ -137,20 +152,37 @@ jobs:
           EOF
 
           start=$(date +%s)
-          nix build .#i-bin -L --out-link result-i-bin
+          nix build --print-out-paths --out-link result-i-bin .#packages.${{ matrix.system }}.i-bin -L | tee ibin-path
           echo "build .#i-bin: $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
           ./result-i-bin/bin/i --version
           test "$(./result-i-bin/bin/i --version)" = "$(./result-i/bin/i --version)"
           echo "i and i-bin report the same version: $(./result-i/bin/i --version)" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Run both packages through nix run
+      - name: Check the Darwin dependencies of i-bin
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
-          test "$(nix run .#i -- --version)" = "i $(nix eval --raw .#packages.x86_64-linux.i.version)"
-          test "$(nix run .#i-bin -- --version)" = "i $(nix eval --raw .#packages.x86_64-linux.i.version)"
+          set -euo pipefail
+          otool -L result-i-bin/bin/i | tee otool-i-bin.txt
+          deps=$(tail -n +2 otool-i-bin.txt | awk '{print $1}')
+          bad=$(echo "$deps" | grep -vE '^(/usr/lib/|/System/Library/)' || true)
+          if [ -n "$bad" ]; then
+            echo "i-bin links non-system libraries:" >&2
+            echo "$bad" >&2
+            exit 1
+          fi
 
-      # With the archive pinned above, this also builds the same-version
-      # check that `nix flake check` runs after a real release.
+      - name: Run both packages through nix run
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(nix eval --raw .#packages.${{ matrix.system }}.i.version)
+          test "$(nix run .#packages.${{ matrix.system }}.i -- --version)" = "i $version"
+          test "$(nix run .#packages.${{ matrix.system }}.i-bin -- --version)" = "i $version"
+
+      # With the archive pinned above, this also builds and runs the
+      # same-version check on this platform.
       - name: Check the flake
         shell: bash
         run: |
@@ -161,8 +193,8 @@ jobs:
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: i-x86_64-linux
-          path: dist/i-*.tar.gz
+          name: i-${{ matrix.platform }}
+          path: dist/i-*-${{ matrix.platform }}.tar.gz
           if-no-files-found: error
           retention-days: 7
 
@@ -172,11 +204,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/nix-store-cache
-          nix-store --export $(nix-store -qR "$(readlink -f result-i)" "$(readlink -f result-i-bin)") \
+          nix-store --export $(nix-store -qR "$(cat i-path)" "$(cat ibin-path)") \
             > /tmp/nix-store-cache/store.nar
           du -h /tmp/nix-store-cache/store.nar
       - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: success() && steps.nix-cache.outputs.cache-hit != 'true'
         with:
           path: /tmp/nix-store-cache
-          key: nix-store-${{ runner.os }}-${{ github.sha }}-${{ hashFiles('flake.lock') }}
+          key: nix-store-${{ matrix.platform }}-${{ github.sha }}-${{ hashFiles('flake.lock') }}

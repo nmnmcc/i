@@ -11,7 +11,6 @@
   #      repository variable) and to the CI job for that runner;
   #   3. after its first archive is published, add its url and hash to
   #      `nix/release.nix`.
-  # x86_64-linux is the platform this repository has a runner for.
   inputs = {
     # nixpkgs is the package set; rust-overlay supplies exactly the toolchain
     # that rust-toolchain.toml pins (Nixpkgs' Rust is usually older).
@@ -26,7 +25,7 @@
     let
       inherit (nixpkgs) lib;
 
-      systems = [ "x86_64-linux" ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
 
       forAllSystems = f: lib.genAttrs systems (system: f system);
 
