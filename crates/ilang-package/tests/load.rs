@@ -133,7 +133,7 @@ fn graph_with_path_dependencies() {
     assert_eq!(
         paths,
         [
-            "i/prelude",
+            "$prelude",
             "i/fail",
             "i/control",
             "i/resource",

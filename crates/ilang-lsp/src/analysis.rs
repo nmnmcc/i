@@ -148,7 +148,11 @@ fn analyze(job: &Job) -> (Analysis, bool) {
             paths.insert(s, dir.join("i.toml"));
         }
         for m in &p.modules {
-            let rest = m.path.split_once('/').map_or(m.path.as_str(), |x| x.1);
+            let rest = if m.path == ilang_package::library::PRELUDE.0 {
+                "prelude"
+            } else {
+                m.path.split_once('/').map_or(m.path.as_str(), |x| x.1)
+            };
             let extension = if graph.sources.get(m.source).display.ends_with(".is") {
                 "is"
             } else {
@@ -189,7 +193,7 @@ fn analyze(job: &Job) -> (Analysis, bool) {
     }
     let checked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let original_graph = graph.clone();
-        match ilang_macro::project::expand(&mut graph) {
+        match ilang_macro::project::expand_all(&mut graph) {
             Ok(mut expanded) => {
                 expanded.lower_quotes();
                 let mut checked =

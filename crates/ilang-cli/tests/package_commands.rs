@@ -135,13 +135,19 @@ impl World {
 
     /// Adds a version to the repository of `example.com/<name>`.
     fn tag(&self, name: &str, version: &str, files: &[(&str, &str)]) {
+        self.tag_as(name, &format!("v{version}"), files);
+    }
+
+    /// Commits exactly `files` in the repository of `example.com/<name>`,
+    /// tags the commit `tag`, and pushes both.
+    fn tag_as(&self, name: &str, tag: &str, files: &[(&str, &str)]) {
         let work = self.path().join("work").join(name);
         let bare = self.path().join("remotes").join(name);
         git(&work, &["rm", "-rq", "--ignore-unmatch", "."]);
         write(&work, files);
         git(&work, &["add", "-A"]);
-        git(&work, &["commit", "-q", "--allow-empty", "-m", version]);
-        git(&work, &["tag", &format!("v{version}")]);
+        git(&work, &["commit", "-q", "--allow-empty", "-m", tag]);
+        git(&work, &["tag", tag]);
         let bare = bare.display().to_string();
         git(&work, &["push", "-q", "-f", &bare, "HEAD:refs/heads/main"]);
         git(&work, &["push", "-q", "-f", &bare, "--tags"]);
@@ -1923,4 +1929,37 @@ fn publish_does_not_panic_on_an_unnamed_test() {
     assert!(ok, "{out}");
     assert!(!out.contains("panicked"), "{out}");
     assert!(out.contains("its 1 test passed"), "{out}");
+}
+
+#[test]
+fn two_processes_fetching_one_package_share_the_cache() {
+    let w = World::new();
+    lib_repo(&w);
+    let dir = app(&w);
+    let project = dir.display().to_string();
+    w.ok(&["add", "lib", "example.com/lib@1.0.0", "--project", &project]);
+    // Both processes start with no cache at all, so both fetch the package.
+    fs::remove_dir_all(w.path().join("cache")).unwrap();
+    let remotes = w.path().join("remotes");
+    let spawn = || {
+        git_env(&mut Command::new(env!("CARGO_BIN_EXE_i")))
+            .current_dir(w.path())
+            .env("ILANG_CACHE", w.path().join("cache"))
+            .env(
+                "ILANG_GIT_URLS",
+                format!("example.com/=file://{}/", remotes.display()),
+            )
+            .env_remove("ILANG_OFFLINE")
+            .args(["check", "--project", &project])
+            .spawn()
+            .unwrap()
+    };
+    let mut first = spawn();
+    let mut second = spawn();
+    let a = first.wait().unwrap();
+    let b = second.wait().unwrap();
+    assert!(a.success(), "first process failed");
+    assert!(b.success(), "second process failed");
+    // The cache is intact and usable after the race.
+    w.ok(&["check", "--offline", "--project", &project]);
 }

@@ -7,7 +7,7 @@
 //! superseded manifests. The versions
 //! of the one that is compiled are loaded.
 
-use crate::git::{self, Git, GitError};
+use crate::git::{self, Git, GitError, split_place};
 use crate::lock::{Lock, LockLine};
 use crate::manifest::{self, DependencySource, Version};
 use crate::mvs::{self, PackageKey, Requirement, Selection};
@@ -34,14 +34,6 @@ struct PathNode {
     dev: Vec<Requirement<Origin>>,
     paths: Vec<PathBuf>,
     dev_paths: Vec<PathBuf>,
-}
-
-/// The repository and the directory of a location.
-fn split_place(place: &str) -> (&str, Option<&str>) {
-    match place.split_once("//") {
-        Some((r, d)) => (r, Some(d)),
-        None => (place, None),
-    }
 }
 
 /// Reads the `i.toml` of the compiled package and of the packages it gets
@@ -163,8 +155,13 @@ impl Resolver<'_> {
             .lock
             .get(&key.location, version)
             .map(|l| l.commit.as_str());
-        let commit = self.git.commit(repository, version, expected)?;
-        let path = match dir {
+        // The tags of the location's own prefix (`<dir>-v` for `//dir`).
+        let commit = self.git.commit(&key.location, version, expected)?;
+        let tag = git::tag_name(&key.location, version);
+        // A tag of `//dir` is on a commit of the whole repository, with the
+        // package in `dir`, or on a commit of the package's subtree only.
+        let root = self.git.package_root(repository, &commit, dir)?;
+        let path = match root {
             Some(d) => format!("{d}/i.toml"),
             None => "i.toml".to_string(),
         };
@@ -177,9 +174,12 @@ impl Resolver<'_> {
                 )
             })?,
             None => {
-                let what = match dir {
-                    Some(d) => format!("the directory `{d}` of the tag `v{version}`"),
-                    None => format!("the tag `v{version}`"),
+                let what = match (dir, root) {
+                    (Some(d), Some(_)) => format!("the directory `{d}` of the tag `{tag}`"),
+                    (Some(d), None) => format!(
+                        "the tag `{tag}` (which has no directory `{d}`, so its root is the package)"
+                    ),
+                    (None, _) => format!("the tag `{tag}`"),
                 };
                 return Err(GitError::new(
                     code::NO_PACKAGE,
@@ -369,8 +369,10 @@ pub(crate) fn resolve(
                             source,
                             span,
                             format!(
-                                "`{what}` was got with the commit `{commit}` and the hash `{hash}`, but `i.lock` has the commit `{}` and the hash `{}`; the tag may have been moved, or the files changed on the way",
-                                l.commit, l.hash
+                                "`{what}` was got with the commit `{commit}` and the hash `{hash}`, but `i.lock` has the commit `{}` and the hash `{}`; the tag `{}` may have been moved, or the files changed on the way",
+                                l.commit,
+                                l.hash,
+                                git::tag_name(&key.location, version)
                             ),
                         ));
                         mismatch = true;

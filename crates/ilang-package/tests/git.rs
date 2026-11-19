@@ -570,6 +570,11 @@ fn dir_packages() {
         ],
         "v0.3.2",
     );
+    // The package in `//dir` has the tags `dir-vX.Y.Z`.
+    for tag in ["text-v0.3.2", "num-v0.3.2", "nothing-v0.3.2"] {
+        git(&tools.work, &["tag", tag]);
+    }
+    tools.push();
     let app = w.project(
         "app",
         &[(
@@ -577,7 +582,7 @@ fn dir_packages() {
             "name = \"app\"\n[dependencies]\ntext = \"example.com/bob/tools//text@0.3.2\"\nnum = \"example.com/bob/tools//num@0.3.0\"\n",
         )],
     );
-    // There is no tag v0.3.0.
+    // There is no tag num-v0.3.0.
     let (_, diags) = w.load(&app, true);
     assert_eq!(errors(&diags), [code::NO_VERSION]);
     assert!(!app.join("i.lock").exists());
@@ -1275,5 +1280,304 @@ fn lock_pins_superseded_manifests_in_both_test_configurations() {
             assert!(located(&g).is_empty());
             assert_eq!(fs::read(app.join("i.lock")).unwrap(), locked);
         }
+    }
+}
+
+/// The files of the whole repository `example.com/nmnmcc/i`: a root package
+/// with many files under `crates/` and `docs/`, and the package `stdlib/`
+/// with the module `src/<module>.i`.
+fn monorepo_files(module: &str) -> Vec<(String, String)> {
+    let mut files: Vec<(String, String)> = vec![
+        ("i.toml".into(), "name = \"i\"\n".into()),
+        ("stdlib/i.toml".into(), "name = \"stdlib\"\n".into()),
+        (format!("stdlib/src/{module}.i"), "x = 1\n".into()),
+    ];
+    for n in 0..200 {
+        files.push((format!("crates/c{n}/src/lib.rs"), format!("// {n}\n")));
+        files.push((format!("docs/page{n}.md"), format!("# {n}\n")));
+    }
+    files
+}
+
+impl Repo {
+    /// Commits exactly `files` on the main line, tagged `tag`.
+    fn commit_owned(&self, files: &[(String, String)], tag: &str) -> String {
+        let refs: Vec<(&str, &str)> = files
+            .iter()
+            .map(|(p, t)| (p.as_str(), t.as_str()))
+            .collect();
+        self.commit(&refs, tag)
+    }
+
+    /// Tags `tag` (moving it) on a commit with no parent whose tree is the
+    /// directory `dir` of `HEAD`, as `i publish` does for a package in a
+    /// directory, and pushes it. Gives the commit.
+    fn subtree_tag(&self, dir: &str, tag: &str) -> String {
+        let tree = git(&self.work, &["rev-parse", &format!("HEAD:{dir}")]);
+        let c = git(&self.work, &["commit-tree", &tree, "-m", tag]);
+        git(&self.work, &["tag", "-f", tag, &c]);
+        self.push();
+        c
+    }
+}
+
+/// The repository `example.com/nmnmcc/i`, with the root tagged `v1.0.0`
+/// and `stdlib-v0.1.0` on a commit of the subtree `stdlib/` only. Gives the
+/// repository and the commit of `stdlib-v0.1.0`.
+fn monorepo(w: &World) -> (Repo, String) {
+    let r = w.repo("nmnmcc/i");
+    r.commit_owned(&monorepo_files("text"), "v1.0.0");
+    let c = r.subtree_tag("stdlib", "stdlib-v0.1.0");
+    (r, c)
+}
+
+/// The objects reachable from `rev` in the bare repository `dir`, with
+/// their paths.
+fn objects(dir: &Path, rev: &str) -> Vec<String> {
+    git(dir, &["rev-list", "--objects", rev])
+        .lines()
+        .map(str::to_string)
+        .collect()
+}
+
+#[test]
+fn subpackage_tags_have_the_prefix_of_their_directory() {
+    use ilang_package::git::{tag_name, tag_prefix};
+    assert_eq!(tag_prefix(None), "");
+    assert_eq!(tag_prefix(Some("stdlib")), "stdlib-");
+    assert_eq!(tag_prefix(Some("tools/text")), "tools-text-");
+    let v = parse_version("1.2.3").unwrap();
+    assert_eq!(tag_name("github.com/nmnmcc/i", v), "v1.2.3");
+    assert_eq!(tag_name("github.com/nmnmcc/i//stdlib", v), "stdlib-v1.2.3");
+    assert_eq!(
+        tag_name("example.com/a//tools/text", v),
+        "tools-text-v1.2.3"
+    );
+
+    let w = World::new();
+    let (_r, c) = monorepo(&w);
+    let stdlib = "example.com/nmnmcc/i//stdlib";
+    let mut g = Git::new(w.cache(), false, w.urls());
+    let tags: Vec<String> = g
+        .tags(stdlib)
+        .unwrap()
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+    assert_eq!(tags, ["0.1.0"]);
+    assert_eq!(
+        g.commit(stdlib, parse_version("0.1.0").unwrap(), None)
+            .unwrap(),
+        c
+    );
+    let e = g
+        .commit(stdlib, parse_version("1.0.0").unwrap(), None)
+        .unwrap_err();
+    assert_eq!(e.code, code::NO_VERSION);
+    assert!(e.message.contains("`stdlib-v1.0.0`"), "{}", e.message);
+    assert!(
+        e.message.contains("its versions are 0.1.0"),
+        "{}",
+        e.message
+    );
+
+    // Only the tags `stdlib-v*` were fetched: not `v1.0.0`, and nothing that
+    // only it reaches.
+    let bare = w.cache().join("git").join(escape("example.com/nmnmcc/i"));
+    let refs = git(&bare, &["for-each-ref", "--format=%(refname)"]);
+    assert_eq!(refs, "refs/tags/stdlib-v0.1.0");
+    for rev in ["stdlib-v0.1.0", "--all"] {
+        let objs = objects(&bare, rev);
+        eprintln!("objects reachable from {rev} in the cache: {}", objs.len());
+        assert!(objs.len() < 300, "{}", objs.len());
+        // The package is the root of the tagged tree.
+        assert!(objs.iter().any(|o| o.ends_with(" src/text.i")), "{objs:?}");
+        assert!(!objs.iter().any(|o| o.contains(" stdlib/")), "{objs:?}");
+        assert!(
+            !objs
+                .iter()
+                .any(|o| o.contains(" crates/") || o.contains(" docs/")),
+            "{objs:?}"
+        );
+    }
+    let all = git(&bare, &["count-objects", "-v"]);
+    eprintln!("cache count-objects after the stdlib fetch:\n{all}");
+
+    // The root package of the same repository keeps its tags `vX.Y.Z`, in
+    // the same bare repository, and fetching them leaves the stdlib tags.
+    let tags: Vec<String> = g
+        .tags("example.com/nmnmcc/i")
+        .unwrap()
+        .iter()
+        .map(|v| v.to_string())
+        .collect();
+    assert_eq!(tags, ["1.0.0"]);
+    let refs = git(&bare, &["for-each-ref", "--format=%(refname)"]);
+    assert_eq!(refs, "refs/tags/stdlib-v0.1.0\nrefs/tags/v1.0.0");
+    // For contrast: the root tag reaches every file of the repository.
+    let root_objects = objects(&bare, "v1.0.0").len();
+    eprintln!("objects reachable from v1.0.0 in the cache: {root_objects}");
+    assert!(root_objects > 400, "{root_objects}");
+    let mut fresh = Git::new(w.cache(), true, w.urls());
+    assert_eq!(
+        fresh
+            .commit(stdlib, parse_version("0.1.0").unwrap(), None)
+            .unwrap(),
+        c
+    );
+}
+
+#[test]
+fn subpackage_lock_lines_and_moved_subpackage_tag() {
+    let w = World::new();
+    let (r, c) = monorepo(&w);
+    let app = w.project(
+        "app",
+        &[(
+            "i.toml",
+            "name = \"app\"\n[dependencies]\nstdlib = \"example.com/nmnmcc/i//stdlib@0.1.0\"\n",
+        )],
+    );
+    let (graph, diags) = w.load(&app, true);
+    no_errors(&graph, &diags);
+    assert_eq!(located(&graph), ["example.com/nmnmcc/i//stdlib@0.1.0"]);
+    let locked = fs::read_to_string(app.join("i.lock")).unwrap();
+    assert!(
+        locked.starts_with(&format!("example.com/nmnmcc/i//stdlib 0.1.0 {c} sha256-")),
+        "{locked}"
+    );
+    assert_eq!(locked.lines().count(), 1);
+    let bare = w.cache().join("git").join(escape("example.com/nmnmcc/i"));
+    assert!(!git(&bare, &["tag", "--list"]).contains("v1.0.0\n"));
+    assert_eq!(git(&bare, &["tag", "--list", "v*"]), "");
+
+    // The files of the package are at the root of the tagged tree; in the
+    // cache they are the package, with nothing else of the repository.
+    let root = graph.root.unwrap();
+    let pkg = dep(&graph, root, "stdlib");
+    let pkg_dir = pkg.dir.as_ref().unwrap();
+    assert!(pkg_dir.join("i.toml").is_file());
+    assert!(pkg_dir.join("src/text.i").is_file());
+    assert!(!pkg_dir.join("stdlib").exists());
+    assert!(!pkg_dir.join("crates").exists());
+    assert_eq!(
+        graph.sources.get(pkg.modules[0].source).display,
+        "example.com/nmnmcc/i//stdlib@0.1.0/src/text.i"
+    );
+    let subtree_hash = pkg.location.as_ref().unwrap().hash.clone();
+
+    // A tag on a commit of the whole repository (with the directory) is
+    // read from the directory, and has the same files and hash.
+    let whole = r.commit_owned(&monorepo_files("text"), "stdlib-v0.2.0");
+    let app2 = w.project(
+        "app2",
+        &[(
+            "i.toml",
+            "name = \"app2\"\n[dependencies]\nstdlib = \"example.com/nmnmcc/i//stdlib@0.2.0\"\n",
+        )],
+    );
+    let (graph, diags) = w.load(&app2, true);
+    no_errors(&graph, &diags);
+    let pkg = dep(&graph, graph.root.unwrap(), "stdlib");
+    let loc = pkg.location.as_ref().unwrap();
+    assert_eq!(loc.commit, whole);
+    assert_eq!(loc.hash, subtree_hash);
+    assert!(!pkg.dir.as_ref().unwrap().join("crates").exists());
+
+    // A subtree tag with no `i.toml` at its root is no package: only the
+    // directory or the root is looked in, never a missing `i.toml` let go.
+    r.commit_owned(
+        &[("stdlib/src/text.i".to_string(), "x = 1\n".to_string())],
+        "v1.0.1",
+    );
+    r.subtree_tag("stdlib", "stdlib-v0.3.0");
+    let app3 = w.project(
+        "app3",
+        &[(
+            "i.toml",
+            "name = \"app3\"\n[dependencies]\nstdlib = \"example.com/nmnmcc/i//stdlib@0.3.0\"\n",
+        )],
+    );
+    let (_, diags) = w.load(&app3, true);
+    assert_eq!(errors(&diags), [code::NO_PACKAGE]);
+
+    // Moving the root tag changes nothing for `//stdlib`.
+    r.commit(&[("i.toml", "name = \"i\"\n# moved\n")], "v1.0.0");
+    let mut options = w.options(true);
+    options.cache = Some(w.path().join("cache2"));
+    let (graph, diags) = load_with(&app, &options);
+    no_errors(&graph, &diags);
+    assert_eq!(fs::read_to_string(app.join("i.lock")).unwrap(), locked);
+
+    // The tag `stdlib-v0.1.0` is moved to another subtree commit.
+    r.commit_owned(&monorepo_files("evil"), "v1.1.0");
+    r.subtree_tag("stdlib", "stdlib-v0.1.0");
+    let mut options = w.options(true);
+    options.cache = Some(w.path().join("cache3"));
+    let (graph, diags) = load_with(&app, &options);
+    assert_eq!(errors(&diags), [code::LOCK_MISMATCH]);
+    let line = graph.sources.render(&diags[0]);
+    assert!(line.starts_with("i.lock:1:1: error[E0632]: "), "{line}");
+    assert!(line.contains("`stdlib-v0.1.0`"), "{line}");
+    assert!(located(&graph).is_empty());
+    assert_eq!(fs::read_to_string(app.join("i.lock")).unwrap(), locked);
+}
+
+#[test]
+fn two_fetches_of_one_repository_at_once() {
+    let w = World::new();
+    let json = w.repo("alice/json");
+    let c = json.package("json", &[], "1.4.0");
+    for round in 0..4 {
+        let cache = w.path().join(format!("shared-cache-{round}"));
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let threads: Vec<_> = (0..2)
+            .map(|_| {
+                let cache = cache.clone();
+                let urls = w.urls();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    let mut g = Git::new(cache, false, urls);
+                    barrier.wait();
+                    g.fetch("example.com/alice/json")?;
+                    g.commit(
+                        "example.com/alice/json",
+                        parse_version("1.4.0").unwrap(),
+                        None,
+                    )
+                })
+            })
+            .collect();
+        for t in threads {
+            assert_eq!(t.join().unwrap().unwrap(), c, "round {round}");
+        }
+        // The cache is usable afterwards, offline.
+        let mut g = Git::new(cache.clone(), true, w.urls());
+        assert_eq!(
+            g.commit(
+                "example.com/alice/json",
+                parse_version("1.4.0").unwrap(),
+                Some(&c)
+            )
+            .unwrap(),
+            c
+        );
+        let (dir, _) = g
+            .package("example.com/alice/json", None, "example.com/alice/json", &c)
+            .unwrap();
+        assert!(dir.join("i.toml").is_file());
+        assert!(
+            cache
+                .join("git")
+                .join("example.com%2falice%2fjson.lock")
+                .is_file()
+        );
+        // No temporary bare repository was left behind.
+        let left: Vec<_> = fs::read_dir(cache.join("git"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|n| n.starts_with(".tmp-"))
+            .collect();
+        assert!(left.is_empty(), "{left:?}");
     }
 }

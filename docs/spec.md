@@ -609,7 +609,7 @@ inhabitance rule; destructuring an impossible value first is not required.
 
 ### 4.2 Built-in types
 
-These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. So a module that defines a type with the name of a built-in type can still name the built-in type. The prelude types may be named through `i/prelude`.
+These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. So a module that defines a type with the name of a built-in type can still name the built-in type. The prelude names are built in and need no import.
 
 | Type | Values |
 |---|---|

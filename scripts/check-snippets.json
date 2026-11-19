@@ -3190,5 +3190,20 @@
   },
   "crates/ilang-cli/tests/package_commands.rs:9a401754e36c5860": {
     "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-check/tests/lazy_parse.rs:41a8b6c35fcc6353": {
+    "not_source": "deliberately invalid fixture text"
+  },
+  "crates/ilang-package/tests/git.rs:34e755e209bee761": {
+    "not_source": "manifest or repository fragment"
+  },
+  "crates/ilang-package/tests/git.rs:b159c0436e3e214c": {
+    "not_source": "manifest or repository fragment"
+  },
+  "crates/ilang-package/tests/git.rs:7995857a79bb7ac1": {
+    "not_source": "manifest or repository fragment"
+  },
+  "crates/ilang-package/tests/git.rs:261dc05ed93edc52": {
+    "not_source": "manifest or repository fragment"
   }
 }
