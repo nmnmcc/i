@@ -160,7 +160,7 @@ jobs:
     needs: changes
     if: fromJSON(needs.changes.outputs.changed).rust || fromJSON(needs.changes.outputs.changed).docs || fromJSON(needs.changes.outputs.changed).editors
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -229,7 +229,7 @@ jobs:
     name: lint and test (rust, other crates)
     needs: changes
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 20
     env:
       CHECKS_TEST_GROUP: rest
     steps:
@@ -260,6 +260,17 @@ jobs:
       - name: Run the Rust tests
         if: fromJSON(needs.changes.outputs.changed).rust
         run: devenv shell -- ./scripts/checks rust-test
+      # The deterministic TLS test five times, so a flake shows up here rather
+      # than in a release.
+      - name: Repeat the local TLS test
+        if: fromJSON(needs.changes.outputs.changed).rust
+        run: |
+          for run in 1 2 3 4 5; do
+            if ! devenv shell -- cargo test -p ilang-cli --locked --test tls -- --test-threads=1; then
+              echo "local TLS run $run of 5 failed" >&2
+              exit 1
+            fi
+          done
       - uses: ./.github/actions/marker
         with:
           name: lint and test (rust, other crates)
@@ -272,7 +283,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -282,6 +293,7 @@ jobs:
       CHECKS_TEST_GROUP: targets
       CHECKS_TEST_TARGETS: ${{ matrix.targets }}
       CHECKS_SHARD: ${{ matrix.shard }}
+      CHECKS_NETWORK_TESTS: ${{ github.event_name == 'schedule' && '1' || '0' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -317,7 +329,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -364,7 +376,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -408,7 +420,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -455,7 +467,7 @@ jobs:
     needs: [changes, release]
     if: fromJSON(needs.changes.outputs.changed).rust || fromJSON(needs.changes.outputs.changed).docs || fromJSON(needs.changes.outputs.changed).editors
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 20
     env:
       I_BIN: ${{ github.workspace }}/target/release/i
     steps:
@@ -546,7 +558,7 @@ jobs:
     needs: [plan, release]
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -590,7 +602,7 @@ jobs:
     needs: [plan, release]
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
