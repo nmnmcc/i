@@ -13,6 +13,7 @@ on:
       - .github/workflows/perf-diagnose.yml
       - bench/test/diag_test.i
       - bench/test/diag2_test.i
+      - bench/test/diag3_test.i
       - diag/**
 
 permissions:
