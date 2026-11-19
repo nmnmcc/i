@@ -79,3 +79,5 @@ jobs:
           path: out/
           if-no-files-found: error
           retention-days: 14
+
+# Rerun for a second set of five rounds.
