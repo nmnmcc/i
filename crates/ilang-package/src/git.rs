@@ -541,16 +541,41 @@ impl Git {
         Ok(objects.pop().flatten())
     }
 
+    /// Where the package of the directory `dir` of a location is in the tree
+    /// of `commit`: `dir` when the commit has that directory (a tag on a
+    /// commit of the whole repository), and otherwise the root of the tree
+    /// (a tag on a commit of the package's subtree only, as `i publish`
+    /// makes for a package in a directory). `None` is the root.
+    pub fn package_root<'d>(
+        &self,
+        repository: &str,
+        commit: &str,
+        dir: Option<&'d str>,
+    ) -> Result<Option<&'d str>> {
+        let Some(d) = dir else {
+            return Ok(None);
+        };
+        let mut cmd = self.command(Some(&self.repo_dir(repository)));
+        cmd.args(["cat-file", "-t", &format!("{commit}:{d}")]);
+        let out = self.run(cmd, None)?;
+        let is_tree = out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "tree";
+        Ok(is_tree.then_some(d))
+    }
+
     /// The files of the package in `dir` of the tree of `commit`, or in the
     /// whole tree: read with `git ls-tree` and `git cat-file`, with
     /// their bytes as git keeps them, symbolic links with their target as
-    /// bytes, and without submodules. In the order of their paths.
+    /// bytes, and without submodules. In the order of their paths. When
+    /// `commit` has no directory `dir`, it is a commit of the package's
+    /// subtree, and the files are those of the whole tree (see
+    /// [`Git::package_root`]).
     pub fn files(
         &self,
         repository: &str,
         commit: &str,
         dir: Option<&str>,
     ) -> Result<Vec<PackageFile>> {
+        let dir = self.package_root(repository, commit, dir)?;
         let tree = format!("{commit}:{}", dir.unwrap_or(""));
         let out = self.run_ok(repository, &["ls-tree", "-r", "-z", &tree], None)?;
         let mut entries = Vec::new();

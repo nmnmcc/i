@@ -1929,6 +1929,16 @@ fn publish_a_package_in_a_directory_of_the_repository() {
         ],
     );
     write(&top, &[("README", "mono\n")]);
+    // The rest of a big repository, which the package's tags must not reach.
+    for n in 0..200 {
+        write(
+            &top,
+            &[
+                (&format!("crates/c{n}/src/lib.rs"), &format!("// {n}\n")),
+                (&format!("docs/page{n}.md"), &format!("# {n}\n")),
+            ],
+        );
+    }
     test_project::configure(&dir);
     git(&top, &["init", "-q"]);
     commit(&top, "first");
@@ -1948,10 +1958,79 @@ fn publish_a_package_in_a_directory_of_the_repository() {
     assert!(out.contains("made the tag stdlib-v0.1.0"), "{out}");
     assert!(out.contains("git push origin stdlib-v0.1.0"), "{out}");
     assert_eq!(tags(&top), "stdlib-v0.1.0\nv5.0.0");
+    // The tag is on a commit of the package's subtree only, with no parent.
+    let tagged = git(&top, &["rev-parse", "stdlib-v0.1.0^{commit}"]);
+    assert_ne!(tagged, git(&top, &["rev-parse", "HEAD"]));
     assert_eq!(
-        git(&top, &["rev-parse", "stdlib-v0.1.0^{commit}"]),
-        git(&top, &["rev-parse", "HEAD"])
+        git(&top, &["rev-list", "--parents", "-n1", &tagged]),
+        tagged
     );
+    assert_eq!(
+        git(&top, &["rev-parse", "stdlib-v0.1.0^{tree}"]),
+        git(&top, &["rev-parse", "HEAD:stdlib"])
+    );
+    assert_eq!(
+        git(&top, &["log", "-1", "--format=%s", &tagged]),
+        "stdlib 0.1.0"
+    );
+    let objects = git(&top, &["rev-list", "--objects", "stdlib-v0.1.0"]);
+    let count = objects.lines().count();
+    eprintln!("objects reachable from stdlib-v0.1.0: {count}");
+    assert!(count < 300, "{count}");
+    assert!(
+        !objects
+            .lines()
+            .any(|o| o.contains(" crates/") || o.contains(" docs/") || o.contains(" stdlib/")),
+        "{objects}"
+    );
+    assert!(
+        objects.lines().any(|o| o.ends_with(" src/api.i")),
+        "{objects}"
+    );
+
+    // Got by location, the package is the root of the tagged tree.
+    let remote = w.path().join("remotes").join("mono");
+    fs::create_dir_all(&remote).unwrap();
+    git(&remote, &["init", "-q", "--bare"]);
+    let push_tags = |top: &Path| {
+        let remote = remote.display().to_string();
+        git(top, &["push", "-q", "-f", &remote, "HEAD:refs/heads/main"]);
+        git(top, &["push", "-q", "-f", &remote, "--tags"]);
+    };
+    push_tags(&top);
+    let app = w.project(
+        "app",
+        &[
+            (
+                "i.toml",
+                "name = \"app\"\n[dependencies]\npub = \"example.com/mono//stdlib@0.1.0\"\n",
+            ),
+            ("src/main.i", " (pub/api)\n (x)\n\nx = api.one\n"),
+        ],
+    );
+    let app_project = app.display().to_string();
+    w.ok(&["check", "--project", &app_project]);
+    let lock = read(&app.join("i.lock"));
+    assert!(
+        lock.starts_with(&format!("example.com/mono//stdlib 0.1.0 {tagged} sha256-")),
+        "{lock}"
+    );
+    let cache_repo = w
+        .path()
+        .join("cache")
+        .join("git")
+        .join("example.com%2fmono");
+    assert_eq!(
+        git(&cache_repo, &["for-each-ref", "--format=%(refname)"]),
+        "refs/tags/stdlib-v0.1.0"
+    );
+    let cached = git(&cache_repo, &["rev-list", "--objects", "--all"]);
+    eprintln!(
+        "objects in the cache after the fetch: {}",
+        cached.lines().count()
+    );
+    assert!(cached.lines().count() < 300);
+    assert!(!cached.contains(" crates/") && !cached.contains(" docs/"));
 
     // Not newer than the previous `stdlib-v*` tag.
     for old in ["0.1.0", "0.0.9"] {
@@ -1965,8 +2044,30 @@ fn publish_a_package_in_a_directory_of_the_repository() {
     write(&dir, &[("src/api.i", &format!("{API_1}\nhidden = 3\n"))]);
     commit(&top, "internal");
     let out = w.ok(&["publish", "0.1.1", "--dry-run", "--project", &project]);
-    assert!(out.contains("stdlib-v0.1.0"), "{out}");
+    assert!(
+        out.contains("the public interface is the same as in stdlib-v0.1.0"),
+        "{out}"
+    );
     assert!(!out.contains("v5.0.0"), "{out}");
     assert!(out.contains("the tag stdlib-v0.1.1 was not made"), "{out}");
     assert_eq!(tags(&top), "stdlib-v0.1.0\nv5.0.0");
+    // An addition since the subtree tag needs a minor version.
+    let added = API_1
+        .replace("\tone\n", "\tone\n\ttwo\n")
+        .replace("one = 1\n", "one = 1\n\ntwo = 2\n");
+    write(&dir, &[("src/api.i", &added)]);
+    commit(&top, "two");
+    let err = w.fails(&["publish", "0.1.1", "--project", &project]);
+    assert!(
+        err.contains("something was added since stdlib-v0.1.0"),
+        "{err}"
+    );
+    let out = w.ok(&["publish", "0.2.0", "--project", &project]);
+    assert!(out.contains("git push origin stdlib-v0.2.0"), "{out}");
+    let tagged = git(&top, &["rev-parse", "stdlib-v0.2.0^{commit}"]);
+    assert_eq!(
+        git(&top, &["rev-list", "--parents", "-n1", &tagged]),
+        tagged
+    );
+    assert_eq!(tags(&top), "stdlib-v0.1.0\nstdlib-v0.2.0\nv5.0.0");
 }
