@@ -1217,3 +1217,57 @@ same callee passed two different known functions (two clones).
 The cost is code size: clones duplicate a function body. The pass caps them at
 eight times the program's function count; the probe grew 0.35%. Exports, the
 ABI metadata, source positions and the inspection threshold do not change.
+
+### Reusing a list comparison's continuation frame (2026-11-19)
+
+`equality` (20 comparisons of two 100k-element lists of `(Int, String)`
+tuples) was the slowest remaining benchmark the compiler can reach. The
+isolating probes ran three times in one job on an Intel Xeon 6975P-C:
+
+| Comparison, 20 rounds of 100k elements | seconds | ns per element |
+|---|---:|---:|
+| Int lists | 0.059 | 29.5 |
+| `(Int, Int)` tuple lists | 0.171 | 85.5 |
+| `(Int, String)` tuple lists | 0.241 | 120.5 |
+
+Building 2M cons cells on the same runner took 0.111 s, 55.5 ns per cell. The
+56 ns a two-field tuple costs over a plain Int element is therefore one
+allocation per list cell: `$value_compare_i32` remembered the two list tails
+in a heap `$compare_frame` while it compared the heads, and allocated a new
+frame for every cell.
+
+A popped list continuation now stays in a local and is reused for the next
+cell, so a list comparison allocates one frame per nesting level instead of
+one per element. The frame fields became mutable for that reuse. This is a
+runtime implementation change (it applies at every `--opt` level); it does
+not change the comparison result.
+
+Two independent paired runs, five alternating rounds each, on two runners
+(seconds, medians; the second run's absolute times are slower, so only the
+within-run change is meaningful):
+
+| Benchmark | Xeon Platinum 8573C | AMD EPYC 7763 |
+|---|---:|---:|
+| `equality` | 0.367 -> 0.246 (**-33.0%**) | 0.444 -> 0.256 (**-42.3%**) |
+| `list_sort` | +0.8% | +0.4% |
+| `list_merge` | +0.9% | +0.4% |
+| `list_build` | -1.1% | +2.1% |
+| `list_map` | -0.7% | +0.6% |
+| `list_reverse` | -0.5% | 0.0% |
+| `closures` | 0.0% | 0.0% |
+| `inspect` | -2.3% | -0.6% |
+| `dict_insert` | -0.9% | 0.0% |
+
+The equality probes confirm the same cause: `diag_equal_20x` -33.2%,
+`(Int,Int)` tuple lists -26.5%, Int lists -5.1% (noise). The other benchmarks
+move by at most 2.1%, with overlapping ranges, and none of them executes the
+changed comparison; `list_build`'s +2.1% is a 2 ms difference in a path that
+never calls `==` on a list, so it is layout noise rather than a regression.
+
+Compile time for the specialization committed just before this one was
+measured paired on one AMD EPYC 7763: `i test --project std --opt 2` with a
+filter that matches no test (the whole std collection build) took 233.8 and
+236.6 s of CPU before and 234.5 and 236.4 s after, and 2.76-2.80 s for the
+small probe package in both. About 0.1-0.2% of the std build, not a
+measurable cost. (The +1.8 s quoted earlier in this document is the
+always-inline change, which is a different change.)
