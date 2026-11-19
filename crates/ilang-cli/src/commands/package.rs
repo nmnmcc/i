@@ -876,10 +876,29 @@ fn check_clean(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Check the committed package tree, never the destinations of its links.
-fn check_source_links_at(project: &Path, revision: &str) -> Result<()> {
+/// Where the package of `project` is in the tree of `revision`: its
+/// directory in the repository (`--show-prefix`, without the last `/`) when
+/// `revision` has that directory, and otherwise `""`, the root, as in a tag
+/// of a package in a directory, which is on a commit of its subtree only.
+fn package_dir_at(project: &Path, revision: &str) -> Result<String> {
     let prefix = git_in(project, &["rev-parse", "--show-prefix"])?;
     let prefix = prefix.trim_end_matches('/');
+    if prefix.is_empty() {
+        return Ok(String::new());
+    }
+    let kind = git_in(
+        project,
+        &["cat-file", "-t", &format!("{revision}:{prefix}")],
+    );
+    Ok(match kind {
+        Ok(k) if k == "tree" => prefix.to_string(),
+        _ => String::new(),
+    })
+}
+
+/// Check the committed package tree, never the destinations of its links.
+fn check_source_links_at(project: &Path, revision: &str) -> Result<()> {
+    let prefix = package_dir_at(project, revision)?;
     let tree = if prefix.is_empty() {
         revision.to_owned()
     } else {
@@ -948,13 +967,25 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
         Some(p) => compare_with(project, &format!("{prefix}v{p}"), p, version, &now)?,
     }
 
-    // 5. The tag.
+    // 5. The tag. A package at the top of the repository tags `HEAD`. A
+    // package in a directory tags a commit of its subtree only, with no
+    // parent, so that getting the tag gets the package and nothing else of
+    // the repository or its history.
     let tag = format!("{prefix}v{version}");
     if dry_run {
         outln!("dry run: every check passed; the tag {tag} was not made");
         return Ok(ExitCode::SUCCESS);
     }
-    git_in(project, &["tag", &tag])?;
+    let target = if prefix.is_empty() {
+        "HEAD".to_string()
+    } else {
+        let dir = git_in(project, &["rev-parse", "--show-prefix"])?;
+        let dir = dir.trim_end_matches('/');
+        let tree = git_in(project, &["rev-parse", &format!("HEAD:{dir}")])?;
+        let message = format!("{} {version}", prefix.trim_end_matches('-'));
+        git_in(project, &["commit-tree", &tree, "-m", &message])?
+    };
+    git_in(project, &["tag", &tag, &target])?;
     let remotes = git_in(project, &["remote"])?;
     let remote = if remotes.lines().any(|r| r == "origin") || remotes.is_empty() {
         "origin"
@@ -1081,7 +1112,7 @@ fn compare_with(
         }
         Some(Ok(old)) => {
             let diff = Diff::new(old, now)?;
-            diff.print(&tag);
+            diff.print(tag);
             diff.version_step()
         }
     };
@@ -1134,14 +1165,25 @@ impl Step {
 /// the package was not in the repository at that tag.
 fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interface>>> {
     let top = PathBuf::from(git_in(project, &["rev-parse", "--show-toplevel"])?);
-    let prefix = git_in(project, &["rev-parse", "--show-prefix"])?;
-    let prefix = prefix.trim_end_matches('/');
+    // The package is in its directory of the tag, or at the root of a tag
+    // on a commit of its subtree. Its `i.toml` must be there either way.
+    let prefix = package_dir_at(project, tag)?;
+    let prefix = prefix.as_str();
     let toml = if prefix.is_empty() {
         format!("{tag}:i.toml")
     } else {
         format!("{tag}:{prefix}/i.toml")
     };
     if git_in(&top, &["cat-file", "-e", &toml]).is_err() {
+        let dir = git_in(project, &["rev-parse", "--show-prefix"])?;
+        let dir = dir.trim_end_matches('/');
+        if !dir.is_empty() && prefix.is_empty() {
+            // A tag of this package that is neither a commit with its
+            // directory nor a commit of its subtree.
+            bail!(
+                "the tag {tag} has no directory `{dir}`, and no `i.toml` at its root, so it is not a version of this package"
+            );
+        }
         return Ok(None);
     }
     if let Err(error) = check_source_links_at(project, tag) {

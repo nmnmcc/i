@@ -158,7 +158,10 @@ impl Resolver<'_> {
         // The tags of the location's own prefix (`<dir>-v` for `//dir`).
         let commit = self.git.commit(&key.location, version, expected)?;
         let tag = git::tag_name(&key.location, version);
-        let path = match dir {
+        // A tag of `//dir` is on a commit of the whole repository, with the
+        // package in `dir`, or on a commit of the package's subtree only.
+        let root = self.git.package_root(repository, &commit, dir)?;
+        let path = match root {
             Some(d) => format!("{d}/i.toml"),
             None => "i.toml".to_string(),
         };
@@ -171,9 +174,12 @@ impl Resolver<'_> {
                 )
             })?,
             None => {
-                let what = match dir {
-                    Some(d) => format!("the directory `{d}` of the tag `{tag}`"),
-                    None => format!("the tag `{tag}`"),
+                let what = match (dir, root) {
+                    (Some(d), Some(_)) => format!("the directory `{d}` of the tag `{tag}`"),
+                    (Some(d), None) => format!(
+                        "the tag `{tag}` (which has no directory `{d}`, so its root is the package)"
+                    ),
+                    (None, _) => format!("the tag `{tag}`"),
                 };
                 return Err(GitError::new(
                     code::NO_PACKAGE,

@@ -1283,31 +1283,51 @@ fn lock_pins_superseded_manifests_in_both_test_configurations() {
     }
 }
 
-/// The repository `example.com/nmnmcc/i`: a root package tagged `v1.0.0`
-/// with many files under `crates/` and `docs/`, and the package `//stdlib`
-/// tagged `stdlib-v0.1.0` on a history that has only `stdlib/`. Gives the
-/// repository and the commit of `stdlib-v0.1.0`.
-fn monorepo(w: &World) -> (Repo, String) {
-    let r = w.repo("nmnmcc/i");
-    let mut files: Vec<(String, String)> = vec![("i.toml".into(), "name = \"i\"\n".into())];
+/// The files of the whole repository `example.com/nmnmcc/i`: a root package
+/// with many files under `crates/` and `docs/`, and the package `stdlib/`
+/// with the module `src/<module>.i`.
+fn monorepo_files(module: &str) -> Vec<(String, String)> {
+    let mut files: Vec<(String, String)> = vec![
+        ("i.toml".into(), "name = \"i\"\n".into()),
+        ("stdlib/i.toml".into(), "name = \"stdlib\"\n".into()),
+        (format!("stdlib/src/{module}.i"), "x = 1\n".into()),
+    ];
     for n in 0..200 {
         files.push((format!("crates/c{n}/src/lib.rs"), format!("// {n}\n")));
         files.push((format!("docs/page{n}.md"), format!("# {n}\n")));
     }
-    let refs: Vec<(&str, &str)> = files
-        .iter()
-        .map(|(p, t)| (p.as_str(), t.as_str()))
-        .collect();
-    r.commit(&refs, "v1.0.0");
-    git(&r.work, &["checkout", "-q", "--orphan", "stdlib-release"]);
-    git(&r.work, &["rm", "-rqf", "."]);
-    let c = r.commit(
-        &[
-            ("stdlib/i.toml", "name = \"stdlib\"\n"),
-            ("stdlib/src/text.i", "x = 1\n"),
-        ],
-        "stdlib-v0.1.0",
-    );
+    files
+}
+
+impl Repo {
+    /// Commits exactly `files` on the main line, tagged `tag`.
+    fn commit_owned(&self, files: &[(String, String)], tag: &str) -> String {
+        let refs: Vec<(&str, &str)> = files
+            .iter()
+            .map(|(p, t)| (p.as_str(), t.as_str()))
+            .collect();
+        self.commit(&refs, tag)
+    }
+
+    /// Tags `tag` (moving it) on a commit with no parent whose tree is the
+    /// directory `dir` of `HEAD`, as `i publish` does for a package in a
+    /// directory, and pushes it. Gives the commit.
+    fn subtree_tag(&self, dir: &str, tag: &str) -> String {
+        let tree = git(&self.work, &["rev-parse", &format!("HEAD:{dir}")]);
+        let c = git(&self.work, &["commit-tree", &tree, "-m", tag]);
+        git(&self.work, &["tag", "-f", tag, &c]);
+        self.push();
+        c
+    }
+}
+
+/// The repository `example.com/nmnmcc/i`, with the root tagged `v1.0.0`
+/// and `stdlib-v0.1.0` on a commit of the subtree `stdlib/` only. Gives the
+/// repository and the commit of `stdlib-v0.1.0`.
+fn monorepo(w: &World) -> (Repo, String) {
+    let r = w.repo("nmnmcc/i");
+    r.commit_owned(&monorepo_files("text"), "v1.0.0");
+    let c = r.subtree_tag("stdlib", "stdlib-v0.1.0");
     (r, c)
 }
 
@@ -1370,6 +1390,9 @@ fn subpackage_tags_have_the_prefix_of_their_directory() {
         let objs = objects(&bare, rev);
         eprintln!("objects reachable from {rev} in the cache: {}", objs.len());
         assert!(objs.len() < 300, "{}", objs.len());
+        // The package is the root of the tagged tree.
+        assert!(objs.iter().any(|o| o.ends_with(" src/text.i")), "{objs:?}");
+        assert!(!objs.iter().any(|o| o.contains(" stdlib/")), "{objs:?}");
         assert!(
             !objs
                 .iter()
@@ -1428,8 +1451,57 @@ fn subpackage_lock_lines_and_moved_subpackage_tag() {
     assert!(!git(&bare, &["tag", "--list"]).contains("v1.0.0\n"));
     assert_eq!(git(&bare, &["tag", "--list", "v*"]), "");
 
+    // The files of the package are at the root of the tagged tree; in the
+    // cache they are the package, with nothing else of the repository.
+    let root = graph.root.unwrap();
+    let pkg = dep(&graph, root, "stdlib");
+    let pkg_dir = pkg.dir.as_ref().unwrap();
+    assert!(pkg_dir.join("i.toml").is_file());
+    assert!(pkg_dir.join("src/text.i").is_file());
+    assert!(!pkg_dir.join("stdlib").exists());
+    assert!(!pkg_dir.join("crates").exists());
+    assert_eq!(
+        graph.sources.get(pkg.modules[0].source).display,
+        "example.com/nmnmcc/i//stdlib@0.1.0/src/text.i"
+    );
+    let subtree_hash = pkg.location.as_ref().unwrap().hash.clone();
+
+    // A tag on a commit of the whole repository (with the directory) is
+    // read from the directory, and has the same files and hash.
+    let whole = r.commit_owned(&monorepo_files("text"), "stdlib-v0.2.0");
+    let app2 = w.project(
+        "app2",
+        &[(
+            "i.toml",
+            "name = \"app2\"\n[dependencies]\nstdlib = \"example.com/nmnmcc/i//stdlib@0.2.0\"\n",
+        )],
+    );
+    let (graph, diags) = w.load(&app2, true);
+    no_errors(&graph, &diags);
+    let pkg = dep(&graph, graph.root.unwrap(), "stdlib");
+    let loc = pkg.location.as_ref().unwrap();
+    assert_eq!(loc.commit, whole);
+    assert_eq!(loc.hash, subtree_hash);
+    assert!(!pkg.dir.as_ref().unwrap().join("crates").exists());
+
+    // A subtree tag with no `i.toml` at its root is no package: only the
+    // directory or the root is looked in, never a missing `i.toml` let go.
+    r.commit_owned(
+        &[("stdlib/src/text.i".to_string(), "x = 1\n".to_string())],
+        "v1.0.1",
+    );
+    r.subtree_tag("stdlib", "stdlib-v0.3.0");
+    let app3 = w.project(
+        "app3",
+        &[(
+            "i.toml",
+            "name = \"app3\"\n[dependencies]\nstdlib = \"example.com/nmnmcc/i//stdlib@0.3.0\"\n",
+        )],
+    );
+    let (_, diags) = w.load(&app3, true);
+    assert_eq!(errors(&diags), [code::NO_PACKAGE]);
+
     // Moving the root tag changes nothing for `//stdlib`.
-    git(&r.work, &["checkout", "-q", "main"]);
     r.commit(&[("i.toml", "name = \"i\"\n# moved\n")], "v1.0.0");
     let mut options = w.options(true);
     options.cache = Some(w.path().join("cache2"));
@@ -1437,15 +1509,9 @@ fn subpackage_lock_lines_and_moved_subpackage_tag() {
     no_errors(&graph, &diags);
     assert_eq!(fs::read_to_string(app.join("i.lock")).unwrap(), locked);
 
-    // The tag `stdlib-v0.1.0` is moved to other files.
-    git(&r.work, &["checkout", "-q", "stdlib-release"]);
-    r.commit(
-        &[
-            ("stdlib/i.toml", "name = \"stdlib\"\n"),
-            ("stdlib/src/evil.i", "x = 2\n"),
-        ],
-        "stdlib-v0.1.0",
-    );
+    // The tag `stdlib-v0.1.0` is moved to another subtree commit.
+    r.commit_owned(&monorepo_files("evil"), "v1.1.0");
+    r.subtree_tag("stdlib", "stdlib-v0.1.0");
     let mut options = w.options(true);
     options.cache = Some(w.path().join("cache3"));
     let (graph, diags) = load_with(&app, &options);
