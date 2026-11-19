@@ -1,8 +1,7 @@
-src/main.i:9:2: error[E0210]: there is no module `i/bit_array`. Import `std/bit_array` instead; that module exists.
 src/main.i:32:3: error[E0201]: `value` is not defined
-src/main.i:45:47: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
-src/main.i:45:65: error[E0201]: `None` is not defined. Import `(None) = std/option` to use `None`.
-src/main.i:46:45: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
-src/main.i:46:63: error[E0201]: `None` is not defined. Import `(None) = std/option` to use `None`.
-src/main.i:96:6: error[E0201]: `Some` is not defined. Import `(Some) = std/option` to use `Some`.
-7 errors
+src/main.i:45:47: error[E0201]: `Some` is not defined. Import `(Some) = i/option` to use `Some`.
+src/main.i:45:65: error[E0201]: `None` is not defined. Import `(None) = i/option` to use `None`.
+src/main.i:46:45: error[E0201]: `Some` is not defined. Import `(Some) = i/option` to use `Some`.
+src/main.i:46:63: error[E0201]: `None` is not defined. Import `(None) = i/option` to use `None`.
+src/main.i:96:6: error[E0201]: `Some` is not defined. Import `(Some) = i/option` to use `Some`.
+6 errors

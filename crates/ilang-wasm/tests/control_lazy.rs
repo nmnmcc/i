@@ -899,7 +899,7 @@ fn bench_source(depth: u32, rounds: u32, capture_only: bool) -> String {
                 .path
                 .iter()
                 .map(|part| part.name.as_str())
-                .eq(["std", "test"])
+                .eq(["i", "test"])
         })
         .expect("benchmark imports its test macros")
         .span

@@ -805,10 +805,7 @@ impl Loader {
 /// Whether a package has the standard library as a dependency or a
 /// dev-dependency.
 fn has_library(manifest: &Manifest) -> bool {
-    manifest
-        .dependencies
-        .iter()
-        .any(|d| d.name == LIBRARY_NAME)
+    manifest.dependencies.iter().any(|d| d.name == LIBRARY_NAME)
 }
 
 /// Says, in an offline error on the dependency `i`, that it is the standard

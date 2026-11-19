@@ -7,10 +7,10 @@
 	i/fail
 	i/stdio
 	i/bit_array
-	std/json
-	std/int
-	std/list
-	std/path
+	i/json
+	i/int
+	i/list
+	i/path
 )
 
 Job = (name = String, url = String)

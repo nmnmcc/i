@@ -3,10 +3,10 @@
 	i/fs
 	i/core
 	i/stdio
-	std/bit_array
-	std/json
-	std/string
-	std/int
+	i/bit_array
+	i/json
+	i/string
+	i/int
 )
 
 parse_amount = (value) {

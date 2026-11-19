@@ -352,7 +352,7 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     // Already-observed failures are ordered explicitly, independently
     // of their observation order. Seed the private typed storage directly in
     // a source copy; the IO and continuation queries are unused by this pure unit probe.
-    let source = include_str!("../../../lib/i/task.i");
+    let source = include_str!("../../../stdlib/src/task.i");
     let source = source.replace(
         "@external(\"ilang:request\", \"observe_change\")\nobserve_change : (Key(Nil)) -> Request(Nil)",
         "observe_change = (_root : Key(Nil)) -> Request(Nil) { request.ready(Nil) }",

@@ -189,7 +189,7 @@ fn analyze(job: &Job) -> (Analysis, bool) {
     }
     let checked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let original_graph = graph.clone();
-        match ilang_macro::project::expand(&mut graph) {
+        match ilang_macro::project::expand_all(&mut graph) {
             Ok(mut expanded) => {
                 expanded.lower_quotes();
                 let mut checked =

@@ -4,11 +4,11 @@
 	i/stdio
 	i/fail
 	i/core
-	std/bit_array
-	std/json
-	std/list
-	std/int
-	(Some, None) = std/option
+	i/bit_array
+	i/json
+	i/list
+	i/int
+	(Some, None) = i/option
 	(Process, Fs, Stdio) = i/process
 )
 

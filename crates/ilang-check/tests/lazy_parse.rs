@@ -244,6 +244,7 @@ fn library_modules_are_parsed_only_when_reached() {
             "i/random",
             "i/request",
             "i/resource",
+            "i/syntax",
             "i/task",
         ]
     );
@@ -260,7 +261,7 @@ fn library_modules_are_parsed_only_when_reached() {
     }
     // Every other module of `i` is not parsed.
     let paths = parsed_paths(&graph);
-    for unreached in ["i/json", "i/list", "i/syntax", "i/test"] {
+    for unreached in ["i/json", "i/list", "i/test"] {
         assert!(!paths.contains(&unreached.to_string()), "{paths:?}");
     }
     let (_dir, graph) = load(

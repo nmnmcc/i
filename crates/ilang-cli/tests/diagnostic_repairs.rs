@@ -124,7 +124,7 @@ fn wrong_standard_namespace_is_suggested_in_both_directions() {
     let diagnostics = check(&[("src/main.i", "(std/process)\nmain = () { Nil }\n")]);
     assert!(
         diagnostics.contains(
-            "there is no module `std/process`. Import `i/process` instead; that module exists."
+            "`std` is not the name of this package or a dependency name; the standard library is `i`, so write `i/process`"
         ),
         "{diagnostics}"
     );

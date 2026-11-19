@@ -4,10 +4,10 @@
 	i/net
 	i/core
 	i/stdio
-	std/bit_array
-	std/json
-	std/int
-	std/list
+	i/bit_array
+	i/json
+	i/int
+	i/list
 )
 
 Job = (name = String, url = String)

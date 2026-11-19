@@ -5,11 +5,11 @@
 	i/core
 	i/stdio
 	i/fail
-	(Some, None, Option) = std/option
-	std/bit_array
-	std/json
-	std/int
-	std/list
+	(Some, None, Option) = i/option
+	i/bit_array
+	i/json
+	i/int
+	i/list
 )
 
 Job = (name = String, url = String)

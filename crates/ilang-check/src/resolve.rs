@@ -659,6 +659,12 @@ impl<'a> Resolver<'a> {
             let dev = pkg.dev_dependencies.iter().any(|(n, _)| n == first);
             let msg = if dev {
                 format!("`{first}` is a dev-dependency, so only modules under `test/` may use it")
+            } else if first == "std" {
+                let rest: Vec<&str> = item.path[1..].iter().map(|p| p.name.as_str()).collect();
+                format!(
+                    "`std` is not the name of this package or a dependency name; the standard library is `i`, so write `i/{}`",
+                    rest.join("/")
+                )
             } else {
                 format!("`{first}` is not the name of this package or a dependency name")
             };

@@ -50,11 +50,39 @@ impl Expanded {
 /// Parses and expands each module after its dependencies. On failure the
 /// diagnostics are returned without publishing partial output to the checker.
 pub fn expand(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
-    ilang_syntax::syn3::deep::deep(|| expand_here(graph))
+    ilang_syntax::syn3::deep::deep(|| expand_here(graph, false))
 }
 
-fn expand_here(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
-    let (mut parsed, mut diagnostics) = ilang_check::parse(graph);
+/// As [`expand`], but parses every module of the graph. Tools that query
+/// modules the program does not import (editor completion) need this.
+pub fn expand_all(graph: &mut PackageGraph) -> Result<Expanded, Vec<Diagnostic>> {
+    ilang_syntax::syn3::deep::deep(|| expand_here(graph, true))
+}
+
+fn expand_here(graph: &mut PackageGraph, all: bool) -> Result<Expanded, Vec<Diagnostic>> {
+    let (mut parsed, mut diagnostics) = if all {
+        // Tools that query a dependency's modules need them parsed, but the
+        // standard library is large and its test macro module is only expanded
+        // when a project imports it. Keep every module outside the library and
+        // the library's usual closure.
+        let (closure, _) = ilang_check::parse(graph);
+        let kept: std::collections::HashSet<_> = closure
+            .iter()
+            .map(|p| (p.package, p.path.clone()))
+            .collect();
+        let (parsed, diagnostics) = ilang_check::parse_all(graph);
+        let parsed = parsed
+            .into_iter()
+            .filter(|p| {
+                let package = &graph.packages[p.package];
+                package.name != ilang_package::LIBRARY_NAME
+                    || kept.contains(&(p.package, p.path.clone()))
+            })
+            .collect();
+        (parsed, diagnostics)
+    } else {
+        ilang_check::parse(graph)
+    };
     if diagnostics.iter().any(Diagnostic::is_error) {
         return Err(diagnostics);
     }

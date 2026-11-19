@@ -22,16 +22,33 @@ fn stdlib_paths() -> Vec<String> {
 
 #[test]
 fn library_resolves_cleanly() {
-    let (graph, program, diags) = common::check_all_modules(&[]);
-    let rendered = graph.sources.render_all(&diags);
+    let (graph, _, _) = common::check_all_modules(&[]);
+    let (parsed, parse_diags) = ilang_check::parse_all(&graph);
+    let rendered = graph.sources.render_all(&parse_diags);
     assert!(rendered.is_empty(), "{rendered:#?}");
-    let program = program.unwrap();
+    // Every module of the package `i` is parsed, including the Lisp macro
+    // module `i/test`, whose quotes the macro driver expands before
+    // resolution; this checker-only test leaves it out of that pass.
+    let mut parsed_paths: Vec<&str> = parsed.iter().map(|p| p.path.as_str()).collect();
+    parsed_paths.sort();
+    let mut all: Vec<String> = vec!["$prelude".to_string()];
+    all.extend(stdlib_paths());
+    all.sort();
+    assert_eq!(parsed_paths, all);
+    assert_eq!(all.len(), 1 + 49);
+    let checked = parsed
+        .into_iter()
+        .filter(|p| p.path != "i/test")
+        .collect::<Vec<_>>();
+    let checked = ilang_check::check_parsed(&graph, &checked);
+    let rendered = graph.sources.render_all(&checked.diags);
+    assert!(rendered.is_empty(), "{rendered:#?}");
+    let program = checked.program.unwrap();
     let paths: Vec<&str> = program.modules.iter().map(|m| m.path.as_str()).collect();
-    // The built-in prelude, then the modules of the dependency `i`.
     let mut want = vec!["$prelude".to_string()];
-    want.extend(stdlib_paths());
+    want.extend(stdlib_paths().into_iter().filter(|p| p != "i/test"));
     assert_eq!(paths, want);
-    assert_eq!(want.len(), 1 + 49);
+    assert_eq!(want.len() + 1, 1 + 49);
     // The modules that the compiler names are all there.
     for path in ilang_package::library::RUNTIME
         .iter()
@@ -361,12 +378,11 @@ fn library_names() {
 #[test]
 fn library_labels() {
     let (graph, _, _) = common::check_all_modules(&[]);
-    let checked = common::check_all_parsed(&graph);
-    assert!(
-        !checked.diags.iter().any(|d| d.is_error()),
-        "{:?}",
-        checked.diags
-    );
+    let (parsed, _) = ilang_check::parse_all(&graph);
+    let parsed: Vec<_> = parsed.into_iter().filter(|p| p.path != "i/test").collect();
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    let errors: Vec<_> = checked.diags.iter().filter(|d| d.is_error()).collect();
+    assert!(errors.is_empty(), "{errors:?}");
     let program = checked.program.unwrap();
     let types = checked.types.unwrap();
     // Catch and keep are ordinary bindings. Inspect the public parameter
