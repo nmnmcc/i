@@ -7,7 +7,7 @@ root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/stop/src"
-printf 'name = "stop"\n' >"$work/stop/i.toml"
+printf 'name = "stop"\n[dependencies]\ni = { path = "%s" }\n' "$root/stdlib" >"$work/stop/i.toml"
 printf 'main = () { assert(1 + 1 == 3) }\n' >"$work/stop/src/main.i"
 cat >"$work/node-wasi.mjs" <<'JS'
 import { readFile } from "node:fs/promises";

@@ -29,7 +29,7 @@ for (const opt of [0, 2]) {
     const dir = await mkdtemp(join(tmpdir(), 'i-wasi-args-'));
     try {
       await mkdir(join(dir, 'src'));
-      await writeFile(join(dir, 'i.toml'), 'name = "app"\n');
+      await writeFile(join(dir, 'i.toml'), `name = "app"\n[dependencies]\ni = {path = ${JSON.stringify(join(root, 'stdlib'))}}\n`);
       await writeFile(join(dir, 'src/main.i'), `(
 	i/process
 	i/stdio
@@ -86,7 +86,7 @@ test('WASI rejects unavailable Net, Tls and Process at compile time', { timeout:
   assert.notEqual(net.status, 0); assert.match(net.stderr, /Net/); assert.match(net.stderr, /wasi/i);
   const dir = await mkdtemp(join(tmpdir(), 'i-wasi-unavailable-'));
   try {
-    await mkdir(join(dir, 'src')); await writeFile(join(dir, 'i.toml'), 'name = "app"\n');
+    await mkdir(join(dir, 'src')); await writeFile(join(dir, 'i.toml'), `name = "app"\n[dependencies]\ni = {path = ${JSON.stringify(join(root, 'stdlib'))}}\n`);
     for (const [source, service] of [["(\n\ti/tls\n)\nmain = () <- (t : tls.Tls) { () }", 'Tls'], ["(\n\ti/process\n)\nmain = () <- (p : process.Process) { () }", 'Process']]) {
       await writeFile(join(dir, 'src/main.i'), source);
       const out = spawnSync(cli, ['build', '--project', dir, '--target', 'wasi'], { encoding: 'utf8' });

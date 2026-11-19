@@ -57,7 +57,7 @@ rustPlatform.buildRustPackage {
   pname = "i";
   inherit version;
 
-  # Only what the build reads: the workspace, the embedded `lib` and `std`
+  # Only what the build reads: the workspace, the built-in `lib` and the `stdlib` package
   # sources, and the spec that `i spec` embeds. A README or CI change does not
   # rebuild the compiler.
   src = lib.fileset.toSource {
@@ -68,7 +68,7 @@ rustPlatform.buildRustPackage {
       ../rust-toolchain.toml
       ../crates
       ../lib
-      ../std
+      ../stdlib
       ../docs/spec.md
     ];
   };

@@ -5,14 +5,15 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { instantiate, authorizeBindings } from '../ilang.mjs';
-const cli = resolve(import.meta.dirname, '../../../target/debug/i');
+const root = resolve(import.meta.dirname, '../../..');
+const cli = join(root, 'target/debug/i');
 
 async function build(source, plan, use) {
   const dir = await mkdtemp(join(tmpdir(), 'i-providers-'));
   try {
     await mkdir(join(dir, 'src'));
     await writeFile(join(dir, 'src/main.i'), source);
-    await writeFile(join(dir, 'i.toml'), 'name = "app"\n' + plan);
+    await writeFile(join(dir, 'i.toml'), `name = "app"\n[dependencies]\ni = {path = ${JSON.stringify(join(root, 'stdlib'))}}\n` + plan);
     execFileSync(cli, ['build', '--target', 'nodejs', '--opt', '0', '--project', dir], { stdio: 'pipe' });
     const bytes = await readFile(join(dir, 'build/app.wasm'));
     const declarations = JSON.parse(await readFile(join(dir, 'build/app.bindings.json'), 'utf8'));
