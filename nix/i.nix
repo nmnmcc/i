@@ -32,20 +32,27 @@ let
   # The musl compiler is used only for the nested `cargo build` of
   # `ilang-runner` (see `crates/ilang-cli/build.rs`). It is not added to
   # nativeBuildInputs: its setup hook would change how `i` itself and Binaryen
-  # are built.
-  muslCC = pkgsCross.musl64.stdenv.cc;
-  muslPrefix = muslCC.targetPrefix;
+  # are built. The runner is statically linked for `<arch>-unknown-linux-musl`
+  # on every Linux host, so an aarch64 host still cross-compiles to musl; the
+  # cross package set is one data entry per architecture.
+  arch = stdenv.hostPlatform.parsed.cpu.name;
+  muslCross = {
+    x86_64 = pkgsCross.musl64;
+    aarch64 = pkgsCross.aarch64-multiplatform-musl;
+  }.${arch} or (throw "nix/i.nix: no musl cross compiler configured for ${arch}-linux");
+  muslCC = muslCross.stdenv.cc;
+  muslTarget = "${arch}-unknown-linux-musl";
+  muslTargetUpper = lib.toUpper (lib.replaceStrings [ "-" ] [ "_" ] muslTarget);
+  muslTargetLower = lib.replaceStrings [ "-" ] [ "_" ] muslTarget;
 
   muslEnv = lib.optionalAttrs stdenv.hostPlatform.isLinux {
-    CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER = "${muslCC}/bin/${muslPrefix}cc";
-    CC_x86_64_unknown_linux_musl = "${muslCC}/bin/${muslPrefix}cc";
-    CXX_x86_64_unknown_linux_musl = "${muslCC}/bin/${muslPrefix}c++";
-    AR_x86_64_unknown_linux_musl = "${muslCC}/bin/${muslPrefix}ar";
-    RANLIB_x86_64_unknown_linux_musl = "${muslCC}/bin/${muslPrefix}ranlib";
+    "CARGO_TARGET_${muslTargetUpper}_LINKER" = "${muslCC}/bin/${muslCC.targetPrefix}cc";
+    "CC_${muslTargetLower}" = "${muslCC}/bin/${muslCC.targetPrefix}cc";
+    "CXX_${muslTargetLower}" = "${muslCC}/bin/${muslCC.targetPrefix}c++";
+    "AR_${muslTargetLower}" = "${muslCC}/bin/${muslCC.targetPrefix}ar";
+    "RANLIB_${muslTargetLower}" = "${muslCC}/bin/${muslCC.targetPrefix}ranlib";
   };
 in
-assert lib.assertMsg (!stdenv.hostPlatform.isLinux || stdenv.hostPlatform.isx86_64)
-  "nix/i.nix: the nested musl runner build is wired for x86_64 Linux; add the aarch64 musl cross compiler before enabling aarch64-linux";
 rustPlatform.buildRustPackage {
   pname = "i";
   inherit version;
@@ -105,6 +112,20 @@ rustPlatform.buildRustPackage {
   # whole 1.7 GB toolchain at install time.
   postFixup = ''
     remove-references-to -t ${rustToolchain} "$out/bin/i"
+  '' + lib.optionalString stdenv.hostPlatform.isDarwin ''
+    # nixpkgs' stdenv links libiconv from the store on Darwin. macOS ships
+    # the same ABI as a system library, and a single /nix/store dependency
+    # would make the release archive unusable on a machine that does not have
+    # that path. Rewrite it, then sign the binary again (arm64 needs this).
+    for dep in $(otool -L "$out/bin/i" | awk '/\/nix\/store\/.*\/libiconv[^ ]*\.dylib/ {print $1}'); do
+      install_name_tool -change "$dep" /usr/lib/libiconv.2.dylib "$out/bin/i"
+    done
+    if otool -L "$out/bin/i" | tail -n +2 | grep -q '/nix/store'; then
+      echo "i still links a Nix store library:" >&2
+      otool -L "$out/bin/i" >&2
+      exit 1
+    fi
+    /usr/bin/codesign --force --sign - "$out/bin/i"
   '';
 
   # The nested build of the musl runner inherits this. nixpkgs sets the Cargo
@@ -119,6 +140,6 @@ rustPlatform.buildRustPackage {
     homepage = "https://i.nmnm.cc";
     license = lib.licenses.asl20;
     mainProgram = "i";
-    platforms = [ "x86_64-linux" ];
+    platforms = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
   };
 }

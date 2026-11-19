@@ -11,7 +11,6 @@
   #      repository variable) and to the CI job for that runner;
   #   3. after its first archive is published, add its url and hash to
   #      `nix/release.nix`.
-  # x86_64-linux is the platform this repository has a runner for.
   inputs = {
     # nixpkgs is the package set; rust-overlay supplies exactly the toolchain
     # that rust-toolchain.toml pins (Nixpkgs' Rust is usually older).
@@ -26,7 +25,7 @@
     let
       inherit (nixpkgs) lib;
 
-      systems = [ "x86_64-linux" ];
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
 
       forAllSystems = f: lib.genAttrs systems (system: f system);
 
@@ -41,8 +40,23 @@
 
       release = import ./nix/release.nix;
 
+      # The toolchain is the one rust-toolchain.toml pins, plus the musl
+      # target the nested runner build needs on the host architecture: the
+      # file can only name one architecture's target. Everything else
+      # (channel, profile, components) comes from the file.
       rustToolchainFor = pkgs:
-        pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        let
+          pinned = (lib.importTOML ./rust-toolchain.toml).toolchain;
+          muslTarget =
+            "${pkgs.stdenv.hostPlatform.parsed.cpu.name}-unknown-linux-musl";
+        in
+        pkgs.rust-bin.fromRustupToolchain {
+          inherit (pinned) channel profile components;
+          targets = lib.unique (
+            (pinned.targets or [ ])
+            ++ lib.optional pkgs.stdenv.hostPlatform.isLinux muslTarget
+          );
+        };
 
       mkI = system:
         let

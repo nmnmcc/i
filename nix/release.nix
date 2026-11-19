@@ -10,9 +10,20 @@
 # binaries and fails if the archive is stale.
 {
   artifacts = {
+    # One entry per platform; the key is the system in `flake.nix`.
     # x86_64-linux = {
     #   version = "0.1.0";
     #   url = "https://github.com/nmnmcc/i/releases/download/v0.1.0/i-0.1.0-x86_64-linux.tar.gz";
+    #   hash = "sha256-...=";
+    # };
+    # aarch64-linux = {
+    #   version = "0.1.0";
+    #   url = "https://github.com/nmnmcc/i/releases/download/v0.1.0/i-0.1.0-aarch64-linux.tar.gz";
+    #   hash = "sha256-...=";
+    # };
+    # aarch64-darwin = {
+    #   version = "0.1.0";
+    #   url = "https://github.com/nmnmcc/i/releases/download/v0.1.0/i-0.1.0-aarch64-darwin.tar.gz";
     #   hash = "sha256-...=";
     # };
   };
