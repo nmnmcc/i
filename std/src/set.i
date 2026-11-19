@@ -3,8 +3,13 @@
 ////
 //// A `Set(A)` is a `Dict(A, ())` (see `std/dict`): members are compared
 //// with `==` and found by their `core.hash`, so any value may be a member.
-//// `insert`, `delete`, and `contains` take O(log n) steps. Two sets with the
-//// same members are `==`. The order of `to_list` and `fold` is not fixed.
+//// `insert`, `delete`, and `contains` take O(log n) steps. The order of
+//// `to_list` and `fold` is not fixed.
+////
+//// `==` compares the representation, not the members: members with the same
+//// 32-bit hash are kept in the order they were put in, so two sets with the
+//// same members may differ under `==`. Use `same_elements` to compare
+//// members.
 (
 	i/core
 	dict = (Dict) = std/dict
@@ -32,6 +37,7 @@
 	symmetric_difference
 	is_subset
 	is_disjoint
+	same_elements
 )
 
 /// A set of values of type `a`.
@@ -158,6 +164,18 @@ is_subset = <A>(first : Set(A), of : Set(A)) -> Bool {
 is_disjoint = <A>(first : Set(A), from : Set(A)) -> Bool {
 	(small, big) = by_size(first, from)
 	fold(small, True, (ok, x) { ok && core.not(contains(big, x)) })
+}
+
+/// `True` when both sets have the same members, whatever order they were put
+/// in. This takes O(n log n) steps (see `dict.same_entries`).
+///
+/// ```i
+/// set.same_elements(set.from_list([1, 2]), set.from_list([2, 1]))  // True
+/// ```
+same_elements = <A>(first : Set(A), second : Set(A)) -> Bool {
+	Set(a) = first
+	Set(b) = second
+	dict.same_entries(a, b)
 }
 
 by_size = <X>(a : Set(X), b : Set(X)) -> (Set(X), Set(X)) {

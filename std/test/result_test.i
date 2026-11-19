@@ -262,22 +262,24 @@ test("try_recover_error_to_error_test", () {
 	()
 })
 
-test("from_option_test", () {
-	assert(result.from_option(Some(1), "none") == Ok(1))
-	assert(result.from_option(None, "none") == Error("none"))
+test("option_to_result_test", () {
+	// The conversions from and to `Option` live in `std/option`.
+	assert(option.to_result(Some(1), "none") == Ok(1))
+	assert(option.to_result(None, "none") == Error("none"))
 })
 
-test("to_option_test", () {
-	assert(result.to_option(Ok(1)) == Some(1))
-	assert(result.to_option(Error("e")) == None)
+test("option_from_result_test", () {
+	assert(option.from_result(Ok(1)) == Some(1))
+	assert(option.from_result(Error("e")) == None)
 })
 
-test("to_error_and_catch_test", () {
-	assert(result.catch(() { result.to_error(Ok(1)) + 1 }) == Ok(2))
+test("stored_outcome_round_trip_test", () {
+	// `fail.catch` stores an outcome; `fail.from_result` raises it again.
+	assert(fail.catch(() { fail.from_result(Ok(1)) + 1 }) == Ok(2))
 	assert(
-		result.catch(() { result.to_error(Error("bad")) + 1 }) == Error("bad"),
+		fail.catch(() { fail.from_result(Error("bad")) + 1 }) == Error("bad"),
 	)
-	assert(result.catch(() { fail.raise(42) }) == Error(42))
+	assert(fail.catch(() { fail.raise(42) }) == Error(42))
 })
 
 test("recover_test", () {

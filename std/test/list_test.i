@@ -3,7 +3,6 @@
 	i/core
 	i/fail
 	i/control
-	result = std/result
 	dict = std/dict
 	float = std/float
 	int = std/int
@@ -1743,16 +1742,16 @@ test("sort_stable_big_test", () {
 
 test("sort_effects_test", () {
 	// The compare function may raise errors.
-	r = result.catch(() { list.sort([3, 1, 2], (a, b) { fail.raise("no") }) })
+	r = fail.catch(() { list.sort([3, 1, 2], (a, b) { fail.raise("no") }) })
 	assert(r == Error("no"))
 })
 
 test("map_effects_test", () {
-	r = result.catch(() {
+	r = fail.catch(() {
 		list.map([1, 2, 3], (x) { x |> (2) { fail.raise("two") } & (_) { x } })
 	})
 	assert(r == Error("two"))
-	assert(result.catch(() { list.map([1, 2], (x) { x }) }) == Ok([1, 2]))
+	assert(fail.catch(() { list.map([1, 2], (x) { x }) }) == Ok([1, 2]))
 })
 
 test("min_max_test", () {

@@ -6,10 +6,14 @@
 //// compared with `==`, so any value may be a key and no compare
 //// function is needed. `get`, `insert`, and `delete` take O(log n) steps.
 ////
-//// The tree of a set of keys has only one form, whatever order the keys
-//// were put in. So two dicts with the same entries are `==`. (The one
-//// exception: keys with the same 32-bit hash are kept in the order they were
-//// put in, so two such dicts may differ in that order.)
+//// `==` (and `inspect` and `hash`) compare the representation, not the
+//// content. The tree has one form for a set of keys whose 32-bit hashes are
+//// all different, whatever order they were put in. But keys with the same
+//// 32-bit hash share one node and are kept there in the order they were put
+//// in, so two dicts with the same entries may differ under `==`. Use
+//// `same_entries` to compare content. When a content-keyed value is needed,
+//// for example a dict as a key of another dict, use `to_list` sorted with an
+//// explicit compare function.
 ////
 //// The order of `keys`, `values`, `to_list`, and `fold` comes from the
 //// hashes. It is the same every time for the same compiled program, but
@@ -44,6 +48,7 @@
 	merge
 	combine
 	group
+	same_entries
 )
 
 /// A map from keys of type `k` to values of type `v`.
@@ -535,6 +540,22 @@ group = <V, K, N>(list : List(V), by : (V) <- N -> K) -> Dict(K, List(V)) {
 	}
 	reversed = go(reverse_onto(list, []), new())
 	reversed
+}
+
+/// `True` when both dicts have the same keys, and the values for each key
+/// are `==`. Unlike `==`, this does not depend on the order the entries were
+/// put in. It looks up every key of `first` in `second`: O(n log n) steps.
+///
+/// ```i
+/// a = dict.new() |> dict.insert("x", 1) |> dict.insert("y", 2)
+/// b = dict.new() |> dict.insert("y", 2) |> dict.insert("x", 1)
+/// dict.same_entries(a, b)  // True
+/// ```
+same_entries = <K, V>(first : Dict(K, V), second : Dict(K, V)) -> Bool {
+	size(first) == size(second) &&
+		fold(first, True, (ok, k, v) {
+			ok && { get(second, k) |> (Some(w)) { w == v } & (None) { False } }
+		})
 }
 
 reverse_onto = <A>(list : List(A), acc : List(A)) -> List(A) {

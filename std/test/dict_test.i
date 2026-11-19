@@ -1104,3 +1104,94 @@ test("filter_take_drop_test", () {
 		dict.size(dict.drop(d, [1, 2, 99])) == 8,
 	)
 })
+
+test("same_entries_empty_test", () {
+	assert(
+		dict.same_entries(dict.new(), dict.new()),
+	)
+	assert(
+		core.not(
+			dict.same_entries(dict.new(), dict.from_list([(1, 1)])),
+		),
+	)
+	assert(
+		core.not(
+			dict.same_entries(dict.from_list([(1, 1)]), dict.new()),
+		),
+	)
+})
+
+test("same_entries_insert_order_test", () {
+	pairs = list.map(list.range(0, 199), (i) { (i, i * 3) })
+	forward = dict.from_list(pairs)
+	backward = dict.from_list(list.reverse(pairs))
+	assert(dict.same_entries(forward, backward))
+	assert(dict.same_entries(backward, forward))
+	assert(dict.same_entries(forward, forward))
+	// Deleting and putting back gives the same content.
+	again = forward |> dict.delete(7) |> dict.insert(7, 21)
+	assert(dict.same_entries(forward, again))
+})
+
+test("same_entries_different_value_test", () {
+	a = dict.from_list([("a", 1), ("b", 2)])
+	b = dict.from_list([("b", 3), ("a", 1)])
+	assert(
+		core.not(dict.same_entries(a, b)),
+	)
+	assert(
+		core.not(dict.same_entries(b, a)),
+	)
+})
+
+test("same_entries_missing_and_extra_keys_test", () {
+	a = dict.from_list([("a", 1), ("b", 2)])
+	extra = dict.insert(a, "c", 3)
+	assert(
+		core.not(dict.same_entries(a, extra)),
+	)
+	assert(
+		core.not(dict.same_entries(extra, a)),
+	)
+	// Same size, but one key differs.
+	other = dict.from_list([("a", 1), ("c", 2)])
+	assert(
+		core.not(dict.same_entries(a, other)),
+	)
+	assert(
+		core.not(dict.same_entries(other, a)),
+	)
+})
+
+// "f3zx" and "0pad" have the same 32-bit `core.hash`, so a dict keeps them in
+// one node in the order they were put in. `==` sees that order;
+// `same_entries` does not.
+test("same_entries_colliding_keys_test", () {
+	assert(core.hash("f3zx") == core.hash("0pad"))
+	a = dict.new() |> dict.insert("f3zx", 1) |> dict.insert("0pad", 2)
+	b = dict.new() |> dict.insert("0pad", 2) |> dict.insert("f3zx", 1)
+	assert(a != b)
+	assert(dict.same_entries(a, b))
+	assert(dict.same_entries(b, a))
+	assert(
+		core.not(
+			dict.same_entries(a, dict.insert(b, "0pad", 3)),
+		),
+	)
+	list.each([a, b], (d) {
+		assert(dict.size(d) == 2)
+		assert(dict.get(d, "f3zx") == Some(1))
+		assert(dict.get(d, "0pad") == Some(2))
+		assert(dict.has(d, "f3zx"))
+		without_first = dict.delete(d, "f3zx")
+		assert(dict.get(without_first, "f3zx") == None)
+		assert(dict.get(without_first, "0pad") == Some(2))
+		assert(dict.size(without_first) == 1)
+		without_second = dict.delete(d, "0pad")
+		assert(dict.get(without_second, "0pad") == None)
+		assert(dict.get(without_second, "f3zx") == Some(1))
+		assert(dict.size(without_second) == 1)
+	})
+	// After deleting one colliding key, the dicts are `==` again.
+	assert(dict.delete(a, "0pad") == dict.delete(b, "0pad"))
+})

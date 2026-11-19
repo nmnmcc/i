@@ -1,13 +1,16 @@
 //// Functions for the built-in type `Result(A, E) = Ok(A) | Error(E)`.
 ////
-//// A `Result` is an error kept as a value. i also has errors as effects
-//// (the `Fail(E)` service from `i/fail`): `to_error` and `catch` go from one
-//// form to the other.
-(
-	i/fail
-	option = (Option, Some, None) = std/option
-)
-
+//// A `Result` is a stored outcome: data that a boundary keeps, inspects,
+//// collects or passes on. It is not a second way to fail. An operation that
+//// cannot give its answer raises through `Fail(E)` (`i/fail`), and the
+//// caller turns that into a `Result` where it wants to store it:
+////
+//// - `fail.catch` makes a `Result` from a computation that may raise.
+//// - `fail.from_result` raises the error of a stored `Error` again.
+////
+//// `Assert` failures are not outcomes; take them with `i/assertion.catch`.
+//// A stop (`panic`) is never caught. To go between `Option` and `Result`,
+//// use `option.to_result` and `option.from_result` (`std/option`).
 (
 	is_ok
 	is_error
@@ -27,10 +30,6 @@
 	replace
 	replace_error
 	recover
-	from_option
-	to_option
-	to_error
-	catch
 )
 
 /// `True` for `Ok`.
@@ -52,7 +51,8 @@ map = <A, E, B, N>(over : Result(A, E), with : (A) <- N -> B) -> Result(B, E) {
 	over |> (Ok(value)) { Ok(with(value)) } & (Error(error)) { Error(error) }
 }
 
-/// Changes the error of an `Error` with a function. An `Ok` stays.
+/// Changes the error of an `Error` with a function. An `Ok` stays. To
+/// change raised errors, use `fail.map_error`.
 map_error = <A, E, F, N>(over : Result(A, E), with : (E) <- N -> F) -> Result(
 	A,
 	F,
@@ -168,30 +168,6 @@ recover = <A, E, F, N>(
 	with : (E) <- N -> Result(A, F)
 ) -> Result(A, F) {
 	result |> (Ok(value)) { Ok(value) } & (Error(error)) { with(error) }
-}
-
-/// `Ok` with the value of a `Some`, or `Error(error)` for `None`.
-from_option = <A, E>(option : Option(A), error : E) -> Result(A, E) {
-	option |> (Some(value)) { Ok(value) } & (None) { Error(error) }
-}
-
-/// `Some` with the value of an `Ok`, or `None` for an `Error`.
-to_option = <A, E>(result : Result(A, E)) -> Option(A) {
-	result |> (Ok(value)) { Some(value) } & (Error(_)) { None }
-}
-
-/// The value of an `Ok`. For `Error(x)`, the computation ends with the
-/// error `x`, which `catch` or `i/fail` can take.
-to_error = <A, E>(result : Result(A, E)) -> A { fail.from_result(result) }
-
-/// Does `body`, and gives `Ok` with its value, or `Error` with the error it
-/// ends with.
-///
-/// ```i
-/// result.catch(() { fail.raise("no") })  // Error("no")
-/// ```
-catch : <A, E, N>(() <- (Fail(E), ..N) -> A) <- N -> Result(A, E) = (body) {
-	fail.catch(body)
 }
 
 reverse = (list) {

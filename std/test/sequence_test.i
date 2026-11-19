@@ -1,5 +1,6 @@
 (
 	testlib = (test) = std/test
+	i/core
 	i/fail
 	i/control
 	sequence = std/sequence
@@ -46,10 +47,10 @@ test("sequence_examples", () {
 	check(original, [10, 20])
 	assert(sequence.set(original, -1, 7) == None)
 	assert(sequence.set(original, 2, 7) == None)
-	check(sequence.wrap(5), [5])
+	check(sequence.singleton(5), [5])
 	check(
 		sequence.reverse(
-			sequence.append(sequence.from_list([1, 2]), sequence.wrap(3)),
+			sequence.append(sequence.from_list([1, 2]), sequence.singleton(3)),
 		),
 		[3, 2, 1],
 	)
@@ -63,25 +64,25 @@ check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {
 	c = sequence.from_list(zs)
 	check(a, xs)
 	assert(
-		sequence.equal(
+		sequence.same_elements(
 			sequence.from_list(sequence.to_list(a)),
 			a,
 		),
 	)
 	assert(
-		sequence.equal(
+		sequence.same_elements(
 			sequence.append(a, sequence.new()),
 			a,
 		),
 	)
 	assert(
-		sequence.equal(
+		sequence.same_elements(
 			sequence.append(sequence.new(), a),
 			a,
 		),
 	)
 	assert(
-		sequence.equal(
+		sequence.same_elements(
 			sequence.append(sequence.append(a, b), c),
 			sequence.append(a, sequence.append(b, c)),
 		),
@@ -91,7 +92,7 @@ check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {
 			sequence.length(a) + sequence.length(b),
 	)
 	assert(
-		sequence.equal(
+		sequence.same_elements(
 			sequence.reverse(sequence.reverse(a)),
 			a,
 		),
@@ -103,7 +104,7 @@ check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {
 			check(left, list.take(xs, i))
 			check(right, list.drop(xs, i))
 			assert(
-				sequence.equal(sequence.append(left, right), a),
+				sequence.same_elements(sequence.append(left, right), a),
 			)
 			check(sequence.take(a, i), list.take(xs, i))
 			check(sequence.drop(a, i), list.drop(xs, i))
@@ -257,7 +258,7 @@ model = (
 			check(s, xs)
 			assert(sequence.at(t, i) == list.at(ys, i))
 			assert(
-				sequence.equal(sequence.from_list(ys), t),
+				sequence.same_elements(sequence.from_list(ys), t),
 			)
 			model(prng(next), remaining - 1, [(t, ys), ..versions])
 		}
@@ -380,16 +381,16 @@ test("sequence_large_boundaries", () {
 			check(left, list.take(xs, i))
 			check(right, list.drop(xs, i))
 			assert(
-				sequence.equal(sequence.append(left, right), s),
+				sequence.same_elements(sequence.append(left, right), s),
 			)
 			assert(sequence.at(s, i) == list.at(xs, i))
 		})
 		check(
-			sequence.append(s, sequence.wrap(-1)),
+			sequence.append(s, sequence.singleton(-1)),
 			list.append(xs, [-1]),
 		)
 		check(
-			sequence.append(sequence.wrap(-1), s),
+			sequence.append(sequence.singleton(-1), s),
 			[-1, ..xs],
 		)
 		check(sequence.append(s, s), list.append(xs, xs))
@@ -457,11 +458,11 @@ test("sequence_callback_types_and_order", () {
 			& (False) { fail.raise("other") }
 	}
 	assert(
-		fail.catch(() { sequence.each(sequence.wrap(1), union_error) }) ==
+		fail.catch(() { sequence.each(sequence.singleton(1), union_error) }) ==
 			Error(True),
 	)
 	assert(
-		fail.catch(() { sequence.map(sequence.wrap(2), union_error) }) ==
+		fail.catch(() { sequence.map(sequence.singleton(2), union_error) }) ==
 			Error("other"),
 	)
 	()
@@ -479,8 +480,8 @@ test("sequence_independent_histories", () {
 		sequence.from_list(list.take(xs, 211)),
 		sequence.from_list(list.drop(xs, 211)),
 	)
-	assert(sequence.equal(back, front))
-	assert(sequence.equal(front, joined))
+	assert(sequence.same_elements(back, front))
+	assert(sequence.same_elements(front, joined))
 	check(back, xs)
 	check(front, xs)
 	check(joined, xs)
@@ -499,3 +500,50 @@ test("sequence_independent_histories", () {
 	()
 })
 // Cached sizes, ranks and bounded digits are the private sequence invariants.
+
+// `==` observes the finger-tree shape, which depends on the history of edits.
+// `same_elements` observes only the elements. Pushing 1, 2, 3 at the back
+// gives digits [1] and [2, 3]; pushing 3, 2, 1 at the front gives [1, 2] and
+// [3]. Both hold the elements [1, 2, 3].
+test("same_elements_ignores_shape_test", () {
+	back = sequence.new()
+		|> sequence.push_back(1)
+		|> sequence.push_back(2)
+		|> sequence.push_back(3)
+	front = sequence.new()
+		|> sequence.push_front(3)
+		|> sequence.push_front(2)
+		|> sequence.push_front(1)
+	check(back, [1, 2, 3])
+	check(front, [1, 2, 3])
+	assert(back != front)
+	assert(sequence.same_elements(back, front))
+	assert(sequence.same_elements(front, back))
+	assert(
+		sequence.same_elements(sequence.from_list([1, 2, 3]), back),
+	)
+	assert(
+		sequence.same_elements(sequence.from_list([1, 2, 3]), front),
+	)
+	assert(
+		sequence.same_elements(sequence.new(), sequence.from_list([])),
+	)
+	four = sequence.from_list([4])
+	assert(
+		sequence.same_elements(sequence.singleton(4), four),
+	)
+	differ = (xs : List(Int)) -> Bool {
+		core.not(
+			sequence.same_elements(back, sequence.from_list(xs)),
+		)
+	}
+	assert(differ([1, 2]))
+	assert(differ([1, 2, 4]))
+	assert(differ([3, 2, 1]))
+	assert(
+		core.not(
+			sequence.same_elements(sequence.new(), back),
+		),
+	)
+	()
+})

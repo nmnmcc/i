@@ -1,9 +1,12 @@
 //// Finite persistent indexed deques, implemented as strict measured finger
 //// trees. End edits, indexing, splitting, and concatenation take O(log(n+1))
 //// node work in every history. Whole walks and bottom-up construction are O(n).
-//// `equal` compares elements; ordinary `==`, inspect, and hash also observe
-//// the private shape. Equal element lists need not give interchangeable dict
-//// keys. Use `to_list` as a key when element equality is required.
+////
+//// Ordinary `==`, `inspect`, and `hash` observe the private tree shape, which
+//// depends on the history of edits: two sequences with the same elements may
+//// differ under `==`. Use `same_elements` to compare element content. Equal
+//// element lists need not give interchangeable dict keys; use `to_list` as a
+//// key when element equality is required.
 (
 	list = std/list
 	option = (Option, Some, None) = std/option
@@ -12,7 +15,7 @@
 (
 	Sequence
 	new
-	wrap
+	singleton
 	from_list
 	to_list
 	length
@@ -33,7 +36,7 @@
 	map
 	fold
 	each
-	equal
+	same_elements
 )
 
 /// An immutable sequence of elements. Its constructors and cached sizes are
@@ -43,8 +46,12 @@ Sequence(A) = (Tree(A))
 /// An empty sequence. This function may be used at any element type.
 new = <A>() -> Sequence(A) { Sequence(EmptyTree) }
 
-/// A sequence of one item.
-wrap = <A>(item : A) -> Sequence(A) { Sequence(Single(Leaf(item))) }
+/// A sequence of one item, in O(1) work.
+///
+/// ```i
+/// sequence.singleton(5) |> sequence.to_list  // [5]
+/// ```
+singleton = <A>(item : A) -> Sequence(A) { Sequence(Single(Leaf(item))) }
 
 /// Builds a sequence in O(n) work, grouping nodes from the bottom up.
 from_list = <A>(items : List(A)) -> Sequence(A) {
@@ -193,8 +200,16 @@ to_list = <A>(sequence : Sequence(A)) -> List(A) {
 	list.reverse(fold(sequence, [], (acc, x) { [x, ..acc] }))
 }
 
-/// Compares lengths and elements using `==`, independently of tree shape.
-equal = <A>(first : Sequence(A), second : Sequence(A)) -> Bool {
+/// `True` when both sequences have the same length and `==` elements in the
+/// same order, whatever their tree shapes. This takes O(n) work. Unlike `==`,
+/// it does not depend on the history of edits.
+///
+/// ```i
+/// a = sequence.from_list([1, 2])
+/// b = sequence.push_front(sequence.push_front(sequence.new(), 2), 1)
+/// sequence.same_elements(a, b)  // True
+/// ```
+same_elements = <A>(first : Sequence(A), second : Sequence(A)) -> Bool {
 	length(first) == length(second) && to_list(first) == to_list(second)
 }
 
