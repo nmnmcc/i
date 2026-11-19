@@ -18,7 +18,10 @@
 //! `Module::deserialize`, which checks the compiler settings once more. The
 //! manifest binds the binding plan to the exact module (its artifact digest).
 //! The trailer digest detects a damaged or truncated file; it is not a
-//! signature (signing is not provided).
+//! signature (signing is not provided). A payload written before the separate
+//! code digest was removed has an unknown manifest field, so it is rejected
+//! while the manifest is decoded and reported as damaged; there is no
+//! compatibility path.
 //!
 //! The metadata module is a Wasm module with only the `ilang.*` custom
 //! sections of the program, read exactly as [`Program::from_bytes`] reads

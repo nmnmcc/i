@@ -806,7 +806,7 @@ pub(crate) fn lower_tests_numeric(
         } else {
             crate::control::may_suspend(&l.out)
         };
-        crate::control::split(&mut l.out, &may);
+        crate::control::split_with_may(&mut l.out, &may);
         Ok((l.out, l.bindings))
     } else {
         Err(l.diags)
@@ -866,7 +866,7 @@ pub(crate) fn lower_selected_numeric(
         } else {
             crate::control::may_suspend(&l.out)
         };
-        crate::control::split(&mut l.out, &may);
+        crate::control::split_with_may(&mut l.out, &may);
         Ok((l.out, l.bindings, is_async))
     } else {
         ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
