@@ -303,7 +303,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn is_core(&self, m: ModuleId) -> bool {
-        self.p.module(m).package == self.graph.library && self.module_name(m) == "i/core"
+        self.graph.is_standard_library(self.p.module(m).package) && self.module_name(m) == "i/core"
     }
 
     fn in_library(&self) -> bool {

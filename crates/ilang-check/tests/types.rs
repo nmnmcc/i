@@ -191,7 +191,13 @@ fn types() {
 fn library() {
     let dir = tempfile::tempdir().unwrap();
     common::write_manifest(dir.path(), "app");
-    let (graph, _) = ilang_package::load(dir.path());
+    let (mut graph, _) = ilang_package::load(dir.path());
+    if let Some(library) = graph.standard_library() {
+        // `i/test` is a Lisp macro module, expanded before resolution.
+        graph.packages[library]
+            .modules
+            .retain(|m| m.path != "i/test");
+    }
     let actual = output(&graph, false, true);
     let mut failed = Vec::new();
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/types/library.out");

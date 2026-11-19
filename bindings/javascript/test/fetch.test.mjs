@@ -36,7 +36,7 @@ test(`fetch provider at O${opt}: GET POST headers status timeout cancel refused 
   const dir = await mkdtemp(join(tmpdir(), 'i-fetch-'));
   try {
     await mkdir(join(dir, 'src'));
-    await writeFile(join(dir, 'i.toml'), `name = "app"\n[dependencies]\nstd = {path = ${JSON.stringify(join(root, 'std'))}}\n[wasm]\nexports = ["app/main.get", "app/main.post", "app/main.headers", "app/main.status", "app/main.timeout", "app/main.cancel", "app/main.stream"]\n`);
+    await writeFile(join(dir, 'i.toml'), `name = "app"\n[dependencies]\ni = {path = ${JSON.stringify(join(root, 'stdlib'))}}\n[wasm]\nexports = ["app/main.get", "app/main.post", "app/main.headers", "app/main.status", "app/main.timeout", "app/main.cancel", "app/main.stream"]\n`);
     await writeFile(join(dir, 'src/main.i'), `(
 	i/fail
 	i/core
