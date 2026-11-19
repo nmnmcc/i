@@ -212,6 +212,10 @@ pub enum Op {
     FloatGe,
     Equal,
     NotEqual,
+    /// Structural equality specialized for a closed type: calls
+    /// `$eq_plan_<index>` (see [`Program::eq_plans`]).
+    EqualPlan(u32),
+    NotEqualPlan(u32),
     StringAppend,
     /// `panic(m)`: it never gives a value.
     Panic,
@@ -300,6 +304,19 @@ impl Op {
 /// every such id is at least 2^32. A closure keeps the id of its shape in
 /// field 2 of its `$clo{n}`; a multi-shape value keeps one per group.
 pub type ShapeId = u64;
+
+/// A structural comparison for a closed type. Every plan is also an entry of
+/// [`Program::eq_plans`]; a compound plan names its parts by index. A type
+/// with a function, a host reference or an opaque part has no plan and keeps
+/// the generic comparison.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum EqPlan {
+    Int,
+    Float,
+    String,
+    List(u32),
+    Tuple(Vec<u32>),
+}
 
 /// The id of the shape of `positions` positions and the label set `set`
 /// (0 for none).
@@ -894,6 +911,9 @@ pub struct SitePos {
 pub struct Program {
     /// Numeric code generation; reference lowering is the O0 oracle.
     pub numeric: crate::Numeric,
+    /// Specialized structural equality plans, children before parents. An
+    /// [`Op::EqualPlan`] names one by index.
+    pub eq_plans: Vec<EqPlan>,
     /// Facts for fresh local definitions, keyed by code identity.
     pub numeric_locals: std::collections::HashMap<
         FuncId,

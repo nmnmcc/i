@@ -633,3 +633,41 @@ fn a_known_function_with_another_indirect_call_stays_indirect() {
     let apply = function(&text, "app/main.apply");
     assert!(apply.contains("call_ref"), "{apply}");
 }
+
+#[test]
+fn structural_equality_is_specialized_for_closed_types() {
+    let text = wat_scalars("main = () { [(1, \"a\"), (2, \"b\")] == [(1, \"a\"), (2, \"b\")] }\n");
+    let main = function(&text, "app/main.main");
+    assert!(main.contains("call $eq_plan_"), "{main}");
+    assert!(!main.contains("(call $equal "), "{main}");
+    // A float plan keeps IEEE equality, which is what the generic path does
+    // for finite floats.
+    let floats = wat_scalars("main = () { [1.5, 0.0] == [1.5, 0.0] }\n");
+    let main = function(&floats, "app/main.main");
+    assert!(main.contains("call $eq_plan_"), "{main}");
+    assert!(floats.contains("(f64.eq "), "{floats}");
+}
+
+#[test]
+fn equality_with_a_function_inside_falls_back() {
+    let text = wat_scalars("f = (x) { x }\ng = (x) { x }\n\nmain = () { [(1, f)] == [(1, f)] }\n");
+    let main = function(&text, "app/main.main");
+    assert!(!main.contains("$eq_plan_"), "{main}");
+    assert!(main.contains("(call $equal "), "{main}");
+}
+
+#[test]
+fn equality_of_a_record_falls_back() {
+    let text = wat_scalars("main = () { (a = 1, b = \"x\") == (a = 1, b = \"x\") }\n");
+    let main = function(&text, "app/main.main");
+    assert!(!main.contains("$eq_plan_"), "{main}");
+    assert!(main.contains("(call $equal "), "{main}");
+}
+
+#[test]
+fn equality_beyond_the_plan_depth_falls_back() {
+    let text = wat_scalars("main = () { [[[[[[[1]]]]]]] == [[[[[[[1]]]]]]] }\n");
+    let main = function(&text, "app/main.main");
+    assert!(!main.contains("$eq_plan_"), "{main}");
+    assert!(main.contains("(call $equal "), "{main}");
+}

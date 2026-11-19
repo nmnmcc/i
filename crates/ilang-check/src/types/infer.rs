@@ -146,6 +146,8 @@ pub(crate) struct Checker<'a> {
     pub out: Typed,
     numeric_handles: HashMap<(ModuleId, Span), Ty>,
     numeric_param_handles: HashMap<(ModuleId, Span), Ty>,
+    /// The operand types of each `==`/`!=`, kept for the code generator.
+    comparison_handles: Vec<((ModuleId, Span), Ty, Ty)>,
     pub(super) query_binder_handles: HashMap<(ModuleId, Span), Ty>,
     /// The `case` expressions of the group being typed, whose coverage is
     /// checked with the types that inference finds.
@@ -232,6 +234,7 @@ impl<'a> Checker<'a> {
             out: Typed::default(),
             numeric_handles: HashMap::new(),
             numeric_param_handles: HashMap::new(),
+            comparison_handles: Vec::new(),
             query_binder_handles: HashMap::new(),
             cases: Vec::new(),
             keep_locals: false,
@@ -358,6 +361,18 @@ impl<'a> Checker<'a> {
             })
             .filter_map(|id| self.defs.get(&id).cloned())
             .collect::<Vec<_>>();
+        let opts = display::Opts {
+            mono: true,
+            written: false,
+        };
+        let handles = std::mem::take(&mut self.comparison_handles);
+        for ((module, span), lt, rt) in handles {
+            let left = display::shown_and_scheme(&self.s, &lt, opts);
+            let right = display::shown_and_scheme(&self.s, &rt, opts);
+            if let (Ok((_, left)), Ok((_, right))) = (left, right) {
+                typed.comparison_types.insert((module, span), (left, right));
+            }
+        }
         let mut artifact_catalog = None;
         let mut test_shaped = HashSet::new();
         for (mi, m) in p.modules.iter().enumerate() {
@@ -2313,6 +2328,10 @@ impl<'a> Checker<'a> {
                 )
             };
             self.warning(code::EQ_DISJOINT, span, message);
+        }
+        if matches!(op, Eq | NotEq) {
+            self.comparison_handles
+                .push(((self.module, span), lt.clone(), rt.clone()));
         }
         if let Some(want) = operand {
             self.sub(&lt, &want, lhs.span);
