@@ -21,8 +21,8 @@ permissions:
 env:
   # Perf baseline artifacts for current and documented.
   BASELINE_RUN: "44503007673"
-  # Perf change artifact (i-release-change).
-  CHANGE_RUN: "44507343351"
+  # The always-inline-40 candidate.
+  INLINE_RUN: "44510447311"
   RAYON_NUM_THREADS: 1
   REPEATS: "5"
 
@@ -60,13 +60,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: i-release-change
-          path: bin/change
-          run-id: ${{ env.CHANGE_RUN }}
+          name: i-release-inline
+          path: bin/inline
+          run-id: ${{ env.INLINE_RUN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Fetch the libraries of the binaries
         run: |
-          for b in current documented change; do
+          for b in current documented inline; do
             chmod +x "bin/$b/i"
             xargs nix-store --realise < "bin/$b/i.nix-paths" > /dev/null
             "bin/$b/i" --version
@@ -77,10 +77,10 @@ jobs:
       - name: Alternate the configurations
         run: |
           set -x
-          configs="current-o0 current-o2 change-o0 change-o2 documented-o2"
+          configs="current-o0 current-o2 documented-o2 inline-o2"
           for r in $(seq 1 "$REPEATS"); do
             # Rotate the order each round.
-            shift_by=$(( (r - 1) % 5 ))
+            shift_by=$(( (r - 1) % 4 ))
             ordered=$(echo $configs | cut -d' ' -f$((shift_by+1))- )
             if [ "$shift_by" -gt 0 ]; then
               ordered="$ordered $(echo $configs | cut -d' ' -f1-$shift_by)"
