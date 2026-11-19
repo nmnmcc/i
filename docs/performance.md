@@ -1055,6 +1055,13 @@ not comparable across machines. Every comparison below alternates its
 configurations inside one job (five rounds, rotated order), so both sides see
 one CPU.
 
+Each timed round records `free -g` and `/proc/loadavg` before and after the
+run (`machine.txt` and `load-*.txt` in the artifacts). A round whose load
+exceeds half the machine's core count is not a measurement and is discarded.
+On the shared development machine, builds use `CARGO_BUILD_JOBS=2` and only
+one compiler or test process runs at a time; these CI measurements ran on
+4-vCPU runners and recorded load 0-1 throughout.
+
 Commits: `current` is `a906931b9` (main when this was measured); `documented`
 is `ad87d8c06`, the tree the earlier "After" numbers were recorded on; `change`
 is the always-inline commit. The `documented` column runs that commit's own
