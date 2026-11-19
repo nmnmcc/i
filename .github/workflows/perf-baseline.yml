@@ -4,9 +4,11 @@
 # bench --opt N --time` on each, so that the before/after numbers in
 # docs/performance.md can be compared on one machine and one runner type.
 #
-#   before      f7b3964, the "Before" column of docs/performance.md
 #   documented  ad87d8c06, the tree that the "After" column was recorded on
 #   current     the main under test
+#
+# f7b3964 (the "Before" column) is not measured: that commit has no `bench/`
+# package, so its numbers cannot be reproduced from a tree.
 #
 # Dispatch from the branch that carries this file:
 #
@@ -49,8 +51,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: before
-            ref: f7b3964da53b1712e2d89b3c7661954769cc26f6
           - name: documented
             ref: ad87d8c064202698f4d2ef9c8211771052c36d28
           - name: current
@@ -78,12 +78,6 @@ jobs:
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Install devenv
         run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          key: perf-baseline-${{ matrix.name }}-${{ hashFiles('Cargo.lock') }}
-          cmd-format: devenv shell -- {0}
-          cache-directories: ~/.cache/ccache
-          save-if: ${{ startsWith(github.ref, 'refs/heads/ci/') }}
       - name: Build the release i
         run: devenv shell -- cargo build --release --locked -p ilang-cli
       - name: Record the build
@@ -117,9 +111,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: before
-            ref: f7b3964da53b1712e2d89b3c7661954769cc26f6
-            opt: 2
           - name: documented
             ref: ad87d8c064202698f4d2ef9c8211771052c36d28
             opt: 2
