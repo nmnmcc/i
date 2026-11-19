@@ -211,7 +211,7 @@ jobs:
           mkdir -p out
           { uname -a; nproc; lscpu | head -20; free -h; cat /proc/loadavg; } > out/machine.txt
           cat out/machine.txt
-          for f in list_merge dict_insert equality diag_; do
+          for f in list_merge dict_insert equality diag_ diag3_; do
             for r in 1 2 3; do
               /usr/bin/time -v -o "out/time-$f-$r.txt" \
                 target/release/i test --project bench --opt 2 --time "$f" \
