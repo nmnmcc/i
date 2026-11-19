@@ -842,7 +842,10 @@ fn spec_corpus_reverse_order_and_recovery() {
                                 .unwrap_or_else(|| "non-string panic".into());
                             Err(format!("panicked: {message}"))
                         });
-                        timings.lock().unwrap().push((spec_case_key(&root, path), started.elapsed().as_secs_f64()));
+                        timings
+                            .lock()
+                            .unwrap()
+                            .push((spec_case_key(&root, path), started.elapsed().as_secs_f64()));
                         out.push((path, result));
                     }
                     out
@@ -860,9 +863,17 @@ fn spec_corpus_reverse_order_and_recovery() {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).unwrap();
         }
-        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path).unwrap();
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .unwrap();
         for (key, seconds) in timings.into_inner().unwrap() {
-            writeln!(file, "{{\"set\":\"value-type-recovery-cases\",\"key\":{key:?},\"seconds\":{seconds:.3}}}").unwrap();
+            writeln!(
+                file,
+                "{{\"set\":\"value-type-recovery-cases\",\"key\":{key:?},\"seconds\":{seconds:.3}}}"
+            )
+            .unwrap();
         }
     }
     let mut count = 0;

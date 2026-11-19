@@ -489,7 +489,10 @@ fn main() {
                     let started = std::time::Instant::now();
                     let r = run_case(case);
                     let seconds = started.elapsed().as_secs_f64();
-                    results.lock().unwrap().push((case.name.clone(), seconds, r));
+                    results
+                        .lock()
+                        .unwrap()
+                        .push((case.name.clone(), seconds, r));
                 }
             });
         }
@@ -502,9 +505,17 @@ fn main() {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).unwrap();
         }
-        let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&path).unwrap();
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .unwrap();
         for (name, seconds, _) in &results {
-            writeln!(file, "{{\"set\":\"spec-cases\",\"key\":{name:?},\"seconds\":{seconds:.3}}}").unwrap();
+            writeln!(
+                file,
+                "{{\"set\":\"spec-cases\",\"key\":{name:?},\"seconds\":{seconds:.3}}}"
+            )
+            .unwrap();
         }
     }
     let mut passed = 0;
