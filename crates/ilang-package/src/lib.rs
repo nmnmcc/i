@@ -59,6 +59,8 @@ pub mod code {
     /// The compiled package has no dependency `i`, the standard library,
     /// and is not itself named `i`.
     pub const NO_LIBRARY: &str = "E0641";
+    /// The project still has the old copied standard library.
+    pub const LEGACY_LIBRARY: &str = "E0640";
 }
 
 /// The dependency name of the standard library.
@@ -612,7 +614,24 @@ impl Loader {
             ..d
         }));
         let manifest = manifest?;
-        if is_root && manifest.name != LIBRARY_NAME && !has_library(&manifest) {
+        let legacy = is_root && legacy_library(&dir, &manifest);
+        if legacy {
+            let mut diagnostic = Diagnostic::error(
+                code::LEGACY_LIBRARY,
+                Some(source),
+                manifest.name_span,
+                LEGACY_LIBRARY_MESSAGE,
+            );
+            if dir.join("std").is_dir() && !legacy_copy_unchanged(&dir) {
+                diagnostic.related.push(DiagnosticNote {
+                    source,
+                    span: manifest.name_span,
+                    message: "this copy has changes; back it up before deleting it".to_string(),
+                });
+            }
+            self.diags.push(diagnostic);
+        }
+        if is_root && !legacy && manifest.name != LIBRARY_NAME && !has_library(&manifest) {
             self.diags.push(Diagnostic::error(
                 code::NO_LIBRARY,
                 Some(source),
@@ -804,6 +823,101 @@ impl Loader {
 
 /// Whether a package has the standard library as a dependency or a
 /// dev-dependency.
+const LEGACY_LIBRARY_MESSAGE: &str = "the standard library is delivered by the package manager, not as a copy in the project\n  help: delete `std/` and remove the `std = { path = \"std\" }` dependency, then add:\n        i = \"github.com/nmnmcc/i//stdlib@<latest>\"";
+
+/// The files that `i new` copied before the library became a package.
+const LEGACY_FILES: &[&str] = &[
+    "i.toml",
+    "UNICODE-LICENSE",
+    "src/bit_array.i",
+    "src/bool.i",
+    "src/calendar.i",
+    "src/cli.i",
+    "src/crypto.i",
+    "src/csv.i",
+    "src/dict.i",
+    "src/float.i",
+    "src/http.i",
+    "src/int.i",
+    "src/json.i",
+    "src/list.i",
+    "src/log.i",
+    "src/option.i",
+    "src/order.i",
+    "src/pair.i",
+    "src/path.i",
+    "src/property.i",
+    "src/regex.i",
+    "src/result.i",
+    "src/schema.i",
+    "src/sequence.i",
+    "src/set.i",
+    "src/stream.i",
+    "src/string.i",
+    "src/test.is",
+    "src/time.i",
+    "src/uri.i",
+];
+
+/// The SHA-256 of the old copied tree: path, NUL, size, NUL, bytes, in path
+/// order, for exactly the files of [`LEGACY_FILES`].
+const LEGACY_HASH: &str = "d579e9b74a1a230209535b5244f77e444c7918e2f440e11b5c026ebbca9904fe";
+
+fn legacy_library(dir: &Path, manifest: &Manifest) -> bool {
+    let dependency = manifest.dependencies.iter().any(|d| {
+        (d.name == "std" || d.name == "stdlib")
+            && matches!(d.source, DependencySource::Path(_))
+    });
+    dependency || dir.join("std").join("i.toml").is_file()
+}
+
+fn legacy_copy_unchanged(dir: &Path) -> bool {
+    let base = dir.join("std");
+    if !base.join("i.toml").is_file() {
+        return false;
+    }
+    let mut found = Vec::new();
+    fn walk(base: &Path, dir: &Path, out: &mut Vec<String>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(base, &path, out);
+            } else if let Ok(relative) = path.strip_prefix(base) {
+                out.push(relative.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+    walk(&base, &base, &mut found);
+    found.sort();
+    if found.len() != LEGACY_FILES.len()
+        || found.iter().any(|f| !LEGACY_FILES.contains(&f.as_str()))
+    {
+        return false;
+    }
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    for relative in LEGACY_FILES {
+        let Ok(bytes) = std::fs::read(base.join(relative)) else {
+            return false;
+        };
+        hash.update(relative.as_bytes());
+        hash.update([0]);
+        hash.update(bytes.len().to_string().as_bytes());
+        hash.update([0]);
+        hash.update(&bytes);
+    }
+    let digest = hash.finalize();
+    let mut hex = String::with_capacity(64);
+    for byte in digest {
+        hex.push(char::from_digit(u32::from(byte >> 4), 16).unwrap());
+        hex.push(char::from_digit(u32::from(byte & 15), 16).unwrap());
+    }
+    hex == LEGACY_HASH
+}
+
 fn has_library(manifest: &Manifest) -> bool {
     manifest.dependencies.iter().any(|d| d.name == LIBRARY_NAME)
 }
