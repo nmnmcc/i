@@ -1038,3 +1038,122 @@ representation or numeric optimization was implemented in this lane.
 The original ABI-4 Rust metadata reader and JavaScript SDK were also checked
 against version-5 metadata; both reject it with the existing message:
 `the module uses i ABI version 5, but this host reads version 4; update the host`.
+
+## CI baseline and the always-inline threshold (2026-11-19)
+
+These numbers come from GitHub Actions' `ubuntu-24.04` hosted runners (4 vCPU,
+16 GB), a release `i` built from the stated commit, `RAYON_NUM_THREADS=1`, and
+the benchmark package's own sources. `i test --time` gives each test's wall
+time and the process's CPU time (user plus system) without the build;
+`/usr/bin/time -v` gives the peak RSS.
+
+**Runner speed is not constant.** The same binary measured `list_sort` in
+1.98 s on an Intel Xeon 6975P-C and 2.63-2.69 s on an AMD EPYC 7763 in the same
+workflow, and 2.18 s on an AMD EPYC 9V74. Absolute numbers from different
+runners, including the older numbers earlier in this document, are therefore
+not comparable across machines. Every comparison below alternates its
+configurations inside one job (five rounds, rotated order), so both sides see
+one CPU.
+
+Commits: `current` is `a906931b9` (main when this was measured); `documented`
+is `ad87d8c06`, the tree the earlier "After" numbers were recorded on; `change`
+is the always-inline commit. The `documented` column runs that commit's own
+benchmark sources because the current sources use newer syntax; the benchmark
+algorithms are the same.
+
+### Benchmark table
+
+Median of five alternating rounds in one job, seconds. Process CPU time is
+within 0.01 s of the wall time in every row, so only the wall time is shown.
+
+| Benchmark | current `--opt 0` | current `--opt 2` | documented `--opt 2` | always-inline 40 `--opt 2` | 40 vs current |
+|---|---:|---:|---:|---:|---:|
+| `list_build` | 0.136 | 0.084 | 0.098 | 0.068 | -19% |
+| `list_map` | 0.194 | 0.128 | 0.150 | 0.109 | -15% |
+| `list_reverse` | 0.269 | 0.186 | 0.239 | 0.163 | -12% |
+| `list_sort` | 3.166 | 1.966 | 2.849 | 1.615 | -18% |
+| `list_merge` | 0.855 | 0.580 | 0.853 | 0.572 | -1% |
+| `closures` | 0.109 | 0.069 | 0.064 | 0.065 | -6% |
+| `inspect` | 0.145 | 0.115 | 0.094 | 0.110 | -4% |
+| `dict_insert` | 0.582 | 0.452 | 0.410 | 0.450 | -0.4% |
+| `equality` | 0.314 | 0.255 | 0.228 | 0.247 | -3% |
+
+Peak RSS of the whole `i test --project bench` at `--opt 2`: 540 MB on
+`current`, 435 MB at `--opt 0`. The 1M-element lists do not approach the
+runner's memory; the 11-19 GB figures earlier in this document were the `std`
+test collection's Wasmtime compilation, which this package does not have.
+
+Against the documented tree on the same machine, `current` is faster on the
+list benchmarks: `list_sort` -31%, `list_merge` -32%, `list_reverse` -22%,
+`list_build` -14%, `list_map` -15%. It is slower on `equality` (+12%),
+`dict_insert` (+10%), `inspect` (+22%) and `closures` (+8%); `inspect`'s
+output work also changed since that tree (labels and canonical order), so only
+part of its difference is code generation. The others are the representation
+changes since then (unions of single-constructor types, `Nil` removal); they
+are the reason a representation change is not free and why the next one must be
+paired.
+
+### Where `list_sort` spends its time
+
+The comparison kernel in `bench/test/diag_test.i` (diagnostic branch only, never
+merged) runs 10M iterations of one self tail call. Three rounds on one Xeon
+6975P-C agreed to 0.002 s:
+
+| Loop body, 10M iterations | seconds | ns per iteration |
+|---|---:|---:|
+| empty loop | 0.179 | 17.9 |
+| `int.compare` called directly, result matched | 0.330 | 33.0 |
+| a function value from a list, called the same way | 0.634 | 63.4 |
+| a capturing closure, called the same way | 0.514 | 51.4 |
+
+A call through a function value costs about 30 ns more than a direct call;
+`list.sort` compares about `N log N ≈ 20M` times for 1M elements, so about
+0.6 s of its 2.0-2.2 s is the indirect comparator call.
+
+The collector is not the cost: on one runner the same `list_sort` at `--opt 2`
+took 1.83 s with copying and a 1 GiB heap, 2.04 s with `ILANG_GC=null`, and
+12.97 s with `ILANG_GC=drc`.
+
+Allocation is the rest. `list.reverse` costs 0.19-0.22 s per 1M cells
+(37-44 ns per new cell); the sort creates two cells per element per pass
+(accumulate, then reverse) over about 19 passes, roughly 38M cells and about
+1.4 s. Ints stay `i31ref` and `Order`/`Bool` are canonical globals, so there is
+no per-comparison boxing. What the compiler can still remove is call overhead:
+every list access, pattern test and shadow-stack position stayed a Wasm call,
+because Binaryen's default inlines only functions of 2 expressions and
+Wasmtime inlines nothing.
+
+### The change: always inline up to 40 expressions
+
+`ilang-binaryen` already called `BinaryenSetAlwaysInlineMaxSize`. The change
+raises that from 20 to 40, so the small runtime helpers around list cells,
+patterns and the shadow stack become part of their callers at `--opt 2`.
+
+Measured on the same runner in the same run (Intel Xeon 6975P-C; the same
+`current` binary measured 1.98-2.00 s for `list_sort` in the other paired
+runs, so these numbers are reproducible): `list_sort` 1.966 -> 1.615 s
+(-17.9%), `list_build` -19.0%, `list_map` -14.8%, `list_reverse` -12.4%,
+`closures` -5.8%, `inspect` -4.3%, `equality` -3.1%, `list_merge` -1.4%,
+`dict_insert` -0.4%. No benchmark got slower. The gain is the calls around
+list cells, pattern tests and shadow-stack positions that are now inlined;
+the indirect comparator call itself is not removed by this change.
+
+The cost is compile time. The earlier measurement in this document put the
+`std` test build at 3.5 s with 20 and 5.3 s with 40; that measurement was not
+repeated here. The inspection threshold itself is unchanged.
+
+### A second measured candidate, not taken
+
+Ordinary values (Bool, Float, String, records, data) can be allocated as a new
+`final` subtype of `$obj` instead of `$obj` itself. A cast to a final type is
+an exact type-index comparison, while a cast to the non-final `$val` calls
+Wasmtime's `is_subtype`. A paired run on one runner measured `list_sort`
+2.179 -> 1.953 s (-10%), `list_build` -10%, `list_map` -6%, but `equality`
++8% (the generic comparison pays for a type test per operand). The optimized
+probe module went from 34 casts to `$val` to 1. It is a real but smaller win,
+and it was not landed: the plan is one change at a time, and the inline
+threshold was larger and had no regression. The branch and the numbers stay in
+`ci/perf-obj-final` as the record.
+
+Verification: the PR's `CI` workflow runs the spec suite, the `ilang-check` and
+`ilang-cli` groups, the review corpus and the `i` group on the change commit.
