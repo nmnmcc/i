@@ -44,7 +44,7 @@ pub enum Error {
 /// references. 20 makes list-heavy benchmarks about 25% faster and the
 /// optimization of `std`'s tests about 1 s slower; 40 gains little more and
 /// costs twice that.
-pub const ALWAYS_INLINE: u32 = 20;
+pub const ALWAYS_INLINE: u32 = 40;
 
 /// Run once more after the default pipeline. Heap2Local only removes an
 /// allocation whose reference does not escape; an allocation stored into
