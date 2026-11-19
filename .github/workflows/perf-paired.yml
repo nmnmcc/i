@@ -1,0 +1,106 @@
+# Same-machine paired measurement for the whole baseline table: every
+# configuration alternates inside one job, so neither the runner's CPU model
+# nor its load can be mistaken for a difference between commits or opt levels.
+#
+# Configurations:
+#   current     a906931b9, bench sources of its own tree
+#   documented  ad87d8c06, the tree docs/performance.md recorded, its sources
+#   change      the performance change, on the current sources
+#
+# Started by a push to this file.
+name: Perf paired
+
+on:
+  push:
+    branches: [ci/perf-baseline]
+    paths: [.github/workflows/perf-paired.yml]
+
+permissions:
+  contents: read
+
+env:
+  # Perf baseline artifacts for current and documented.
+  BASELINE_RUN: "44503007673"
+  # Perf change artifact (i-release-change).
+  CHANGE_RUN: "44507343351"
+  RAYON_NUM_THREADS: 1
+  REPEATS: "5"
+
+jobs:
+  paired:
+    name: paired
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: a906931b9166b650f14d1d96d1100daa54fd5e51
+          path: src
+          submodules: true
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ad87d8c064202698f4d2ef9c8211771052c36d28
+          path: src-documented
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-current
+          path: bin/current
+          run-id: ${{ env.BASELINE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-documented
+          path: bin/documented
+          run-id: ${{ env.BASELINE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-change
+          path: bin/change
+          run-id: ${{ env.CHANGE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of the binaries
+        run: |
+          for b in current documented change; do
+            chmod +x "bin/$b/i"
+            xargs nix-store --realise < "bin/$b/i.nix-paths" > /dev/null
+            "bin/$b/i" --version
+          done
+          mkdir -p out
+          { uname -a; nproc; lscpu; free -h; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+      - name: Alternate the configurations
+        run: |
+          set -x
+          configs="current-o0 current-o2 change-o0 change-o2 documented-o2"
+          for r in $(seq 1 "$REPEATS"); do
+            # Rotate the order each round.
+            shift_by=$(( (r - 1) % 5 ))
+            ordered=$(echo $configs | cut -d' ' -f$((shift_by+1))- )
+            if [ "$shift_by" -gt 0 ]; then
+              ordered="$ordered $(echo $configs | cut -d' ' -f1-$shift_by)"
+            fi
+            for cfg in $ordered; do
+              bin=${cfg%-o*}
+              opt=${cfg##*-o}
+              src=src
+              if [ "$bin" = documented ]; then src=src-documented; fi
+              cat /proc/loadavg > "out/load-$r-$cfg.txt"
+              ( cd "$src" && /usr/bin/time -v -o "../out/time-$r-$cfg.txt" \
+                  "../bin/$bin/i" test --project bench --opt "$opt" --time ) \
+                  > "out/run-$r-$cfg.log" 2> "out/stderr-$r-$cfg.log"
+              grep -hE "^pass bench/bench_test" "out/run-$r-$cfg.log"
+              grep -E "Maximum resident|Elapsed|User time|System time" "out/time-$r-$cfg.txt"
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-paired-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14

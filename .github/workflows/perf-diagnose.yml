@@ -143,6 +143,45 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  service_env:
+    name: service environment K4 vs K32
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-current
+          path: target/release
+          run-id: ${{ env.BASELINE_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of i
+        run: |
+          chmod +x target/release/i
+          xargs nix-store --realise < target/release/i.nix-paths > /dev/null
+      - name: Alternate K = 4 and K = 32
+        run: |
+          mkdir -p out
+          { uname -a; nproc; lscpu | head -20; free -h; cat /proc/loadavg; } > out/machine.txt
+          for r in $(seq 1 5); do
+            if [ $((r % 2)) -eq 1 ]; then order="svc4 svc32"; else order="svc32 svc4"; fi
+            for k in $order; do
+              target/release/i test --project "diag/$k" --opt 2 --time \
+                > "out/run-$r-$k.log" 2> "out/stderr-$r-$k.log"
+              grep -hE "^pass" "out/run-$r-$k.log"
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diag-service-env-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+
   wasm:
     name: wasm stats
     runs-on: ubuntu-24.04
