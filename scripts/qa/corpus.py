@@ -233,6 +233,16 @@ def materialize(case, runtime):
     return runtime
 
 
+def levels():
+    """The optimisation levels this run compares. The gate runs 0; the daily
+    run sets CHECKS_CORPUS_LEVELS=0,2."""
+    raw = os.environ.get('CHECKS_CORPUS_LEVELS', '0,2')
+    chosen = sorted({int(part) for part in raw.split(',') if part.strip()})
+    if not chosen or any(level not in (0, 2) for level in chosen):
+        raise SystemExit(f'CHECKS_CORPUS_LEVELS must be a comma list of 0 and 2, not {raw!r}')
+    return chosen
+
+
 def observe(binary, case, bound):
     work = CORPUS / '.work'
     work.mkdir(exist_ok=True)
@@ -247,7 +257,7 @@ def observe_in(binary, case, bound, runtime):
     check, elapsed = invoke(binary, project, ['check', '--types'], bound)
     result = {'check': check}
     if check['exit'] == 1 and case.get('run_rejected'):
-        for opt in [0, 2]:
+        for opt in levels():
             result['run' + str(opt)], _ = invoke(binary, project, ['run', '--opt', str(opt)], bound)
     if check['exit'] == 0:
         source = project / 'src/main.i'
@@ -281,7 +291,7 @@ def observe_in(binary, case, bound, runtime):
             else:
                 manifest += '\n[test]\ncollection = "std/test.tests"\n'
         manifest_path.write_text(manifest)
-        for opt in [0, 2]:
+        for opt in levels():
             test, _ = invoke(binary, project, ['test', '--opt', str(opt)], bound)
             result['test' + str(opt)] = test
             if has_main or named_entry:
@@ -351,8 +361,10 @@ def run_corpus(args):
     def comparable(outcome):
         # A killed child has no complete diagnostic/output to compare. Preserve
         # its raw partial output, but compare only its censored outcome.
+        chosen = levels()
         return {k: ({'exit': 'timeout', 'command': v['command']} if v['exit'] == 'timeout' else v)
-                for k, v in outcome.items()}
+                for k, v in outcome.items()
+                if k in ('check',) or (k[-1].isdigit() and int(k[-1]) in chosen)}
     def completed_phases_match(before, after):
         checker_censored = before['check']['exit'] == 'timeout' or after['check']['exit'] == 'timeout'
         for phase in before.keys() | after.keys():
@@ -407,18 +419,17 @@ def run_corpus(args):
             if wanted == 'reject':
                 met = check['exit'] == 1 and 'error[' in check['stderr'] and 'panicked at' not in check['stderr']
                 if requirement.get('phase') == 'entry':
-                    entry_checks = [check, *[result[k] for k in ['run0', 'run2'] if k in result]] if check['exit'] != 0 else [result['run0'], result['run2']] if 'run0' in result else [result['test0'], result['test2']]
+                    entry_checks = [check, *[result[k] for k in ['run0', 'run2'] if k in result]] if check['exit'] != 0 else [result[k] for k in ['test0', 'test2'] if k in result]
                     met = all(v['exit'] == 1 and ('error[' in v['stderr'] or 'provider:' in v['stderr'])
                               and 'E0505' not in v['stderr'] and 'trap:' not in v['stderr']
                               for v in entry_checks)
             elif wanted == 'accept':
                 met = check['exit'] == 0 and all(value['exit'] == 0 for value in result.values())
             elif wanted == 'diverge':
-                met = check['exit'] == 0 and all(
-                    result[phase]['exit'] == 0 for phase in ('test0', 'test2')
-                ) and all(
-                    result[phase]['exit'] == 'timeout' and not result[phase]['stdout']
-                    for phase in ('run0', 'run2')
+                tested = [p for p in ('test0', 'test2') if int(p[-1]) in levels()]
+                ran = [p for p in ('run0', 'run2') if int(p[-1]) in levels()]
+                met = check['exit'] == 0 and all(result[p]['exit'] == 0 for p in tested) and all(
+                    result[p]['exit'] == 'timeout' and not result[p]['stdout'] for p in ran
                 )
             else:
                 met = False
@@ -429,7 +440,7 @@ def run_corpus(args):
                 met = met and fragment in check['stdout']
             if 'run_stdout' in requirement:
                 met = met and all(phase in result and result[phase]['stdout'] == requirement['run_stdout']
-                                  for phase in ['run0', 'run2'])
+                                  for phase in [p for p in ('run0', 'run2') if int(p[-1]) in levels()])
             if requirement.get('known_failure'):
                 summary['completed-resource-case' if met and requirement.get('censored') else 'XPASS' if met else 'XFAIL'] += 1
                 if met and not update and not requirement.get('censored'):

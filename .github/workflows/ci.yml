@@ -10,6 +10,10 @@ on:
     branches: [main, redesign]
   pull_request:
   workflow_dispatch:
+    inputs:
+      levels:
+        description: 'Optimisation levels (0, or 0,2); empty follows the event'
+        default: ''
 
 permissions:
   contents: read
@@ -410,7 +414,7 @@ jobs:
       CHECKS_TEST_GROUP: spec-${{ matrix.shard }}
       I_SPEC_SHARD: ${{ matrix.shard }}
       # The push/PR gate runs O0; the daily run compares O0 and O2.
-      CHECKS_SPEC_LEVELS: ${{ github.event_name == 'schedule' && '0,2' || '0' }}
+      CHECKS_SPEC_LEVELS: ${{ inputs.levels != '' && inputs.levels || (github.event_name == 'schedule' && '0,2' || '0') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -590,6 +594,7 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.corpus) }}
     env:
       CHECKS_SHARD: ${{ matrix.shard }}
+      CHECKS_CORPUS_LEVELS: ${{ inputs.levels != '' && inputs.levels || (github.event_name == 'schedule' && '0,2' || '0') }}
       # One thread per i process; the runner's four cores run four cases.
       RAYON_NUM_THREADS: 1
       # The runner's cores are slower than the machine the expectations were recorded on.
