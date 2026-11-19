@@ -1,0 +1,192 @@
+# Baseline for the compiler/runtime performance lane.
+#
+# Builds the release `i` from three pinned commits and runs `i test --project
+# bench --opt N --time` on each, so that the before/after numbers in
+# docs/performance.md can be compared on one machine and one runner type.
+#
+#   before      f7b3964, the "Before" column of docs/performance.md
+#   documented  ad87d8c06, the tree that the "After" column was recorded on
+#   current     the main under test
+#
+# Dispatch from the branch that carries this file:
+#
+#   gh workflow run perf-baseline.yml --ref ci/perf-baseline
+#
+# The raw logs are uploaded as artifacts and are the source of the summary in
+# docs/performance.md. Nothing here is a gate.
+name: Perf baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: Timed runs per benchmark set
+        required: false
+        default: "3"
+  # workflow_dispatch is only offered for workflows on the default branch, so
+  # a push to this file starts the run. Reruns use `gh run rerun`.
+  push:
+    branches: [ci/perf-baseline]
+    paths: [.github/workflows/perf-baseline.yml]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_INCREMENTAL: 0
+  # One Rayon thread for the build and for `i`, as the documented measurements
+  # used. The benchmark code itself is single threaded.
+  RAYON_NUM_THREADS: 1
+  REPEATS: ${{ github.event.inputs.repeats || '3' }}
+
+jobs:
+  build:
+    name: build (${{ matrix.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: before
+            ref: f7b3964da53b1712e2d89b3c7661954769cc26f6
+          - name: documented
+            ref: ad87d8c064202698f4d2ef9c8211771052c36d28
+          - name: current
+            ref: a906931b9166b650f14d1d96d1100daa54fd5e51
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
+            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
+            /usr/local/share/chromium /usr/lib/jvm
+          df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.ref }}
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: perf-baseline-${{ matrix.name }}-${{ hashFiles('Cargo.lock') }}
+          cmd-format: devenv shell -- {0}
+          cache-directories: ~/.cache/ccache
+          save-if: ${{ startsWith(github.ref, 'refs/heads/ci/') }}
+      - name: Build the release i
+        run: devenv shell -- cargo build --release --locked -p ilang-cli
+      - name: Record the build
+        run: |
+          git rev-parse HEAD > target/release/i.commit
+          target/release/i --version >> target/release/i.commit || true
+          devenv shell -- rustc --version >> target/release/i.commit || true
+          cat target/release/i.commit
+      - name: List the Nix store paths that i loads
+        run: |
+          devenv shell -- ldd target/release/i \
+            | grep -o '/nix/store/[a-z0-9]\{32\}-[^/ ]*' | sort -u > target/release/i.nix-paths
+          cat target/release/i.nix-paths
+          test -s target/release/i.nix-paths
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: i-release-${{ matrix.name }}
+          path: |
+            target/release/i
+            target/release/i.nix-paths
+            target/release/i.commit
+          if-no-files-found: error
+          retention-days: 7
+
+  measure:
+    name: measure (${{ matrix.name }}, opt ${{ matrix.opt }})
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: before
+            ref: f7b3964da53b1712e2d89b3c7661954769cc26f6
+            opt: 2
+          - name: documented
+            ref: ad87d8c064202698f4d2ef9c8211771052c36d28
+            opt: 2
+          - name: current
+            ref: a906931b9166b650f14d1d96d1100daa54fd5e51
+            opt: 0
+          - name: current
+            ref: a906931b9166b650f14d1d96d1100daa54fd5e51
+            opt: 2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.ref }}
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        with:
+          use-flakehub: disabled
+          use-gha-cache: enabled
+          source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-${{ matrix.name }}
+          path: target/release
+      - name: Fetch the libraries of i
+        run: |
+          chmod +x target/release/i
+          xargs nix-store --realise < target/release/i.nix-paths > /dev/null
+          target/release/i --version
+          cat target/release/i.commit
+      - name: Machine
+        run: |
+          mkdir -p out
+          {
+            echo "commit: $(git rev-parse HEAD)"
+            echo "opt: ${{ matrix.opt }}"
+            uname -a
+            nproc
+            lscpu
+            free -h
+            cat /proc/loadavg
+          } > out/machine.txt
+          cat out/machine.txt
+      - name: Run the benchmarks
+        env:
+          OPT: ${{ matrix.opt }}
+        run: |
+          set -x
+          for r in $(seq 1 "$REPEATS"); do
+            cat /proc/loadavg > "out/load-$r.txt"
+            # --time reports each test's wall and process CPU time without the
+            # build; /usr/bin/time -v reports the whole process's peak RSS.
+            /usr/bin/time -v -o "out/time-$r.txt" \
+              target/release/i test --project bench --opt "$OPT" --time \
+              > "out/run-$r.log" 2> "out/stderr-$r.log"
+            echo "exit: $?" >> "out/run-$r.log"
+            cat /proc/loadavg > "out/load-after-$r.txt"
+            tail -5 "out/run-$r.log"
+            grep -E "Maximum resident set size|User time|System time|Elapsed" "out/time-$r.txt"
+          done
+          ls -l out
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-${{ matrix.name }}-o${{ matrix.opt }}-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
