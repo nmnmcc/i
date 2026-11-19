@@ -1,7 +1,7 @@
 # Mid-end design: the next compiler project
 
-Status: proposal; pass 1 (type-directed equality) is implemented on the
-`perf/eq-typed` branch. All numbers use the `docs/performance.md` protocol: one machine,
+Status: proposal. Pass 1 (type-directed equality) is merged. Pass 2 and pass 3
+were probed; the results are in their sections. All numbers use the `docs/performance.md` protocol: one machine,
 one run, five alternating rounds, median. Each run records `free -g` and
 `/proc/loadavg`; local builds use `CARGO_BUILD_JOBS=2` and one process at a
 time on a shared development machine, scaled to the host's limits; a round
@@ -79,6 +79,43 @@ pass 3 on current evidence.
 - **Cost/risk**: high. New IR value/statement form and emit support; a result
   tuple can cross a suspension, so those cases must stay allocated; workers
   must see the same representation.
+
+
+**Pass 3 probe (2026-11-20, no code).** A copy of `std/dict`'s insert path
+with the per-level result tuples removed (`put` returns only the new node and
+`put_entry` only the new list) was compared with `std/dict` on 200k random
+keys in one CI job, five alternating rounds (Xeon 6975P-C, load 0.5):
+`dict.insert` cost 0.385 s with the tuples and 0.328 s without, a **14.8%**
+difference (1.9 µs to 1.65 µs per insert, about 250 ns each). The trie shape
+and node allocations are identical; the difference is the removable result
+tuples. That is the upper bound for pass 3 on this workload, and it is below
+the 20% target set for the highest-cost pass. **Pass 3 is therefore not
+proposed now**; the shape is recorded below in case a later change needs it
+as an enabler.
+
+**Shape of the change (if revisited).**
+
+- IR: a multi-result call form used only when the immediately following
+  statement destructures the result of a direct/known call, e.g.
+  `Stmt::Let2 { dst_a, dst_b, value: Value::Call, .. }` (generalized to at
+  most four results). Calls through a function value and calls whose result
+  is stored, returned or held across a suspension keep the tuple.
+- Emit: clone the callee as a multi-value function returning
+  `(result eqref eqref ...)`; the call site stores the results directly into
+  locals. Other callers keep the tuple-returning function; a function used as
+  a value keeps its `$fn_n` single-result form.
+- Must stay allocated: a call that may suspend (the split `Suspendable`
+  points), a tuple that escapes its destructuring or crosses a suspension,
+  exports and worker-visible functions, and any result consumed as a value.
+- Workers: the multi-result clone is internal, never a constant closure or a
+  worker entry, so the codec never encodes a multi-value result.
+- `--opt 0`: this pass, like the earlier ones, runs only at O2/O3. O0 keeps
+  the tuple; the O0/O2 differential corpus stays independent. No ABI, export
+  or metadata change; source sites and stop traces stay at the same
+  positions.
+- Tests: immediate destructuring removes the tuple from the generated code;
+  escaping, suspending, worker-visible and value-position cases keep it;
+  results stay identical.
 
 ### 4. Monomorphization of generic library calls
 
