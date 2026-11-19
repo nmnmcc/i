@@ -56,6 +56,7 @@ pub(crate) fn split_with_may(p: &mut Program, may: &[bool]) {
         };
         let first = p.points.len() as PointId;
         let mut next = first;
+        demote_suspending_tail_calls(&mut f.body, may, &mut f.locals, &mut f.budget_frame);
         mark(&mut f.body, may, &mut next);
         if next == first {
             continue;
@@ -300,6 +301,73 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
         Stmt::Suspendable { .. } => true,
         _ => false,
     })
+}
+
+/// A call in tail position that provides an environment to its callee,
+/// where the callee may suspend, must not stay a tail call.
+///
+/// A tail call leaves no frame, so it is not a `Suspendable` point and has no
+/// `Point` record. The provided environment is then not in any `Point` delta,
+/// so a capture inside the callee carries no record for it; the next
+/// trampoline rebuilds the re-entered frames from the resume caller's
+/// environment, the provided services are missing, and a later nested call
+/// reads a wrong value (`ref.cast` trap). Demoting the call to `Let` +
+/// `Return` gives it a point, a delta, and a frame record.
+///
+/// A tail call without a provided environment has no delta to lose and stays
+/// a tail call; this keeps the recursion in `tests/spec/9/environment.i` and
+/// ordinary loops on the tail-call path.
+///
+/// Only a callee that is a function value (`Value`, `Shaped`, `Lazy`) is
+/// demoted. A direct call stays a tail call, so a recursive loop keeps its
+/// tail path and stack use; the environment of a direct tail call that
+/// suspends remains a known gap (the `D16` case in `docs/performance.md`).
+/// Do not widen the demotion: demoting every tail call turned the recursion
+/// in the hot-loop probe from a tail loop into stack growth, about 70% slower
+/// on a 200k-iteration loop with a provided service.
+fn demote_suspending_tail_calls(
+    stmts: &mut Vec<Stmt>,
+    may: &[bool],
+    locals: &mut Vec<LocalType>,
+    budget_frame: &mut u32,
+) {
+    let mut i = 0;
+    while i < stmts.len() {
+        let demote = match &stmts[i] {
+            Stmt::TailCall {
+                callee,
+                args,
+                env,
+                site,
+            } if *env != Env::Param
+                && matches!(
+                    callee,
+                    Callee::Value(_) | Callee::Shaped(..) | Callee::Lazy { .. }
+                ) =>
+            {
+                let value = Value::Call {
+                    callee: callee.clone(),
+                    args: args.clone(),
+                    env: *env,
+                };
+                suspends(&value, may).then_some((value, *site))
+            }
+            _ => None,
+        };
+        if let Some((value, site)) = demote {
+            let dst = locals.len() as u32;
+            locals.push(LocalType::Value);
+            *budget_frame += 1;
+            stmts[i] = Stmt::Let { dst, value, site };
+            stmts.insert(i + 1, Stmt::Return(Atom::Local(dst)));
+            i += 2;
+            continue;
+        }
+        stmts[i]
+            .bodies_mut()
+            .for_each(|b| demote_suspending_tail_calls(b, may, locals, budget_frame));
+        i += 1;
+    }
 }
 
 /// Turns every call that may suspend into a `Suspendable` with the next
@@ -823,7 +891,9 @@ mod tests {
         };
         let may = may_suspend(&p);
         split_with_may(&mut p, &may);
-        assert_eq!(p.points.len(), 1);
+        // The tail call to a value with a provided environment is demoted to
+        // a frame (see `demote_suspending_tail_calls`), so it is a point too.
+        assert_eq!(p.points.len(), 2);
         let point = &p.points[0];
         assert_eq!(point.params, vec![1, 2]);
         assert_eq!(
