@@ -68,7 +68,10 @@ with its compiler-enabled Wasmtime; the runner has the runtime, standard service
 reactor, without a compiler backend. The artifact/runner contract pins Wasmtime version,
 target triple, CPU feature baseline, collector, engine tunables and
 epoch-instrumentation mode. Do not infer build-machine CPU features for a distributed
-baseline. Check a manifest before unsafe deserialize; load only the trusted payload
+baseline. The manifest carries no separate code digest: the trailer digest covers the
+code with the rest of the payload. A payload written before that field was removed
+fails at manifest decoding and is reported as damaged; no compatibility path is kept.
+Check a manifest before unsafe deserialize; load only the trusted payload
 packaged for that runner, never an arbitrary user .cwasm. Program::from_bytes must be
 factored, not reused unchanged (§9/§10). Reason: the review's runtime-only probe and
 current constructor, cited in §9.
