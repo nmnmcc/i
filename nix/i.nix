@@ -103,6 +103,10 @@ rustPlatform.buildRustPackage {
       binary="target/release/i"
     fi
     install -Dm755 "$binary" "$out/bin/i"
+    # The library package travels with the distribution, so that `i new`
+    # can build a local repository for offline use.
+    mkdir -p "$out/share/i"
+    cp -a stdlib "$out/share/i/stdlib"
     runHook postInstall
   '';
 

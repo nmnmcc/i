@@ -118,7 +118,7 @@
 
             # A local package repository with the library tag, as a user's
             # cache would get from the network.
-            cp -a ${../stdlib} "$TMPDIR/library"
+            cp -a ${i}/share/i/stdlib "$TMPDIR/library"
             chmod -R u+w "$TMPDIR/library"
             git -C "$TMPDIR/library" init -q
             git -C "$TMPDIR/library" -c user.email=i@example.invalid -c user.name=i add -A
