@@ -194,6 +194,13 @@ i() {
     cargo build --release --locked -p ilang-cli
     i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
   fi
+  # The library's own types, before the long tests. `i fmt` only parses and
+  # prints, so a type error in lib/ or std/ would otherwise show up after
+  # minutes of tests; this keeps it to the file, line and column it is.
+  if (( first )); then
+    echo "checks: i check --project std"
+    "$i" check --project std
+  fi
   if (( first )); then
     "$i" fmt --check lib std bench examples
     # Every example with an `i.toml` must type check on its own.
