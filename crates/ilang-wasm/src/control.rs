@@ -43,7 +43,9 @@ pub fn split(p: &mut Program) {
     split_with_may(p, &may);
 }
 
-/// [`split`] with the `may_suspend` fixed point already computed.
+/// [`split`] with the `may_suspend` fixed point already computed. Both this
+/// and [`may_suspend`] stay crate-internal: outside callers use [`split`],
+/// which computes the vector itself, and tests must not widen the API.
 pub(crate) fn split_with_may(p: &mut Program, may: &[bool]) {
     for i in 0..p.funcs.len() {
         if !may[i] {
