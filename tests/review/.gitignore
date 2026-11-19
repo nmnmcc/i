@@ -1,2 +1,8 @@
 .work/
 cases/**/actual.json
+# Reviews and test runs write these; records belong in the pull request or git history.
+*.log
+*-proof.json
+summary.json
+integrity.json
+known-failures.md

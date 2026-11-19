@@ -85,7 +85,7 @@ tree" is what must exist before it can move. Sizes are lines of the file and
 | `src/walk.rs` | 337 | `Visitor`/`Walk` over the old tree (every span and string) | `ilang-macro` (`item_phase` 14, `typed`, `registry`, `project`, `body_engine`), `lisp/{expansion,from_ast,quote_lower}`, `shape.rs`, `syn3/convert.rs`, `ilang-cli` `expand`, tests `macro_run`, `body_walk` | A walker over the new tree is needed first; then deleted. |
 | `src/print.rs` | 1001 | Old-surface printer of the old tree | `ast.rs` (`string_literal` for `LitValue::text`), `lisp/from_ast.rs`, `syn3/lisp.rs` (`string_literal`), tests `lisp_datum`, `string_forms`, `syn3_lower` | `string_literal` moves to the new printer; the rest is deleted (it prints syntax that no parser of the default build reads). |
 | `src/shape.rs` | 164 | `shape`, `canon`, `equivalent` on the old tree | `ilang-cli` `fmt --to` (write check), `lisp/to_source.rs`, tests `common.rs`, `format`, `lisp_*`, `string_forms` | Replaced by `==` on the new tree (spans are not compared; a group is a `Block`, so the check needs the one-statement-block rule of `canonical`). |
-| `src/legacy/{parser,format}.rs` | 2155, 1789 | Old parser and formatter, feature `legacy` | examples `migrate-syntax3`, `migrate-syntax3-pipe`, `migrate-tests`; tests `syn3`, `syn3_lower`; scripts `syn3-convert-all`, `syn3-convert-embedded`, `old-syntax-check`, `test-macro-migrate`, `migrate-syntax3-labels-text` | Stays while the migrator must read old text; then moves under `examples/` with a private copy of `ast.rs`, `walk.rs`, `print.rs` and `syn3/convert.rs`. |
+| `src/legacy/{parser,format}.rs` | 2155, 1789 | Old parser and formatter, feature `legacy` | examples `migrate-syntax3`, `migrate-syntax3-pipe`, `migrate-tests`; tests `syn3`, `syn3_lower`; one-shot migration scripts (removed) | Stays while the migrator must read old text; then moves under `examples/` with a private copy of `ast.rs`, `walk.rs`, `print.rs` and `syn3/convert.rs`. |
 | `src/syn3/convert.rs` | 2214 | Old tree to new tree (the migrator), and `syn3::print_current` | migrator; **`ilang-cli` `expand --to`** and **`ilang-check` `query.rs`:375** print an expanded old tree through it | The two compiler users go away when the expanded tree is the new tree; the file then belongs to the migrator only. |
 | `src/syn3/lower.rs` | 1429 | New tree to old tree | `syn3::parse_lowered` (= `ilang_syntax::parse_module`), `syn3::parse_lisp_lowered` (= `lisp::parse_source`), migrator `--check` | Deleted when the resolver reads the new tree (step 3). |
 
@@ -311,8 +311,9 @@ Morning additive checkpoint (lane/fa, 2026-11-13):
 - faF `89c0ecf4` (including the reboot's pending test fixes): written Lisp
   fixtures use §6.8; tests of old readers/encoders keep their old rows.
   `cargo check -p ilang-syntax -p ilang-check --all-targets --locked`
-  passed in faF before committing. The conversion inventory is in
-  `syn3-final-ast-tests.md`; its post-flip entries are still a checklist.
+  passed in faF before committing. The conversion inventory from that
+  checkpoint is not kept in the tree; its post-flip entries were still a
+  checklist then.
 
 The evening gate is `cargo check --workspace --all-targets --locked`, all
 `ilang-syntax` and `ilang-macro` tests, CLI `macro_run`, `typed_macros`,
@@ -756,8 +757,8 @@ the only landable hash. The scheduler is paused; the already-running std
 O2 check may finish, but no further queued heavy checks will start after
 the merge deadline. Compiler sources are frozen. Full final-source checker
 integration, LSP, examples, std O0, chapters 6/7/9/15.7 and final formatting/
-clippy repetition remain unchecked; the exact matrix/commands are in
-syn3-final-ast-fa-checking.md. Step 4 is prepared only, not applied.
+clippy repetition remain unchecked; the exact matrix and commands are in git
+history. Step 4 is prepared only, not applied.
 
 Post-deadline read-only result (2026-11-14T02:01:53.534619+08:00): the already-running std O2
 finishes 2170/2170, including unchanged schema.null_round. Wrapper kernel
@@ -781,7 +782,7 @@ earlier no-commit-before-full-green notes are historical.
 
 Nov14 05:35 preparation milestone: the unused guarded deletion tools are
 retained under `scripts/syn3-delete-*.py`, with the exact five-case capture
-helper and `syn3-final-ast-deletion.md` procedure. All Python syntax checks
+helper and an ordered deletion procedure (all since removed). All Python syntax checks
 and the driver dry run pass. No production tree or Rust test is changed by
 this milestone. Preparation fixes the macro dev-dependency boundary, retains
 private parse-lowered entry points and native-fact access, and preserves full
@@ -811,8 +812,8 @@ APIs and tests. The strict resolver comparison covers677 original files and
 519 programs with complete HIR/diagnostic equality, including later grouping
 and selection forms. Provider fusion is decided after alias/import expansion,
 and the closed-function generalization boundary is retained. Step four is
-still unapplied; the detailed command/result record is in
-`syn3-final-ast-fa-checking.md`. The historical fa2 null-round failure
+still unapplied; the detailed command and result record is in git history.
+The historical fa2 null-round failure
 does not reproduce; no guessed backend fix or expectation change is made.
 
 
@@ -911,8 +912,7 @@ The gate includes workspace all-target check, strict clippy, Rust757
 all39 CLI integration binaries plus library, examples13 (one existing
 skip), std2170 at O0/O2, spec6=80/7=104/9=139/15.7=28 at both levels,
 short generation and root/private/source formatting. Every exact command,
-initial failure and successful retry is recorded in
-[syn3-final-ast-fa-checking.md](syn3-final-ast-fa-checking.md).
+initial failure and successful retry was recorded at the time.
 The unchanged schema_test.null_round passes at both levels; the earlier
 fa2 failure is unreproduced, with no speculative patch or changed assertion.
 Unfiltered workspace/spec/corpus checking remains the coordinator's.
@@ -920,15 +920,13 @@ Unfiltered workspace/spec/corpus checking remains the coordinator's.
 
 Nov14 10:43: the new coordinator integration merges lane/tyalt046550bd.
 All16 conflicts are resolved and the workspace all-target check passes.
-Every incoming change to deleted/relocated files is inventoried in
-[syn3-final-ast-tyalt-integration.md](syn3-final-ast-tyalt-integration.md).
-This is a compiling milestone, not a green claim on the new main base.
+Every incoming change to deleted or relocated files was inventoried at the
+time. This is a compiling milestone, not a green claim on the new main base.
 
 Nov14 12:53: the native-tree integration now contains latest tyalt c220161d5
 (main/ABI5, stage3, colon precedence, continuation environment fix and the
-stop-position proof). Every deleted-file change and every diagnostic move
-is inventoried in [the integration report](syn3-final-ast-tyalt-integration.md).
-Fresh workspace all-target check, strict clippy,27 Wasm units, the full
+stop-position proof). Every deleted-file change and every diagnostic move was
+inventoried at the time. Fresh workspace all-target check, strict clippy,27 Wasm units, the full
 syntax/macro/check/LSP gate (764 passes after four test-shape repairs),
 complete initial CLI plus all three repaired binaries, macro examples and
 both std O0/O2 (2170/2170 each, including schema.null_round) pass.
@@ -954,10 +952,9 @@ spec80/114/140/28 at both levels, generation32+64+32/0, all formatting and
 direct fresh-driver snippets5035+34+94 pass. The current-repository strict
 native/reference HIR and diagnostic differential passes. Old production
 tree/lower/legacy reader deletions are intact. Every incoming deleted-file
-change and every known diagnostic location/row change is explained in
-[the final integration report](syn3-final-ast-tyalt-integration.md), including
-all command results and repaired initial failures. No implementation or
-required gate remains pending. Landable documentation hash follows in
+change and every known diagnostic location or row change was explained at
+the time, including all command results and repaired initial failures. No
+implementation or required gate remains pending. Landable documentation hash follows in
 shared status-fa.txt; production source is unchanged since e840c135b.
 
 Nov14 19:10: origin/main9b806113 is integrated for MP01–MP16 and F1, with
@@ -967,7 +964,7 @@ ported; production lower/old tree stay deleted. Workspace all-target check,
 requested Rust packages (value_types omitted), reader follow-up/doctests and
 CLI cache3/known3/macro66/package34 pass. Spec4.8/9/14 and direct snippets
 remain active/pending; final phase results follow in shared status-fa.txt.
-See [the main integration report](syn3-final-ast-main-mp-integration.md).
+The merge record is in git history.
 
 Nov14 19:18:02: merged-main9b806113 targeted gate is fully GREEN:
 workspacealltargets; Rustsyntax/macro/check/package725/0 (value_types omitted,
