@@ -28,4 +28,4 @@ not_tuple : ((Int, Int) | ()) -> Never
 70:39: error[E0506]: `.name` needs a known type for its value; write the parameter's type, for example `(u : User) { u.name }`, or give the function where a type is expected, for example `get_name : (User) -> String = (u) { u.name }`. An inferred type is solved from constraints; a known type comes from written types and earlier known facts, including the expected type, before solving
 80:14: error[E0501]: `Rock` is not a subtype of `Cat` (the type at 80:2 needs it)
 86:42: error[E0512]: the data `(Int)` has no part `1`
-88:44: error[E0512]: `.0` needs every member of the known type `(Int, Int) | ()` of its value to be data, but `()` is not
+88:43: error[E0512]: the data `()` has no part `0`

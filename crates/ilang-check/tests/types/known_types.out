@@ -93,9 +93,9 @@ annotated_call : Int
 101:3: warning[W0502]: this value is not used, and working it out does nothing
 108:13: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
 112:18: warning[W0503]: the two sides have the known types `Box(1)` and `1`, which can never be equal, so `==` is always `False`
-118:37: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False`
+118:36: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False`
 129:18: warning[W0503]: the two sides have the known types `1 | "a"` and `Float`, which can never be equal, so `==` is always `False`
-135:36: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False`
+135:35: warning[W0503]: the two sides have the known types `User` and `1`, which can never be equal, so `==` is always `False`
 138:2: warning[W0502]: this value is not used, and working it out does nothing
 142:19: warning[W0503]: both sides are constants, `1` and `"a"`, which can never be equal, so `==` is always `False`
 145:22: warning[W0503]: the two sides have the known types `String` and `1`, which can never be equal, so `==` is always `False`
