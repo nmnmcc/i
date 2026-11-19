@@ -86,7 +86,11 @@ Data-rest patterns are not available yet; list rest patterns work (P13).
 
 ### Resource scopes
 
-`resource.scoped` and `Scope` are not available yet; use `resource.acquire` callbacks (EF11).
+`resource.scoped` gives its body a `Scope`, and `resource.acquire` attaches a release to it (EF11). The scope is open while its body runs, closing before its first release, and closed after; `acquire` checks that state before calling `open`, so using a scope outside its body stops with `panic("resource: scope is not open")`. A child task does not share the enclosing `Scope`: it opens its own `resource.scoped` (spec §9.5).
+
+- [ ] **Platform entry `Scope`.** The platform gives every entry a `Scope` (§10.2), so a program need not start with `resource.scoped`. Prerequisite: the checker's platform-service table and the host must provide `Scope` at entries; the library `Scope` already has the open, closing and closed states.
+- [ ] **Rename `dict.has` and `set.has` to `contains`.** Prerequisite: migrate `std/src/list.i`, `std/src/regex.i`, `std/src/dict.i`, `std/src/set.i`, `std/test/dict_test.i` and the review-corpus snapshots in the same change, since the snapshots vendor their own copies.
+- [ ] **Merge `lazy_unwrap` and `lazy_or` into labelled `unwrap`/`or` shapes.** Prerequisite: labelled function parameters (parameter groups) implemented and tested in the language; the baseline has labelled data fields only.
 
 ### Loader generation
 

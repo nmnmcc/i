@@ -11,7 +11,12 @@ i/control.resume : (Continuation(A, B, C), A) <- C -> B
 i/control.cancel : (Continuation(A, B, C)) <- C -> ()
 i/control.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B
 i/resource.ensure : (() <- N -> A, () <- N -> ()) <- N -> A
-i/resource.acquire : (() <- (Fail(B), ..N) -> A, (A) <- N -> (), (A) <- (Fail(B), ..N) -> C) <- (Fail(B), ..N) -> C
+i/resource.gate_ready : (A) -> Request(A)
+i/resource.gate_state : (Request(A)) -> Result(A, Int)
+i/resource.gate_take : (Request(A)) -> A
+i/resource.pure_release : ((A) <- N -> ()) <- N -> (A) -> ()
+i/resource.acquire : (() <- (Fail(B), ..N) -> A, (A) <- N -> ()) <- (Fail(B), Scope, ..N) -> A
+i/resource.scoped : (() <- (Scope, ..N) -> A) <- N -> A
 i/assertion.catch : (() <- N -> A) <- (N - Assert) -> Result(A, AssertionFailure)
 i/request.new_root : (Key(())) -> Key(())
 i/request.end_root : (Key(())) -> ()

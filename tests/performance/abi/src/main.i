@@ -53,11 +53,10 @@ echo = (value : Int) -> Int { tick(value) }
 // Real filesystem adapter; /dev/zero keeps every read at eight bytes.
 fs_reads = (n : Int, path : String) {
 	fail.catch(() {
-		resource.acquire(
-			() { fs.open(path, fs.ReadOnly) },
-			fs.close,
-			(file) { fs_loop(n, file) },
-		)
+		resource.scoped(() {
+			file = resource.acquire(() { fs.open(path, fs.ReadOnly) }, fs.close)
+			fs_loop(n, file)
+		})
 	}) |>
 		(Ok(answer)) { answer }
 		& (Error(_)) { panic("fs read benchmark") }

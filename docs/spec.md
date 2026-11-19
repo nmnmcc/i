@@ -5,7 +5,7 @@ Version: 1.0; Date: 2026-11-14
 
 This document is the definition of the i Programming Language. A compiler or a program that does not keep to it is wrong. The present compiler does not yet do everything in this document.
 
-This document is complete in itself, except that the principality argument (§4.7), the contract of `resource.ensure`'s final callback (§9.5), and the contracts of the library operations in §9.12 are still being completed; this qualification is to be removed when all three are complete. It defines:
+This document is complete in itself, except that the principality argument (§4.7), the contract of `resource.ensure`'s final callback (§9.5), the platform entry `Scope` (§9.5, §10.2), and the contracts of the library operations in §9.12 are still being completed; this qualification is to be removed when all four are complete. It defines:
 
 - the source language (§1 to §8);
 - effects, and the library modules `i/fail`, `i/control`, `i/resource`, `i/assertion`, `i/io`, `i/key`, `i/task`, `i/random`, `i/request`, `i/clock`, `i/fs`, `i/process`, `i/net`, `i/tls`, and `i/stdio` (§9);
@@ -1500,27 +1500,36 @@ finals are run; the removed registration is not invoked again. Structured task
 cancellation shields an already-running final as §9.9 R4 specifies. That
 shielding is a task rule, not a change to raw `control.cancel`.
 
-The module `i/resource` puts final functions in place. `Scope` is a service of `i/resource`; the platform gives every entry one (§10.2).
+The module `i/resource` puts final functions in place. `Scope` is a service of `i/resource`; the platform will give every entry one (§10.2), and until it does `resource.scoped` makes one.
 
 | Function | Type | What it does |
 |---|---|---|
 | `resource.ensure` | `<A, N>(() <- N -> A, () <- N -> ()) <- N -> A` | Runs the second function after the first, whether the first ends normally, ends with an error, or is unwound |
-| `resource.acquire` | `<A, N>(() <- N -> A, (A) -> ()) <- (..N, Scope) -> A` | Opens a resource and attaches its release to the current `Scope` |
+| `resource.acquire` | `<A, E, N>(() <- (..N, Fail(E)) -> A, (A) <- N -> ()) <- (Fail(E), ..N, Scope) -> A` | Opens a resource and attaches its release to the current `Scope` |
 | `resource.scoped` | `<A, N>(() <- (..N, Scope) -> A) <- N -> A` | Runs the body with a new `Scope`, and runs the attached releases in reverse order when the body ends, also by an error, an escape or a cancel |
 
 A `Scope` starts **open**. `acquire` checks that state before calling
 `open`; acquisition into a closing or closed scope stops with
 `panic("resource: scope is not open")` without calling `open`. A successful
-open registers its release before returning the resource. When the scoped body
-ends, the scope becomes **closing** before any release runs. It waits for
-acquisitions already admitted while open to register their releases, then
-drains releases in reverse registration order. A release cannot acquire into
-that closing scope; it can open a fresh scope. After draining, the scope is
-**closed** and stays closed even when its service value was captured or returned.
-The entry's root resource scope closes after its task run and all structured
-children and task finals end, before the entry returns to its host (§10.2).
+open registers its release before returning the resource; registration is
+synchronous, so an acquisition admitted by an open scope registers before its
+body can end. When the scoped body ends, the scope becomes **closing** before
+any release runs. It waits for acquisitions already admitted while open to
+register their releases, then drains releases in reverse registration order.
+A release cannot acquire into that closing scope; it can open a fresh scope.
+After draining, the scope is **closed** and stays closed even when its service
+value was captured or returned. The entry's root resource scope closes after
+its task run and all structured children and task finals end, before the entry
+returns to its host (§10.2).
 
-A release that needs services is made with `keep` (§9.4). A final function may not raise errors. When the program stops (§11.7), final functions are not run.
+A child task does not inherit a usable `Scope`: the boundary of the enclosing
+`scoped` is not on the child's stack. A child task that acquires opens its own
+`resource.scoped`.
+
+A release uses only the services in `open`'s row, which are captured at
+acquisition. A release may not raise an error. A final function may not raise
+errors. When the program stops (§11.7), final functions are not
+run.
 
 A structured task group waits for cancelled children and their final functions before it returns (§9.9). Those final functions may suspend and resume and use services, but may not raise errors. An unstarted child has no installed final functions. A host failure or a destroyed instance cannot run i final functions; the host instead releases its own work and resources (Appendix B).
 
