@@ -1,37 +1,17 @@
 {
-  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
-  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
+  "compiler": "56b7ace831980fbc76d7bc7266deda258cac0260",
+  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 0,
-      "stdout": "app/main.f_0 : (() <- N -> A) <- N -> A\napp/main.f_1 : (() <- N -> A) <- N -> A\napp/main.f_2 : (() <- N -> A) <- N -> A\napp/main.f_3 : (() <- N -> A) <- N -> A\napp/main.f_4 : (() <- N -> A) <- N -> A\napp/main.f_5 : (() <- N -> A) <- N -> A\napp/main.f_6 : (() <- N -> A) <- N -> A\napp/main.f_7 : (() <- N -> A) <- N -> A\napp/main.f_8 : (() <- N -> A) <- N -> A\napp/main.f_9 : (() <- N -> A) <- N -> A\napp/main.f_10 : (() <- N -> A) <- N -> A\napp/main.f_11 : (() <- N -> A) <- N -> A\napp/main.f_12 : (() <- N -> A) <- N -> A\napp/main.f_13 : (() <- N -> A) <- N -> A\napp/main.f_14 : (() <- N -> A) <- N -> A\napp/main.f_15 : (() <- N -> A) <- N -> A\napp/main.f_16 : (() <- N -> A) <- N -> A\napp/main.f_17 : (() <- N -> A) <- N -> A\napp/main.f_18 : (() <- N -> A) <- N -> A\napp/main.f_19 : (() <- N -> A) <- N -> A\napp/main.f_20 : (() <- N -> A) <- N -> A\napp/main.f_21 : (() <- N -> A) <- N -> A\napp/main.f_22 : (() <- N -> A) <- N -> A\napp/main.f_23 : (() <- N -> A) <- N -> A\napp/main.f_24 : (() <- N -> A) <- N -> A\napp/main.f_25 : (() <- N -> A) <- N -> A\napp/main.f_26 : (() <- N -> A) <- N -> A\napp/main.f_27 : (() <- N -> A) <- N -> A\napp/main.f_28 : (() <- N -> A) <- N -> A\napp/main.f_29 : (() <- N -> A) <- N -> A\napp/main.f_30 : (() <- N -> A) <- N -> A\napp/main.f_31 : (() <- N -> A) <- N -> A\n",
-      "stderr": "src/main.i:32:1: warning[W0504]: top-level binding `f_31` is not used\n"
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:32:1: warning[W0504]: top-level binding `f_31` is not used\n"
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:32:1: warning[W0504]: top-level binding `f_31` is not used\n"
+      "exit": 1,
+      "stdout": "",
+      "stderr": "../../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
     }
   }
 }

@@ -1,37 +1,17 @@
 {
-  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
-  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
+  "compiler": "56b7ace831980fbc76d7bc7266deda258cac0260",
+  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 0,
-      "stdout": "app/main.u0 : () <- (S0(N), ..N) -> ()\napp/main.u1 : () <- (S1(N), ..N) -> ()\napp/main.u2 : () <- (S2(N), ..N) -> ()\napp/main.u3 : () <- (S3(N), ..N) -> ()\napp/main.u4 : () <- (S4(N), ..N) -> ()\napp/main.u5 : () <- (S5(N), ..N) -> ()\napp/main.u6 : () <- (S6(N), ..N) -> ()\napp/main.u7 : () <- (S7(N), ..N) -> ()\napp/main.u8 : () <- (S8(N), ..N) -> ()\napp/main.u9 : () <- (S9(N), ..N) -> ()\napp/main.u10 : () <- (S10(N), ..N) -> ()\napp/main.u11 : () <- (S11(N), ..N) -> ()\napp/main.u12 : () <- (S12(N), ..N) -> ()\napp/main.u13 : () <- (S13(N), ..N) -> ()\napp/main.u14 : () <- (S14(N), ..N) -> ()\napp/main.u15 : () <- (S15(N), ..N) -> ()\napp/main.u16 : () <- (S16(N), ..N) -> ()\napp/main.u17 : () <- (S17(N), ..N) -> ()\napp/main.u18 : () <- (S18(N), ..N) -> ()\napp/main.u19 : () <- (S19(N), ..N) -> ()\napp/main.u20 : () <- (S20(N), ..N) -> ()\napp/main.u21 : () <- (S21(N), ..N) -> ()\napp/main.u22 : () <- (S22(N), ..N) -> ()\napp/main.u23 : () <- (S23(N), ..N) -> ()\napp/main.u24 : () <- (S24(N), ..N) -> ()\napp/main.u25 : () <- (S25(N), ..N) -> ()\napp/main.u26 : () <- (S26(N), ..N) -> ()\napp/main.u27 : () <- (S27(N), ..N) -> ()\napp/main.u28 : () <- (S28(N), ..N) -> ()\napp/main.u29 : () <- (S29(N), ..N) -> ()\napp/main.u30 : () <- (S30(N), ..N) -> ()\napp/main.u31 : () <- (S31(N), ..N) -> ()\napp/main.run : (() <- N -> A) <- N -> A\napp/main.wide : () <- (S0(N), S1(N2), S10(N3), S11(N4), S12(N5), S13(N6), S14(N7), S15(N8), S16(N9), S17(N10), S18(N11), S19(N12), S2(N13), S20(N14), S21(N15), S22(N16), S23(N17), S24(N18), S25(N19), S26(N20), S27(N21), S28(N22), S29(N23), S3(N24), S30(N25), S31(N26), S4(N27), S5(N28), S6(N29), S7(N30), S8(N31), S9(N32), ..N, ..N10, ..N11, ..N12, ..N13, ..N14, ..N15, ..N16, ..N17, ..N18, ..N19, ..N2, ..N20, ..N21, ..N22, ..N23, ..N24, ..N25, ..N26, ..N27, ..N28, ..N29, ..N3, ..N30, ..N31, ..N32, ..N4, ..N5, ..N6, ..N7, ..N8, ..N9) -> ()\n",
-      "stderr": "src/main.i:162:1: warning[W0504]: top-level binding `wide` is not used\n"
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:162:1: warning[W0504]: top-level binding `wide` is not used\n"
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:162:1: warning[W0504]: top-level binding `wide` is not used\n"
+      "exit": 1,
+      "stdout": "",
+      "stderr": "../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
     }
   }
 }

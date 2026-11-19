@@ -1,8 +1,8 @@
 {
-  "compiler": "c2ea38b4f043760ec5076088cc7c1aa82c99fe68",
-  "binary_sha256": "f655b0e14ebec0cc64152f3abd32e578099f14c3ac00ec78996f1160247f93f4",
+  "compiler": "56b7ace831980fbc76d7bc7266deda258cac0260",
+  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
@@ -10,8 +10,8 @@
         "--types"
       ],
       "exit": 1,
-      "stdout": "app/main.one : () <- (S(Int)) -> Int\napp/main.run : (() <- N -> Int, N) <- N -> Int\napp/main.bad : () -> Int\napp/main.generated_test : () -> ()\n",
-      "stderr": "src/main.i:13:20: error[E0515]: `S(Int)` and `S(\"hi\")` do not agree: a service in an environment meets a need when it is a subtype of the needed form as a value, and two forms of one type constructor are one entry, so arguments whose parameter does not change must be equal (the type at 13:2 needs it)\nsrc/main.i:16:60: error[E0501]: `Int - 2` is not a subtype of `String` (the type at src/main.i:16:54 needs it)\n2 errors\n"
+      "stdout": "",
+      "stderr": "../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
     }
   }
 }

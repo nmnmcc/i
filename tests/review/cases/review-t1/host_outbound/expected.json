@@ -1,37 +1,17 @@
 {
-  "compiler": "a4143bac82d630dbd7048048693fac4d6fbf912a",
-  "binary_sha256": "6efe11e69f91b90b43269fa76b6227cf99771e8814ac247c03be39a1d344652c",
+  "compiler": "a9fca5fe778734d2d9084ce7b6532fe5da369f42",
+  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 0,
-      "stdout": "probe/main.log : (\"error\" | \"info\" | \"warn\") -> ()\nprobe/main.number : (Int - 0) -> ()\n",
-      "stderr": ""
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
       "exit": 1,
-      "stdout": "FAIL probe/qa_corpus_runtime_test.qa_startup\n  missing host function app log\n0 passed, 1 failed\n",
-      "stderr": ""
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 1,
-      "stdout": "FAIL probe/qa_corpus_runtime_test.qa_startup\n  missing host function app log\n0 passed, 1 failed\n",
-      "stderr": ""
+      "stdout": "",
+      "stderr": "../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
     }
   }
 }

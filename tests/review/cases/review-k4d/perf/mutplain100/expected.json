@@ -1,37 +1,17 @@
 {
-  "compiler": "feed44df3d84ba3b86acd68479c7c2251d491226",
-  "binary_sha256": "6369cea1793acff5a0cf67c7c410160f5afac0f5c37ab84c46b9604eb671a535",
+  "compiler": "a9fca5fe778734d2d9084ce7b6532fe5da369f42",
+  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 0,
-      "stdout": "app/main.use : () <- (S(N), ..N) -> Int\napp/main.get : () <- (Dep) -> Int\napp/main.m0 : (Int) -> 1\napp/main.m1 : (Int) -> 1\napp/main.m2 : (Int) -> 1\napp/main.m3 : (Int) -> 1\napp/main.m4 : (Int) -> 1\napp/main.m5 : (Int) -> 1\napp/main.m6 : (Int) -> 1\napp/main.m7 : (Int) -> 1\napp/main.m8 : (Int) -> 1\napp/main.m9 : (Int) -> 1\napp/main.m10 : (Int) -> 1\napp/main.m11 : (Int) -> 1\napp/main.m12 : (Int) -> 1\napp/main.m13 : (Int) -> 1\napp/main.m14 : (Int) -> 1\napp/main.m15 : (Int) -> 1\napp/main.m16 : (Int) -> 1\napp/main.m17 : (Int) -> 1\napp/main.m18 : (Int) -> 1\napp/main.m19 : (Int) -> 1\napp/main.m20 : (Int) -> 1\napp/main.m21 : (Int) -> 1\napp/main.m22 : (Int) -> 1\napp/main.m23 : (Int) -> 1\napp/main.m24 : (Int) -> 1\napp/main.m25 : (Int) -> 1\napp/main.m26 : (Int) -> 1\napp/main.m27 : (Int) -> 1\napp/main.m28 : (Int) -> 1\napp/main.m29 : (Int) -> 1\napp/main.m30 : (Int) -> 1\napp/main.m31 : (Int) -> 1\napp/main.m32 : (Int) -> 1\napp/main.m33 : (Int) -> 1\napp/main.m34 : (Int) -> 1\napp/main.m35 : (Int) -> 1\napp/main.m36 : (Int) -> 1\napp/main.m37 : (Int) -> 1\napp/main.m38 : (Int) -> 1\napp/main.m39 : (Int) -> 1\napp/main.m40 : (Int) -> 1\napp/main.m41 : (Int) -> 1\napp/main.m42 : (Int) -> 1\napp/main.m43 : (Int) -> 1\napp/main.m44 : (Int) -> 1\napp/main.m45 : (Int) -> 1\napp/main.m46 : (Int) -> 1\napp/main.m47 : (Int) -> 1\napp/main.m48 : (Int) -> 1\napp/main.m49 : (Int) -> 1\napp/main.m50 : (Int) -> 1\napp/main.m51 : (Int) -> 1\napp/main.m52 : (Int) -> 1\napp/main.m53 : (Int) -> 1\napp/main.m54 : (Int) -> 1\napp/main.m55 : (Int) -> 1\napp/main.m56 : (Int) -> 1\napp/main.m57 : (Int) -> 1\napp/main.m58 : (Int) -> 1\napp/main.m59 : (Int) -> 1\napp/main.m60 : (Int) -> 1\napp/main.m61 : (Int) -> 1\napp/main.m62 : (Int) -> 1\napp/main.m63 : (Int) -> 1\napp/main.m64 : (Int) -> 1\napp/main.m65 : (Int) -> 1\napp/main.m66 : (Int) -> 1\napp/main.m67 : (Int) -> 1\napp/main.m68 : (Int) -> 1\napp/main.m69 : (Int) -> 1\napp/main.m70 : (Int) -> 1\napp/main.m71 : (Int) -> 1\napp/main.m72 : (Int) -> 1\napp/main.m73 : (Int) -> 1\napp/main.m74 : (Int) -> 1\napp/main.m75 : (Int) -> 1\napp/main.m76 : (Int) -> 1\napp/main.m77 : (Int) -> 1\napp/main.m78 : (Int) -> 1\napp/main.m79 : (Int) -> 1\napp/main.m80 : (Int) -> 1\napp/main.m81 : (Int) -> 1\napp/main.m82 : (Int) -> 1\napp/main.m83 : (Int) -> 1\napp/main.m84 : (Int) -> 1\napp/main.m85 : (Int) -> 1\napp/main.m86 : (Int) -> 1\napp/main.m87 : (Int) -> 1\napp/main.m88 : (Int) -> 1\napp/main.m89 : (Int) -> 1\napp/main.m90 : (Int) -> 1\napp/main.m91 : (Int) -> 1\napp/main.m92 : (Int) -> 1\napp/main.m93 : (Int) -> 1\napp/main.m94 : (Int) -> 1\napp/main.m95 : (Int) -> 1\napp/main.m96 : (Int) -> 1\napp/main.m97 : (Int) -> 1\napp/main.m98 : (Int) -> 1\napp/main.m99 : (Int) -> 1\n",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:2:1: warning[W0504]: top-level binding `use` is not used\nsrc/main.i:7:1: warning[W0504]: top-level binding `get` is not used\n"
+      "exit": 1,
+      "stdout": "",
+      "stderr": "../../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
     }
   }
 }

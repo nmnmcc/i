@@ -204,11 +204,20 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             }
         }
     }
-    // The library's test collection module is always parsed: test builds need
-    // its macros, and the driver expands them before resolution.
-    for package in 0..graph.packages.len() {
-        if let Some(&i) = index.get(&(package, "i/test")) {
-            queue.push_back((package, i));
+    // A test build needs the library's test collection module parsed so that
+    // its macros can install the collection entries.
+    let wants_tests = graph.packages[root]
+        .modules
+        .iter()
+        .any(|m| m.kind == ModuleKind::Test)
+        || graph.packages[root]
+            .manifest_source
+            .is_some_and(|source| graph.sources.get(source).text.contains("collection"));
+    if wants_tests {
+        for package in 0..graph.packages.len() {
+            if let Some(&i) = index.get(&(package, "i/test")) {
+                queue.push_back((package, i));
+            }
         }
     }
     let pkg = &graph.packages[root];
@@ -366,9 +375,6 @@ pub(crate) fn parse_one(
 /// many times.
 pub fn resolve_program(graph: &PackageGraph) -> (Option<hir::Program>, Vec<Diagnostic>) {
     let (mut parsed, mut diags) = parse(graph);
-    // `i/test` is a Lisp macro module: the build driver expands it before
-    // resolution. Checker-only resolution leaves it out.
-    parsed.retain(|m| m.path != "i/test");
     if diags.iter().any(Diagnostic::is_error) {
         return (None, diags);
     }
@@ -396,17 +402,6 @@ pub fn resolve_parsed(
     parsed: &[Parsed],
 ) -> (Option<hir::Program>, Vec<Diagnostic>) {
     let mut diags = Vec::new();
-    let filtered: Vec<Parsed>;
-    let parsed = if parsed.iter().any(|m| m.path == "i/test") {
-        filtered = parsed
-            .iter()
-            .filter(|m| m.path != "i/test")
-            .cloned()
-            .collect();
-        &filtered[..]
-    } else {
-        parsed
-    };
     let (mut program, more) = resolve::resolve(graph, parsed);
     diags.extend(more);
     order::order(&mut program, &mut diags);
@@ -424,17 +419,6 @@ pub fn check_compiler_exports(
     parsed: &[Parsed],
     entries: &[(&str, &str)],
 ) -> Checked {
-    let filtered: Vec<Parsed>;
-    let parsed = if parsed.iter().any(|m| m.path == "i/test") {
-        filtered = parsed
-            .iter()
-            .filter(|m| m.path != "i/test")
-            .cloned()
-            .collect();
-        &filtered[..]
-    } else {
-        parsed
-    };
     let (mut program, mut diags) = resolve::resolve(graph, parsed);
     order::order(&mut program, &mut diags);
     for module in &mut program.modules {

@@ -1,8 +1,8 @@
 {
-  "compiler": "045dd7dc8590cba93ec27bd6f7f03d49a995deaa",
-  "binary_sha256": "c1ef55233cb94ac719e5a0eec5514ed86d3fa9a27e7a9243802c618099483270",
+  "compiler": "a9fca5fe778734d2d9084ce7b6532fe5da369f42",
+  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [

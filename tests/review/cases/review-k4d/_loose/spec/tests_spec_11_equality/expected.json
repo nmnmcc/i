@@ -1,37 +1,17 @@
 {
-  "compiler": "c47bf862c6231276becac94ac2485809887c4ba2",
-  "binary_sha256": "18f7d556d9f2f711878fa921c266e9e3b1a23d69c3e9f6e285b2eef849b4a85a",
+  "compiler": "a9fca5fe778734d2d9084ce7b6532fe5da369f42",
+  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 0,
-      "stdout": "spec/equality.check : (String, String) -> ()\nspec/equality.yes : (Bool) -> ()\nspec/equality.no : (Bool) -> ()\nspec/equality.top : (A) -> A\nspec/equality.alias : (A) -> A\nspec/equality.make : () -> (A) -> A\nspec/equality.generated_test : () -> ()\nspec/equality.generated_test : () -> ()\nspec/equality.mixed : (Int | String | ()) -> Bool\nspec/equality.generated_test : () -> ()\nspec/equality.generated_test : () -> ()\n",
-      "stderr": "test/equality.i:32:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`\ntest/equality.i:34:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False`\ntest/equality.i:35:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True`\ntest/equality.i:40:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False`\ntest/equality.i:57:5: warning[W0503]: the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False`\ntest/equality.i:59:5: warning[W0503]: the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False`\ntest/equality.i:62:5: warning[W0503]: the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False`\n"
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
-      "exit": 0,
-      "stdout": "pass spec/equality.values\npass spec/equality.structures\npass spec/equality.different_types\npass spec/equality.functions\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
-      "stderr": "test/equality.i:32:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`\ntest/equality.i:34:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False`\ntest/equality.i:35:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True`\ntest/equality.i:40:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False`\ntest/equality.i:57:5: warning[W0503]: the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False`\ntest/equality.i:59:5: warning[W0503]: the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False`\ntest/equality.i:62:5: warning[W0503]: the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False`\n"
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 0,
-      "stdout": "pass spec/equality.values\npass spec/equality.structures\npass spec/equality.different_types\npass spec/equality.functions\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
-      "stderr": "test/equality.i:32:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`\ntest/equality.i:34:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False`\ntest/equality.i:35:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True`\ntest/equality.i:40:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False`\ntest/equality.i:57:5: warning[W0503]: the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False`\ntest/equality.i:59:5: warning[W0503]: the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False`\ntest/equality.i:62:5: warning[W0503]: the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False`\n"
+      "exit": 1,
+      "stdout": "",
+      "stderr": "../../../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
     }
   }
 }

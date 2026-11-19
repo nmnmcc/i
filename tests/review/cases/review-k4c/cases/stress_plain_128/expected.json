@@ -1,37 +1,17 @@
 {
-  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
-  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
+  "compiler": "a9fca5fe778734d2d9084ce7b6532fe5da369f42",
+  "binary_sha256": "8b804558dd2bd60830086b72db827332c61dcbb0b5f57e56f374ebd9f3a3a77f",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
         "check",
         "--types"
       ],
-      "exit": 0,
-      "stdout": "app/main.f_0 : (() <- N -> A) <- N -> A\napp/main.f_1 : (() <- N -> A) <- N -> A\napp/main.f_2 : (() <- N -> A) <- N -> A\napp/main.f_3 : (() <- N -> A) <- N -> A\napp/main.f_4 : (() <- N -> A) <- N -> A\napp/main.f_5 : (() <- N -> A) <- N -> A\napp/main.f_6 : (() <- N -> A) <- N -> A\napp/main.f_7 : (() <- N -> A) <- N -> A\napp/main.f_8 : (() <- N -> A) <- N -> A\napp/main.f_9 : (() <- N -> A) <- N -> A\napp/main.f_10 : (() <- N -> A) <- N -> A\napp/main.f_11 : (() <- N -> A) <- N -> A\napp/main.f_12 : (() <- N -> A) <- N -> A\napp/main.f_13 : (() <- N -> A) <- N -> A\napp/main.f_14 : (() <- N -> A) <- N -> A\napp/main.f_15 : (() <- N -> A) <- N -> A\napp/main.f_16 : (() <- N -> A) <- N -> A\napp/main.f_17 : (() <- N -> A) <- N -> A\napp/main.f_18 : (() <- N -> A) <- N -> A\napp/main.f_19 : (() <- N -> A) <- N -> A\napp/main.f_20 : (() <- N -> A) <- N -> A\napp/main.f_21 : (() <- N -> A) <- N -> A\napp/main.f_22 : (() <- N -> A) <- N -> A\napp/main.f_23 : (() <- N -> A) <- N -> A\napp/main.f_24 : (() <- N -> A) <- N -> A\napp/main.f_25 : (() <- N -> A) <- N -> A\napp/main.f_26 : (() <- N -> A) <- N -> A\napp/main.f_27 : (() <- N -> A) <- N -> A\napp/main.f_28 : (() <- N -> A) <- N -> A\napp/main.f_29 : (() <- N -> A) <- N -> A\napp/main.f_30 : (() <- N -> A) <- N -> A\napp/main.f_31 : (() <- N -> A) <- N -> A\napp/main.f_32 : (() <- N -> A) <- N -> A\napp/main.f_33 : (() <- N -> A) <- N -> A\napp/main.f_34 : (() <- N -> A) <- N -> A\napp/main.f_35 : (() <- N -> A) <- N -> A\napp/main.f_36 : (() <- N -> A) <- N -> A\napp/main.f_37 : (() <- N -> A) <- N -> A\napp/main.f_38 : (() <- N -> A) <- N -> A\napp/main.f_39 : (() <- N -> A) <- N -> A\napp/main.f_40 : (() <- N -> A) <- N -> A\napp/main.f_41 : (() <- N -> A) <- N -> A\napp/main.f_42 : (() <- N -> A) <- N -> A\napp/main.f_43 : (() <- N -> A) <- N -> A\napp/main.f_44 : (() <- N -> A) <- N -> A\napp/main.f_45 : (() <- N -> A) <- N -> A\napp/main.f_46 : (() <- N -> A) <- N -> A\napp/main.f_47 : (() <- N -> A) <- N -> A\napp/main.f_48 : (() <- N -> A) <- N -> A\napp/main.f_49 : (() <- N -> A) <- N -> A\napp/main.f_50 : (() <- N -> A) <- N -> A\napp/main.f_51 : (() <- N -> A) <- N -> A\napp/main.f_52 : (() <- N -> A) <- N -> A\napp/main.f_53 : (() <- N -> A) <- N -> A\napp/main.f_54 : (() <- N -> A) <- N -> A\napp/main.f_55 : (() <- N -> A) <- N -> A\napp/main.f_56 : (() <- N -> A) <- N -> A\napp/main.f_57 : (() <- N -> A) <- N -> A\napp/main.f_58 : (() <- N -> A) <- N -> A\napp/main.f_59 : (() <- N -> A) <- N -> A\napp/main.f_60 : (() <- N -> A) <- N -> A\napp/main.f_61 : (() <- N -> A) <- N -> A\napp/main.f_62 : (() <- N -> A) <- N -> A\napp/main.f_63 : (() <- N -> A) <- N -> A\napp/main.f_64 : (() <- N -> A) <- N -> A\napp/main.f_65 : (() <- N -> A) <- N -> A\napp/main.f_66 : (() <- N -> A) <- N -> A\napp/main.f_67 : (() <- N -> A) <- N -> A\napp/main.f_68 : (() <- N -> A) <- N -> A\napp/main.f_69 : (() <- N -> A) <- N -> A\napp/main.f_70 : (() <- N -> A) <- N -> A\napp/main.f_71 : (() <- N -> A) <- N -> A\napp/main.f_72 : (() <- N -> A) <- N -> A\napp/main.f_73 : (() <- N -> A) <- N -> A\napp/main.f_74 : (() <- N -> A) <- N -> A\napp/main.f_75 : (() <- N -> A) <- N -> A\napp/main.f_76 : (() <- N -> A) <- N -> A\napp/main.f_77 : (() <- N -> A) <- N -> A\napp/main.f_78 : (() <- N -> A) <- N -> A\napp/main.f_79 : (() <- N -> A) <- N -> A\napp/main.f_80 : (() <- N -> A) <- N -> A\napp/main.f_81 : (() <- N -> A) <- N -> A\napp/main.f_82 : (() <- N -> A) <- N -> A\napp/main.f_83 : (() <- N -> A) <- N -> A\napp/main.f_84 : (() <- N -> A) <- N -> A\napp/main.f_85 : (() <- N -> A) <- N -> A\napp/main.f_86 : (() <- N -> A) <- N -> A\napp/main.f_87 : (() <- N -> A) <- N -> A\napp/main.f_88 : (() <- N -> A) <- N -> A\napp/main.f_89 : (() <- N -> A) <- N -> A\napp/main.f_90 : (() <- N -> A) <- N -> A\napp/main.f_91 : (() <- N -> A) <- N -> A\napp/main.f_92 : (() <- N -> A) <- N -> A\napp/main.f_93 : (() <- N -> A) <- N -> A\napp/main.f_94 : (() <- N -> A) <- N -> A\napp/main.f_95 : (() <- N -> A) <- N -> A\napp/main.f_96 : (() <- N -> A) <- N -> A\napp/main.f_97 : (() <- N -> A) <- N -> A\napp/main.f_98 : (() <- N -> A) <- N -> A\napp/main.f_99 : (() <- N -> A) <- N -> A\napp/main.f_100 : (() <- N -> A) <- N -> A\napp/main.f_101 : (() <- N -> A) <- N -> A\napp/main.f_102 : (() <- N -> A) <- N -> A\napp/main.f_103 : (() <- N -> A) <- N -> A\napp/main.f_104 : (() <- N -> A) <- N -> A\napp/main.f_105 : (() <- N -> A) <- N -> A\napp/main.f_106 : (() <- N -> A) <- N -> A\napp/main.f_107 : (() <- N -> A) <- N -> A\napp/main.f_108 : (() <- N -> A) <- N -> A\napp/main.f_109 : (() <- N -> A) <- N -> A\napp/main.f_110 : (() <- N -> A) <- N -> A\napp/main.f_111 : (() <- N -> A) <- N -> A\napp/main.f_112 : (() <- N -> A) <- N -> A\napp/main.f_113 : (() <- N -> A) <- N -> A\napp/main.f_114 : (() <- N -> A) <- N -> A\napp/main.f_115 : (() <- N -> A) <- N -> A\napp/main.f_116 : (() <- N -> A) <- N -> A\napp/main.f_117 : (() <- N -> A) <- N -> A\napp/main.f_118 : (() <- N -> A) <- N -> A\napp/main.f_119 : (() <- N -> A) <- N -> A\napp/main.f_120 : (() <- N -> A) <- N -> A\napp/main.f_121 : (() <- N -> A) <- N -> A\napp/main.f_122 : (() <- N -> A) <- N -> A\napp/main.f_123 : (() <- N -> A) <- N -> A\napp/main.f_124 : (() <- N -> A) <- N -> A\napp/main.f_125 : (() <- N -> A) <- N -> A\napp/main.f_126 : (() <- N -> A) <- N -> A\napp/main.f_127 : (() <- N -> A) <- N -> A\n",
-      "stderr": "src/main.i:128:1: warning[W0504]: top-level binding `f_127` is not used\n"
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:128:1: warning[W0504]: top-level binding `f_127` is not used\n"
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 0,
-      "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
-      "stderr": "src/main.i:128:1: warning[W0504]: top-level binding `f_127` is not used\n"
+      "exit": 1,
+      "stdout": "",
+      "stderr": "../../../../../../stdlib/src/test.is:16:1: error[E0210]: macro `test`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:20:1: error[E0210]: macro `skip`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:24:1: error[E0210]: macro `only`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:28:1: error[E0210]: macro `fails`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:90:1: error[E0210]: macro `suite`: there is no module `i/test`\n../../../../../../stdlib/src/test.is:122:1: error[E0210]: macro `each`: there is no module `i/test`\n6 errors\n"
     }
   }
 }
