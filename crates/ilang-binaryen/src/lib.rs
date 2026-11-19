@@ -41,10 +41,14 @@ pub enum Error {
 /// (Binaryen's default is 2). The runtime and the generated code call many
 /// small functions, such as `$list_head` and the shadow stack ones, and
 /// Wasmtime inlines nothing, so each would stay a call with its spills of GC
-/// references. 20 makes list-heavy benchmarks about 25% faster and the
-/// optimization of `std`'s tests about 1 s slower; 40 gains little more and
-/// costs twice that.
-pub const ALWAYS_INLINE: u32 = 20;
+/// references. 20 made list-heavy benchmarks about 25% faster and the
+/// optimization of `std`'s tests about 1 s slower. On 2026-11-19 a paired
+/// run on one CI runner (five alternating rounds, `--opt 2`) measured 40
+/// against 20: `list_sort` 1.966 -> 1.615 s, `list_build` -19%,
+/// `list_map` -15%, `list_reverse` -12%, and no benchmark slower; the price
+/// is compile time, about 1.8 s more for `std`'s test build in the earlier
+/// measurement.
+pub const ALWAYS_INLINE: u32 = 40;
 
 /// Run once more after the default pipeline. Heap2Local only removes an
 /// allocation whose reference does not escape; an allocation stored into
