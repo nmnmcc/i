@@ -5,3 +5,6 @@ name = "app"
 
 [entries]
 legacy = "main.allowed"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

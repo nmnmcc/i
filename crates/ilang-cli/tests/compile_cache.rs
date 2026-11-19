@@ -29,7 +29,7 @@ fn project(root: &Path) -> PathBuf {
     let manifest = std::fs::read_to_string(project.join("i.toml"))
         .unwrap()
         .replace(
-            "\"../stdlib\"",
+            "\"../../stdlib\"",
             &format!("{:?}", std_path.display().to_string()),
         );
     std::fs::write(project.join("i.toml"), manifest).unwrap();

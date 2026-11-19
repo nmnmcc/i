@@ -1,4 +1,4 @@
 name = "http_get"
 
 [dependencies]
-i = { path = "../stdlib" }
+i = { path = "../../stdlib" }

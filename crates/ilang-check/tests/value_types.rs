@@ -529,7 +529,7 @@ fn places_keep_local_declaration_identity_before_allocation() {
 #[test]
 fn standard_library_reverse_order_and_recovery_preserve_types() {
     // Compare ordinary standard-library inference in both orders.
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
     let options = ilang_package::LoadOptions {
         // The schema tests deliberately exercise value-derived types; this
         // check measures the ordinary library without that feature.
@@ -550,7 +550,7 @@ fn standard_library_reverse_order_and_recovery_preserve_types() {
         "{:?}",
         g.sources.render_all(&c.diags)
     );
-    // std/time uses i/clock, so the standard library now has Of sites.
+    // i/time uses i/clock, so the standard library now has Of sites.
     let mut p = c.program.unwrap();
     let before = p.order.groups.clone();
     let init = p.order.init.clone();
@@ -607,7 +607,7 @@ fn spec_case_reverse_order_and_recovery(
     let project = if path.is_dir() {
         path.to_path_buf()
     } else {
-        std::fs::write(temp.path().join("i.toml"), "name = \"spec\"\n").unwrap();
+        common::write_manifest(temp.path(), "spec");
         std::fs::create_dir(temp.path().join("test")).unwrap();
         std::fs::copy(
             path,

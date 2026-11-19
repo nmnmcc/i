@@ -9,7 +9,7 @@ Build a greeting command with typed arguments, help, and structured logging.
 name = "guide_cli"
 
 [dependencies]
-std = { path = "../stdlib" }
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 
 [test]
 collection = "i/test.tests"
@@ -129,7 +129,7 @@ pass guide_cli/options_test.parses arguments
 1 passed, 0 failed
 ```
 
-Create `guide-cli/` beside `stdlib/`; run commands there. `cli.parse` returns the parsed value or raises an error; `fail.catch` captures failures for assertions. Both `argument` and `option` require a value; error indexes start at zero, and an attached value belongs to its option's token.
+Make the package with `i new guide_cli --path guide-cli` and run commands in `guide-cli/`; `i new` writes the dependency on the standard library. `cli.parse` returns the parsed value or raises an error; `fail.catch` captures failures for assertions. Both `argument` and `option` require a value; error indexes start at zero, and an attached value belongs to its option's token.
 
 ```sh
 i test --opt 0
@@ -141,7 +141,7 @@ pass guide_cli/options_test.parses arguments
 1 passed, 0 failed
 ```
 
-Each command prints this result. Other builders include `flag` (Boolean), `optional` (`Option`), `many` (repeated options), and `rest` (remaining positionals); see `i/src/cli.i` and `i/test/cli_test.i`.
+Each command prints this result. Other builders include `flag` (Boolean), `optional` (`Option`), `many` (repeated options), and `rest` (remaining positionals); see `stdlib/src/cli.i` and `stdlib/test/cli_test.i`.
 
 ## Command entry
 

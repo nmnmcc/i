@@ -4,4 +4,4 @@ name = "tour"
 collection = "i/test.tests"
 
 [dependencies]
-i = { path = "../stdlib" }
+i = { path = "../../stdlib" }

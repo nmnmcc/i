@@ -90,12 +90,12 @@ fn http_server() {
 fn run_http_program(source: &str) {
     let project = tempfile::tempdir().unwrap();
     std::fs::create_dir(project.path().join("src")).unwrap();
-    let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib");
+    let library = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
     std::fs::write(
         project.path().join("i.toml"),
         format!(
-            "name = \"http_test\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-            std_path.to_str().unwrap()
+            "name = \"http_test\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            library.to_str().unwrap()
         ),
     )
     .unwrap();
@@ -128,7 +128,7 @@ fn http_timeout() {
 (
  i/fail
  i/task
- std/http
+ i/http
 )
 main = () {{
  task.run(() {{
@@ -146,7 +146,7 @@ fn http_dns() {
     run_http_program(
         r#"(
 	i/fail
-	std/http
+	i/http
 )
 
 main = () {
@@ -165,7 +165,7 @@ fn http_dns_distinct_from_connection_refused() {
     run_http_program(&format!(
         r#"(
 	i/fail
-	std/http
+	i/http
 )
 main = () {{
 	result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/") }})
@@ -222,7 +222,7 @@ fn http_redirect_methods() {
         });
         run_http_program(&format!(
             r#"
-(std/http)
+(i/http)
 
 main = () {{ assert(http.post("http://127.0.0.1:{port}/start", <<"hello":utf8>>).status == http.Status(200)) }}
 "#
@@ -253,7 +253,7 @@ fn http_redirect_limit() {
     run_http_program(&format!(
         r#"(
 	i/fail
-	std/http
+	i/http
 )
 main = () {{
 	result = fail.catch(() {{ http.get("http://127.0.0.1:{port}/start") }})
@@ -307,7 +307,7 @@ fn http_redirect_drops_sensitive_headers() {
     });
     run_http_program(&format!(
         r#"(
-	std/http
+	i/http
 )
 
 main = () {{
@@ -377,7 +377,7 @@ fn http_reuse() {
     });
     run_http_program(&format!(
         r#"
-(std/http)
+(i/http)
 
 main = () {{
  client = http.client()
@@ -419,7 +419,7 @@ fn http_reuse_replaces_closed_connection() {
     });
     run_http_program(&format!(
         r#"
-(std/http)
+(i/http)
 
 main = () {{
  client = http.client()
@@ -437,12 +437,12 @@ main = () {{
 fn http_stream_request_body() {
     let project = tempfile::tempdir().unwrap();
     std::fs::create_dir(project.path().join("src")).unwrap();
-    let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib");
+    let library = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
     std::fs::write(
         project.path().join("i.toml"),
         format!(
-            "name = \"http_stream_test\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-            std_path.to_str().unwrap()
+            "name = \"http_stream_test\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            library.to_str().unwrap()
         ),
     )
     .unwrap();
@@ -453,10 +453,10 @@ fn http_stream_request_body() {
 	i/task
 	i/stdio
 	i/core
-	std/http
-	std/bit_array
-	std/list
-	std/option
+	i/http
+	i/bit_array
+	i/list
+	i/option
 )
 read_pieces = (
 	body : (read = _, trailers = _),
@@ -608,7 +608,7 @@ fn http_reuse_keeps_origins_separate() {
         .collect();
     run_http_program(&format!(
         r#"
-(std/http, std/option)
+(i/http, i/option)
 
 main = () {{
  client = http.client()

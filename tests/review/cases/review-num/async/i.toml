@@ -1,3 +1,6 @@
 name = "asyncprobe"
 [wasm]
 exports = ["asyncprobe/main.work"]
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

@@ -1,3 +1,6 @@
 # spec: 15.7 7.4; typed macro typed query signature.
 # expect: pass
 name = "spec"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

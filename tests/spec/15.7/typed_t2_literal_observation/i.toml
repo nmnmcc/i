@@ -1,3 +1,6 @@
 # spec: 15.7 T2; typed macro typed t2 literal observation.
 # expect: pass
 name = "spec"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

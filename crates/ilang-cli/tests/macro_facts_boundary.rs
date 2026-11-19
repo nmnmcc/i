@@ -6,12 +6,19 @@
 //! decide chain grouping could silently change. This pins the result users
 //! see: `check`, `run`, the expanded `main`, and the Wasm module's output.
 
+#[path = "common/test_project.rs"]
+mod test_project;
+
 use std::path::Path;
 use std::process::{Command, Output};
 
 fn package(root: &Path, name: &str, files: &[(&str, &str)]) {
     std::fs::create_dir_all(root.join("src")).unwrap();
-    std::fs::write(root.join("i.toml"), format!("name = \"{name}\"\n")).unwrap();
+    std::fs::write(
+        root.join("i.toml"),
+        format!("name = \"{name}\"\n{}", test_project::stdlib_dependency()),
+    )
+    .unwrap();
     for (path, text) in files {
         let path = root.join(path);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();

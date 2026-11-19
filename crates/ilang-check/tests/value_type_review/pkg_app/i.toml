@@ -1,3 +1,4 @@
 name="app"
 [dependencies]
+i = { path = "../../../../../stdlib" }
 schema={path="../pkg_lib"}

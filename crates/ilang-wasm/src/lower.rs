@@ -1102,7 +1102,7 @@ impl<'a> Lowerer<'a> {
             .modules
             .iter()
             .enumerate()
-            .find(|(_, m)| m.path == path && m.package == self.graph.library)
+            .find(|(_, m)| m.path == path)
             .unwrap_or_else(|| panic!("library module {path}"));
         let index = m
             .defs
@@ -1116,7 +1116,7 @@ impl<'a> Lowerer<'a> {
     }
 
     fn is_library(&self, m: ModuleId) -> bool {
-        self.program.module(m).package == self.graph.library
+        self.graph.is_language(self.program.module(m).package)
     }
 
     fn number_types(&mut self) {
@@ -2087,31 +2087,41 @@ impl<'a> Lowerer<'a> {
                     digest
                 }
             };
-            let package_hash = match &package.location {
-                Some(location) => location.hash.clone(),
-                None => self
-                    .package_hashes
-                    .entry(source_module.package)
-                    .or_insert_with(|| {
-                        let mut files: Vec<_> = package
-                            .modules
-                            .iter()
-                            .map(|m| PackageFile {
-                                path: m.path.clone(),
-                                kind: FileKind::Regular,
-                                bytes: self.graph.sources.get(m.source).text.as_bytes().to_vec(),
-                            })
-                            .collect();
-                        if let Some(source) = package.manifest_source {
-                            files.push(PackageFile {
-                                path: "i.toml".into(),
-                                kind: FileKind::Regular,
-                                bytes: self.graph.sources.get(source).text.as_bytes().to_vec(),
-                            });
-                        }
-                        hash(&files)
-                    })
-                    .clone(),
+            let package_hash = if self.graph.is_language(source_module.package) {
+                self.graph.language_hash()
+            } else {
+                match &package.location {
+                    Some(location) => location.hash.clone(),
+                    None => self
+                        .package_hashes
+                        .entry(source_module.package)
+                        .or_insert_with(|| {
+                            let mut files: Vec<_> = package
+                                .modules
+                                .iter()
+                                .map(|m| PackageFile {
+                                    path: m.path.clone(),
+                                    kind: FileKind::Regular,
+                                    bytes: self
+                                        .graph
+                                        .sources
+                                        .get(m.source)
+                                        .text
+                                        .as_bytes()
+                                        .to_vec(),
+                                })
+                                .collect();
+                            if let Some(source) = package.manifest_source {
+                                files.push(PackageFile {
+                                    path: "i.toml".into(),
+                                    kind: FileKind::Regular,
+                                    bytes: self.graph.sources.get(source).text.as_bytes().to_vec(),
+                                });
+                            }
+                            hash(&files)
+                        })
+                        .clone(),
+                }
             };
             let binding = serde_json::json!({
                 "package": package_hash,

@@ -1,4 +1,4 @@
-(, (= syntax (/ i syntax)) (= int (/ std int)))
+(, (= syntax (/ i syntax)) (= int (/ i int)))
 
 (, tests test skip only fails suite each)
 

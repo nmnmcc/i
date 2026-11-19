@@ -4,6 +4,8 @@
 //! This replaces the deep-resolution coverage removed with the legacy
 //! differential tests. Unlike `hir_deep.rs`, which exercises HIR visitors on
 //! hand-built trees, it drives the real pipeline from source text.
+mod common;
+
 use ilang_check::hir::DefKind;
 use ilang_syntax::deep::deep;
 
@@ -12,7 +14,7 @@ fn resolve_handles_a_20000_deep_value() {
     let depth = 20_000;
     let text = format!("x = {}1{}\n", "[".repeat(depth), "]".repeat(depth));
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"deep\"\n").unwrap();
+    common::write_manifest(dir.path(), "deep");
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), &text).unwrap();
 

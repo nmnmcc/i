@@ -9,7 +9,7 @@ Write and read a local file, then handle a missing path.
 name = "guide_files"
 
 [dependencies]
-std = { path = "../stdlib" }
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 ```
 
 ```i run package=guide_files title="src/main.i"
@@ -36,7 +36,7 @@ guide-note.txt
 hello from a file
 ```
 
-Create `guide-files/` beside `stdlib/` in the i source folder and run `i run` there. `write_file` creates or truncates its path: reserve these filenames for the exercise. `bit_array.to_string` raises on invalid UTF-8; whole-file operations close their handles internally; use `fs.open`, `read`, `write`, and `close` with [resources](/docs/tour/resources) for handle operations.
+Make the package with `i new guide_files --path guide-files` and run `i run` in `guide-files/`. `write_file` creates or truncates its path: reserve these filenames for the exercise. `bit_array.to_string` raises on invalid UTF-8; whole-file operations close their handles internally; use `fs.open`, `read`, `write`, and `close` with [resources](/docs/tour/resources) for handle operations.
 
 ## A missing path
 

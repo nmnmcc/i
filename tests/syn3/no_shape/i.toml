@@ -1,3 +1,4 @@
 name = "syn3_no_shape"
 
 [dependencies]
+i = { path = "../../../stdlib" }

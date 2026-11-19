@@ -6,6 +6,19 @@ use ilang_wasm::{Numeric, Options};
 use num_bigint::BigInt;
 use std::sync::{Arc, Mutex};
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 struct Case {
     body: String,
     input: Value,
@@ -594,7 +607,10 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
         .collect::<Vec<_>>();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"numeric\"\n[wasm]\nexports = {exports:?}\n"),
+        format!(
+            "name = \"numeric\"\n[wasm]\nexports = {exports:?}\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     let mut source = String::from(
@@ -907,7 +923,10 @@ fn nonnumeric_functions_are_emitted_byte_equal() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        "name = \"plain\"\n[wasm]\nexports = [\"plain/pass.pass\"]\n",
+        format!(
+            "name = \"plain\"\n[wasm]\nexports = [\"plain/pass.pass\"]\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::write(
@@ -957,7 +976,7 @@ fn nonnumeric_functions_are_emitted_byte_equal() {
 fn representation_facts_follow_code_identity_not_debug_names() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"identity\"\n[wasm]\nexports = [\"identity/functions.floating\", \"identity/functions.integer\"]\n").unwrap();
+    std::fs::write(dir.path().join("i.toml"), format!("name = \"identity\"\n[wasm]\nexports = [\"identity/functions.floating\", \"identity/functions.integer\"]\n{}", library_dependencies())).unwrap();
     std::fs::write(dir.path().join("src/functions.i"), "(floating, integer)\nfloating = (x : Float) -> Float { x +. 1.0 }\ninteger = (x : Int) -> Int { x + 1 }\n").unwrap();
     let (graph, diagnostics) = ilang_package::load(dir.path());
     assert!(diagnostics.is_empty());
@@ -1001,7 +1020,11 @@ fn representation_facts_follow_code_identity_not_debug_names() {
 fn transitive_suspend_preserves_pending_logical_frames() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"trace\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("name = \"trace\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::write(dir.path().join("src/main.i"), "(i/control)\ng = (b, x : Float) -> Float {\n y = control.suspend(b, (k) { control.resume(k, 1.0) })\n x *. x +. y\n}\nf = (b, x : Float) -> Float {\n y = g(b, x)\n y +. 0.25\n}\nh = (b, x : Float) -> Float {\n y = f(b, x)\n y +. 0.5\n}\n\nmain = () {\n control.boundary((b) { h(b, 1.0e308) })\n ()\n}\n").unwrap();
     let (graph, diags) = ilang_package::load(dir.path());
     assert!(diags.is_empty());

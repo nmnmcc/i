@@ -7,6 +7,9 @@ Split a program into reusable modules and choose what callers can access.
 
 ```toml file=i.toml title="i.toml"
 name = "tour"
+
+[dependencies]
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 ```
 
 ```i file=src/greeting.i title="src/greeting.i"
@@ -134,6 +137,7 @@ message = (name : String) -> String { "hello, " <> name }
 name = "app"
 
 [dependencies]
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 util = { path = "words" }
 ```
 
@@ -150,9 +154,9 @@ main = () <- (io : Io) { io.print(greeting.message("package")) }
 hello, package
 ```
 
-`path` is relative to the manifest; `util` is the caller’s import prefix for `words`. Only the package’s own name, `i`, and declared dependencies are visible; dependency dev-dependencies do not propagate. Module and package cycles are rejected.
+`path` is relative to the manifest; `util` is the caller’s import prefix for `words`. Only the package’s own name and its declared dependencies are visible; dependency dev-dependencies do not propagate. Module and package cycles are rejected.
 
-If the package itself is named `std`, its copied standard library cannot use the dependency key `std`, because a package cannot depend on itself. `i new std` names the key `stdlib`, and source imports it as `stdlib/int`.
+The standard library is the dependency `i`: `i new` writes `i = "github.com/nmnmcc/i//stdlib@X.Y.Z"` with its newest version, and source imports its modules as `i/int`, `i/test`, and so on. The prelude is built into the compiler and is not imported. The package that is compiled must name `i` under `[dependencies]`, even when only its tests import the library. No package other than the library, or a fork of it, may be named `i`; `std` is an ordinary name.
 
 A location dependency such as `"github.com/alice/json@1.4.0"` uses Git, omits `https://`, and sets a minimum version; `//directory` before `@` selects a subpackage, and fetched packages cannot use path dependencies. Selection takes the greatest requested minimum per location and major version; distinct majors stay separate. `i.lock`, beside the root manifest, records reached locations, versions, tag commits, and package SHA-256 hashes; changed commits or bytes fail integrity checks, while local paths remain unlocked.
 
@@ -163,8 +167,8 @@ A location dependency such as `"github.com/alice/json@1.4.0"` uses Git, omits `h
 ```toml file=i.toml title="i.toml"
 name = "tour"
 
-[dev-dependencies]
-std = { path = "../stdlib" }
+[dependencies]
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 
 [test]
 collection = "i/test.tests"
@@ -192,12 +196,15 @@ pass tour/greeting_test.greeting
 1 passed, 0 failed
 ```
 
-Here `../stdlib` points to the standard library's directory. Tests can import source modules; source cannot import tests, and another package cannot import them. `[dependencies]` serves source and tests; `[dev-dependencies]` serves only tests.
+`collection = "i/test.tests"` registers the package's tests in the standard library's test collection. Tests can import source modules; source cannot import tests, and another package cannot import them. `[dependencies]` serves source and tests; `[dev-dependencies]` serves only tests.
 
 ## Entries and exports
 
 ```toml file=i.toml title="i.toml"
 name = "tour"
+
+[dependencies]
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 
 [entries]
 show = "main.main"

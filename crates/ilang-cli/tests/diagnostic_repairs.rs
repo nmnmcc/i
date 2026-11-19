@@ -11,15 +11,15 @@ fn check(files: &[(&str, &str)]) -> String {
 
 fn check_status(files: &[(&str, &str)], status: i32) -> String {
     let dir = tempfile::tempdir().unwrap();
-    let std = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../stdlib")
+    let library = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
         .canonicalize()
         .unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-            std.to_str().unwrap()
+            "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            library.to_str().unwrap()
         ),
     )
     .unwrap();
@@ -91,10 +91,10 @@ fn import_candidates_are_sorted_limited_and_respect_existing_imports() {
         !diagnostics.contains("existing import of `app/z`"),
         "{diagnostics}"
     );
-    let diagnostics = check(&[("src/main.i", "(std/option)\nmain = () { Some(1) }\n")]);
+    let diagnostics = check(&[("src/main.i", "(i/option)\nmain = () { Some(1) }\n")]);
     assert!(
         diagnostics.contains(
-            "Add `Some` to the names in your existing import of `std/option`, or use `option.Some`."
+            "Add `Some` to the names in your existing import of `i/option`, or use `option.Some`."
         ),
         "{diagnostics}"
     );
@@ -124,7 +124,7 @@ fn wrong_standard_namespace_is_suggested_in_both_directions() {
     let diagnostics = check(&[("src/main.i", "(std/process)\nmain = () { () }\n")]);
     assert!(
         diagnostics.contains(
-            "there is no module `std/process`. Import `i/process` instead; that module exists."
+            "`std` is not the name of this package or a dependency name; the standard library is `i`, so write `i/process`"
         ),
         "{diagnostics}"
     );

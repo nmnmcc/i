@@ -4,11 +4,11 @@
 	i/fail
 	i/stdio
 	i/core
-	std/bit_array
-	std/int
-	std/json
-	std/list
-	(None, Some) = std/option
+	i/bit_array
+	i/int
+	i/json
+	i/list
+	(None, Some) = i/option
 )
 
 Outcome = Committed(Int, Int) | RolledBack(Int)

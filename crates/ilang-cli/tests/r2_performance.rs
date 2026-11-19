@@ -4,6 +4,19 @@ use ilang_cli::{BuildOptions, Level, build};
 use ilang_host::{HostOptions, Outcome, Program, Value, block_on};
 use std::{fmt::Write, path::Path, time::Instant};
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 #[test]
 fn paired_inside_scope_measurements() {
     let Ok(directory) = std::env::var("R2_PERF_INTERVAL_DUMP") else {
@@ -35,7 +48,10 @@ fn paired_inside_scope_measurements() {
         .collect();
     std::fs::write(
         project.path().join("i.toml"),
-        format!("name = \"r2perf\"\n[wasm]\nexports = {exports:?}\n"),
+        format!(
+            "name = \"r2perf\"\n[wasm]\nexports = {exports:?}\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     let built = build(

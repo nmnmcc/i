@@ -24,7 +24,7 @@ fn check(files: &[(&str, &str)], entry: &str) -> Vec<String> {
         .collect::<Vec<_>>();
     foreign_externals(
         &program,
-        graph.library,
+        &graph,
         &modules,
         &[DefId {
             module: main,

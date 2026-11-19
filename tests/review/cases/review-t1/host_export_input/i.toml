@@ -1,3 +1,6 @@
 name="probe"
 [wasm]
 exports=["probe/main.f"]
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

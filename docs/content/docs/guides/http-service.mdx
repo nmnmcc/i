@@ -9,7 +9,7 @@ Test a JSON handler without sockets, then serve it over local HTTP.
 name = "guide_http"
 
 [dependencies]
-std = { path = "../stdlib" }
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 
 [test]
 collection = "i/test.tests"
@@ -131,7 +131,7 @@ pass guide_http/handler_test.JSON request
 2 passed, 0 failed
 ```
 
-Create `guide-http/` beside `stdlib/`; run commands there. `http.feed_request` returns a request and leftover bytes. Requests also carry headers and trailers; these tests need no network service.
+Make the package with `i new guide_http --path guide-http` and run commands in `guide-http/`. `http.feed_request` returns a request and leftover bytes. Requests also carry headers and trailers; these tests need no network service.
 
 ```sh
 i test --opt 0

@@ -145,15 +145,15 @@ pub(crate) fn import_indices(
         .expect("loaded graph includes the prelude");
     let syntax = parsed
         .iter()
-        .position(|m| m.package == graph.library && m.path == "i/syntax")
-        .expect("loaded graph includes compiler syntax module");
+        .position(|m| m.path == "i/syntax")
+        .expect("loaded graph includes the compiler syntax module `i/syntax`; the standard library `i` is a dependency");
     let mut queue = VecDeque::from([start, prelude, syntax]);
     // The runtime calls these library modules, so every program has them.
     queue.extend(ilang_package::library::RUNTIME.iter().map(|&path| {
         parsed
             .iter()
-            .position(|m| m.package == graph.library && m.path == path)
-            .unwrap_or_else(|| panic!("loaded graph includes runtime module {path}"))
+            .position(|m| m.path == path)
+            .unwrap_or_else(|| panic!("loaded graph includes runtime module {path}; the standard library `i` is a dependency"))
     }));
     let mut selected = BTreeSet::new();
     let mut errors = Vec::new();
@@ -168,9 +168,7 @@ pub(crate) fn import_indices(
                 .path
                 .first()
                 .expect("parser guarantees a nonempty import path");
-            let id = if first.name == "i" {
-                Some(graph.library)
-            } else if first.name == package.name {
+            let id = if first.name == package.name {
                 Some(module.package)
             } else {
                 package
@@ -195,7 +193,20 @@ pub(crate) fn import_indices(
                     ilang_check::code::UNKNOWN_PACKAGE,
                     Some(module.source),
                     first.span.0,
-                    format!("unknown package `{}`", first.name),
+                    if first.name == "std" {
+                        let rest: Vec<&str> = import
+                            .path
+                            .iter()
+                            .skip(1)
+                            .map(|p| p.name.as_str())
+                            .collect();
+                        format!(
+                            "`std` is not the name of this package or a dependency name; the standard library is `i`, so write `i/{}`",
+                            rest.join("/")
+                        )
+                    } else {
+                        format!("unknown package `{}`", first.name)
+                    },
                 ));
                 continue;
             };

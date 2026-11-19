@@ -40,7 +40,7 @@
 #   tests/t1-blockers             fixtures of ilang-cli/ilang-check tests   rust-test
 #   tests/review/cases/**         review corpus, expected.json and the
 #                                 known failures in requirements.json  i (scripts/review-corpus run)
-#   lib, std, bench, examples     i tests at --opt 0 and 2, formatting i
+#   lib, stdlib, bench, examples  i tests at --opt 0 and 2, formatting i
 #   scripts/qa/generate.py        generated programs                   i (scripts/test-generation)
 #   i snippets in .i/.rs/.js/.md  scripts/check-snippets               snippets
 #   bindings/javascript, tests/browser                                 js
@@ -195,14 +195,14 @@ i() {
     i="$(realpath "${CARGO_TARGET_DIR:-target}")/release/i"
   fi
   # The library's own types, before the long tests. `i fmt` only parses and
-  # prints, so a type error in lib/ or std/ would otherwise show up after
+  # prints, so a type error in lib/ or stdlib/ would otherwise show up after
   # minutes of tests; this keeps it to the file, line and column it is.
   if (( first )); then
     echo "checks: i check --project stdlib"
     "$i" check --project stdlib
   fi
   if (( first )); then
-    "$i" fmt --check lib std bench examples
+    "$i" fmt --check lib stdlib bench examples
     # Every example with an `i.toml` must type check on its own.
     for manifest in examples/*/i.toml; do
       example="$(dirname "$manifest")"
@@ -261,7 +261,7 @@ editors() {
     done
     while IFS= read -r -d '' source; do
       npx tree-sitter parse -q "$source"
-    done < <(find ../../lib ../stdlib ../../examples -name '*.i' -print0)
+    done < <(find ../../lib ../../stdlib ../../examples -name '*.i' -print0)
   )
   (
     cd editors/zed

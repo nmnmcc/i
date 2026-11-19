@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Makes a local git repository that stands in for the repository of the
+# language, so that `i new` and the loading of the standard library work
+# without the network.
+#
+#   scripts/dev-library-repo <stdlib dir> <dest dir> [X.Y.Z]
+#
+# <dest dir>/i.git is a bare repository whose one commit has the files of
+# <stdlib dir> under `stdlib/`, tagged `stdlib-vX.Y.Z` (default 0.1.0): the
+# shape of `github.com/nmnmcc/i//stdlib@X.Y.Z`. It prints the value for
+# ILANG_GIT_URLS that points that repository at it:
+#
+#   export ILANG_GIT_URLS=$(scripts/dev-library-repo stdlib "$work/git")
+#
+# Only the files git tracks in <stdlib dir> are taken when it is in a git
+# work tree, so a build directory or an editor's files do not change the
+# hash; otherwise every file is taken.
+set -euo pipefail
+
+src=${1:?usage: scripts/dev-library-repo <stdlib dir> <dest dir> [X.Y.Z]}
+dest=${2:?usage: scripts/dev-library-repo <stdlib dir> <dest dir> [X.Y.Z]}
+version=${3:-0.1.0}
+[[ -f $src/i.toml ]] || {
+  echo "dev-library-repo: '$src' has no i.toml" >&2
+  exit 2
+}
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+  echo "dev-library-repo: '$version' is not X.Y.Z" >&2
+  exit 2
+}
+src=$(realpath -- "$src")
+mkdir -p -- "$dest"
+dest=$(realpath -- "$dest")
+[[ ! -e $dest/i.git ]] || {
+  echo "dev-library-repo: '$dest/i.git' is already there" >&2
+  exit 2
+}
+
+tree=$(mktemp -d "${TMPDIR:-/var/tmp}/i-library-tree.XXXXXX")
+trap 'rm -rf -- "$tree"' EXIT
+mkdir -p "$tree/stdlib"
+if git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  (cd "$src" && git ls-files -z -- . | xargs -0 -r cp --parents -t "$tree/stdlib" --)
+else
+  cp -a -- "$src/." "$tree/stdlib/"
+fi
+
+# No user configuration, hooks or signing: the commit is the same anywhere.
+g() {
+  GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+    GIT_AUTHOR_NAME=i GIT_AUTHOR_EMAIL=i@localhost GIT_COMMITTER_NAME=i GIT_COMMITTER_EMAIL=i@localhost \
+    GIT_AUTHOR_DATE='2000-01-01T00:00:00Z' GIT_COMMITTER_DATE='2000-01-01T00:00:00Z' \
+    git "$@"
+}
+g -C "$tree" init -q -b main
+g -C "$tree" add -A
+g -C "$tree" commit -q -m "stdlib $version"
+g -C "$tree" tag "stdlib-v$version"
+g clone -q --bare -- "$tree" "$dest/i.git"
+
+echo "github.com/nmnmcc/i=file://$dest/i.git"

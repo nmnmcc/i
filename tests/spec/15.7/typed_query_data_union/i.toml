@@ -4,3 +4,6 @@
 # (syntax-3 stage 6) a union of data is ordinary type syntax, not an
 # opaque TypeView, so the query result is written back in a type position.
 name = "spec"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

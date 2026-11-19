@@ -9,6 +9,19 @@ use ilang_host::{HostImports, HostOptions, Outcome, Program, Value};
 use ilang_wasm::{Numeric, Options};
 use num_bigint::BigInt;
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 const SOURCE: &str = "(\n\ti/core\n)\n\n(\n\tapply\n\tbits\n\tfloat_of\n\twhole\n\tsegment\n\tread_u\n\tread_i\n\tle72\n\tle72_i\n\tle512\n\tle512_u\n)\napply = (a : Int, b : Int) -> String {\n\tcore.inspect(\n\t\t(a + b, a - b, a * b, a / b, a % b, a < b, a == b, a > b, a <= b),\n\t)\n}\nbits = (a : Int, b : Int, n : Int) -> String {\n\tcore.inspect(\n\t\t(\n\t\t\tcore.bit_and(a, b),\n\t\t\tcore.bit_or(a, b),\n\t\t\tcore.bit_xor(a, b),\n\t\t\tcore.bit_not(a),\n\t\t\tcore.shift_left(a, n),\n\t\t\tcore.shift_right(a, n),\n\t\t),\n\t)\n}\nfloat_of = (a : Int) -> Float { core.to_float(a) }\nwhole = (x : Float) -> String { core.inspect(core.truncate(x)) }\nsegment = (v : Int, n : Int) -> BitArray { <<v:u(n)>> }\nread_u = (b : BitArray, n : Int) -> Int { b |> (<<x:u(n)>>) { x } & (_) { -1 } }\nread_i = (b : BitArray, n : Int) -> Int { b |> (<<x:i(n)>>) { x } & (_) { -1 } }\nle72 = (v : Int) -> BitArray { <<v:u72le>> }\nle72_i = (b : BitArray) -> Int { b |> (<<x:i72le>>) { x } & (_) { -1 } }\nle512 = (v : Int) -> BitArray { <<v:u512le>> }\nle512_u = (b : BitArray) -> Int { b |> (<<x:u512le>>) { x } & (_) { -1 } }\n";
 
 fn programs() -> Vec<(u8, Program)> {
@@ -17,12 +30,13 @@ fn programs() -> Vec<(u8, Program)> {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"big\"\n[wasm]\nexports = {:?}\n",
+            "name = \"big\"\n[wasm]\nexports = {:?}\n{}",
             [
                 "apply", "bits", "float_of", "whole", "segment", "read_u", "read_i", "le72",
                 "le72_i", "le512", "le512_u"
             ]
-            .map(|name| format!("big/main.{name}"))
+            .map(|name| format!("big/main.{name}")),
+            library_dependencies()
         ),
     )
     .unwrap();

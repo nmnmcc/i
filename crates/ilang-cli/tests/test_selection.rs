@@ -13,8 +13,12 @@ fn package(files: &[(&str, &str)]) -> tempfile::TempDir {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
     }
+    // Every package depends on the standard library `i`; one that uses
+    // `i/test` also collects its tests.
     if files.iter().any(|(_, source)| source.contains("i/test")) {
         test_project::configure(dir.path());
+    } else {
+        test_project::depend_on_library(dir.path());
     }
     dir
 }
@@ -35,7 +39,7 @@ fn tested() -> tempfile::TempDir {
         ("src/lib.i", " (twice)\n\ntwice = (n : Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { () } & (_) { panic(\"no\") } })\n",
+            "(\n\ttestlib = (test) = i/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { () } & (_) { panic(\"no\") } })\n",
         ),
     ])
 }
@@ -106,7 +110,7 @@ fn the_configured_collection_still_runs_its_tests() {
 /// A package with five passing tests, `app/many_test.a` to `.e`, and a cost
 /// table that makes two shards of them.
 fn sharded() -> (tempfile::TempDir, std::path::PathBuf) {
-    let mut test = String::from("(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n");
+    let mut test = String::from("(\n\ttestlib = (test) = i/test\n\tapp/lib\n)\n");
     for name in ["a", "b", "c", "d", "e"] {
         test.push_str(&format!(
             "\ntest(\"{name}\", () {{ lib.twice(2) |> (4) {{ () }} & (_) {{ panic(\"no\") }} }})\n"

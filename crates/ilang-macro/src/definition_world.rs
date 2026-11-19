@@ -151,9 +151,7 @@ impl DefinitionWorld {
     fn target(&self, p: &Parsed, import: &ilang_syntax::ast::Import) -> Option<u32> {
         let package = &self.graph.packages[p.package];
         let first = &import.path.first()?.name;
-        let id = if first == "i" {
-            Some(self.graph.library)
-        } else if first == &package.name {
+        let id = if first == &package.name {
             Some(p.package)
         } else {
             package

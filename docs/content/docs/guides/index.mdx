@@ -7,11 +7,11 @@ Build commands, handle files and requests, test code, and package programs.
 
 | Task | Prerequisites |
 | --- | --- |
-| [CLI](/docs/guides/cli) | [Functions](/docs/tour/functions-and-branches), [services](/docs/tour/services-and-errors), `stdlib/` |
+| [CLI](/docs/guides/cli) | [Functions](/docs/tour/functions-and-branches), [services](/docs/tour/services-and-errors) |
 | [Files](/docs/guides/files) | [Values](/docs/tour/values-and-data), services, a writable project directory |
-| [HTTP service](/docs/guides/http-service) | Services, [concurrency](/docs/tour/concurrency), `stdlib/`, `curl` |
-| [Testing](/docs/guides/testing) | Functions, services, `stdlib/` |
+| [HTTP service](/docs/guides/http-service) | Services, [concurrency](/docs/tour/concurrency), `curl` |
+| [Testing](/docs/guides/testing) | Functions, services |
 | [Packaging](/docs/guides/packaging) | [Packages](/docs/tour/packages), a working compiler |
 | [Host and WASI interop](/docs/guides/js-and-wasi-interop) | Packaging, i source code, Node with the required Wasm features, Wasmtime for its command |
 
-Start with [installation](/docs/getting-started/install), a project containing `i.toml`, and the [tour](/docs/tour). Place guide projects beside `stdlib/`, or adjust their manifest's path dependency; `i/…` modules come with the compiler.
+Start with [installation](/docs/getting-started/install), a project containing `i.toml`, and the [tour](/docs/tour). Make each guide's package with `i new`; its `i.toml` names the standard library, whose modules are imported as `i/…`, by its version.

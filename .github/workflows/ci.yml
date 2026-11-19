@@ -49,8 +49,8 @@ env:
 # Path filters, on pull requests only (see scripts/ci/changes):
 #   rust     a file outside docs/ and editors/, or docs/spec.md: the release
 #            build, the Rust and JavaScript tests, i, corpus and docs.
-#   docs     docs/, lib/ or std/: the release build and docs.
-#   editors  editors/, lib/, std/ or examples/: the editor checks.
+#   docs     docs/, lib/ or stdlib/: the release build and docs.
+#   editors  editors/, lib/, stdlib/ or examples/: the editor checks.
 #   A change to .github/, ci/, scripts/ci/, scripts/checks or the Devenv files
 #   sets all three. lint always runs (on a change without rust, only its
 #   snippet check, which reads every .md and .mdx file).

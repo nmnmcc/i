@@ -1,6 +1,19 @@
 use rcgen::{BasicConstraints, CertificateParams, IsCa, Issuer, KeyPair, KeyUsagePurpose};
 use std::{fs, process::Command};
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 #[test]
 fn tls_round_trip_and_certificate_validation() {
     let mut ca_params = CertificateParams::new(Vec::<String>::new()).unwrap();
@@ -19,7 +32,11 @@ fn tls_round_trip_and_certificate_validation() {
         .unwrap();
     let project = tempfile::tempdir().unwrap();
     fs::create_dir(project.path().join("src")).unwrap();
-    fs::write(project.path().join("i.toml"), "name = \"tls_test\"\n").unwrap();
+    fs::write(
+        project.path().join("i.toml"),
+        format!("name = \"tls_test\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     let source = format!(
         r#"
 (

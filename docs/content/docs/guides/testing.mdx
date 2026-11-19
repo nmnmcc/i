@@ -9,12 +9,10 @@ Run unit tests, generate cases, and substitute a service implementation.
 name = "guide_tests"
 
 [dependencies]
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 
 [test]
 collection = "i/test.tests"
-
-[dev-dependencies]
-std = { path = "../stdlib" }
 ```
 
 ```i file=src/count.i title="src/count.i"
@@ -39,7 +37,7 @@ pass guide_tests/count_test.adds one
 1 passed, 0 failed
 ```
 
-Create `guide-tests/` beside `stdlib/` and run commands there. Tests import `src/` modules by package path; the loader reads `.i` and `.is` throughout `test/`, with `_test.i` a convention. Without a configured collection, no tests run.
+Make the package with `i new guide_tests --path guide-tests` and run commands in `guide-tests/`. Tests import `src/` modules by package path; the loader reads `.i` and `.is` throughout `test/`, with `_test.i` a convention. Without a configured collection, no tests run.
 
 ```sh
 i test --opt 0

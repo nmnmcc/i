@@ -307,7 +307,7 @@ impl<'a> Resolver<'a> {
     }
 
     fn in_library(&self) -> bool {
-        self.p.module(self.cur).package == self.graph.library
+        self.graph.is_language(self.p.module(self.cur).package)
     }
 
     fn new_var(&mut self) -> VarId {
@@ -604,9 +604,7 @@ impl<'a> Resolver<'a> {
         let pkg = &self.graph.packages[me.package];
         let first = item.path[0].name.as_str();
         let is_test = me.kind == ModuleKind::Test;
-        let package = if first == "i" {
-            Some(self.graph.library)
-        } else if first == pkg.name {
+        let package = if first == pkg.name {
             Some(me.package)
         } else if let Some((_, id)) = pkg.dependencies.iter().find(|(n, _)| n == first) {
             *id
@@ -620,8 +618,14 @@ impl<'a> Resolver<'a> {
             let dev = pkg.dev_dependencies.iter().any(|(n, _)| n == first);
             let msg = if dev {
                 format!("`{first}` is a dev-dependency, so only modules under `test/` may use it")
+            } else if first == "std" {
+                let rest: Vec<&str> = item.path[1..].iter().map(|p| p.name.as_str()).collect();
+                format!(
+                    "`std` is not the name of this package or a dependency name; the standard library is `i`, so write `i/{}`",
+                    rest.join("/")
+                )
             } else {
-                format!("`{first}` is not `i`, the name of this package, or a dependency name")
+                format!("`{first}` is not the name of this package or a dependency name")
             };
             self.error(code::UNKNOWN_PACKAGE, item.path[0].span, msg);
             return None;
@@ -634,11 +638,13 @@ impl<'a> Resolver<'a> {
         let written = written.join("/");
         let found = self.by_path.get(&(package, path)).copied();
         let Some(target) = found else {
-            self.error(
-                code::NO_MODULE,
-                item.span,
-                self.missing_module_message(&written),
-            );
+            let message = if written == "i/prelude" {
+                "there is no module `i/prelude`: the prelude is built in; its names need no import"
+                    .to_string()
+            } else {
+                self.missing_module_message(&written)
+            };
+            self.error(code::NO_MODULE, item.span, message);
             return None;
         };
         if self.p.module(target).kind == ModuleKind::Test && !is_test {
@@ -806,9 +812,7 @@ impl<'a> Resolver<'a> {
                     let me = self.p.module(ModuleId(m));
                     let first = &path[0];
                     let pkg = &self.graph.packages[me.package];
-                    let package = if first == "i" {
-                        Some(self.graph.library)
-                    } else if *first == pkg.name {
+                    let package = if *first == pkg.name {
                         Some(me.package)
                     } else {
                         pkg.dependencies

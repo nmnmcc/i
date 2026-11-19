@@ -92,6 +92,38 @@ impl Resolver<'_> {
             .collect()
     }
 
+    fn import_paths_of(&self, target: PackageId, path: &str, kind: ModuleKind) -> Vec<String> {
+        let here = self.p.module(self.cur);
+        if kind == ModuleKind::Prelude || kind == ModuleKind::Test && here.kind != ModuleKind::Test
+        {
+            return Vec::new();
+        }
+        let package = &self.graph.packages[here.package];
+        let Some((_, rest)) = path.split_once('/') else {
+            return Vec::new();
+        };
+        let mut prefixes = BTreeSet::new();
+        if target == self.graph.library {
+            prefixes.insert("i".to_string());
+        } else if target == here.package {
+            prefixes.insert(package.name.clone());
+        } else {
+            for (name, id) in package.dependencies.iter().chain(
+                package
+                    .dev_dependencies
+                    .iter()
+                    .filter(|_| here.kind == ModuleKind::Test),
+            ) {
+                if *id == Some(target) {
+                    prefixes.insert(name.clone());
+                }
+            }
+        }
+        prefixes
+            .into_iter()
+            .map(|p| format!("{p}/{rest}"))
+            .collect()
+    }
     pub(super) fn undefined_name_message(&self, name: &str, module_only: bool) -> String {
         let mut message = if module_only {
             format!("there is no module `{name}`")
@@ -128,6 +160,33 @@ impl Resolver<'_> {
                     format!("Import `({name}) = {path}` to use `{name}`.")
                 };
                 candidates.insert((!is_module, path, advice));
+            }
+        }
+        // Advice may name a module of a dependency that the closure did not
+        // parse. Read its header only, and only when advice is needed.
+        for (package, p) in self.graph.packages.iter().enumerate() {
+            for m in &p.modules {
+                if self.by_path.contains_key(&(package, m.path.clone())) {
+                    continue;
+                }
+                let (parsed, errors) = crate::parse_one(self.graph, package, m);
+                if !errors.is_empty() {
+                    continue;
+                }
+                let is_module = m.path.rsplit('/').next() == Some(name);
+                let is_export =
+                    !module_only && parsed.ast.exports.iter().any(|e| e.name.name == name);
+                if !is_module && !is_export {
+                    continue;
+                }
+                for path in self.import_paths_of(package, &m.path, m.kind) {
+                    let advice = if is_module {
+                        format!("Import `{path}` to use the module `{name}`.")
+                    } else {
+                        format!("Import `({name}) = {path}` to use `{name}`.")
+                    };
+                    candidates.insert((!is_module, path, advice));
+                }
             }
         }
         if !candidates.is_empty() {

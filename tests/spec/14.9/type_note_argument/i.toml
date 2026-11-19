@@ -2,6 +2,6 @@
 # expect: compile-error E0501
 name = "spec"
 [dependencies]
-i = { path = "../stdlib" }
+i = { path = "../../../../stdlib" }
 [test]
 collection = "i/test.tests"

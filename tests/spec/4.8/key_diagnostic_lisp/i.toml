@@ -1,3 +1,6 @@
 # spec: 4.8, 6.7, 14.1
 # expect: compile-error E0506
 name = "spec"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

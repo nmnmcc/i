@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# The edges of `i new`: a package named `std`, a path with spaces in it,
-# something already there where the new package goes, the same directory used
-# twice, and a directory that cannot be written.
+# The edges of `i new`: the reserved name `i`, a package named `std`, a path
+# with spaces in it, something already there where the new package goes, the
+# same directory used twice, and a directory that cannot be written.
+#
+# `i new` names the newest version of the standard library, so a local git
+# repository made by scripts/dev-library-repo from `stdlib/` stands in for the
+# repository of the language, and ILANG_GIT_URLS points at it.
 #
 #   scripts/dev-new-edge-cases <path to i>
 #
@@ -22,6 +26,9 @@ work=$(mktemp -d "${TMPDIR:-/var/tmp}/i-new-edge.XXXXXX")
 trap 'chmod -R u+w "$work" 2>/dev/null; rm -rf -- "$work"' EXIT
 export HOME="$work/home" XDG_CACHE_HOME="$work/cache" I_CACHE_DIR="$work/cache/i"
 mkdir -p "$HOME" "$I_CACHE_DIR"
+here=$(dirname -- "$(realpath -- "${BASH_SOURCE[0]}")")
+ILANG_GIT_URLS=$("$here/dev-library-repo" "$here/../stdlib" "$work/git")
+export ILANG_GIT_URLS
 
 bad=0
 fail() { echo "  $*  <-- FAILED"; bad=1; }
@@ -43,22 +50,30 @@ expect_ok() { # what command...
 # A snapshot of every file of a directory, to compare before and after.
 snapshot() { (cd "$1" && find . -type f -print0 | sort -z | xargs -0 sha256sum); }
 
+echo "== the name i =="
+run new i
+[[ $CODE -ne 0 ]] || fail "i new i was allowed"
+grep -qi 'reserved' <<<"$ERR" || fail "the refusal does not say the name is reserved: ${ERR:-<no stderr>}"
+[[ ! -e $work/i ]] || fail "the refusal left i/ behind"
+ok "i new i is refused"
+
 echo "== a package named std =="
 run new std
 if [[ $CODE -ne 0 ]]; then
   fail "i new std was refused: ${ERR:-<no stderr>}"
 else
   ok "i new std made a package"
-  # The copied standard library cannot be a dependency also named std, so the
-  # manifest names it stdlib; it still points at the copy.
-  if grep -qx 'stdlib = { path = "std" }' "$work/std/i.toml"; then
-    ok "its manifest names the copy stdlib"
+  # An ordinary package: it depends on the library by its version, as any
+  # other, and has nothing of it copied in.
+  if grep -qx 'i = "github.com/nmnmcc/i//stdlib@0.1.0"' "$work/std/i.toml"; then
+    ok "its manifest names the library at 0.1.0"
   else
-    fail "its manifest does not name the copy stdlib: $(cat "$work/std/i.toml")"
+    fail "its manifest does not name the library: $(cat "$work/std/i.toml")"
   fi
-  expect_ok "the std package checks" check --offline --project stdlib
-  expect_ok "the std package runs" run --offline --project stdlib
-  run test --offline --project stdlib
+  [[ ! -e $work/std/std && ! -e $work/std/stdlib ]] || fail "i new std copied the library"
+  expect_ok "the std package checks" check --project std
+  expect_ok "the std package runs" run --offline --project std
+  run test --offline --project std
   [[ $CODE -eq 0 ]] && grep -qxE '[0-9]+ passed, 0 failed' <<<"$OUT" &&
     ok "the std package tests pass" ||
     fail "the std package: exit $CODE; $ERR$OUT"

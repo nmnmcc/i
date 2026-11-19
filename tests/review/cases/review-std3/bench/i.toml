@@ -1,6 +1,6 @@
 name = "review"
 [dependencies]
-i = { path = "../stdlib" }
+i = { path = "../../../../../stdlib" }
 
 [test]
 collection = "i/test.tests"

@@ -1462,7 +1462,6 @@
     "review-k4s/simple": 0.555,
     "review-k4s/soundness": 0.977,
     "review-k4s/soundness_unannotated": 0.694,
-    "review-k4s/std": 11.496,
     "review-k4s/wide_128": 0.902,
     "review-k4s/wide_256": 0.629,
     "review-k4s/wide_32": 1.012,
@@ -3415,7 +3414,6 @@
     "review-k4s/simple",
     "review-k4s/soundness",
     "review-k4s/soundness_unannotated",
-    "review-k4s/std",
     "review-k4s/wide_128",
     "review-k4s/wide_256",
     "review-k4s/wide_32",
@@ -5299,16 +5297,16 @@
     "bench@2": 16.092,
     "examples/hello@0": 1.862,
     "examples/hello@2": 2.835,
-    "std@0": 258.146,
-    "std@2": 212.264
+    "stdlib@0": 258.146,
+    "stdlib@2": 212.264
    },
    "keys": [
     "bench@0",
     "bench@2",
     "examples/hello@0",
     "examples/hello@2",
-    "std@0",
-    "std@2"
+    "stdlib@0",
+    "stdlib@2"
    ]
   },
   "value-type-recovery-cases": {

@@ -2,3 +2,6 @@ name="spec"
 
 [entries]
 legacy = "main_test.main"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

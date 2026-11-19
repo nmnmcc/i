@@ -2,3 +2,6 @@ name = "app"
 
 [wasm]
 exports = ["app/main.call"]
+
+[dependencies]
+i = { path = "../../../../stdlib" }

@@ -1,1 +1,4 @@
 name="time"
+
+[dependencies]
+i = { path = "../../../../../../stdlib" }

@@ -3,9 +3,9 @@
 name = "review"
 
 [dependencies]
+i = { path = "../../../../stdlib" }
 
 [test]
 collection = "i/test.tests"
 
 [dev-dependencies]
-i = { path = "../stdlib" }

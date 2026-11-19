@@ -17,7 +17,7 @@ This document is complete in itself, except that the principality argument (§4.
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
 
-Every compiler must give the library modules above. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. A program may not define a module with any of these library paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
+The library modules above are modules of the **standard library**: the package in the directory `stdlib` of the repository `github.com/nmnmcc/i`, which a package names with the dependency name `i` (§2.1, §2.6). They are i source, got and versioned like any other package; no compiler builds a library module in. A compiler supplies the built-in operations that these modules declare because they cannot be written in i (§13), and must accept the versions of the standard library made for it. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. Only the standard library, or a fork of it, may be named `i` (§2.6), so no other package defines a module with any of these library paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
 
 
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a chain of branches is a function too (§6.12). A binding is a binding wherever it is written, and a parameter group is a pattern matched as a binding matches. Where two forms look the same, they have the same rules, with this exception, where the place of a form decides its rules:
@@ -240,9 +240,10 @@ A test module may be imported only by test modules of the same package. Its expo
 
 In a module, the first part of a module path says which package the module is in. It must be one of these:
 
-- `i`, for the **library modules** (§9, §10, §13, §14, §B.7.1) and kept paths named at the start of this document. How it gives them is not fixed: the operations that cannot be written in i may be built into the compiler, and they are not host imports (§10.1);
 - the `name` of the module's own package;
 - a dependency name of the module's own package (§2.6); in a test module, also a dev-dependency name.
+
+The dependency name `i` is the standard library (§2.6), so `i/…` names its **library modules** (§9, §10, §13, §14, §B.7.1) and the kept paths named at the start of this document. They are source files of that package; none is built into the compiler. The operations that cannot be written in i are declared in them and supplied by the compiler, and they are not host imports (§10.1). The **prelude**, the built-in names that every module may use without an import (§4.2, §12), is built into the compiler; it is not a module and cannot be imported.
 
 A module may only import modules that are named in this way. Then the rest of the path is the path of the module in that package, as that package names it. So with the dependency `json`, `json/decode` is the module `src/decode.i` of that package.
 
@@ -417,6 +418,7 @@ The file `i.toml` is in TOML. These keys have a meaning; other root keys are not
 name = "app"                                   # required: the first part of the paths of this package's modules
 
 [dependencies]                                 # packages that this package uses
+i = "github.com/nmnmcc/i//stdlib@0.1.0"        # the standard library
 json = "github.com/alice/json@1.4.0"           # a location, "@", and the lowest version needed
 text = "codeberg.org/bob/tools//text@0.3.2"    # a package in a directory of a repository
 util = { path = "../util" }                    # a directory on this computer, relative to this file
@@ -428,8 +430,9 @@ check = "github.com/carol/check@2.1.0"
 exports = ["app/math.add"]                     # host exports (§10.2): module path, ".", function name
 ```
 
-- `name` must be a `name` (§1.3), and not `i`. It is only used inside the package. A package may have any `name`, and the packages that use it give it their own dependency names.
-- The key of a dependency is its **dependency name**. It must be a `name`, not `i`, not the `name` of this package, and not the same as another dependency name or dev-dependency name of this package.
+- `name` must be a `name` (§1.3). It is only used inside the package. A package may have any `name`, and the packages that use it give it their own dependency names, except that `i` is reserved: only the standard library, or a fork of it, is named `i`.
+- The key of a dependency is its **dependency name**. It must be a `name`, not the `name` of this package, and not the same as another dependency name or dev-dependency name of this package.
+- The dependency name `i` is the standard library: `github.com/nmnmcc/i//stdlib` at a version, or a fork of it. The package that is compiled, unless it is itself named `i`, must have `i` in `[dependencies]`, even when only its tests use it; without it, it is an error. A package does not contain the standard library, and publishing a package does not carry it: the package names its version, and `i.lock` (§2.8) pins it like any other package with a location.
 - A **location** is the address of a git repository, without `https://`, for example `github.com/alice/json`. The repository is got with git from `https://` and the location. A location may end with `//` and a directory path, for a package that is in that directory of the repository. Any git host may be used; there is no central list of packages.
 - A version is `major.minor.patch`, three decimal numbers, as in Semantic Versioning.
 - `{ path = "…" }` is a package in a directory on this computer. Only the package that is compiled, and the packages that it gets by path, may have path dependencies. A package that is got by location may not have them.
@@ -505,7 +508,7 @@ A plain `i build` writes no `.wasm` module. `<name>` is the package name for the
 
 ### 2.7 Versions
 
-A **version** of a package with a location is a git tag `vmajor.minor.patch` in its repository, for example `v1.4.0`. The package is the files of the repository at that tag, or the files of the directory after `//`, with its `i.toml` at the top.
+A **version** of a package with a location is a git tag `vmajor.minor.patch` in its repository, for example `v1.4.0`. For a package in a directory of its repository, the tag starts with that directory, with `-` in place of each `/`, and then `-`: `stdlib-v0.1.0` is version `0.1.0` of `github.com/nmnmcc/i//stdlib`, and `tools-text-v0.3.2` is version `0.3.2` of `codeberg.org/bob/tools//text`. The package is the files of the repository at that tag, or the files of the directory after `//`, with its `i.toml` at the top.
 
 A **package** in a program is a location and a major version, or a directory for a path dependency. So `github.com/alice/json@1.4.0` and `github.com/alice/json@2.0.1` are two different packages, and their types are different. A program may use both, with two dependency names. Inside one major version, a newer version must be able to take the place of an older one. A published macro interface includes whether it is a syntax or typed macro, its argument-data shapes and explicit labels, and its compile-time contract. Without a stronger declared contract, a tool conservatively treats any change to the source bytes of its defining module or its transitive imported modules (including initializers) as a changed macro interface, even when its ordinary function type is unchanged. Removing or changing that contract requires a new major version; adding a macro requires a new minor version.
 
@@ -609,7 +612,7 @@ inhabitance rule; destructuring an impossible value first is not required.
 
 ### 4.2 Built-in types
 
-These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. So a module that defines a type with the name of a built-in type can still name the built-in type. The prelude names are built in and need no import.
+These types may be used in every module and named through `i/core`, for example `core.Int` after `(core = i/core)`. So a module that defines a type with the name of a built-in type can still name the built-in type. The prelude names are built in and need no import; the prelude is not a module and cannot be imported (§2.1).
 
 | Type | Values |
 |---|---|

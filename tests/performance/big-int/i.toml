@@ -2,3 +2,6 @@ name = "bigperf"
 
 [wasm]
 exports = ["bigperf/main.add", "bigperf/main.compare", "bigperf/main.multiply", "bigperf/main.divide", "bigperf/main.empty"]
+
+[dependencies]
+i = { path = "../../../stdlib" }

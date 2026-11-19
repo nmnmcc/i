@@ -19,9 +19,7 @@ pub fn order(graph: &PackageGraph, parsed: &[Parsed]) -> Result<Vec<SourceId>, I
         let package = &graph.packages[module.package];
         for import in &module.ast.imports {
             let first = &import.path[0].name;
-            let id = if first == "i" {
-                Some(graph.library)
-            } else if *first == package.name {
+            let id = if *first == package.name {
                 Some(module.package)
             } else {
                 package

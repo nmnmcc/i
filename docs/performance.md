@@ -113,8 +113,8 @@ historical measurements, retained as reported; they are not new timings.
 | `--opt 2` | 0.82 s / 128 MB | 0.87 s / 145 MB | 0.05 s / 17 MB |
 
 Repeat the timing command on the stored project directly, through the
-shared heavy wrapper. The corpus driver adds a `qa_startup` test and a
-`i/test` dependency; that is a different workload. Do not use its prepared
+shared heavy wrapper. The corpus driver adds a `qa_startup` test and an
+`i` dependency; that is a different workload. Do not use its prepared
 project for comparison with this table, or run the corpus driver for the
 performance measurement.
 

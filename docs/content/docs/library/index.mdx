@@ -23,7 +23,7 @@ main = () <- (io : Io) {
 False
 ```
 
-[bool](/docs/library/generated/std-bool) lists `not` among its exports; select an export for its declaration and source documentation.
+[bool](/docs/library/generated/i-bool) lists `not` among its exports; select an export for its declaration and source documentation.
 
 ## Text
 
@@ -52,7 +52,7 @@ héllo
 6
 ```
 
-[string](/docs/library/generated/std-string) documents index units and costs alongside its functions.
+[string](/docs/library/generated/i-string) documents index units and costs alongside its functions.
 
 ## Lists
 
@@ -74,7 +74,7 @@ main = () <- (io : Io) {
 [2, 4, 6]
 ```
 
-[list](/docs/library/generated/std-list) includes callback signatures.
+[list](/docs/library/generated/i-list) includes callback signatures.
 
 ## Parsed numbers
 
@@ -101,16 +101,14 @@ main = () <- (io : Io) {
 Error(())
 ```
 
-[int](/docs/library/generated/std-int) documents accepted input and the `Fail(())` service required for parsing.
+[int](/docs/library/generated/i-int) documents accepted input and the `Fail(())` service required for parsing.
 
 ## Dependencies
 
-Add `std = { path = "../stdlib" }` under `[dependencies]` in `i.toml`; paths are package-relative. Test-only imports use `[dev-dependencies]`. Compiler-supplied `i/…` modules need no dependency.
+The standard library is the versioned package `i`: `i new` writes `i = "github.com/nmnmcc/i//stdlib@X.Y.Z"` under `[dependencies]` in `i.toml`, and source imports its modules as `i/…`. Nothing of the library is copied into a package; `i.lock` pins the version, `i update i` moves to the newest one, and `i publish` does not carry it. The dependency belongs under `[dependencies]` even when only the package's tests import the library. The source of every module, with the documentation shown here, is in [stdlib/src](https://github.com/nmnmcc/i/tree/main/stdlib/src) of the repository.
 
 ## Modules
 
-**std:** [bit_array](/docs/library/generated/std-bit-array) · [bool](/docs/library/generated/std-bool) · [calendar](/docs/library/generated/std-calendar) · [cli](/docs/library/generated/std-cli) · [crypto](/docs/library/generated/std-crypto) · [csv](/docs/library/generated/std-csv) · [dict](/docs/library/generated/std-dict) · [float](/docs/library/generated/std-float) · [http](/docs/library/generated/std-http) · [int](/docs/library/generated/std-int) · [json](/docs/library/generated/std-json) · [list](/docs/library/generated/std-list) · [log](/docs/library/generated/std-log) · [option](/docs/library/generated/std-option) · [order](/docs/library/generated/std-order) · [pair](/docs/library/generated/std-pair) · [path](/docs/library/generated/std-path) · [property](/docs/library/generated/std-property) · [regex](/docs/library/generated/std-regex) · [result](/docs/library/generated/std-result) · [schema](/docs/library/generated/std-schema) · [sequence](/docs/library/generated/std-sequence) · [set](/docs/library/generated/std-set) · [stream](/docs/library/generated/std-stream) · [string](/docs/library/generated/std-string) · [time](/docs/library/generated/std-time) · [uri](/docs/library/generated/std-uri).
-
-**i:** [assertion](/docs/library/generated/i-assertion) · [big](/docs/library/generated/i-big) · [bits](/docs/library/generated/i-bits) · [clock](/docs/library/generated/i-clock) · [control](/docs/library/generated/i-control) · [core](/docs/library/generated/i-core) · [fail](/docs/library/generated/i-fail) · [fetch](/docs/library/generated/i-fetch) · [float_text](/docs/library/generated/i-float-text) · [fs](/docs/library/generated/i-fs) · [io](/docs/library/generated/i-io) · [key](/docs/library/generated/i-key) · [net](/docs/library/generated/i-net) · [process](/docs/library/generated/i-process) · [random](/docs/library/generated/i-random) · [request](/docs/library/generated/i-request) · [resource](/docs/library/generated/i-resource) · [stdio](/docs/library/generated/i-stdio) · [syntax](/docs/library/generated/i-syntax) · [task](/docs/library/generated/i-task) · [tls](/docs/library/generated/i-tls).
+[assertion](/docs/library/generated/i-assertion) · [big](/docs/library/generated/i-big) · [bit_array](/docs/library/generated/i-bit-array) · [bits](/docs/library/generated/i-bits) · [bool](/docs/library/generated/i-bool) · [calendar](/docs/library/generated/i-calendar) · [cli](/docs/library/generated/i-cli) · [clock](/docs/library/generated/i-clock) · [control](/docs/library/generated/i-control) · [core](/docs/library/generated/i-core) · [crypto](/docs/library/generated/i-crypto) · [csv](/docs/library/generated/i-csv) · [dict](/docs/library/generated/i-dict) · [fail](/docs/library/generated/i-fail) · [fetch](/docs/library/generated/i-fetch) · [float](/docs/library/generated/i-float) · [float_text](/docs/library/generated/i-float-text) · [fs](/docs/library/generated/i-fs) · [http](/docs/library/generated/i-http) · [int](/docs/library/generated/i-int) · [io](/docs/library/generated/i-io) · [json](/docs/library/generated/i-json) · [key](/docs/library/generated/i-key) · [list](/docs/library/generated/i-list) · [log](/docs/library/generated/i-log) · [net](/docs/library/generated/i-net) · [option](/docs/library/generated/i-option) · [order](/docs/library/generated/i-order) · [pair](/docs/library/generated/i-pair) · [path](/docs/library/generated/i-path) · [process](/docs/library/generated/i-process) · [property](/docs/library/generated/i-property) · [random](/docs/library/generated/i-random) · [regex](/docs/library/generated/i-regex) · [request](/docs/library/generated/i-request) · [resource](/docs/library/generated/i-resource) · [result](/docs/library/generated/i-result) · [schema](/docs/library/generated/i-schema) · [sequence](/docs/library/generated/i-sequence) · [set](/docs/library/generated/i-set) · [stdio](/docs/library/generated/i-stdio) · [stream](/docs/library/generated/i-stream) · [string](/docs/library/generated/i-string) · [syntax](/docs/library/generated/i-syntax) · [task](/docs/library/generated/i-task) · [time](/docs/library/generated/i-time) · [tls](/docs/library/generated/i-tls) · [uri](/docs/library/generated/i-uri).
 
 Reference introductions come from `////` comments and exports from `///`; declarations use checked types when available, otherwise source text. [Packages](/docs/tour/packages) explains imports.

@@ -1,3 +1,6 @@
 # spec: 2.4, 6.7; exporting T alone forbids field selection outside its module.
 # expect: compile-error E0204
 name = "app"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

@@ -4616,8 +4616,8 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 1106,
     "hash": "398527dac972453ccc0721892ef715438ca0ed9dfac61771ce3e0cd1ab26bf21",
-    "old": "#[test]\nfn shipped_stored_callback_types_keep_their_need_invariant() {\n    // std-1 §3.1 and std-2 L5 require invariant N. Read the shipped\n    // declarations, rather than a second copy that could miss a port bug.\n    let stream = include_str!(\"../stdlib/src/stream.i\");\n",
-    "new": "#[test]\nfn shipped_stored_callback_types_keep_their_need_invariant() {\n    // Stored callback needs remain invariant. Read the shipped\n    // declarations, rather than a second copy that could miss a port bug.\n    let stream = include_str!(\"../stdlib/src/stream.i\");\n"
+    "old": "#[test]\nfn shipped_stored_callback_types_keep_their_need_invariant() {\n    // std-1 §3.1 and std-2 L5 require invariant N. Read the shipped\n    // declarations, rather than a second copy that could miss a port bug.\n    let stream = include_str!(\"../../../stdlib/src/stream.i\");\n",
+    "new": "#[test]\nfn shipped_stored_callback_types_keep_their_need_invariant() {\n    // Stored callback needs remain invariant. Read the shipped\n    // declarations, rather than a second copy that could miss a port bug.\n    let stream = include_str!(\"../../../stdlib/src/stream.i\");\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -9145,8 +9145,8 @@
     "file": "crates/ilang-syntax/tests/syn3_lower.rs",
     "line": 173,
     "hash": "da8cfa2fe21fd476fc56362a5c6cb0c8e9e1f63d1d272e01dda66d6d4baaa91d",
-    "old": "}\n\n/// The Lisp surface: `std/src/test.is`, converted and read back, is the\n/// tree that the file gives today (quotes included).\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../stdlib/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // The repository file is in today's rows until the conversion commit,\n    // and in the rows of syntax three after it.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n",
-    "new": "}\n\n/// Round-tripping the library macro must retain its quotes as well as the\n/// surrounding source tree.\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../stdlib/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // Accept either input encoding so the migration adapter can compare\n    // repository sources without changing the file under test.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n"
+    "old": "}\n\n/// The Lisp surface: `std/src/test.is`, converted and read back, is the\n/// tree that the file gives today (quotes included).\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../stdlib/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // The repository file is in today's rows until the conversion commit,\n    // and in the rows of syntax three after it.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n",
+    "new": "}\n\n/// Round-tripping the library macro must retain its quotes as well as the\n/// surrounding source tree.\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../stdlib/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // Accept either input encoding so the migration adapter can compare\n    // repository sources without changing the file under test.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n"
   },
   {
     "file": "crates/ilang-syntax/tests/syn3_lower.rs",

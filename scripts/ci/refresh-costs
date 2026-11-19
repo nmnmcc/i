@@ -30,7 +30,7 @@ or one job's log (`timestamp text`, or bare text). Lines are grouped by job
   Projects run by `i test --project` (set std-tests, keys <project>@<opt>):
     timestamps are required. After `dev-new-machine: ok`, each run ends at a
     line `<N> passed, <M> failed`; its project is named by its first
-    `pass <name>/...` or `fail <name>/...` line (std, hello -> examples/hello,
+    `pass <name>/...` or `fail <name>/...` line (i -> stdlib, hello -> examples/hello,
     bench); its cost is from the end of the previous run (or the
     `dev-new-machine: ok` line) to its own end, so it includes the build. The
     first run of a project in a job is --opt 0 and the second --opt 2, the
@@ -53,7 +53,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CRATE_SETS = {'ilang-check': 'ilang-check-tests', 'ilang-cli': 'ilang-cli-tests'}
-PROJECTS = {'std': 'std', 'hello': 'examples/hello', 'bench': 'bench'}
+PROJECTS = {'i': 'stdlib', 'hello': 'examples/hello', 'bench': 'bench'}
 LEVELS = ('0', '2')
 
 RUNNING = re.compile(r'^\s+Running (unittests )?(\S+) \((?:\S*/)?deps/([A-Za-z0-9_]+)-[0-9a-f]+(?:\.exe)?\)\s*$')

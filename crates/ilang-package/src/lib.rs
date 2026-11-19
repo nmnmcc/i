@@ -1,5 +1,5 @@
-//! Package loading: the package file, the modules of a package, the library
-//! package `i`, and the graph of packages that a program uses.
+//! Package loading: the package file, the modules of a package, the built-in
+//! package with the prelude, and the graph of packages that a program uses.
 //!
 //! A package is a directory with an `i.toml` file; every `.i` file under its
 //! `src/` or `test/` directory is a module of it. Packages with a location
@@ -56,7 +56,18 @@ pub mod code {
     pub const CACHE: &str = "E0636";
     /// `i.lock` could not be written.
     pub const LOCK_WRITE: &str = "E0637";
+    /// The compiled package has no dependency `i`, the standard library,
+    /// and is not itself named `i`.
+    pub const NO_LIBRARY: &str = "E0641";
+    /// The project still has the old copied standard library.
+    pub const LEGACY_LIBRARY: &str = "E0640";
 }
+
+/// The dependency name of the standard library.
+pub const LIBRARY_NAME: &str = "i";
+
+/// The message of [`code::NO_LIBRARY`].
+pub const NO_LIBRARY_MESSAGE: &str = "the standard library is not resolved for this package; add `i = \"github.com/nmnmcc/i//stdlib@X.Y.Z\"` to [dependencies]";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Severity {
@@ -215,8 +226,8 @@ pub enum ModuleKind {
     Src,
     /// A module under `test/`.
     Test,
-    /// The built-in names, written in i. It is in the package `i`, but
-    /// it may not be imported.
+    /// The built-in names, written in i. It is in the built-in package
+    /// ([`PackageGraph::library`]), and it may not be imported.
     Prelude,
 }
 
@@ -231,7 +242,7 @@ pub struct ModuleSource {
 #[derive(Clone, Debug)]
 pub struct Package {
     pub name: String,
-    /// The canonical directory. `None` for the library package `i`. For a
+    /// The canonical directory. `None` for the built-in package. For a
     /// package with a location, it is in the cache (see [`git`]).
     pub dir: Option<PathBuf>,
     pub manifest_source: Option<SourceId>,
@@ -286,12 +297,14 @@ impl PackageLocation {
     }
 }
 
-/// The packages of a program: the library package `i`, the compiled package,
-/// and its dependencies.
+/// The packages of a program: the built-in package with the prelude, the
+/// compiled package, and its dependencies (among them the library `i`).
 #[derive(Clone, Debug)]
 pub struct PackageGraph {
     pub sources: Sources,
     pub packages: Vec<Package>,
+    /// The built-in package (see [`library`]): only the prelude. The
+    /// library modules `i/...` are in the package named `i`.
     pub library: PackageId,
     /// The compiled package, or `None` when it could not be read.
     pub root: Option<PackageId>,
@@ -301,6 +314,77 @@ pub struct PackageGraph {
     /// Whether the program is compiled for test execution rather than with
     /// its normal entries and host exports.
     pub test_run: bool,
+}
+
+impl PackageGraph {
+    /// Whether a package is the standard library: a package named `i`
+    /// ([`LIBRARY_NAME`]), the dependency of every other package, or the
+    /// compiled package when it is the library itself.
+    pub fn is_standard_library(&self, id: PackageId) -> bool {
+        self.packages[id].name == LIBRARY_NAME
+    }
+
+    /// Whether a package is part of the language: the built-in package
+    /// with the prelude ([`PackageGraph::library`]) or the standard library.
+    /// Only these may use names kept for the runtime.
+    pub fn is_language(&self, id: PackageId) -> bool {
+        id == self.library || self.is_standard_library(id)
+    }
+
+    /// The content hash of the language: the modules of the built-in
+    /// prelude and of the standard library `i` ([`PackageGraph::is_language`]),
+    /// as [`lock::hash`] of their module paths and texts. It is the one
+    /// trusted package that a host grants: the host bindings declared in the
+    /// prelude or in `i` carry it (`ilang_wasm`), and the macro runner and
+    /// `i run` grant it. Other packages' bindings carry their own hash.
+    pub fn language_hash(&self) -> String {
+        use lock::{FileKind, PackageFile, hash};
+        let files = (0..self.packages.len())
+            .filter(|&id| self.is_language(id))
+            .flat_map(|id| &self.packages[id].modules)
+            .map(|m| PackageFile {
+                path: m.path.clone(),
+                kind: FileKind::Regular,
+                bytes: self.sources.get(m.source).text.as_bytes().to_vec(),
+            })
+            .collect::<Vec<_>>();
+        hash(&files)
+    }
+
+    /// The standard library package of the program: the compiled package
+    /// when it is named `i`, else its dependency (or dev-dependency) `i`,
+    /// else any package named `i`. `None` when there is none, which the
+    /// loader has reported ([`code::NO_LIBRARY`]).
+    pub fn standard_library(&self) -> Option<PackageId> {
+        if let Some(root) = self.root {
+            if self.is_standard_library(root) {
+                return Some(root);
+            }
+            let p = &self.packages[root];
+            if let Some(id) = p
+                .dependencies
+                .iter()
+                .chain(&p.dev_dependencies)
+                .find(|(n, _)| n == LIBRARY_NAME)
+                .and_then(|(_, id)| *id)
+            {
+                return Some(id);
+            }
+        }
+        (0..self.packages.len()).find(|&id| self.is_standard_library(id))
+    }
+
+    /// The module of the standard library with a module path, as
+    /// `(package, index in its modules)`, wherever the library is in the
+    /// graph.
+    pub fn standard_library_module(&self, path: &str) -> Option<(PackageId, usize)> {
+        let package = self.standard_library()?;
+        let index = self.packages[package]
+            .modules
+            .iter()
+            .position(|m| m.path == path)?;
+        Some((package, index))
+    }
 }
 
 /// How packages are loaded.
@@ -399,7 +483,9 @@ pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagn
     {
         let mut effective = options.clone();
         effective.tests = loader.tests;
+        let before = loader.diags.len();
         let located = locations::resolve(&mut loader, &dir, &effective);
+        library_offline_context(&loader.graph.sources, &mut loader.diags[before..]);
         loader.located = Some(located);
         for p in std::mem::take(&mut loader.pending) {
             let found = loader.located.as_ref().and_then(|l| l.get(&p.key)).cloned();
@@ -528,6 +614,31 @@ impl Loader {
             ..d
         }));
         let manifest = manifest?;
+        let legacy = is_root && legacy_library(&dir, &manifest);
+        if legacy {
+            let mut diagnostic = Diagnostic::error(
+                code::LEGACY_LIBRARY,
+                Some(source),
+                manifest.name_span,
+                LEGACY_LIBRARY_MESSAGE,
+            );
+            if dir.join("std").is_dir() && !legacy_copy_unchanged(&dir) {
+                diagnostic.related.push(DiagnosticNote {
+                    source,
+                    span: manifest.name_span,
+                    message: "this copy has changes; back it up before deleting it".to_string(),
+                });
+            }
+            self.diags.push(diagnostic);
+        }
+        if is_root && !legacy && manifest.name != LIBRARY_NAME && !has_library(&manifest) {
+            self.diags.push(Diagnostic::error(
+                code::NO_LIBRARY,
+                Some(source),
+                manifest.name_span,
+                NO_LIBRARY_MESSAGE,
+            ));
+        }
         if is_root && !self.tests {
             self.tests = manifest.entries.iter().any(|(_, entry)| {
                 let module = entry.module.replace('.', "/");
@@ -707,6 +818,136 @@ impl Loader {
             out.push((d.name.clone(), id));
         }
         out
+    }
+}
+
+/// Whether a package has the standard library as a dependency or a
+/// dev-dependency.
+const LEGACY_LIBRARY_MESSAGE: &str = "the standard library is delivered by the package manager, not as a copy in the project\n  help: delete `std/` and remove the `std = { path = \"std\" }` dependency, then add:\n        i = \"github.com/nmnmcc/i//stdlib@<latest>\"";
+
+/// The files that `i new` copied before the library became a package.
+const LEGACY_FILES: &[&str] = &[
+    "i.toml",
+    "UNICODE-LICENSE",
+    "src/bit_array.i",
+    "src/bool.i",
+    "src/calendar.i",
+    "src/cli.i",
+    "src/crypto.i",
+    "src/csv.i",
+    "src/dict.i",
+    "src/float.i",
+    "src/http.i",
+    "src/int.i",
+    "src/json.i",
+    "src/list.i",
+    "src/log.i",
+    "src/option.i",
+    "src/order.i",
+    "src/pair.i",
+    "src/path.i",
+    "src/property.i",
+    "src/regex.i",
+    "src/result.i",
+    "src/schema.i",
+    "src/sequence.i",
+    "src/set.i",
+    "src/stream.i",
+    "src/string.i",
+    "src/test.is",
+    "src/time.i",
+    "src/uri.i",
+];
+
+/// The SHA-256 of the old copied tree: path, NUL, size, NUL, bytes, in path
+/// order, for exactly the files of [`LEGACY_FILES`].
+const LEGACY_HASH: &str = "d579e9b74a1a230209535b5244f77e444c7918e2f440e11b5c026ebbca9904fe";
+
+fn legacy_library(dir: &Path, manifest: &Manifest) -> bool {
+    let dependency = manifest.dependencies.iter().any(|d| {
+        (d.name == "std" || d.name == "stdlib")
+            && match &d.source {
+                DependencySource::Path(path) => {
+                    let path = Path::new(path);
+                    !path.is_absolute()
+                        && !path.components().any(|c| matches!(c, Component::ParentDir))
+                        && dir.join(path).starts_with(dir)
+                }
+                DependencySource::Location(_) => false,
+            }
+    });
+    dependency || dir.join("std").join("i.toml").is_file()
+}
+
+fn legacy_copy_unchanged(dir: &Path) -> bool {
+    let base = dir.join("std");
+    if !base.join("i.toml").is_file() {
+        return false;
+    }
+    let mut found = Vec::new();
+    fn walk(base: &Path, dir: &Path, out: &mut Vec<String>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(base, &path, out);
+            } else if let Ok(relative) = path.strip_prefix(base) {
+                out.push(relative.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+    walk(&base, &base, &mut found);
+    found.sort();
+    if found.len() != LEGACY_FILES.len()
+        || found.iter().any(|f| !LEGACY_FILES.contains(&f.as_str()))
+    {
+        return false;
+    }
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    for relative in LEGACY_FILES {
+        let Ok(bytes) = std::fs::read(base.join(relative)) else {
+            return false;
+        };
+        hash.update(relative.as_bytes());
+        hash.update([0]);
+        hash.update(bytes.len().to_string().as_bytes());
+        hash.update([0]);
+        hash.update(&bytes);
+    }
+    let digest = hash.finalize();
+    let mut hex = String::with_capacity(64);
+    for byte in digest {
+        hex.push(char::from_digit(u32::from(byte >> 4), 16).unwrap());
+        hex.push(char::from_digit(u32::from(byte & 15), 16).unwrap());
+    }
+    hex == LEGACY_HASH
+}
+
+fn has_library(manifest: &Manifest) -> bool {
+    manifest.dependencies.iter().any(|d| d.name == LIBRARY_NAME)
+}
+
+/// Says, in an offline error on the dependency `i`, that it is the standard
+/// library that is not in the cache. The code and the rest of the message
+/// are kept.
+fn library_offline_context(sources: &Sources, diags: &mut [Diagnostic]) {
+    for d in diags {
+        let Some(source) = d.source else { continue };
+        if d.code != code::OFFLINE {
+            continue;
+        }
+        let text = &sources.get(source).text;
+        let key = text
+            .get(d.span.start as usize..d.span.end as usize)
+            .map(|k| k.trim_matches(|c| c == '"' || c == '\''));
+        if key == Some(LIBRARY_NAME) {
+            d.message.push_str(
+                "; the standard library `i` is not in the cache; run once online to fetch it",
+            );
+        }
     }
 }
 

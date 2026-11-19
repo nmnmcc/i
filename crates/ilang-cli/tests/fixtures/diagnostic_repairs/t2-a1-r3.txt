@@ -3,8 +3,8 @@
 	stdio = i/stdio
 	process = i/process
 	fail = i/fail
-	bit_array = std/bit_array
-	json = std/json
+	bit_array = i/bit_array
+	json = i/json
 )
 
 main = () {

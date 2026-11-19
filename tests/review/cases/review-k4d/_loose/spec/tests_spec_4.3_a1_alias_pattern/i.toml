@@ -2,3 +2,6 @@ name = "spec"
 
 [entries]
 legacy = "a1_alias_pattern.main"
+
+[dependencies]
+i = { path = "../../../../../../../stdlib" }

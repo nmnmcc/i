@@ -5,3 +5,6 @@ exports = ["app/ints.echo", "app/ints.import_echo", "app/ints.async_echo", "app/
 
 [entries]
 legacy = "app.main"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

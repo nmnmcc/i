@@ -1,6 +1,7 @@
 name = "app"
 
 [dependencies]
+i = { path = "../../../../../stdlib" }
 u = { path = "u" }
 
 # `u/x.main` is `@main` in a dependency, which is not the program entry, so
