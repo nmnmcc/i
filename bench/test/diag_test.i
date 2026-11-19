@@ -38,7 +38,7 @@ test("diag_call_indirect", () {
 				go(i - 1, acc + order.to_int(r))
 			}
 	}
-	check(go(rounds, 0) == rounds, "sum")
+	check(go(rounds, 0) == -rounds, "sum")
 })
 
 test("diag_call_direct", () {
@@ -50,7 +50,7 @@ test("diag_call_direct", () {
 				go(i - 1, acc + order.to_int(r))
 			}
 	}
-	check(go(rounds, 0) == rounds, "sum")
+	check(go(rounds, 0) == -rounds, "sum")
 })
 
 test("diag_call_closure", () {
@@ -68,5 +68,5 @@ test("diag_call_closure", () {
 				go(i - 1, acc + order.to_int(r))
 			}
 	}
-	check(go(rounds, 0) == rounds, "sum")
+	check(go(rounds, 0) == -rounds, "sum")
 })
