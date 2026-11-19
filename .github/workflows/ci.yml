@@ -342,7 +342,6 @@ jobs:
       # 0-based shard index of N; the test plans the cases from ci/costs.json.
       VALUE_TYPES_SHARD: ${{ matrix.index }}
       VALUE_TYPES_SHARD_OF: ${{ matrix.of }}
-      CHECKS_TIMINGS: ${{ runner.temp }}/timings.jsonl
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -364,6 +363,8 @@ jobs:
           cache-directories: ~/.cache/ccache
           save-if: true
       - name: Run the Rust tests
+        env:
+          CHECKS_TIMINGS: ${{ runner.temp }}/timings.jsonl
         run: devenv shell -- ./scripts/checks rust-test
       - name: Keep the case timings
         if: always()
@@ -439,7 +440,6 @@ jobs:
     env:
       CHECKS_TEST_GROUP: spec-${{ matrix.shard }}
       I_SPEC_SHARD: ${{ matrix.shard }}
-      CHECKS_TIMINGS: ${{ runner.temp }}/timings.jsonl
       # The push/PR gate runs O0; the daily run compares O0 and O2.
       CHECKS_SPEC_LEVELS: ${{ inputs.levels != '' && inputs.levels || (github.event_name == 'schedule' && '0,2' || '0') }}
     steps:
@@ -463,6 +463,8 @@ jobs:
           cache-directories: ~/.cache/ccache
           save-if: true
       - name: Run the spec suite
+        env:
+          CHECKS_TIMINGS: ${{ runner.temp }}/timings.jsonl
         run: devenv shell -- ./scripts/checks rust-test
       - name: Keep the case timings
         if: always()
@@ -630,7 +632,6 @@ jobs:
         include: ${{ fromJSON(needs.plan.outputs.corpus) }}
     env:
       CHECKS_SHARD: ${{ matrix.shard }}
-      CHECKS_TIMINGS: ${{ runner.temp }}/timings.jsonl
       CHECKS_CORPUS_LEVELS: ${{ inputs.levels != '' && inputs.levels || (github.event_name == 'schedule' && '0,2' || '0') }}
       # One thread per i process; the runner's four cores run four cases.
       RAYON_NUM_THREADS: 1
@@ -659,6 +660,8 @@ jobs:
           target/release/i --version
           python3 --version
       - name: Review corpus, shard ${{ matrix.shard }}
+        env:
+          CHECKS_TIMINGS: ${{ runner.temp }}/timings.jsonl
         run: ./scripts/review-corpus run --binary target/release/i --shard "$CHECKS_SHARD" --jobs 4
       - name: Keep the case timings
         if: always()
