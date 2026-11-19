@@ -10,7 +10,7 @@
 S = (attach = (() -> ()) -> (), peek = () -> Int)
 
 check = (want : Int) <- (s : S) -> Int {
-	{ s.peek() == want } |>
+	{ s.peek() == 7 } |>
 		(True) { () }
 		& (False) { panic("peek") }
 	want

@@ -56,6 +56,7 @@ pub(crate) fn split_with_may(p: &mut Program, may: &[bool]) {
         };
         let first = p.points.len() as PointId;
         let mut next = first;
+        demote_suspending_tail_calls(&mut f.body, may, &mut f.locals, &mut f.budget_frame);
         mark(&mut f.body, may, &mut next);
         if next == first {
             continue;
@@ -300,6 +301,51 @@ fn any_suspends(stmts: &[Stmt], may: &[bool]) -> bool {
         Stmt::Suspendable { .. } => true,
         _ => false,
     })
+}
+
+/// A tail call with an environment statement between the caller's
+/// environment and the call leaves no frame, so a callee that suspends would
+/// be rebuilt without that environment (§9.4 rule 3). Such a call is kept as
+/// an ordinary call, so it becomes a `Suspendable` point with a delta. Tail
+/// calls without such a statement stay tail calls.
+fn demote_suspending_tail_calls(
+    stmts: &mut Vec<Stmt>,
+    may: &[bool],
+    locals: &mut Vec<LocalType>,
+    budget_frame: &mut u32,
+) {
+    let mut i = 0;
+    while i < stmts.len() {
+        let demote = match &stmts[i] {
+            Stmt::TailCall {
+                callee,
+                args,
+                env,
+                site,
+            } if *env != Env::Param => {
+                let value = Value::Call {
+                    callee: callee.clone(),
+                    args: args.clone(),
+                    env: *env,
+                };
+                suspends(&value, may).then(|| (value, *site))
+            }
+            _ => None,
+        };
+        if let Some((value, site)) = demote {
+            let dst = locals.len() as u32;
+            locals.push(LocalType::Value);
+            *budget_frame += 1;
+            stmts[i] = Stmt::Let { dst, value, site };
+            stmts.insert(i + 1, Stmt::Return(Atom::Local(dst)));
+            i += 2;
+            continue;
+        }
+        stmts[i]
+            .bodies_mut()
+            .for_each(|b| demote_suspending_tail_calls(b, may, locals, budget_frame));
+        i += 1;
+    }
 }
 
 /// Turns every call that may suspend into a `Suspendable` with the next
