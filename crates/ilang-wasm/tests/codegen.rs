@@ -522,3 +522,114 @@ fn run_opaque_target(bytes: &[u8]) {
         );
     }
 }
+
+/// Lowering with the optimized (O2/O3) numeric stage, which is where the
+/// known-function-argument specialization runs.
+fn wat_scalars(source: &str) -> String {
+    let (graph, c, _dir) = checked(source);
+    ilang_wasm::compile_wat_numeric(
+        &graph,
+        c.program.as_ref().unwrap(),
+        c.types.as_ref().unwrap(),
+        Options::default().numeric(ilang_wasm::Numeric::Scalars),
+    )
+    .unwrap()
+}
+
+/// The text of every clone whose name starts with `base#spec`. Function
+/// comments start a segment; the `;; numeric:` notes do not.
+fn clones<'a>(text: &'a str, base: &str) -> Vec<&'a str> {
+    let needle = format!("{base}#spec");
+    text.split(";; ")
+        .skip(1)
+        .filter_map(|seg| {
+            let name_end = seg.find('\n')?;
+            if seg[..name_end].starts_with(&needle) && !seg[..name_end].contains('[') {
+                Some(seg)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+#[test]
+fn a_known_function_argument_becomes_a_direct_call() {
+    let text = wat_scalars(
+        "apply = (f, x) { f(x) }\ninc = (x) { x + 1 }\n\nmain = () { apply(inc, 1) }\n",
+    );
+    let c = clones(&text, "app/main.apply");
+    assert_eq!(c.len(), 1, "{text}");
+    assert!(c[0].contains("call $f"), "{}", c[0]);
+    assert!(!c[0].contains("call_ref"), "{}", c[0]);
+    // The call site reaches the clone, not the original.
+    let main = function(&text, "app/main.main");
+    assert!(main.contains("call $f"), "{main}");
+    assert!(!main.contains("call_ref"), "{main}");
+}
+
+#[test]
+fn recursion_through_the_parameter_stays_direct() {
+    let text = wat_scalars(
+        "go = (f, n) { n |> (0) { 0 } & (_) { f(go(f, n - 1)) } }\ninc = (x) { x + 1 }\n\nmain = () { go(inc, 2) }\n",
+    );
+    let c = clones(&text, "app/main.go");
+    assert_eq!(c.len(), 1, "{text}");
+    assert!(!c[0].contains("call_ref"), "{}", c[0]);
+    // The recursive forwarding call reaches the clone itself.
+    assert!(c[0].matches("call $f").count() >= 2, "{}", c[0]);
+}
+
+#[test]
+fn two_known_functions_make_two_direct_clones() {
+    let text = wat_scalars(
+        "apply = (f, x) { f(x) }\ninc = (x) { x + 1 }\ndbl = (x) { x + x }\n\nmain = () { (apply(inc, 1), apply(dbl, 2)) }\n",
+    );
+    let c = clones(&text, "app/main.apply");
+    assert_eq!(c.len(), 2, "{text}");
+    for clone in c {
+        assert!(!clone.contains("call_ref"), "{clone}");
+        assert!(clone.contains("call $f"), "{clone}");
+    }
+}
+
+#[test]
+fn a_capturing_closure_stays_indirect() {
+    let text = wat_scalars(
+        "apply = (f, x) { f(x) }\nmake = (k) { (x) { x + k } }\n\nmain = () { apply(make(1), 2) }\n",
+    );
+    assert!(clones(&text, "app/main.apply").is_empty(), "{text}");
+    let apply = function(&text, "app/main.apply");
+    assert!(apply.contains("call_ref"), "{apply}");
+}
+
+#[test]
+fn a_parameter_that_escapes_into_a_closure_stays_indirect() {
+    let text = wat_scalars(
+        "apply = (f, x) {\n  g = (y) { f(y) }\n  g(x)\n}\ninc = (x) { x + 1 }\n\nmain = () { apply(inc, 1) }\n",
+    );
+    assert!(clones(&text, "app/main.apply").is_empty(), "{text}");
+    assert!(text.contains("call_ref"), "{text}");
+}
+
+#[test]
+fn a_known_function_that_may_suspend_stays_indirect() {
+    // `twice` calls a closure, so it may suspend; a direct call to it may
+    // suspend too, and the known function must not be treated as pure.
+    let text = wat_scalars(
+        "twice = (f) { f(1) + f(2) }\ng = (x) { twice((y) { y }) }\napply = (f, x) { f(x) }\n\nmain = () { apply(g, 1) }\n",
+    );
+    assert!(clones(&text, "app/main.apply").is_empty(), "{text}");
+    let apply = function(&text, "app/main.apply");
+    assert!(apply.contains("call_ref"), "{apply}");
+}
+
+#[test]
+fn a_known_function_with_another_indirect_call_stays_indirect() {
+    let text = wat_scalars(
+        "g = (x) {\n  h = (y) { y }\n  h(x)\n}\napply = (f, x) { f(x) }\n\nmain = () { apply(g, 1) }\n",
+    );
+    assert!(clones(&text, "app/main.apply").is_empty(), "{text}");
+    let apply = function(&text, "app/main.apply");
+    assert!(apply.contains("call_ref"), "{apply}");
+}

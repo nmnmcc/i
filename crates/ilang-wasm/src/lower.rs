@@ -802,6 +802,7 @@ pub(crate) fn lower_tests_numeric(
     if l.diags.is_empty() {
         l.out.numeric = numeric;
         let may = if numeric == crate::Numeric::Scalars {
+            crate::specialize::run(&mut l.out);
             crate::numeric::run(&mut l.out)
         } else {
             crate::control::may_suspend(&l.out)
@@ -862,6 +863,7 @@ pub(crate) fn lower_selected_numeric(
     if l.diags.is_empty() {
         l.out.numeric = numeric;
         let may = if numeric == crate::Numeric::Scalars {
+            crate::specialize::run(&mut l.out);
             crate::numeric::run(&mut l.out)
         } else {
             crate::control::may_suspend(&l.out)

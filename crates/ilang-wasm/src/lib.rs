@@ -19,6 +19,7 @@ pub mod ir;
 pub mod lower;
 pub mod numeric;
 pub mod runtime;
+mod specialize;
 
 use ilang_check::hir;
 use ilang_check::types::Typed;
