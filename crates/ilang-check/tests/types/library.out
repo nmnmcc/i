@@ -1,5 +1,5 @@
-i/prelude.panic : (String) -> Never
-i/prelude.assert : (Bool) <- (Assert) -> ()
+$prelude.panic : (String) -> Never
+$prelude.assert : (Bool) <- (Assert) -> ()
 i/fail.raise : (A) <- (Fail(A)) -> Never
 i/fail.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
 i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
