@@ -40,7 +40,9 @@ use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
 use ilang_check::platform::{self, Stub};
-use ilang_check::types::{Access, Head, HostType, LitValue, ShownType, TestMember, TestValues, Typed};
+use ilang_check::types::{
+    Access, Head, HostType, LitValue, ShownType, TestMember, TestValues, Typed,
+};
 use ilang_package::{Diagnostic, ModuleKind, PackageGraph, PackageId};
 use ilang_syntax::ast::{BinOp, UnOp};
 use ilang_syntax::span::{LineIndex, Span};
@@ -3445,7 +3447,6 @@ impl<'a> Lowerer<'a> {
         Atom::Local(dst)
     }
 
-    #[allow(clippy::too_many_arguments)]
     /// Registers a comparison plan (children first) and gives its index.
     fn eq_plan(&mut self, plan: EqPlan) -> u32 {
         if let Some(i) = self.out.eq_plans.iter().position(|p| p == &plan) {
@@ -3493,8 +3494,7 @@ impl<'a> Lowerer<'a> {
                     plans.push(self.build_eq_plan(item, depth, nodes)?);
                 }
                 if plans.iter().all(|p| *p == plans[0]) {
-                    let plan = self.out.eq_plans[plans[0] as usize].clone();
-                    plan
+                    self.out.eq_plans[plans[0] as usize].clone()
                 } else {
                     return None;
                 }
@@ -3511,6 +3511,7 @@ impl<'a> Lowerer<'a> {
         Some(self.eq_plan(plan))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn binary(
         &mut self,
         fx: &mut Fx,

@@ -636,9 +636,7 @@ fn a_known_function_with_another_indirect_call_stays_indirect() {
 
 #[test]
 fn structural_equality_is_specialized_for_closed_types() {
-    let text = wat_scalars(
-        "main = () { [(1, \"a\"), (2, \"b\")] == [(1, \"a\"), (2, \"b\")] }\n",
-    );
+    let text = wat_scalars("main = () { [(1, \"a\"), (2, \"b\")] == [(1, \"a\"), (2, \"b\")] }\n");
     let main = function(&text, "app/main.main");
     assert!(main.contains("call $eq_plan_"), "{main}");
     assert!(!main.contains("(call $equal "), "{main}");
@@ -652,9 +650,7 @@ fn structural_equality_is_specialized_for_closed_types() {
 
 #[test]
 fn equality_with_a_function_inside_falls_back() {
-    let text = wat_scalars(
-        "f = (x) { x }\ng = (x) { x }\n\nmain = () { [(1, f)] == [(1, f)] }\n",
-    );
+    let text = wat_scalars("f = (x) { x }\ng = (x) { x }\n\nmain = () { [(1, f)] == [(1, f)] }\n");
     let main = function(&text, "app/main.main");
     assert!(!main.contains("$eq_plan_"), "{main}");
     assert!(main.contains("(call $equal "), "{main}");
@@ -670,9 +666,7 @@ fn equality_of_a_record_falls_back() {
 
 #[test]
 fn equality_beyond_the_plan_depth_falls_back() {
-    let text = wat_scalars(
-        "main = () { [[[[[[[1]]]]]]] == [[[[[[[1]]]]]]] }\n",
-    );
+    let text = wat_scalars("main = () { [[[[[[[1]]]]]]] == [[[[[[[1]]]]]]] }\n");
     let main = function(&text, "app/main.main");
     assert!(!main.contains("$eq_plan_"), "{main}");
     assert!(main.contains("(call $equal "), "{main}");

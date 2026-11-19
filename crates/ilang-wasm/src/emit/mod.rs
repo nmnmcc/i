@@ -425,15 +425,14 @@ fn eq_plans_text(p: &Program) -> String {
   (if (ref.eq (local.get $a) (local.get $b)) (then (return (i32.const 1))))"
         );
         match plan {
-            EqPlan::Int => out.push_str(
-                "\n  (i32.eqz (call $int_compare (local.get $a) (local.get $b))))\n",
-            ),
+            EqPlan::Int => {
+                out.push_str("\n  (i32.eqz (call $int_compare (local.get $a) (local.get $b))))\n")
+            }
             EqPlan::Float => out.push_str(
                 "\n  (f64.eq (call $float_get (local.get $a)) (call $float_get (local.get $b))))\n",
             ),
-            EqPlan::String => out.push_str(
-                "\n  (i32.eqz (call $string_compare (local.get $a) (local.get $b))))\n",
-            ),
+            EqPlan::String => out
+                .push_str("\n  (i32.eqz (call $string_compare (local.get $a) (local.get $b))))\n"),
             EqPlan::List(child) => {
                 let _ = writeln!(
                     out,
