@@ -528,7 +528,7 @@ fn places_keep_local_declaration_identity_before_allocation() {
 #[test]
 fn standard_library_reverse_order_and_recovery_preserve_types() {
     // Compare ordinary standard-library inference in both orders.
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
     let options = ilang_package::LoadOptions {
         // The schema tests deliberately exercise value-derived types; this
         // check measures the ordinary library without that feature.

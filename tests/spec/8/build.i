@@ -1,7 +1,7 @@
 // spec: 8.1, 8.2, 8.3
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
 )
 

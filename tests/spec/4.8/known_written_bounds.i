@@ -3,7 +3,7 @@
 
 // Decision 7: literal parts at noncovariant places become fresh bound holes.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 Sink(A) = (put = (A) -> Nil)

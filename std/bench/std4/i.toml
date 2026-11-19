@@ -1,4 +1,0 @@
-name = "std4_bench"
-
-[dependencies]
-std = { path = "../.." }

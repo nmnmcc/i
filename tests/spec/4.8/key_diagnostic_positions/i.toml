@@ -2,6 +2,6 @@
 # expect: compile-error E0506
 name = "spec"
 [test]
-collection = "std/test.tests"
+collection = "i/test.tests"
 [dependencies]
-std = { path = "../../../../std" }
+i = { path = "../../../../stdlib" }

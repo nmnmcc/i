@@ -1,9 +1,9 @@
 (
 	i/stdio
 	i/request
-	std/cli
-	std/log
-	(None) = std/option
+	i/cli
+	i/log
+	(None) = i/option
 )
 
 Options = (name = String, count = Int)

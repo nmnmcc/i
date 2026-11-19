@@ -1,8 +1,8 @@
 (
 	i/random
 	i/fail
-	std/list
-	(Option, Some, None) = std/option
+	i/list
+	(Option, Some, None) = i/option
 )
 
 (

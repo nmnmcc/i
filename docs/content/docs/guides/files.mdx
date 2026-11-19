@@ -9,15 +9,15 @@ Write and read a local file, then handle a missing path.
 name = "guide_files"
 
 [dependencies]
-std = { path = "../std" }
+std = { path = "../stdlib" }
 ```
 
 ```i run package=guide_files title="src/main.i"
 (
 	i/fs
 	i/stdio
-	std/path
-	std/bit_array
+	i/path
+	i/bit_array
 )
 
 main = () {
@@ -36,7 +36,7 @@ guide-note.txt
 hello from a file
 ```
 
-Create `guide-files/` beside `std/` in the i source folder and run `i run` there. `write_file` creates or truncates its path: reserve these filenames for the exercise. `bit_array.to_string` raises on invalid UTF-8; whole-file operations close their handles internally; use `fs.open`, `read`, `write`, and `close` with [resources](/docs/tour/resources) for handle operations.
+Create `guide-files/` beside `stdlib/` in the i source folder and run `i run` there. `write_file` creates or truncates its path: reserve these filenames for the exercise. `bit_array.to_string` raises on invalid UTF-8; whole-file operations close their handles internally; use `fs.open`, `read`, `write`, and `close` with [resources](/docs/tour/resources) for handle operations.
 
 ## A missing path
 
@@ -45,7 +45,7 @@ Create `guide-files/` beside `std/` in the i source folder and run `i run` there
 	i/fs
 	i/fail
 	i/stdio
-	std/path
+	i/path
 )
 
 main = () {
@@ -74,7 +74,7 @@ Replace `src/main.i` with this independent example. Keep the error's operation, 
 ```i run package=guide_files title="src/main.i"
 (
 	i/stdio
-	std/path
+	i/path
 )
 
 main = () {
@@ -90,6 +90,6 @@ reports
 result.txt
 ```
 
-`std/path` uses POSIX strings with `/` separators; cleaning and parent resolution are lexical, without filesystem queries or symbolic-link resolution. Relative filesystem paths use the working directory.
+`i/path` uses POSIX strings with `/` separators; cleaning and parent resolution are lexical, without filesystem queries or symbolic-link resolution. Relative filesystem paths use the working directory.
 
 [HTTP service](/docs/guides/http-service) · [Testing](/docs/guides/testing)

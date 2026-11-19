@@ -4,7 +4,7 @@
 // The parameters of a function of a host service are types that the host
 // can take.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 @host("test:kv/v1")

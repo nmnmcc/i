@@ -19,8 +19,8 @@ fn collected_tests_share_one_build() {
 #[test]
 fn ordinary_and_collected_tests_share_summary_and_filter() {
     let dir = tempfile::tempdir().unwrap();
-    let std = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
-    std::fs::write(dir.path().join("i.toml"), format!("name = \"mixed\"\n[test]\ncollection = \"std/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n", std.to_str().unwrap())).unwrap();
+    let std = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
+    std::fs::write(dir.path().join("i.toml"), format!("name = \"mixed\"\n[test]\ncollection = \"i/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n", std.to_str().unwrap())).unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(dir.path().join("test/mixed.i"), "(testlib = (test, skip, fails) = std/test)\n\ntest(\"ordinary\", () { assert(True) })\ntest(\"collected\", () { assert(True) })\nskip(\"ignored\", () { assert(False) })\nfails(\"expected\", () { assert(False) })\n").unwrap();
     let run = |filter: Option<&str>| {

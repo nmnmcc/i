@@ -3,10 +3,10 @@ name = "io_udp"
 [dependencies]
 
 [test]
-collection = "std/test.tests"
+collection = "i/test.tests"
 
 [dev-dependencies]
-std = { path = "../../std" }
+i = { path = "../../stdlib" }
 
 [entries]
 checks = "checks.all"

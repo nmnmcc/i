@@ -155,8 +155,8 @@ def import_reviews(args):
             dep = (Path(project.get('context', origin)) / old).resolve() if not Path(old).is_absolute() else Path(old)
             if str(dep) in locations:
                 new = os.path.relpath(locations[str(dep)], path)
-            elif dep.name == 'std' or str(dep).endswith('/std'):
-                new = os.path.relpath(ROOT / 'std', path)
+            elif dep.name == 'i' or str(dep).endswith('/stdlib'):
+                new = os.path.relpath(ROOT / "stdlib", path)
             elif dep.is_dir() and (dep / 'i.toml').is_file():
                 # Installed review dependencies outside /tmp need an explicit escalation.
                 new = old
@@ -263,12 +263,12 @@ def observe_in(binary, case, bound, runtime):
             name += '_again'
         entry = project / 'test' / (name + '.i')
         entry.parent.mkdir(parents=True, exist_ok=True)
-        entry.write_text('(testlib = (test) = std/test)\ntest("qa_startup", () { Nil })\n')
+        entry.write_text('(testlib = (test) = i/test)\ntest("qa_startup", () { Nil })\n')
         manifest_path = project / 'i.toml'
         manifest = manifest_path.read_text()
         data = tomllib.loads(manifest)
-        if data.get('name') != 'std' and 'std' not in data.get('dependencies', {}) and 'std' not in data.get('dev-dependencies', {}):
-            dependency = 'std = { path = ' + json.dumps(str(ROOT / 'std')) + ' }\n'
+        if data.get('name') != 'i' and 'i' not in data.get('dependencies', {}) and 'i' not in data.get('dev-dependencies', {}):
+            dependency = 'i = { path = ' + json.dumps(str(ROOT / "stdlib")) + ' }\n'
             section = re.search(r'(?m)^\[dev-dependencies\]\s*\n', manifest)
             if section:
                 manifest = manifest[:section.end()] + dependency + manifest[section.end():]
@@ -277,9 +277,9 @@ def observe_in(binary, case, bound, runtime):
         if 'collection' not in data.get('test', {}):
             section = re.search(r'(?m)^\[test\]\s*\n', manifest)
             if section:
-                manifest = manifest[:section.end()] + 'collection = "std/test.tests"\n' + manifest[section.end():]
+                manifest = manifest[:section.end()] + 'collection = "i/test.tests"\n' + manifest[section.end():]
             else:
-                manifest += '\n[test]\ncollection = "std/test.tests"\n'
+                manifest += '\n[test]\ncollection = "i/test.tests"\n'
         manifest_path.write_text(manifest)
         for opt in [0, 2]:
             test, _ = invoke(binary, project, ['test', '--opt', str(opt)], bound)

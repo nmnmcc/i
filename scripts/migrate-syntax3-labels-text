@@ -123,7 +123,7 @@ def definitions(text):
 
 def library():
     table = {}
-    for f in sorted((ROOT / "std/src").glob("*.i")) + sorted((ROOT / "lib/i").glob("*.i")):
+    for f in sorted((ROOT / "i/src").glob("*.i")) + sorted((ROOT / "lib/i").glob("*.i")):
         for name, ps in definitions(f.read_text()).items():
             table.setdefault(f"{f.stem}.{name}", ps)
     for name, ps in definitions((ROOT / "lib/prelude.i").read_text()).items():

@@ -2,7 +2,7 @@
 //// The spawn case includes scope creation/retirement and a join; the channel
 //// case includes both peers and their switches. These are aggregate costs.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/task
 )
 

@@ -3,7 +3,7 @@
 
 // Std-1b report §5: an unguarded list rest covers every later item place.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 probe = (xs : List(Int)) -> Nil {

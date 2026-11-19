@@ -1,7 +1,7 @@
 (
 	i/fail
 	i/core
-	std/http
+	i/http
 )
 
 (

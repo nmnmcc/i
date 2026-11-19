@@ -7,7 +7,7 @@ Use `i check --types` to see a function’s arguments, services, errors, and res
 
 ```i types package=tour title="src/main.i"
 (
-	std/int
+	i/int
 )
 
 (
@@ -47,7 +47,7 @@ tour/main.read_count : (Int) <- (Fail(Nil), Input) -> Int
 (
 	i/core
 	(Io) = i/io
-	std/int
+	i/int
 )
 
 Input = (read = () -> String)
@@ -72,7 +72,7 @@ main = () <- (io : Io) {
 (
 	i/core
 	(Io) = i/io
-	std/int
+	i/int
 )
 
 Input = (read = () -> String)
@@ -99,7 +99,7 @@ The provision applies to this call.
 	i/core
 	i/fail
 	(Io) = i/io
-	std/int
+	i/int
 )
 
 Input = (read = () -> String)
@@ -125,7 +125,7 @@ Error(Nil)
 
 ```i types package=tour title="src/main.i"
 (
-	std/int
+	i/int
 )
 
 (
@@ -151,7 +151,7 @@ Text conversion changes the result type and keeps the service needs.
 
 ```i types package=tour title="src/main.i"
 (
-	std/int
+	i/int
 )
 
 (
@@ -175,7 +175,7 @@ The function provides `Input`, so its callers still need `Fail(Nil)`.
 
 ## Scratch project
 
-Install [i](/docs/getting-started/install), then run `i new tour` and `cd tour`. The new package has a copy of the standard library in `std/`, named by `std = { path = "std" }` in `i.toml`, so the examples below run as they are. The copy is committed with the package and is not refreshed by `i update`; [First program](/docs/getting-started/first-program) covers updating it.
+Install [i](/docs/getting-started/install), then run `i new tour` and `cd tour`. The new package has a copy of the standard library in `stdlib/`, named by `std = { path = "std" }` in `i.toml`, so the examples below run as they are. The copy is committed with the package and is not refreshed by `i update`; [First program](/docs/getting-started/first-program) covers updating it.
 
 Remove the generated test first, because it tests the `main` that you replace:
 

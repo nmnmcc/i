@@ -1,7 +1,7 @@
 // spec: 9.10
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/random
 	i/fail
 	i/core

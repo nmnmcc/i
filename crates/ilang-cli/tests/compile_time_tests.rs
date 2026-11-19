@@ -22,7 +22,7 @@ fn build(
         target: ilang_cli::Target::Native,
     };
     if tests {
-        return ilang_cli::build_tests(root, options, Some("std/test.tests"))
+        return ilang_cli::build_tests(root, options, Some("i/test.tests"))
             .map(|(built, _)| built);
     }
     ilang_cli::build(

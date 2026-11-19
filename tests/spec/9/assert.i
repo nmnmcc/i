@@ -1,7 +1,7 @@
 // spec: 9.6, 6.10, 6.11, 11.8
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/assertion
 	i/core
 )

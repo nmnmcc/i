@@ -33,7 +33,7 @@ def checked_types(project):
 def inferred_types(modules):
     if not BINARY.is_file() or not os.access(BINARY, os.X_OK):
         raise SystemExit(f'Build target/release/i or set I_BIN to an executable compiler: {BINARY}')
-    types = checked_types(ROOT / 'std')
+    types = checked_types(ROOT / "stdlib")
     # --types prints only the root package. Return each exported i value from a
     # function in a temporary root to obtain its scheme, including needs and
     # Fail. The function defers compiler-owned syntax operations, which cannot

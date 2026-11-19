@@ -1,5 +1,5 @@
 (
-	list = std/list
+	list = i/list
 )
 Box(A) = (get = () -> A)
 

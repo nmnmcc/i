@@ -3,7 +3,7 @@
 	i/core // printing
 	// decoding
 	decode = json/decode
-	opt = (Option, Some, None) = std/option
+	opt = (Option, Some, None) = i/option
 )
 
 // the constructors

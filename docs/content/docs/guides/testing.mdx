@@ -11,10 +11,10 @@ name = "guide_tests"
 [dependencies]
 
 [test]
-collection = "std/test.tests"
+collection = "i/test.tests"
 
 [dev-dependencies]
-std = { path = "../std" }
+std = { path = "../stdlib" }
 ```
 
 ```i file=src/count.i title="src/count.i"
@@ -27,7 +27,7 @@ count = (n : Int) -> Int { n + 1 }
 
 ```i test stdout=exact package=guide_tests title="test/count_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	guide_tests/count
 )
 
@@ -39,7 +39,7 @@ pass guide_tests/count_test.adds one
 1 passed, 0 failed
 ```
 
-Create `guide-tests/` beside `std/` and run commands there. Tests import `src/` modules by package path; the loader reads `.i` and `.is` throughout `test/`, with `_test.i` a convention. Without a configured collection, no tests run.
+Create `guide-tests/` beside `stdlib/` and run commands there. Tests import `src/` modules by package path; the loader reads `.i` and `.is` throughout `test/`, with `_test.i` a convention. Without a configured collection, no tests run.
 
 ```sh
 i test --opt 0
@@ -71,7 +71,7 @@ Each command prints this result. Filters match substrings, with no exact-name or
 
 ```i test stdout=exact package=guide_tests title="test/forms_test.i"
 (
-	testlib = (test, suite, each, skip, fails) = std/test
+	testlib = (test, suite, each, skip, fails) = i/test
 )
 
 suite("arithmetic", () {
@@ -97,7 +97,7 @@ Use each test file independently when comparing counts. `fails` expects a runtim
 
 ```i test stdout=exact package=guide_tests title="test/focus_test.i"
 (
-	testlib = (test, only) = std/test
+	testlib = (test, only) = i/test
 )
 
 test("other", () { assert(False) })
@@ -116,7 +116,7 @@ Any `only` contribution skips ordinary tests; remove focus before a full run. Th
 
 ```i test-fails package=guide_tests title="test/failure_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 test("wrong sum", () { assert(1 + 1 == 3) })
@@ -146,10 +146,10 @@ Exit status is 1; the position identifies the assertion. Remove this file before
 
 ```i test stdout=exact package=guide_tests title="test/reverse_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
-	std/property
-	std/list
+	i/property
+	i/list
 )
 
 test("reverse twice", () {
@@ -195,7 +195,7 @@ remaining = (deadline) <- (clock : Clock) { deadline - clock.now() }
 
 ```i test stdout=exact package=guide_tests title="test/deadline_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	guide_tests/deadline
 )
 

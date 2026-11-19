@@ -65,7 +65,7 @@ def main():
     parser.add_argument('--cpu', type=int)
     parser.add_argument('--require-quiet', action='store_true', help='fail if non-benchmark CPU use exceeds five percent of total capacity during either block')
     parser.add_argument('--runs', type=int, default=11)
-    parser.add_argument('--project', type=Path, default=ROOT / 'std')
+    parser.add_argument('--project', type=Path, default=ROOT / 'stdlib')
     parser.add_argument('--ignored-tests', action='store_true', help='also run the four debug-counter cases through the heavy-job wrapper')
     args = parser.parse_args()
     if args.runs < 11 or args.runs % 2 == 0:

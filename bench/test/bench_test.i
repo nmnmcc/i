@@ -2,12 +2,12 @@
 //// at `--opt 2` and prints how long each one takes. Each one checks its
 //// result, so that no work can be left out.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
-	dict = std/dict
-	int = std/int
-	list = std/list
-	option = (Some) = std/option
+	dict = i/dict
+	int = i/int
+	list = i/list
+	option = (Some) = i/option
 )
 
 size = 1_000_000

@@ -1,7 +1,7 @@
 // spec: 4.9, 6.7
 // expect: pass
 (
-	list = std/list
+	list = i/list
 )
 
 (

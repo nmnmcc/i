@@ -1,7 +1,7 @@
 // spec: 4.2, 6.9
 // expect: warning W0503
 (
-	list = std/list
+	list = i/list
 )
 
 // W520: exact literal types allow ordinary runtime comparisons.

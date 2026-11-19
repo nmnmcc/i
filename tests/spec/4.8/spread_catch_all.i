@@ -5,7 +5,7 @@
 // the places of the fields that it leaves out. So the guard on the first
 // clause does not leave `age` and `name` with no values.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 User = (name = String, age = Int)

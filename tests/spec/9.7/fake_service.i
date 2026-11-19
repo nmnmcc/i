@@ -5,7 +5,7 @@
 // fake in its place in a test (§9.7). Then the test does not need it from
 // the host, and does not wait.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 @host("test:kv/v1")

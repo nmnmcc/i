@@ -9,7 +9,7 @@ Find a function in its module reference and call it in your program.
 (
 	i/core
 	(Io) = i/io
-	std/bool
+	i/bool
 )
 
 main = () <- (io : Io) {
@@ -31,7 +31,7 @@ False
 (
 	i/core
 	(Io) = i/io
-	std/string
+	i/string
 )
 
 main = () <- (io : Io) {
@@ -60,7 +60,7 @@ héllo
 (
 	i/core
 	(Io) = i/io
-	std/list
+	i/list
 )
 
 main = () <- (io : Io) {
@@ -83,7 +83,7 @@ main = () <- (io : Io) {
 	i/core
 	i/fail
 	(Io) = i/io
-	std/int
+	i/int
 )
 
 main = () <- (io : Io) {
@@ -105,7 +105,7 @@ Error(Nil)
 
 ## Dependencies
 
-Add `std = { path = "../std" }` under `[dependencies]` in `i.toml`; paths are package-relative. Test-only imports use `[dev-dependencies]`. Compiler-supplied `i/…` modules need no dependency.
+Add `std = { path = "../stdlib" }` under `[dependencies]` in `i.toml`; paths are package-relative. Test-only imports use `[dev-dependencies]`. Compiler-supplied `i/…` modules need no dependency.
 
 ## Modules
 

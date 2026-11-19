@@ -299,7 +299,7 @@ fn show_as_writes_every_row_in_its_position() {
     use Position::*;
     let cases: &[(Position, &str, &str)] = &[
         // Files and items.
-        (ImportItem, "(/ std list)", "std/list"),
+        (ImportItem, "(/ std list)", "i/list"),
         (ImportItem, "(= l (/ std list))", "l = std/list"),
         (
             ImportItem,

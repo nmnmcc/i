@@ -2,7 +2,7 @@
 // expect: pass
 // Syntax three stage 6: records are closed labelled data (syntax-3 §2.3).
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
 )
 

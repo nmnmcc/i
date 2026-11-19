@@ -170,9 +170,9 @@ fn cases(root: &Path) -> Vec<Result<Case, String>> {
                             }
                         }
                         let dir = tempfile::tempdir().unwrap();
-                        let manifest = if text.contains("std/test") {
-                            let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
-                            format!("name = \"spec\"\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n", std_path.to_str().unwrap())
+                        let manifest = if text.contains("i/test") {
+                            let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
+                            format!("name = \"spec\"\n[test]\ncollection = \"i/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n", std_path.to_str().unwrap())
                         } else {
                             "name = \"spec\"\n".to_string()
                         };

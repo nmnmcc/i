@@ -9,7 +9,7 @@ fn check(source: &str) -> Vec<Diagnostic> {
         dir.path().join("i.toml"),
         format!(
             "name = \"app\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std")
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib")
         ),
     )
     .unwrap();

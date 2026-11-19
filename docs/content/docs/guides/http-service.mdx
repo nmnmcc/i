@@ -9,19 +9,19 @@ Test a JSON handler without sockets, then serve it over local HTTP.
 name = "guide_http"
 
 [dependencies]
-std = { path = "../std" }
+std = { path = "../stdlib" }
 
 [test]
-collection = "std/test.tests"
+collection = "i/test.tests"
 ```
 
 ```i file=src/handler.i title="src/handler.i"
 (
 	i/fail
-	std/http
-	std/json
-	std/schema
-	std/bit_array
+	i/http
+	i/json
+	i/schema
+	i/bit_array
 )
 
 (
@@ -75,7 +75,7 @@ handle = (req : http.Request) {
 	i/net
 	i/task
 	i/stdio
-	std/http
+	i/http
 	guide_http/handler
 )
 
@@ -88,8 +88,8 @@ main = () {
 
 ```i test stdout=exact package=guide_http title="test/handler_test.i"
 (
-	testlib = (test) = std/test
-	std/http
+	testlib = (test) = i/test
+	i/http
 	guide_http/handler
 )
 
@@ -131,7 +131,7 @@ pass guide_http/handler_test.JSON request
 2 passed, 0 failed
 ```
 
-Create `guide-http/` beside `std/`; run commands there. `http.feed_request` returns a request and leftover bytes. Requests also carry headers and trailers; these tests need no network service.
+Create `guide-http/` beside `stdlib/`; run commands there. `http.feed_request` returns a request and leftover bytes. Requests also carry headers and trailers; these tests need no network service.
 
 ```sh
 i test --opt 0

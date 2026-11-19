@@ -95,13 +95,13 @@ Keep the binding-plan sidecar for hosts authorizing its declarations. The host A
 name = "guide_build"
 
 [dependencies]
-std = { path = "../std" }
+std = { path = "../stdlib" }
 ```
 
 ```i run package=guide_build title="src/main.i"
 (
 	i/stdio
-	std/int
+	i/int
 )
 
 main = () { stdio.print(int.to_string(42)) }

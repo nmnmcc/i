@@ -2,7 +2,7 @@
 // expect: pass
 // A wide top-level value survives front-end traversal and initialization.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 keys = [

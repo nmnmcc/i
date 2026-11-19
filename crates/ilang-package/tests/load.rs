@@ -95,7 +95,7 @@ fn graph_with_path_dependencies() {
         &[
             (
                 "app/i.toml",
-                "name = \"app\"\n[dependencies]\nu = { path = \"../util\" }\nv = { path = \"../util\" }\n[dev-dependencies]\nt = { path = \"../tools\" }\ni = { path = \"../stdlib\" }\n",
+                "name = \"app\"\n[dependencies]\nu = { path = \"../util\" }\nv = { path = \"../util\" }\n[dev-dependencies]\nt = { path = \"../tools\" }\ni = { path = \"../../stdlib\" }\n",
             ),
             ("app/src/main.i", "x = 1\n"),
             ("app/src/a/b.i", "x = 1\n"),
@@ -203,7 +203,7 @@ fn circles_and_missing() {
 
 #[test]
 fn standard_library_modules() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib");
     let (graph, diags) = load(&path);
     assert!(diags.is_empty(), "{diags:?}");
     let root = &graph.packages[graph.root.unwrap()];
@@ -216,34 +216,34 @@ fn standard_library_modules() {
     assert_eq!(
         paths,
         [
-            "std/bit_array",
-            "std/bool",
-            "std/calendar",
-            "std/cli",
-            "std/crypto",
-            "std/csv",
-            "std/dict",
-            "std/float",
-            "std/http",
-            "std/int",
-            "std/json",
-            "std/list",
-            "std/log",
-            "std/option",
-            "std/order",
-            "std/pair",
-            "std/path",
-            "std/property",
-            "std/regex",
-            "std/result",
-            "std/schema",
-            "std/sequence",
-            "std/set",
-            "std/stream",
-            "std/string",
-            "std/test",
-            "std/time",
-            "std/uri",
+            "i/bit_array",
+            "i/bool",
+            "i/calendar",
+            "i/cli",
+            "i/crypto",
+            "i/csv",
+            "i/dict",
+            "i/float",
+            "i/http",
+            "i/int",
+            "i/json",
+            "i/list",
+            "i/log",
+            "i/option",
+            "i/order",
+            "i/pair",
+            "i/path",
+            "i/property",
+            "i/regex",
+            "i/result",
+            "i/schema",
+            "i/sequence",
+            "i/set",
+            "i/stream",
+            "i/string",
+            "i/test",
+            "i/time",
+            "i/uri",
         ]
     );
 }

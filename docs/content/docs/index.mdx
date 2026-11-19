@@ -47,7 +47,7 @@ description: "Functions, data, checked types and services, compiled to WebAssemb
 ```i run package=hello title="src/main.i"
 (
 	i/stdio
-	std/int
+	i/int
 )
 
 Ready = ()
@@ -92,7 +92,7 @@ hello/main.remaining : (Int) <- (Clock, Fail(Late)) -> Int
 <section className="example-panel" id="panel-testable" aria-labelledby="title-testable">
 ```i test stdout=exact project=examples/deadline package=hello title="test/deadline_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/fail
 	app = hello/main
 	(Clock) = time/clock

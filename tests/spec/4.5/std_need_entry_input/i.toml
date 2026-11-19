@@ -3,4 +3,4 @@
 name = "std_need_entry_input"
 
 [dependencies]
-std = { path = "../../../../std" }
+i = { path = "../../../../stdlib" }

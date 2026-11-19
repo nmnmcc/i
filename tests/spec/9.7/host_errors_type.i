@@ -1,7 +1,7 @@
 // spec: 9.7, 10.3
 // expect: compile-error E0320
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 Handle = Opaque

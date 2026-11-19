@@ -9,7 +9,7 @@
 // output: echo after
 // output: 4 Error("negative") 10
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/control
 	i/core
 	i/fail

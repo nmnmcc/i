@@ -1,10 +1,10 @@
 // spec: 3, 4.3, 4.7
 // expect: pass
 (
-	testlib = (test) = std/test
-	std/list
-	std/string
-	std/int
+	testlib = (test) = i/test
+	i/list
+	i/string
+	i/int
 )
 
 id = (x) { x }

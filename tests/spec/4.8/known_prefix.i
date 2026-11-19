@@ -3,7 +3,7 @@
 
 // §5.4: slicing a prefix gives whole String, not the original value set.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 f = (s : String) {

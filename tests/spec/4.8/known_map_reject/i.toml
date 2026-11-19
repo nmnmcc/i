@@ -3,4 +3,4 @@
 name = "spec"
 
 [dependencies]
-std = { path = "../../../../std" }
+i = { path = "../../../../stdlib" }

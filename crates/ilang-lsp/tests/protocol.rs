@@ -3003,7 +3003,7 @@ fn lsp_every_offset_of_broken_files() {
 
 #[test]
 fn lsp_latency_on_std() {
-    let std_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
+    let std_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
     let list = std_dir.join("src/list.i");
     let text = fs::read_to_string(&list).unwrap();
     let uri = file_uri(&list);

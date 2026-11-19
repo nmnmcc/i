@@ -12,7 +12,7 @@ fn check(files: &[(&str, &str)]) -> String {
 fn check_status(files: &[(&str, &str)], status: i32) -> String {
     let dir = tempfile::tempdir().unwrap();
     let std = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../std")
+        .join("../../stdlib")
         .canonicalize()
         .unwrap();
     std::fs::write(

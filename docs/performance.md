@@ -58,9 +58,9 @@ has every change below.
 
 | Task (release) | Before | After |
 |---|---|---|
-| `i check --project std` | 20.4 s | 0.13 s |
-| `i test --project std --opt 2` (1376 tests, with the build) | 190 s | 34 s |
-| `i test --project std --opt 0` | | 39 s |
+| `i check --project stdlib` | 20.4 s | 0.13 s |
+| `i test --project stdlib --opt 2` (1376 tests, with the build) | 190 s | 34 s |
+| `i test --project stdlib --opt 0` | | 39 s |
 | type check of the suspend-point chain below, n=800 | 1.6 s | 0.8 s |
 
 ## Instruction counts and peak memory
@@ -74,8 +74,8 @@ is not a CI gate.
 
 | Benchmark | What it runs |
 |---|---|
-| `check_std` | `i check --project std` (checks the tests too) |
-| `build_std_tests_o0`, `build_std_tests_o2` | `i test --project std --opt N` with a filter that matches no test: the build of the whole test program, and no test runs (`i test` has no build-only mode) |
+| `check_std` | `i check --project stdlib` (checks the tests too) |
+| `build_std_tests_o0`, `build_std_tests_o2` | `i test --project stdlib --opt N` with a filter that matches no test: the build of the whole test program, and no test runs (`i test` has no build-only mode) |
 | `corpus_wide_256`, `corpus_wide_1024`, `corpus_wide_generic_1024` | `i check --types` of the wide-union cases `tests/review/cases/review-k4/perf/*` |
 | `kernel_*` | the kernels of `tests/perf/numeric` (`identity`, `fast`, `horner`, `integer`, `dot`, `tuples`, `closures`), a million calls each, in `tests/perf/numeric-loop`; `kernel_base` is the loop alone, to subtract |
 | `bench_closures`, `bench_resume_depth_1000` | tests of `bench/` at `--opt 2`, build included |
@@ -94,11 +94,11 @@ script gives instruction counts for the same things from now on.
 | The same, largest float (max `Float`) | 2.0 times |
 | The same, `5e-324` (smallest subnormal) | 5.9 times |
 | `NUM` integer kernel (`integer` in `tests/perf/numeric`) at step N4 | about 15% slower |
-| `i test --project std` peak memory | 8.5 GB at `--opt 0`, 17 GB at `--opt 2` |
-| `i check --project std` peak memory | 0.3 GB |
+| `i test --project stdlib` peak memory | 8.5 GB at `--opt 0`, 17 GB at `--opt 2` |
+| `i check --project stdlib` peak memory | 0.3 GB |
 
-The memory of `i test --project std` is the backend (the Wasm module, Binaryen and Wasmtime's
-code generation), not inference, which is why `i check --project std` stays small.
+The memory of `i test --project stdlib` is the backend (the Wasm module, Binaryen and Wasmtime's
+code generation), not inference, which is why `i check --project stdlib` stays small.
 
 ## Syntax-three front-end cost
 
@@ -114,7 +114,7 @@ historical measurements, retained as reported; they are not new timings.
 
 Repeat the timing command on the stored project directly, through the
 shared heavy wrapper. The corpus driver adds a `qa_startup` test and a
-`std/test` dependency; that is a different workload. Do not use its prepared
+`i/test` dependency; that is a different workload. Do not use its prepared
 project for comparison with this table, or run the corpus driver for the
 performance measurement.
 
@@ -226,7 +226,7 @@ above the inline limit. Out-of-line multivalue aggregate workers remain
 deferred by numeric-lowering R5. The other five kernels are within their
 time and allocation thresholds in this run; a quiet paired comparison is
 still needed for the performance acceptance gate, especially for the short
-Horner and tuple kernels. These measurements do not establish the std/float
+Horner and tuple kernels. These measurements do not establish the i/float
 release gates or a full-range worst case. Raw batch medians from a new
 quiet run, std check/build cost and benchmark Wasm size acceptance also
 remain to be verified. See [the step-3 report](design/numeric-step3-report.md)
@@ -391,7 +391,7 @@ frees.
   | 40 | 3.26 | 0.96 | 0.33 | 5.3 s |
 
   Wasmtime's own inliner (`Config::compiler_inlining`) gave about the same
-  speed, but `i test --project std` then peaked at 3.7 GB of memory, and it
+  speed, but `i test --project stdlib` then peaked at 3.7 GB of memory, and it
   would change `--opt 0` code as well.
 
 What is left in the hot loops is mostly the shadow stack (a call on entry
@@ -553,7 +553,7 @@ solver throughout.
 ## Debug builds
 
 `[profile.dev]` builds the dependencies (Wasmtime, Cranelift) at
-`opt-level = 2` and the workspace crates at 0. `i test --project std` in a
+`opt-level = 2` and the workspace crates at 0. `i test --project stdlib` in a
 debug build took about 50 minutes; most of that was the type checker (20 s
 for `std` even in a release build) and the DRC collector, both fixed above.
 It now takes under a minute.
@@ -563,10 +563,10 @@ dependencies still at 2) against 0, debug builds, wall time:
 
 | | 0 | 1 |
 |---|---|---|
-| `i test --project std --opt 0` (1376 tests) | 51.6 s | 51.2 s |
+| `i test --project stdlib --opt 0` (1376 tests) | 51.6 s | 51.2 s |
 | the `list_test` module of it | 39.7 s | 39.9 s |
 | `cargo test -p ilang-cli --test spec`, built | 11.3 s | 11.8 s |
-| `i check --project std` | 0.80 s | 0.19 s |
+| `i check --project stdlib` | 0.80 s | 0.19 s |
 | type check of the suspend-point chain, n=800 | 6.1 s | 1.0 s |
 | rebuild of `i` after an edit of `ilang-check/src/types/solve.rs` | 1.7 s | 4.6 s |
 | ... of `ilang-wasm/src/emit.rs` | 1.3 s | 2.7 s |
@@ -594,7 +594,7 @@ wrapper (four Cargo jobs, no LTO, 16 codegen units). The wrapper sets
 
 ```sh
 H=/home/agent/Programming/i/.rd/cache/heavy
-I_TRACE_STAGES=1 ILANG_COMPILE_CACHE=0 $H /run/current-system/sw/bin/time -v ./target/release/i test --project std --opt 2
+I_TRACE_STAGES=1 ILANG_COMPILE_CACHE=0 $H /run/current-system/sw/bin/time -v ./target/release/i test --project stdlib --opt 2
 ```
 
 All **2170 tests passed**, with no failures. On the shared machine the run
@@ -689,7 +689,7 @@ remain open experiments, rather than demonstrated failures or fixes.
 ## Macro expansion and compiled-code cache
 
 Building the macro registry once per expansion and reusing it for typed
-macros reduced release `i check --project std` from 26.2 to 18.1 CPU seconds
+macros reduced release `i check --project stdlib` from 26.2 to 18.1 CPU seconds
 on the lane machine. The expanded std output was byte-identical.
 
 The global cache retains whole compiled modules as well as individual
@@ -700,7 +700,7 @@ Macro compilation itself is not cached across processes: a safe key would need
 all source and macro inputs, compiler and host ABI identities, dependencies,
 configuration, and every observable input to macro execution.
 
-Release `i test --project std --opt 0`, one run per cell, on the shared lane
+Release `i test --project stdlib --opt 0`, one run per cell, on the shared lane
 machine, with separate initially empty private stores and one Rayon thread:
 
 | Cache entries | Run | CPU (user + system) | Peak RSS | Wall time |
@@ -897,7 +897,7 @@ above, the full test runs give:
 Each command was:
 
 ```sh
-ILANG_COMPILE_CACHE=0 $H /run/current-system/sw/bin/time -v ./target/release/i test --project std --opt N
+ILANG_COMPILE_CACHE=0 $H /run/current-system/sw/bin/time -v ./target/release/i test --project stdlib --opt N
 ```
 
 The main-emitter baseline uses the emitter from `95b1b500`; both variants
@@ -927,7 +927,7 @@ harnesses used `RUST_TEST_THREADS=2`.
 | `i test --project examples/hello` | 2 passed |
 | `i test --project bench` | 15 passed |
 | `i test --project examples/macro-tests` | 9 passed, 1 skipped, as configured |
-| `i test --project std http` | 66 passed; complete output matches the baseline result lines selected by the same name substring, in the same order, plus the summary |
+| `i test --project stdlib http` | 66 passed; complete output matches the baseline result lines selected by the same name substring, in the same order, plus the summary |
 | `cargo clippy --release -p ilang-host -p ilang-wasm --all-targets --locked -- -D warnings` | passed |
 | `cargo fmt --all -- --check` and `git diff --check` | passed |
 

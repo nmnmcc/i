@@ -5,7 +5,7 @@ i is a small, statically typed functional language that compiles to WebAssembly 
 ```text
 (
 	i/stdio
-	std/int
+	i/int
 )
 
 Num = (Int)
@@ -35,13 +35,13 @@ rm demo/test/main_test.i
 
 Write the program above to `demo/src/main.i`; the generated test is removed because it tests the program it replaces. `i run --project demo` prints `42`. There are no keywords: a type is a name for data, a sum is a union of types, a function is `(parameters) { body }`, and branches joined by `&` are one function that matches its argument. No type is written, and every type is checked.
 
-The `std/` copy is an ordinary path dependency that belongs to the package: 30 files, about 465 KiB, readable and editable. `.gitignore` lists only `/build/`, so the copy is committed with the package and shipped by `i publish`. It includes `std/UNICODE-LICENSE` and the copyright notices in its sources; keep them when you redistribute it. Nothing refreshes the copy: `i update` handles versioned dependencies, not this directory. To move to a newer standard library, make a temporary package with the newer compiler and replace `std/` with that package's `std/`. A package named `std` imports the copy as `stdlib/…`.
+The `stdlib/` copy is an ordinary path dependency that belongs to the package: 30 files, about 465 KiB, readable and editable. `.gitignore` lists only `/build/`, so the copy is committed with the package and shipped by `i publish`. It includes `stdlib/UNICODE-LICENSE` and the copyright notices in its sources; keep them when you redistribute it. Nothing refreshes the copy: `i update` handles versioned dependencies, not this directory. To move to a newer standard library, make a temporary package with the newer compiler and replace `stdlib/` with that package's `stdlib/`. A package named `std` imports the copy as `stdlib/…`.
 
 A function type has three parts, `(P) <- (S) -> R`: the parameters, the services the function needs, and the result. An error is a service too, `Fail(E)`. All of it is inferred. A service is an ordinary value: a function takes it with `<-` in its head, and the caller gives it with `<-` after an expression, so a test gives its own:
 
 ```text
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/fail
 )
 
@@ -185,7 +185,7 @@ Every command takes `--help`. Editor support is in [editors](editors): a VS Code
 
 ## Documentation and status
 
-The language is defined in one document, [docs/spec.md](docs/spec.md). The library modules `i/…` are in [lib/i](lib/i) and the standard library `std/…` is in [std/src](std/src); each module is documented in its source. The reasons for the design are in [docs/design](docs/design).
+The language is defined in one document, [docs/spec.md](docs/spec.md). The library modules `i/…` are in [lib/i](lib/i) and the standard library `stdlib/…` is in [i/src](i/src); each module is documented in its source. The reasons for the design are in [docs/design](docs/design).
 
 The examples above and the files under `examples` join branch chains with `&`; a value-level `|` separator is a compile error that asks for `&`. i is in development and has no release: the spec comes first, the compiler does not yet do everything in it, and the language still changes.
 
@@ -208,7 +208,7 @@ i is distributed under the [Apache-2.0 license](LICENSE). The lexer is adapted f
 - [Racket](https://racket-lang.org) — items that a macro lifts to the end of a module, and the hang-or-flow choice of its pretty printer.
 - [Lean 4](https://lean-lang.org) — deterministic heartbeats, kept apart from recursion depth, as the budget of a macro run.
 - [cljfmt](https://github.com/weavejester/cljfmt) and [zprint](https://github.com/kkinnear/zprint) — the layout of `.is` files.
-- [CORE-MATH](https://core-math.gitlabpages.inria.fr) — the argument reduction and the certification of rounding studied for `std/float`.
+- [CORE-MATH](https://core-math.gitlabpages.inria.fr) — the argument reduction and the certification of rounding studied for `i/float`.
 - [GHC](https://www.haskell.org/ghc/) — worker and wrapper splitting for unboxed numbers, cancellation as a protocol in which a blocked task owns its registration, and the [SplitMix](https://github.com/haskellari/splitmix) generator behind `i/random`.
 - [TypeScript](https://www.typescriptlang.org) — literal types, and how large unions are reduced.
 - [Wasm_of_ocaml](https://github.com/ocsigen/js_of_ocaml) — how a functional language is laid out in WasmGC, and what Binaryen can then recover.
@@ -218,7 +218,7 @@ i is distributed under the [Apache-2.0 license](LICENSE). The lexer is adapted f
 - [Tokio](https://tokio.rs) and [rustls](https://github.com/rustls/rustls) — the reactor and the TLS of the native host.
 - [wasm-tools](https://github.com/bytecodealliance/wasm-tools) — `wasmparser` and `wat` read and validate modules in the compiler and its tests.
 - [tree-sitter](https://tree-sitter.github.io/tree-sitter/) — the grammar behind highlighting in editors.
-- [Hypothesis](https://hypothesis.readthedocs.io), [Hedgehog](https://github.com/hedgehogqa/haskell-hedgehog) and [QuickCheck](https://hackage.haskell.org/package/QuickCheck) — generators with attached shrinking, sizes and replay in `std/property`.
+- [Hypothesis](https://hypothesis.readthedocs.io), [Hedgehog](https://github.com/hedgehogqa/haskell-hedgehog) and [QuickCheck](https://hackage.haskell.org/package/QuickCheck) — generators with attached shrinking, sizes and replay in `i/property`.
 - [A prettier printer](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf) by Philip Wadler — the document algebra of `i fmt`.
 - [Unicode](https://www.unicode.org) and [Rust regex](https://github.com/rust-lang/regex) — the character data in the standard library.
 - [Nix](https://nixos.org), [devenv](https://devenv.sh) and [Playwright](https://playwright.dev) — the reproducible development shell and the browser tests.

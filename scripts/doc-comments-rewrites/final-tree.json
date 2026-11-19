@@ -4616,8 +4616,8 @@
     "file": "crates/ilang-check/tests/row_schemes.rs",
     "line": 1106,
     "hash": "398527dac972453ccc0721892ef715438ca0ed9dfac61771ce3e0cd1ab26bf21",
-    "old": "#[test]\nfn shipped_stored_callback_types_keep_their_need_invariant() {\n    // std-1 §3.1 and std-2 L5 require invariant N. Read the shipped\n    // declarations, rather than a second copy that could miss a port bug.\n    let stream = include_str!(\"../../../std/src/stream.i\");\n",
-    "new": "#[test]\nfn shipped_stored_callback_types_keep_their_need_invariant() {\n    // Stored callback needs remain invariant. Read the shipped\n    // declarations, rather than a second copy that could miss a port bug.\n    let stream = include_str!(\"../../../std/src/stream.i\");\n"
+    "old": "#[test]\nfn shipped_stored_callback_types_keep_their_need_invariant() {\n    // std-1 §3.1 and std-2 L5 require invariant N. Read the shipped\n    // declarations, rather than a second copy that could miss a port bug.\n    let stream = include_str!(\"../../../stdlib/src/stream.i\");\n",
+    "new": "#[test]\nfn shipped_stored_callback_types_keep_their_need_invariant() {\n    // Stored callback needs remain invariant. Read the shipped\n    // declarations, rather than a second copy that could miss a port bug.\n    let stream = include_str!(\"../../../stdlib/src/stream.i\");\n"
   },
   {
     "file": "crates/ilang-check/tests/row_schemes.rs",
@@ -9145,8 +9145,8 @@
     "file": "crates/ilang-syntax/tests/syn3_lower.rs",
     "line": 173,
     "hash": "da8cfa2fe21fd476fc56362a5c6cb0c8e9e1f63d1d272e01dda66d6d4baaa91d",
-    "old": "}\n\n/// The Lisp surface: `std/src/test.is`, converted and read back, is the\n/// tree that the file gives today (quotes included).\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../std/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // The repository file is in today's rows until the conversion commit,\n    // and in the rows of syntax three after it.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n",
-    "new": "}\n\n/// Round-tripping the library macro must retain its quotes as well as the\n/// surrounding source tree.\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../std/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // Accept either input encoding so the migration adapter can compare\n    // repository sources without changing the file under test.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n"
+    "old": "}\n\n/// The Lisp surface: `std/src/test.is`, converted and read back, is the\n/// tree that the file gives today (quotes included).\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../stdlib/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // The repository file is in today's rows until the conversion commit,\n    // and in the rows of syntax three after it.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n",
+    "new": "}\n\n/// Round-tripping the library macro must retain its quotes as well as the\n/// surrounding source tree.\n#[test]\nfn lisp_surface_round_trip() {\n    let path = concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../stdlib/src/test.is\");\n    let source = std::fs::read_to_string(path).unwrap();\n    // Accept either input encoding so the migration adapter can compare\n    // repository sources without changing the file under test.\n    let Ok(document) = ilang_syntax::lisp::parse(&source) else {\n        return;\n"
   },
   {
     "file": "crates/ilang-syntax/tests/syn3_lower.rs",
@@ -10941,539 +10941,539 @@
     "new": "Assert = (fail = (AssertionFailure) -> Never)\n\n/// The service that ends a computation with an error of type `E`.\nFail(E) = (raise = (E) -> Never)\n\n/// Stops the program with `panic: ` and the message.\n@external(\"ilang:prelude\", \"panic\")\npanic : (String) -> Never\n\n/// Reports a failure to `Assert` when `c` is `False`.\nassert = (c : Bool) <- (a : Assert) {\n\tc |>\n"
   },
   {
-    "file": "std/src/bit_array.i",
+    "file": "i/src/bit_array.i",
     "line": 136,
     "hash": "11027c8757c88e3c9072459766b58debf996e3eeb8ef212bdd1094e6e3e49f33",
     "old": "}\n\n/// The text form of the bit array (§11.8).\n///\n/// ```i\n",
     "new": "}\n\n/// The text form of the bit array.\n///\n/// ```i\n"
   },
   {
-    "file": "std/src/bool.i",
+    "file": "i/src/bool.i",
     "line": 1,
     "hash": "0224a47edf15a766c2aa1dc5cf3a010a567ba28ffd2d751bf030fbd15d7cf64e",
     "old": "//// Functions for the built-in type `Bool { True False }`.\n////\n//// `&&` and `||` are operators and may not be used as values; `and` and\n",
     "new": "//// Functions for the built-in type `Bool = True | False`.\n////\n//// `&&` and `||` are operators and may not be used as values; `and` and\n"
   },
   {
-    "file": "std/src/calendar.i",
+    "file": "i/src/calendar.i",
     "line": 3,
     "hash": "20291956ea4e1846b8918bd57d5925b22c072b95ac7f6b7343246a7d0d92abe8",
     "old": "//// CalendarError expose their constructors. Validation failures use Fail(CalendarError).\n////\n//// C1: leap years divide by 4, except centuries not divisible by 400. Year 0\n//// is 1 BCE. Months are 1..12; validate month before day, with no 1582 gap.\n//// C2: validate hour 0..23, minute/second 0..59 and nanosecond 0..999999999\n//// in that order. Offsets are whole minutes east of UTC in -1439..1439.\n//// C3: day zero is 1970-01-01. Eras and signed days use floor division.\n//// C4: at adds the offset before splitting; to_instant subtracts it. Weekdays\n//// run Monday through Sunday; day zero is Thursday. No leap seconds or zones.\n//// C5: parse accepts YYYY-MM-DDTHH:mm:ss, optional 1..9 fractional digits,\n//// then Z or a signed HH:mm offset. Years outside 0..9999 use a sign;\n//// negative magnitudes have at least four digits, with no excess zeroes.\n//// Reject negative zero years, -00:00 offsets and non-ASCII syntax. Every\n//// parse failure is BadText; component constructors retain precise errors.\n//// C6: format uses canonical years, two-digit fields, trimmed fractional\n//// nanoseconds and Z for zero offset. No locale or host service is consulted.\n////\n",
     "new": "//// CalendarError expose their constructors. Validation failures use Fail(CalendarError).\n////\n//// leap years divide by 4, except centuries not divisible by 400. Year 0\n//// is 1 BCE. Months are 1..12; validate month before day, with no 1582 gap.\n//// validate hour 0..23, minute/second 0..59 and nanosecond 0..999999999\n//// in that order. Offsets are whole minutes east of UTC in -1439..1439.\n//// day zero is 1970-01-01. Eras and signed days use floor division.\n//// at adds the offset before splitting; to_instant subtracts it. Weekdays\n//// run Monday through Sunday; day zero is Thursday. No leap seconds or zones.\n//// parse accepts YYYY-MM-DDTHH:mm:ss, optional 1..9 fractional digits,\n//// then Z or a signed HH:mm offset. Years outside 0..9999 use a sign;\n//// negative magnitudes have at least four digits, with no excess zeroes.\n//// Reject negative zero years, -00:00 offsets and non-ASCII syntax. Every\n//// parse failure is BadText; component constructors retain precise errors.\n//// format uses canonical years, two-digit fields, trimmed fractional\n//// nanoseconds and Z for zero offset. No locale or host service is consulted.\n////\n"
   },
   {
-    "file": "std/src/calendar.i",
+    "file": "i/src/calendar.i",
     "line": 22,
     "hash": "942ad0f506b64b5daf98cab9e4116fdf05d3b757e13dd3d1114bc43b76cae6ad",
     "old": "//// parse(format(c,o)) = (c,o); add_days(d,days_between(d,e)) = e.\n////\n//// Public values:\n//// Date { Date(Int, Int, Int) }, TimeOfDay { TimeOfDay(Int, Int, Int, Int) }\n//// and Offset { Offset(Int) } keep their constructors private.\n//// Civil { Civil(date: Date, time: TimeOfDay) }\n//// Weekday { Monday Tuesday Wednesday Thursday Friday Saturday Sunday }\n//// CalendarError { BadMonth BadDay BadHour BadMinute BadSecond\n////                 BadNanosecond BadOffset BadText }\n////\n//// date: (year: Int, month: Int, day: Int) <- (Fail(CalendarError)) -> Date\n//// time_of_day: (hour: Int, minute: Int, second: Int, nanosecond: Int)\n////              <- (Fail(CalendarError)) -> TimeOfDay\n//// offset: (minutes: Int) <- (Fail(CalendarError)) -> Offset\n//// utc: () -> Offset\n//// date_parts: (date: Date) -> (Int, Int, Int)\n//// time_parts: (time: TimeOfDay) -> (Int, Int, Int, Int)\n//// offset_minutes: (offset: Offset) -> Int\n//// is_leap_year: (year: Int) -> Bool\n//// days_in_month: (year: Int, month: Int) <- (Fail(CalendarError)) -> Int\n//// day_number: (date: Date) -> Int\n//// from_day_number: (day: Int) -> Date\n//// weekday: (date: Date) -> Weekday\n//// add_days: (date: Date, days: Int) -> Date\n//// days_between: (start: Date, end: Date) -> Int\n//// at: (instant: time.Instant, offset: Offset) -> Civil\n//// to_instant: (civil: Civil, offset: Offset) -> time.Instant\n//// parse: (text: String) <- (Fail(CalendarError)) -> (Civil, Offset)\n//// format: (civil: Civil, offset: Offset) -> String\n////\n//// No month/year addition policy is implicit. Conversion uses a fixed number\n",
     "new": "//// parse(format(c,o)) = (c,o); add_days(d,days_between(d,e)) = e.\n////\n//// Date, time-of-day and offset constructors stay private so component\n//// validation cannot be bypassed.\n////\n//// No month/year addition policy is implicit. Conversion uses a fixed number\n"
   },
   {
-    "file": "std/src/calendar.i",
+    "file": "i/src/calendar.i",
     "line": 208,
     "hash": "a6fc43dc52eb0697214dadc92caa6b4ae679b6715f2e34903a5b5e3de79347c3",
     "old": "}\n\n// Only positive divisors occur in the calendar algorithms (C3).\nfloor_divide = (a : Int, b : Int) -> Int {\n\t{ a % b < 0 } |> (True) { a / b - 1 } | (False) { a / b }\n",
     "new": "}\n\n// Only positive divisors occur in the calendar algorithms.\nfloor_divide = (a : Int, b : Int) -> Int {\n\t{ a % b < 0 } |> (True) { a / b - 1 } | (False) { a / b }\n"
   },
   {
-    "file": "std/src/cli.i",
+    "file": "i/src/cli.i",
     "line": 9,
     "hash": "b0487920eaadefc53592461f266e52c1db59407d2050fa1abe8a9503f9aaa863",
     "old": "//// Conversion callbacks have type (String)->Result(A,String), without effects.\n////\n//// A1: validate all metadata first, in leaf order: ASCII long/positional names\n//// [a-z][a-z0-9-]*, one ASCII letter for short names, spelling before duplicates\n//// before positional order. Long, short and positional namespaces are separate.\n//// Rest is unique and last among positional leaves; later options are allowed.\n//// A2: tokens are unchanged strings with zero-based argument indexes. Recognize\n//// exact --long, --long=value and -s until bare --. A lone - is positional;\n//// all other leading-dash tokens are unknown. Options may follow positionals.\n//// A3: flags take no value; other options consume an attached suffix, including\n//// empty, or the next token unless absent or exactly --. Callback behavior does\n//// not change token ownership. All recognized-option errors use --long names.\n//// A4: singleton repetition wins over arity errors; many keeps occurrence order.\n//// A5: allocate required positionals in order, then rest. Optional absence is\n//// None; flags default False; many/rest default []; required leaves must occur.\n//// A6: errors precede decoding: definition, scanning, extra positionals, then\n//// missing/conversion errors in descriptor order. Conversion indexes identify\n//// the value token, or option token for attached values; scanning indexes always\n//// identify the option token. map/map2 run callbacks once after inner success.\n//// A7: integer accepts an optional sign and ASCII decimal digits, otherwise\n//// Error(\"expected integer\"); text preserves all token values, including NUL.\n//// A8: help validates metadata without callbacks. Usage plus program plus LF,\n//// then two spaces, display name, tab, verbatim help and LF for each leaf.\n//// Flags/optional/many are bracketed; value options add VALUE, many adds ...,\n",
     "new": "//// Conversion callbacks have type (String)->Result(A,String), without effects.\n////\n//// validate all metadata first, in leaf order: ASCII long/positional names\n//// [a-z][a-z0-9-]*, one ASCII letter for short names, spelling before duplicates\n//// before positional order. Long, short and positional namespaces are separate.\n//// Rest is unique and last among positional leaves; later options are allowed.\n//// tokens are unchanged strings with zero-based argument indexes. Recognize\n//// exact --long, --long=value and -s until bare --. A lone - is positional;\n//// all other leading-dash tokens are unknown. Options may follow positionals.\n//// flags take no value; other options consume an attached suffix, including\n//// empty, or the next token unless absent or exactly --. Callback behavior does\n//// not change token ownership. All recognized-option errors use --long names.\n//// singleton repetition wins over arity errors; many keeps occurrence order.\n//// allocate required positionals in order, then rest. Optional absence is\n//// None; flags default False; many/rest default []; required leaves must occur.\n//// errors precede decoding: definition, scanning, extra positionals, then\n//// missing/conversion errors in descriptor order. Conversion indexes identify\n//// the value token, or option token for attached values; scanning indexes always\n//// identify the option token. map/map2 run callbacks once after inner success.\n//// integer accepts an optional sign and ASCII decimal digits, otherwise\n//// Error(\"expected integer\"); text preserves all token values, including NUL.\n//// help validates metadata without callbacks. Usage plus program plus LF,\n//// then two spaces, display name, tab, verbatim help and LF for each leaf.\n//// Flags/optional/many are bracketed; value options add VALUE, many adds ...,\n"
   },
   {
-    "file": "std/src/cli.i",
+    "file": "i/src/cli.i",
     "line": 41,
     "hash": "82a8b2a7f7a1b63a77c2538c10d0513532eb727b80c3f7a27edde3a4b0911d46",
     "old": "\n////\n//// Public type inventory:\n//// Names { Names(long: String, short: Option(String)) }\n//// DefinitionError { InvalidName(String) DuplicateName(String) MisplacedRest }\n//// CliError { BadDefinition(DefinitionError) UnknownOption(index:Int,token:String)\n////   MissingValue(index:Int,name:String) UnexpectedValue(index:Int,name:String)\n////   RepeatedOption(index:Int,name:String) MissingArgument(name:String)\n////   InvalidArgument(index:Int,name:String,text:String,reason:String)\n////   ExtraArgument(index:Int,token:String) }\n//// Parser(A) is opaque.\n//// Public signatures:\n//// pure(A): (value: A) -> Parser(A)\n//// flag: (names: Names, help: String) -> Parser(Bool)\n//// option(A): (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(A)\n//// optional(A): (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(Option(A))\n//// many(A): (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))\n//// argument(A): (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(A)\n//// rest(A): (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))\n//// map(A, B): (parser: Parser(A), with: (A) -> B) -> Parser(B)\n//// map2(A, B, C): (first: Parser(A), second: Parser(B), with: (A, B) -> C) -> Parser(C)\n//// parse(A): (parser: Parser(A), args: List(String)) -> A\n//// help(A): (parser: Parser(A), program: String) -> String\n//// text: (text: String) -> Result(String, String)\n//// integer: (text: String) -> Result(Int, String)\n//// read obtains process arguments; run reports errors and runs a body.\n(\n\ti/process\n",
     "new": "\n////\n//// Parser constructors stay private so metadata validation and bucket\n//// consumption cannot be bypassed.\n(\n\ti/process\n"
   },
   {
-    "file": "std/src/dict.i",
+    "file": "i/src/dict.i",
     "line": 2,
     "hash": "86f48c0f4da725e0dd040e2a106cedd497da416d9b63491010a8ab9ee0d18352",
     "old": "////\n//// A `Dict(k, v)` is a hash trie. The key of every entry is hashed with\n//// `core.hash` (§13), and the hash picks a path through a tree with four\n//// branches at each level, two bits of the hash for each level. Keys are\n//// compared with `==` (§11.4), so any value may be a key and no compare\n//// function is needed. `get`, `insert`, and `delete` take O(log n) steps.\n////\n",
     "new": "////\n//// A `Dict(k, v)` is a hash trie. The key of every entry is hashed with\n//// `core.hash`, and the hash picks a path through a tree with four\n//// branches at each level, two bits of the hash for each level. Keys are\n//// compared with `==`, so any value may be a key and no compare\n//// function is needed. `get`, `insert`, and `delete` take O(log n) steps.\n////\n"
   },
   {
-    "file": "std/src/float.i",
+    "file": "i/src/float.i",
     "line": 1,
     "hash": "357b1320f8ce4f705a78541f2243d4537082dc609d205b2240e8bed6385f22dd",
     "old": "//// Functions for `Float`, the type of finite IEEE 754 binary64 numbers.\n////\n//// A Float operation whose result is not finite stops the program\n//// (§11.3), so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;\n//// `divide` raises `Nil` for a zero divisor instead. Functions here\n//// that could give a result that is not finite, such as `power`, raise\n",
     "new": "//// Functions for `Float`, the type of finite IEEE 754 binary64 numbers.\n////\n//// A Float operation whose result is not finite stops the program,\n//// so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;\n//// `divide` raises `Nil` for a zero divisor instead. Functions here\n//// that could give a result that is not finite, such as `power`, raise\n"
   },
   {
-    "file": "std/src/float.i",
+    "file": "i/src/float.i",
     "line": 88,
     "hash": "6ebd3d875f56ff370ecb658215749963ba9bc5749ef64b073d2ab13ae871ffb3",
     "old": "significand_limit = 9007199254740992\n\n/// The text form of the Float (§11.8), the same as `core.inspect`: the\n/// shortest digits that read back as the same number, with `.0` or an\n/// exponent where needed.\n",
     "new": "significand_limit = 9007199254740992\n\n/// The text form of the Float, the same as `core.inspect`: the\n/// shortest digits that read back as the same number, with `.0` or an\n/// exponent where needed.\n"
   },
   {
-    "file": "std/src/http.i",
+    "file": "i/src/http.i",
     "line": 87,
     "hash": "f8a4b2709f89ab5a7a69b89b0a818cd3ecdb1ff3b282abecb21b2e2f809e6667",
     "old": "Headers = (List((String, String)))\nRawHeaders = (List((String, BitArray)))\n/// Before stage 3 this sum was `Headers`, with a constructor of that\n/// name; a member is now a type of its own (syntax-3.md §2.8, §7.3 manual\n/// list), so the sum is `AnyHeaders`.\nAnyHeaders = Headers | RawHeaders\n\n",
     "new": "Headers = (List((String, String)))\nRawHeaders = (List((String, BitArray)))\n/// Header values may be text or raw bytes, so callers can preserve their\n/// original representation.\nAnyHeaders = Headers | RawHeaders\n\n"
   },
   {
-    "file": "std/src/http.i",
+    "file": "i/src/http.i",
     "line": 1355,
     "hash": "dd86fa8630b5bdc94bfb90fe46850aecb82dcff13608b44fc3142670036102b2",
     "old": "\t\t\t\tsend = (req) {\n\t\t\t\t\t{\n\t\t\t\t\t\t// Keep the raw service bindings across suspension (spec 9.4).\n\t\t\t\t\t\tres = provider.send(req)\n\t\t\t\t\t\tres\n",
     "new": "\t\t\t\tsend = (req) {\n\t\t\t\t\t{\n\t\t\t\t\t\t// Keep the raw service bindings across suspension.\n\t\t\t\t\t\tres = provider.send(req)\n\t\t\t\t\t\tres\n"
   },
   {
-    "file": "std/src/int.i",
+    "file": "i/src/int.i",
     "line": 1,
     "hash": "d5b26515b08d6d0ac93f88f016acecef7890124247005a650e1985d818005d11",
     "old": "//// Functions for `Int`, the type of whole numbers of any size.\n////\n//// Ints never overflow (§11.2). `a / b` rounds toward zero, `a % b` has the\n//// sign of `a`, and both are `0` when `b` is `0`. The functions `divide`,\n//// `remainder`, `modulo`, and `floor_divide` raise `Nil` for `0`\n",
     "new": "//// Functions for `Int`, the type of whole numbers of any size.\n////\n//// Ints never overflow. `a / b` rounds toward zero, `a % b` has the\n//// sign of `a`, and both are `0` when `b` is `0`. The functions `divide`,\n//// `remainder`, `modulo`, and `floor_divide` raise `Nil` for `0`\n"
   },
   {
-    "file": "std/src/list.i",
+    "file": "i/src/list.i",
     "line": 2,
     "hash": "6f5f229a0fd18ec145449c65fada5506982a7952d878ce10bc1d3560ca0c9e2f",
     "old": "//// changed.\n////\n//// Every function that walks a whole list is tail-recursive (§11.6), so it\n//// works on lists of any length without using more stack. Functions that\n//// build a new list build it in reverse and then turn it round, which takes\n",
     "new": "//// changed.\n////\n//// Every function that walks a whole list is tail-recursive, so it\n//// works on lists of any length without using more stack. Functions that\n//// build a new list build it in reverse and then turn it round, which takes\n"
   },
   {
-    "file": "std/src/log.i",
+    "file": "i/src/log.i",
     "line": 1,
     "hash": "26e9cdc16b6f85904ee4d985093f9c79a4316850bd7d351662571a3d5819367e",
     "old": "//// Structured entries and call-time sink services. See std-2.md §6/§7.\n//// Level(..), Entry(..) export constructors; Sink(E,N) hides its constructor.\n//// Level { Debug Info Warning Failure }\n//// Entry { Entry(level: Level, message: String, fields: List((String,String)),\n////               at: Option(time.Instant)) }\n//// Sink(E,N) { Sink((Level)->Bool, (Entry)->Nil ? E ! N, (N)->Nil) }\n//// Interface:\n//// make(E,N): (accept: (Level)->Bool, send: (Entry)->Nil ? E ! N)->Sink(E,N)\n//// silent(N): ()->Sink(Never,N)\n//// filter(E,N): (sink: Sink(E,N), accept: (Level)->Bool)->Sink(E,N)\n//// minimum(E,N): (sink: Sink(E,N), level: Level)->Sink(E,N)\n//// enabled(E,N): (level: Level)->Bool ! Sink(E,N)\n//// write(E,N): (entry: Entry)->Nil ? E ! N | Sink(E,N)\n//// lazy(E,F,N): (level: Level, message: ()->String ? F ! N)->Nil ? E | F ! N | Sink(E,N)\n//// format: (entry: Entry)->String\n//// stderr/stdout: () -> Sink for the corresponding stream\n//// file: (path: String) -> Sink appending formatted lines\n//// timestamped: (entry: Entry) -> Entry, reading the Unix clock\n////\n//// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;\n",
     "new": "//// Structured entries and call-time sink services.\n//// Sink constructors stay private so delivery goes through the service laws.\n////\n//// Level order is Debug < Info < Warning < Failure. Entry strings are arbitrary;\n"
   },
   {
-    "file": "std/src/log.i",
+    "file": "i/src/log.i",
     "line": 46,
     "hash": "28d44316df1e2632ab1358369c7d321ccb971799f77c2cf8a469eaa068646ca0",
     "old": "//// entries arrive in sequential call order; filter(s,always_true) preserves\n//// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback\n//// termination guarantee is added. Generic client use awaits the §7 compiler\n//// IO adapters are explicit and use the same sink service.\n(\n",
     "new": "//// entries arrive in sequential call order; filter(s,always_true) preserves\n//// delivery; minimum(minimum(s,a),b) uses threshold max(a,b). No callback\n//// termination guarantee is added.\n//// IO adapters are explicit and use the same sink service.\n(\n"
   },
   {
-    "file": "std/src/log.i",
+    "file": "i/src/log.i",
     "line": 116,
     "hash": "662767532d48db4ba52d4ba3a69d7ed84256fbd68e21df9e5c6aaf942bea621b",
     "old": "}\n\n// Inferred returns retain the exact public error and environment rows (§7).\nwrite = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {\n\tSink(accept, send, _) = sink\n",
     "new": "}\n\n// Inferred returns retain the exact public error and environment rows.\nwrite = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {\n\tSink(accept, send, _) = sink\n"
   },
   {
-    "file": "std/src/property.i",
+    "file": "i/src/property.i",
     "line": 11,
     "hash": "5e4815f81ff2128b624651b11708fc4d182d480ea13a31d804752ff3368d87be",
     "old": "//// global minimum. User thunks may diverge. Integer children cost logarithmic\n//// space; list children can require quadratic copying. Ancestors may remain\n//// reachable through closures. See docs/design/std-3.md P1–P9 for the protocol.\n(\n\ti/core\n",
     "new": "//// global minimum. User thunks may diverge. Integer children cost logarithmic\n//// space; list children can require quadratic copying. Ancestors may remain\n//// reachable through closures. Generators store a draw function that is called\n//// with a non-negative size.\n(\n\ti/core\n"
   },
   {
-    "file": "std/src/regex.i",
+    "file": "i/src/regex.i",
     "line": 1059,
     "hash": "1e04d7b8b1b7d8715647ddc0589daf7a19a76010c6725aa73481c152b184a86b",
     "old": "}\n\n// Derived Unicode data. See docs/design/std-4.md and the Unicode license.\nunicode_word = table(\n\t\"00003000003900004100005a00005f00005f00006100007a0000aa0000aa0000b50000b50000ba0000ba0000c00000d60000d80000f60000f80002c10002c60002d10002e00002e40002ec0002ec0002ee0002ee00030000037400037600037700037a00037d00037f00037f00038600038600038800038a00038c00038c00038e0003a10003a30003f50003f700048100048300052f0005310005560005590005590005600005880005910005bd0005bf0005bf0005c10005c20005c40005c50005c70005c70005d00005ea0005ef0005f200061000061a00062000066900066e0006d30006d50006dc0006df0006e80006ea0006fc0006ff0006ff00071000074a00074d0007b10007c00007f50007fa0007fa0007fd0007fd00080000082d00084000085b00086000086a00087000088700088900088e0008970008e10008e300096300096600096f00097100098300098500098c00098f0009900009930009a80009aa0009b00009b20009b20009b60009b90009bc0009c40009c70009c80009cb0009ce0009d70009d70009dc0009dd0009df0009e30009e60009f10009fc0009fc0009fe0009fe000a01000a03000a05000a0a000a0f000a10000a13000a28000a2a000a30000a32000a33000a35000a36000a38000a39000a3c000a3c000a3e000a42000a47000a48000a4b000a4d000a51000a51000a59000a5c000a5e000a5e000a66000a75000a81000a83000a85000a8d000a8f000a91000a93000aa8000aaa000ab0000ab2000ab3000ab5000ab9000abc000ac5000ac7000ac9000acb000acd000ad0000ad0000ae0000ae3000ae6000aef000af9000aff000b01000b03000b05000b0c000b0f000b10000b13000b28000b2a000b30000b32000b33000b35000b39000b3c000b44000b47000b48000b4b000b4d000b55000b57000b5c000b5d000b5f000b63000b66000b6f000b71000b71000b82000b83000b85000b8a000b8e000b90000b92000b95000b99000b9a000b9c000b9c000b9e000b9f000ba3000ba4000ba8000baa000bae000bb9000bbe000bc2000bc6000bc8000bca000bcd000bd0000bd0000bd7000bd7000be6000bef000c00000c0c000c0e000c10000c12000c28000c2a000c39000c3c000c44000c46000c48000c4a000c4d000c55000c56000c58000c5a000c5d000c5d000c60000c63000c66000c6f000c80000c83000c85000c8c000c8e000c90000c92000ca8000caa000cb3000cb5000cb9000cbc000cc4000cc6000cc8000cca000ccd000cd5000cd6000cdd000cde000ce0000ce3000ce6000cef000cf1000cf3000d00000d0c000d0e000d10000d12000d44000d46000d48000d4a000d4e000d54000d57000d5f000d63000d66000d6f000d7a000d7f000d81000d83000d85000d96000d9a000db1000db3000dbb000dbd000dbd000dc0000dc6000dca000dca000dcf000dd4000dd6000dd6000dd8000ddf000de6000def000df2000df3000e01000e3a000e40000e4e000e50000e59000e81000e82000e84000e84000e86000e8a000e8c000ea3000ea5000ea5000ea7000ebd000ec0000ec4000ec6000ec6000ec8000ece000ed0000ed9000edc000edf000f00000f00000f18000f19000f20000f29000f35000f35000f37000f37000f39000f39000f3e000f47000f49000f6c000f71000f84000f86000f97000f99000fbc000fc6000fc600100000104900105000109d0010a00010c50010c70010c70010cd0010cd0010d00010fa0010fc00124800124a00124d00125000125600125800125800125a00125d00126000128800128a00128d0012900012b00012b20012b50012b80012be0012c00012c00012c20012c50012c80012d60012d800131000131200131500131800135a00135d00135f00138000138f0013a00013f50013f80013fd00140100166c00166f00167f00168100169a0016a00016ea0016ee0016f800170000171500171f00173400174000175300176000176c00176e0017700017720017730017800017d30017d70017d70017dc0017dd0017e00017e900180b00180d00180f0018190018200018780018800018aa0018b00018f500190000191e00192000192b00193000193b00194600196d0019700019740019800019ab0019b00019c90019d00019d9001a00001a1b001a20001a5e001a60001a7c001a7f001a89001a90001a99001aa7001aa7001ab0001ace001b00001b4c001b50001b59001b6b001b73001b80001bf3001c00001c37001c40001c49001c4d001c7d001c80001c8a001c90001cba001cbd001cbf001cd0001cd2001cd4001cfa001d00001f15001f18001f1d001f20001f45001f48001f4d001f50001f57001f59001f59001f5b001f5b001f5d001f5d001f5f001f7d001f80001fb4001fb6001fbc001fbe001fbe001fc2001fc4001fc6001fcc001fd0001fd3001fd6001fdb001fe0001fec001ff2001ff4001ff6001ffc00200c00200d00203f00204000205400205400207100207100207f00207f00209000209c0020d00020f000210200210200210700210700210a00211300211500211500211900211d00212400212400212600212600212800212800212a00212d00212f00213900213c00213f00214500214900214e00214e0021600021880024b60024e9002c00002ce4002ceb002cf3002d00002d25002d27002d27002d2d002d2d002d30002d67002d6f002d6f002d7f002d96002da0002da6002da8002dae002db0002db6002db8002dbe002dc0002dc6002dc8002dce002dd0002dd6002dd8002dde002de0002dff002e2f002e2f00300500300700302100302f00303100303500303800303c00304100309600309900309a00309d00309f0030a10030fa0030fc0030ff00310500312f00313100318e0031a00031bf0031f00031ff003400004dbf004e0000a48c00a4d000a4fd00a50000a60c00a61000a62b00a64000a67200a67400a67d00a67f00a6f100a71700a71f00a72200a78800a78b00a7cd00a7d000a7d100a7d300a7d300a7d500a7dc00a7f200a82700a82c00a82c00a84000a87300a88000a8c500a8d000a8d900a8e000a8f700a8fb00a8fb00a8fd00a92d00a93000a95300a96000a97c00a98000a9c000a9cf00a9d900a9e000a9fe00aa0000aa3600aa4000aa4d00aa5000aa5900aa6000aa7600aa7a00aac200aadb00aadd00aae000aaef00aaf200aaf600ab0100ab0600ab0900ab0e00ab1100ab1600ab2000ab2600ab2800ab2e00ab3000ab5a00ab5c00ab6900ab7000abea00abec00abed00abf000abf900ac0000d7a300d7b000d7c600d7cb00d7fb00f90000fa6d00fa7000fad900fb0000fb0600fb1300fb1700fb1d00fb2800fb2a00fb3600fb3800fb3c00fb3e00fb3e00fb4000fb4100fb4300fb4400fb4600fbb100fbd300fd3d00fd5000fd8f00fd9200fdc700fdf000fdfb00fe0000fe0f00fe2000fe2f00fe3300fe3400fe4d00fe4f00fe7000fe7400fe7600fefc00ff1000ff1900ff2100ff3a00ff3f00ff3f00ff4100ff5a00ff6600ffbe00ffc200ffc700ffca00ffcf00ffd200ffd700ffda00ffdc01000001000b01000d01002601002801003a01003c01003d01003f01004d01005001005d0100800100fa0101400101740101fd0101fd01028001029c0102a00102d00102e00102e001030001031f01032d01034a01035001037a01038001039d0103a00103c30103c80103cf0103d10103d501040001049d0104a00104a90104b00104d30104d80104fb01050001052701053001056301057001057a01057c01058a01058c0105920105940105950105970105a10105a30105b10105b30105b90105bb0105bc0105c00105f30106000107360107400107550107600107670107800107850107870107b00107b20107ba01080001080501080801080801080a01083501083701083801083c01083c01083f01085501086001087601088001089e0108e00108f20108f40108f50109000109150109200109390109800109b70109be0109bf010a00010a03010a05010a06010a0c010a13010a15010a17010a19010a35010a38010a3a010a3f010a3f010a60010a7c010a80010a9c010ac0010ac7010ac9010ae6010b00010b35010b40010b55010b60010b72010b80010b91010c00010c48010c80010cb2010cc0010cf2010d00010d27010d30010d39010d40010d65010d69010d6d010d6f010d85010e80010ea9010eab010eac010eb0010eb1010ec2010ec4010efc010f1c010f27010f27010f30010f50010f70010f85010fb0010fc4010fe0010ff601100001104601106601107501107f0110ba0110c20110c20110d00110e80110f00110f901110001113401113601113f0111440111470111500111730111760111760111800111c40111c90111cc0111ce0111da0111dc0111dc01120001121101121301123701123e01124101128001128601128801128801128a01128d01128f01129d01129f0112a80112b00112ea0112f00112f901130001130301130501130c01130f01131001131301132801132a01133001133201133301133501133901133b01134401134701134801134b01134d01135001135001135701135701135d01136301136601136c01137001137401138001138901138b01138b01138e01138e0113900113b50113b70113c00113c20113c20113c50113c50113c70113ca0113cc0113d30113e10113e201140001144a01145001145901145e0114610114800114c50114c70114c70114d00114d90115800115b50115b80115c00115d80115dd0116000116400116440116440116500116590116800116b80116c00116c90116d00116e301170001171a01171d01172b01173001173901174001174601180001183a0118a00118e90118ff01190601190901190901190c01191301191501191601191801193501193701193801193b0119430119500119590119a00119a70119aa0119d70119da0119e10119e30119e4011a00011a3e011a47011a47011a50011a99011a9d011a9d011ab0011af8011bc0011be0011bf0011bf9011c00011c08011c0a011c36011c38011c40011c50011c59011c72011c8f011c92011ca7011ca9011cb6011d00011d06011d08011d09011d0b011d36011d3a011d3a011d3c011d3d011d3f011d47011d50011d59011d60011d65011d67011d68011d6a011d8e011d90011d91011d93011d98011da0011da9011ee0011ef6011f00011f10011f12011f3a011f3e011f42011f50011f5a011fb0011fb001200001239901240001246e012480012543012f90012ff001300001342f0134400134550134600143fa014400014646016100016139016800016a38016a40016a5e016a60016a69016a70016abe016ac0016ac9016ad0016aed016af0016af4016b00016b36016b40016b43016b50016b59016b63016b77016b7d016b8f016d40016d6c016d70016d79016e40016e7f016f00016f4a016f4f016f87016f8f016f9f016fe0016fe1016fe3016fe4016ff0016ff10170000187f7018800018cd5018cff018d0801aff001aff301aff501affb01affd01affe01b00001b12201b13201b13201b15001b15201b15501b15501b16401b16701b17001b2fb01bc0001bc6a01bc7001bc7c01bc8001bc8801bc9001bc9901bc9d01bc9e01ccf001ccf901cf0001cf2d01cf3001cf4601d16501d16901d16d01d17201d17b01d18201d18501d18b01d1aa01d1ad01d24201d24401d40001d45401d45601d49c01d49e01d49f01d4a201d4a201d4a501d4a601d4a901d4ac01d4ae01d4b901d4bb01d4bb01d4bd01d4c301d4c501d50501d50701d50a01d50d01d51401d51601d51c01d51e01d53901d53b01d53e01d54001d54401d54601d54601d54a01d55001d55201d6a501d6a801d6c001d6c201d6da01d6dc01d6fa01d6fc01d71401d71601d73401d73601d74e01d75001d76e01d77001d78801d78a01d7a801d7aa01d7c201d7c401d7cb01d7ce01d7ff01da0001da3601da3b01da6c01da7501da7501da8401da8401da9b01da9f01daa101daaf01df0001df1e01df2501df2a01e00001e00601e00801e01801e01b01e02101e02301e02401e02601e02a01e03001e06d01e08f01e08f01e10001e12c01e13001e13d01e14001e14901e14e01e14e01e29001e2ae01e2c001e2f901e4d001e4f901e5d001e5fa01e7e001e7e601e7e801e7eb01e7ed01e7ee01e7f001e7fe01e80001e8c401e8d001e8d601e90001e94b01e95001e95901ee0001ee0301ee0501ee1f01ee2101ee2201ee2401ee2401ee2701ee2701ee2901ee3201ee3401ee3701ee3901ee3901ee3b01ee3b01ee4201ee4201ee4701ee4701ee4901ee4901ee4b01ee4b01ee4d01ee4f01ee5101ee5201ee5401ee5401ee5701ee5701ee5901ee5901ee5b01ee5b01ee5d01ee5d01ee5f01ee5f01ee6101ee6201ee6401ee6401ee6701ee6a01ee6c01ee7201ee7401ee7701ee7901ee7c01ee7e01ee7e01ee8001ee8901ee8b01ee9b01eea101eea301eea501eea901eeab01eebb01f13001f14901f15001f16901f17001f18901fbf001fbf902000002a6df02a70002b73902b74002b81d02b82002cea102ceb002ebe002ebf002ee5d02f80002fa1d03000003134a0313500323af0e01000e01ef\",\n",
     "new": "}\n\n// Derived Unicode data, subject to the Unicode license.\nunicode_word = table(\n\t\"00003000003900004100005a00005f00005f00006100007a0000aa0000aa0000b50000b50000ba0000ba0000c00000d60000d80000f60000f80002c10002c60002d10002e00002e40002ec0002ec0002ee0002ee00030000037400037600037700037a00037d00037f00037f00038600038600038800038a00038c00038c00038e0003a10003a30003f50003f700048100048300052f0005310005560005590005590005600005880005910005bd0005bf0005bf0005c10005c20005c40005c50005c70005c70005d00005ea0005ef0005f200061000061a00062000066900066e0006d30006d50006dc0006df0006e80006ea0006fc0006ff0006ff00071000074a00074d0007b10007c00007f50007fa0007fa0007fd0007fd00080000082d00084000085b00086000086a00087000088700088900088e0008970008e10008e300096300096600096f00097100098300098500098c00098f0009900009930009a80009aa0009b00009b20009b20009b60009b90009bc0009c40009c70009c80009cb0009ce0009d70009d70009dc0009dd0009df0009e30009e60009f10009fc0009fc0009fe0009fe000a01000a03000a05000a0a000a0f000a10000a13000a28000a2a000a30000a32000a33000a35000a36000a38000a39000a3c000a3c000a3e000a42000a47000a48000a4b000a4d000a51000a51000a59000a5c000a5e000a5e000a66000a75000a81000a83000a85000a8d000a8f000a91000a93000aa8000aaa000ab0000ab2000ab3000ab5000ab9000abc000ac5000ac7000ac9000acb000acd000ad0000ad0000ae0000ae3000ae6000aef000af9000aff000b01000b03000b05000b0c000b0f000b10000b13000b28000b2a000b30000b32000b33000b35000b39000b3c000b44000b47000b48000b4b000b4d000b55000b57000b5c000b5d000b5f000b63000b66000b6f000b71000b71000b82000b83000b85000b8a000b8e000b90000b92000b95000b99000b9a000b9c000b9c000b9e000b9f000ba3000ba4000ba8000baa000bae000bb9000bbe000bc2000bc6000bc8000bca000bcd000bd0000bd0000bd7000bd7000be6000bef000c00000c0c000c0e000c10000c12000c28000c2a000c39000c3c000c44000c46000c48000c4a000c4d000c55000c56000c58000c5a000c5d000c5d000c60000c63000c66000c6f000c80000c83000c85000c8c000c8e000c90000c92000ca8000caa000cb3000cb5000cb9000cbc000cc4000cc6000cc8000cca000ccd000cd5000cd6000cdd000cde000ce0000ce3000ce6000cef000cf1000cf3000d00000d0c000d0e000d10000d12000d44000d46000d48000d4a000d4e000d54000d57000d5f000d63000d66000d6f000d7a000d7f000d81000d83000d85000d96000d9a000db1000db3000dbb000dbd000dbd000dc0000dc6000dca000dca000dcf000dd4000dd6000dd6000dd8000ddf000de6000def000df2000df3000e01000e3a000e40000e4e000e50000e59000e81000e82000e84000e84000e86000e8a000e8c000ea3000ea5000ea5000ea7000ebd000ec0000ec4000ec6000ec6000ec8000ece000ed0000ed9000edc000edf000f00000f00000f18000f19000f20000f29000f35000f35000f37000f37000f39000f39000f3e000f47000f49000f6c000f71000f84000f86000f97000f99000fbc000fc6000fc600100000104900105000109d0010a00010c50010c70010c70010cd0010cd0010d00010fa0010fc00124800124a00124d00125000125600125800125800125a00125d00126000128800128a00128d0012900012b00012b20012b50012b80012be0012c00012c00012c20012c50012c80012d60012d800131000131200131500131800135a00135d00135f00138000138f0013a00013f50013f80013fd00140100166c00166f00167f00168100169a0016a00016ea0016ee0016f800170000171500171f00173400174000175300176000176c00176e0017700017720017730017800017d30017d70017d70017dc0017dd0017e00017e900180b00180d00180f0018190018200018780018800018aa0018b00018f500190000191e00192000192b00193000193b00194600196d0019700019740019800019ab0019b00019c90019d00019d9001a00001a1b001a20001a5e001a60001a7c001a7f001a89001a90001a99001aa7001aa7001ab0001ace001b00001b4c001b50001b59001b6b001b73001b80001bf3001c00001c37001c40001c49001c4d001c7d001c80001c8a001c90001cba001cbd001cbf001cd0001cd2001cd4001cfa001d00001f15001f18001f1d001f20001f45001f48001f4d001f50001f57001f59001f59001f5b001f5b001f5d001f5d001f5f001f7d001f80001fb4001fb6001fbc001fbe001fbe001fc2001fc4001fc6001fcc001fd0001fd3001fd6001fdb001fe0001fec001ff2001ff4001ff6001ffc00200c00200d00203f00204000205400205400207100207100207f00207f00209000209c0020d00020f000210200210200210700210700210a00211300211500211500211900211d00212400212400212600212600212800212800212a00212d00212f00213900213c00213f00214500214900214e00214e0021600021880024b60024e9002c00002ce4002ceb002cf3002d00002d25002d27002d27002d2d002d2d002d30002d67002d6f002d6f002d7f002d96002da0002da6002da8002dae002db0002db6002db8002dbe002dc0002dc6002dc8002dce002dd0002dd6002dd8002dde002de0002dff002e2f002e2f00300500300700302100302f00303100303500303800303c00304100309600309900309a00309d00309f0030a10030fa0030fc0030ff00310500312f00313100318e0031a00031bf0031f00031ff003400004dbf004e0000a48c00a4d000a4fd00a50000a60c00a61000a62b00a64000a67200a67400a67d00a67f00a6f100a71700a71f00a72200a78800a78b00a7cd00a7d000a7d100a7d300a7d300a7d500a7dc00a7f200a82700a82c00a82c00a84000a87300a88000a8c500a8d000a8d900a8e000a8f700a8fb00a8fb00a8fd00a92d00a93000a95300a96000a97c00a98000a9c000a9cf00a9d900a9e000a9fe00aa0000aa3600aa4000aa4d00aa5000aa5900aa6000aa7600aa7a00aac200aadb00aadd00aae000aaef00aaf200aaf600ab0100ab0600ab0900ab0e00ab1100ab1600ab2000ab2600ab2800ab2e00ab3000ab5a00ab5c00ab6900ab7000abea00abec00abed00abf000abf900ac0000d7a300d7b000d7c600d7cb00d7fb00f90000fa6d00fa7000fad900fb0000fb0600fb1300fb1700fb1d00fb2800fb2a00fb3600fb3800fb3c00fb3e00fb3e00fb4000fb4100fb4300fb4400fb4600fbb100fbd300fd3d00fd5000fd8f00fd9200fdc700fdf000fdfb00fe0000fe0f00fe2000fe2f00fe3300fe3400fe4d00fe4f00fe7000fe7400fe7600fefc00ff1000ff1900ff2100ff3a00ff3f00ff3f00ff4100ff5a00ff6600ffbe00ffc200ffc700ffca00ffcf00ffd200ffd700ffda00ffdc01000001000b01000d01002601002801003a01003c01003d01003f01004d01005001005d0100800100fa0101400101740101fd0101fd01028001029c0102a00102d00102e00102e001030001031f01032d01034a01035001037a01038001039d0103a00103c30103c80103cf0103d10103d501040001049d0104a00104a90104b00104d30104d80104fb01050001052701053001056301057001057a01057c01058a01058c0105920105940105950105970105a10105a30105b10105b30105b90105bb0105bc0105c00105f30106000107360107400107550107600107670107800107850107870107b00107b20107ba01080001080501080801080801080a01083501083701083801083c01083c01083f01085501086001087601088001089e0108e00108f20108f40108f50109000109150109200109390109800109b70109be0109bf010a00010a03010a05010a06010a0c010a13010a15010a17010a19010a35010a38010a3a010a3f010a3f010a60010a7c010a80010a9c010ac0010ac7010ac9010ae6010b00010b35010b40010b55010b60010b72010b80010b91010c00010c48010c80010cb2010cc0010cf2010d00010d27010d30010d39010d40010d65010d69010d6d010d6f010d85010e80010ea9010eab010eac010eb0010eb1010ec2010ec4010efc010f1c010f27010f27010f30010f50010f70010f85010fb0010fc4010fe0010ff601100001104601106601107501107f0110ba0110c20110c20110d00110e80110f00110f901110001113401113601113f0111440111470111500111730111760111760111800111c40111c90111cc0111ce0111da0111dc0111dc01120001121101121301123701123e01124101128001128601128801128801128a01128d01128f01129d01129f0112a80112b00112ea0112f00112f901130001130301130501130c01130f01131001131301132801132a01133001133201133301133501133901133b01134401134701134801134b01134d01135001135001135701135701135d01136301136601136c01137001137401138001138901138b01138b01138e01138e0113900113b50113b70113c00113c20113c20113c50113c50113c70113ca0113cc0113d30113e10113e201140001144a01145001145901145e0114610114800114c50114c70114c70114d00114d90115800115b50115b80115c00115d80115dd0116000116400116440116440116500116590116800116b80116c00116c90116d00116e301170001171a01171d01172b01173001173901174001174601180001183a0118a00118e90118ff01190601190901190901190c01191301191501191601191801193501193701193801193b0119430119500119590119a00119a70119aa0119d70119da0119e10119e30119e4011a00011a3e011a47011a47011a50011a99011a9d011a9d011ab0011af8011bc0011be0011bf0011bf9011c00011c08011c0a011c36011c38011c40011c50011c59011c72011c8f011c92011ca7011ca9011cb6011d00011d06011d08011d09011d0b011d36011d3a011d3a011d3c011d3d011d3f011d47011d50011d59011d60011d65011d67011d68011d6a011d8e011d90011d91011d93011d98011da0011da9011ee0011ef6011f00011f10011f12011f3a011f3e011f42011f50011f5a011fb0011fb001200001239901240001246e012480012543012f90012ff001300001342f0134400134550134600143fa014400014646016100016139016800016a38016a40016a5e016a60016a69016a70016abe016ac0016ac9016ad0016aed016af0016af4016b00016b36016b40016b43016b50016b59016b63016b77016b7d016b8f016d40016d6c016d70016d79016e40016e7f016f00016f4a016f4f016f87016f8f016f9f016fe0016fe1016fe3016fe4016ff0016ff10170000187f7018800018cd5018cff018d0801aff001aff301aff501affb01affd01affe01b00001b12201b13201b13201b15001b15201b15501b15501b16401b16701b17001b2fb01bc0001bc6a01bc7001bc7c01bc8001bc8801bc9001bc9901bc9d01bc9e01ccf001ccf901cf0001cf2d01cf3001cf4601d16501d16901d16d01d17201d17b01d18201d18501d18b01d1aa01d1ad01d24201d24401d40001d45401d45601d49c01d49e01d49f01d4a201d4a201d4a501d4a601d4a901d4ac01d4ae01d4b901d4bb01d4bb01d4bd01d4c301d4c501d50501d50701d50a01d50d01d51401d51601d51c01d51e01d53901d53b01d53e01d54001d54401d54601d54601d54a01d55001d55201d6a501d6a801d6c001d6c201d6da01d6dc01d6fa01d6fc01d71401d71601d73401d73601d74e01d75001d76e01d77001d78801d78a01d7a801d7aa01d7c201d7c401d7cb01d7ce01d7ff01da0001da3601da3b01da6c01da7501da7501da8401da8401da9b01da9f01daa101daaf01df0001df1e01df2501df2a01e00001e00601e00801e01801e01b01e02101e02301e02401e02601e02a01e03001e06d01e08f01e08f01e10001e12c01e13001e13d01e14001e14901e14e01e14e01e29001e2ae01e2c001e2f901e4d001e4f901e5d001e5fa01e7e001e7e601e7e801e7eb01e7ed01e7ee01e7f001e7fe01e80001e8c401e8d001e8d601e90001e94b01e95001e95901ee0001ee0301ee0501ee1f01ee2101ee2201ee2401ee2401ee2701ee2701ee2901ee3201ee3401ee3701ee3901ee3901ee3b01ee3b01ee4201ee4201ee4701ee4701ee4901ee4901ee4b01ee4b01ee4d01ee4f01ee5101ee5201ee5401ee5401ee5701ee5701ee5901ee5901ee5b01ee5b01ee5d01ee5d01ee5f01ee5f01ee6101ee6201ee6401ee6401ee6701ee6a01ee6c01ee7201ee7401ee7701ee7901ee7c01ee7e01ee7e01ee8001ee8901ee8b01ee9b01eea101eea301eea501eea901eeab01eebb01f13001f14901f15001f16901f17001f18901fbf001fbf902000002a6df02a70002b73902b74002b81d02b82002cea102ceb002ebe002ebf002ee5d02f80002fa1d03000003134a0313500323af0e01000e01ef\",\n"
   },
   {
-    "file": "std/src/result.i",
+    "file": "i/src/result.i",
     "line": 1,
     "hash": "801f977a013a1adc9788e94fd874572236f087dba8c0d770cd0334399ba1a4b9",
     "old": "//// Functions for the built-in type `Result(A, E) { Ok(A) Error(E) }`.\n////\n//// A `Result` is an error kept as a value. i also has errors as effects\n//// (`^ E` in a function type, `i/fail`): `to_error` and `catch` go from one\n//// form to the other.\n(\n",
     "new": "//// Functions for the built-in type `Result(A, E) = Ok(A) | Error(E)`.\n////\n//// A `Result` is an error kept as a value. i also has errors as effects\n//// (the `Fail(E)` service from `i/fail`): `to_error` and `catch` go from one\n//// form to the other.\n(\n"
   },
   {
-    "file": "std/src/result.i",
+    "file": "i/src/result.i",
     "line": 182,
     "hash": "e0afae122aecb2502fc905f6dd88a18644ec789716807e7fa631b73cf0a616cd",
     "old": "\n/// The value of an `Ok`. For `Error(x)`, the computation ends with the\n/// error `x` (§9.3), which `catch` or `i/fail` can take.\nto_error = <A, E>(result : Result(A, E)) -> A { fail.from_result(result) }\n\n",
     "new": "\n/// The value of an `Ok`. For `Error(x)`, the computation ends with the\n/// error `x`, which `catch` or `i/fail` can take.\nto_error = <A, E>(result : Result(A, E)) -> A { fail.from_result(result) }\n\n"
   },
   {
-    "file": "std/src/string.i",
+    "file": "i/src/string.i",
     "line": 508,
     "hash": "41d3d6376922cb7ee136a26b48f253a7e85d2228b8d385e0cc9ef4b5908d798a",
     "old": "}\n\n/// The text form of any value, as i source (§11.8).\n///\n/// ```i\n",
     "new": "}\n\n/// The text form of any value, as i source.\n///\n/// ```i\n"
   },
   {
-    "file": "std/src/time.i",
+    "file": "i/src/time.i",
     "line": 16,
     "hash": "8c7214ad598bf8527ce053d5c4dfbec4e66ec0bc155b504b11ba5d21375b48d3",
     "old": "//// compare_instants: (first: Instant, second: Instant) -> Order\n////\n//// T1: Unit constructors multiply by 1, 10^6, 10^9, 60*10^9 and 3600*10^9.\n//// Every Int is accepted, including negative counts; no overflow or clamping.\n//// T2: add, subtract and scale use exact integer arithmetic. divide rejects\n//// zero by raising DivisionByZero, otherwise rounds toward zero, including\n//// negative divisors. compare uses numeric order.\n//// T3: Instant zero is 1970-01-01T00:00:00Z. between(a,b) is b-a, shift adds\n//// a duration, and unix_nanoseconds reverses from_unix_nanoseconds. Instants\n//// cannot be added to one another. Equality compares canonical payloads.\n",
     "new": "//// compare_instants: (first: Instant, second: Instant) -> Order\n////\n//// Unit constructors multiply by 1, 10^6, 10^9, 60*10^9 and 3600*10^9.\n//// Every Int is accepted, including negative counts; no overflow or clamping.\n//// add, subtract and scale use exact integer arithmetic. divide rejects\n//// zero by raising DivisionByZero, otherwise rounds toward zero, including\n//// negative divisors. compare uses numeric order.\n//// Instant zero is 1970-01-01T00:00:00Z. between(a,b) is b-a, shift adds\n//// a duration, and unix_nanoseconds reverses from_unix_nanoseconds. Instants\n//// cannot be added to one another. Equality compares canonical payloads.\n"
   },
   {
-    "file": "std/test/calendar_test.i",
+    "file": "i/test/calendar_test.i",
     "line": 31,
     "hash": "951245a7c393126754172d924b121ec1f4861c688643381d89c3399467c8c7e1",
     "old": "}\n\n// C1/C2: validate in component order, without normalization.\ntest(\"calendar_validation\", () {\n\tlist.each([\n",
     "new": "}\n\n// validate in component order, without normalization.\ntest(\"calendar_validation\", () {\n\tlist.each([\n"
   },
   {
-    "file": "std/test/calendar_test.i",
+    "file": "i/test/calendar_test.i",
     "line": 132,
     "hash": "0f933439bfabfb60cd185ecd6f594adb8772bea3acd2bd3e195f6c73de3c544a",
     "old": "})\n\n// Review's independent day table follows C1/C3 and C4's weekday origin.\ntest(\"calendar_known_days\", () {\n\tcases = [\n",
     "new": "})\n\n// The independent day table uses the same epoch and weekday origin.\ntest(\"calendar_known_days\", () {\n\tcases = [\n"
   },
   {
-    "file": "std/test/calendar_test.i",
+    "file": "i/test/calendar_test.i",
     "line": 168,
     "hash": "261dee7121576b400ab62fd14a39e6207ad4b9c488431eec16bf488ea78213c8",
     "old": "\n// Independent January-based oracle from the review. The production algorithm\n// instead decomposes March-based 400-year eras (note §4.3). C3 requires floor\n// division; adjust the remainder to nonnegative here before dividing.\noracle_floor = (a : Int, b : Int) -> Int { { a - { a % b + b } % b } / b }\n",
     "new": "\n// Independent January-based oracle from the review. The production algorithm\n// instead decomposes March-based 400-year eras. Signed calendar conversion requires floor\n// division; adjust the remainder to nonnegative here before dividing.\noracle_floor = (a : Int, b : Int) -> Int { { a - { a % b + b } % b } / b }\n"
   },
   {
-    "file": "std/test/calendar_test.i",
+    "file": "i/test/calendar_test.i",
     "line": 198,
     "hash": "4aea758665a5dbafbaf5dd6910f0e5909923ee3edf0bc5e0ff19d4d5a2ec7282",
     "old": "}\n\n// C3: both inverse laws, independent reference, negative quotients and all\n// century/era boundaries in this range. Equality alone of two inverses would\n// miss a common shift; oracle_day establishes the required epoch separately.\n",
     "new": "}\n\n// both inverse laws, independent reference, negative quotients and all\n// century/era boundaries in this range. Equality alone of two inverses would\n// miss a common shift; oracle_day establishes the required epoch separately.\n"
   },
   {
-    "file": "std/test/calendar_test.i",
+    "file": "i/test/calendar_test.i",
     "line": 250,
     "hash": "8ba88e5690988ea459ac6881b51c23d7e18590d9815c990842c3fe33cd2916a4",
     "old": "})\n\n// C4: floor splitting for negative epoch nanoseconds and extreme offsets.\ntest(\"calendar_civil_boundaries\", () {\n\tepoch = time.from_unix_nanoseconds(0)\n",
     "new": "})\n\n// floor splitting for negative epoch nanoseconds and extreme offsets.\ntest(\"calendar_civil_boundaries\", () {\n\tepoch = time.from_unix_nanoseconds(0)\n"
   },
   {
-    "file": "std/test/calendar_test.i",
+    "file": "i/test/calendar_test.i",
     "line": 304,
     "hash": "b59bf26cefd0d72cf58afbd1dd11aa7a723698e89bcd910e4763b68e814d249b",
     "old": "})\n\n// C5/C6: canonical expanded years, fractions, and zero offsets.\ntest(\"calendar_text\", () {\n\tcases = [\n",
     "new": "})\n\n// canonical expanded years, fractions, and zero offsets.\ntest(\"calendar_text\", () {\n\tcases = [\n"
   },
   {
-    "file": "std/test/calendar_test.i",
+    "file": "i/test/calendar_test.i",
     "line": 334,
     "hash": "94a44418cce5c0727a434dd7cf0e04644c14e231c283261a620f5617fc711afe",
     "old": "\t\t\t}\n\t})\n\t// C5 requires every component constructor error to become BadText in parse.\n\tinvalid = [\n\t\t\"\",\n",
     "new": "\t\t\t}\n\t})\n\t// Calendar parsing requires every component constructor error to become\n\t// BadText in parse.\n\tinvalid = [\n\t\t\"\",\n"
   },
   {
-    "file": "std/test/calendar_test.i",
+    "file": "i/test/calendar_test.i",
     "line": 381,
     "hash": "8fae2f778965e9c14820622d181bfad6cab4fe5e6522c0845f60b2c7ec36e8dd",
-    "old": "\tNil\n})\n// C1 and spec §2.4 require constructor and constructor-update\n// privacy. Run these negative checks with the exact lane compiler, restoring\n// this owned file after each case. They are not deliberately failing @tests.\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/calendar_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/calendar_test.i')\n//| original = path.read_text()\n//| cases = {\n//|     'private Date constructor': 'bad = () { calendar.Date(2000, 13, 0) }',\n//|     'private Date update': 'bad = (d: calendar.Date) { calendar.Date(..d) }',\n//|     'private TimeOfDay constructor': 'bad = () { calendar.TimeOfDay(24, 0, 0, 0) }',\n//|     'private Offset constructor': 'bad = () { calendar.Offset(1440) }',\n//| }\n//| baseline = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)\n//| assert baseline.returncode == 0, baseline.stderr\n//| try:\n//|     for name, source in cases.items():\n//|         path.write_text(original + '\\n' + source + '\\n')\n//|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)\n//|         print(name, result.returncode, result.stderr, flush=True)\n//|         assert result.returncode == 1 and 'error[E0204]' in result.stderr\n//| finally:\n//|     path.write_text(original)\n",
+    "old": "\tNil\n})\n// C1 and spec §2.4 require constructor and constructor-update\n// privacy. Run these negative checks with the exact lane compiler, restoring\n// this owned file after each case. They are not deliberately failing @tests.\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"i/test/calendar_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/calendar_test.i')\n//| original = path.read_text()\n//| cases = {\n//|     'private Date constructor': 'bad = () { calendar.Date(2000, 13, 0) }',\n//|     'private Date update': 'bad = (d: calendar.Date) { calendar.Date(..d) }',\n//|     'private TimeOfDay constructor': 'bad = () { calendar.TimeOfDay(24, 0, 0, 0) }',\n//|     'private Offset constructor': 'bad = () { calendar.Offset(1440) }',\n//| }\n//| baseline = subprocess.run(['target/release/i', 'check', '--project' , "stdlib"], capture_output=True, text=True)\n//| assert baseline.returncode == 0, baseline.stderr\n//| try:\n//|     for name, source in cases.items():\n//|         path.write_text(original + '\\n' + source + '\\n')\n//|         result = subprocess.run(['target/release/i', 'check', '--project' , "stdlib"], capture_output=True, text=True)\n//|         print(name, result.returncode, result.stderr, flush=True)\n//|         assert result.returncode == 1 and 'error[E0204]' in result.stderr\n//| finally:\n//|     path.write_text(original)\n",
     "new": "\tNil\n})\n// Invalid components are rejected in component order without normalization.\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 32,
     "hash": "04f1f82c0882156ee41e21a71c5654bf6cdc77a064819206466c6d86da31f0fb",
     "old": "options = () -> cli.Parser(Options) { cli.map2(jobs(), verbose(), Options) }\n\n// A2/A3/A6/A7: the note's complete typed description and integer examples.\ntest(\"cli_options\", () {\n\tassert(\n",
     "new": "options = () -> cli.Parser(Options) { cli.map2(jobs(), verbose(), Options) }\n\n// the note's complete typed description and integer examples.\ntest(\"cli_options\", () {\n\tassert(\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 139,
     "hash": "011501ac071bccbe3763a468c82bdb0c8d2403f32109b4abdefa43bcb3a7160c",
     "old": "})\n\n// A1: validate spelling before duplicate names, then positional placement.\ntest(\"cli_definition_errors\", () {\n\tstop_int = (_ : String) -> Result(Int, String) {\n",
     "new": "})\n\n// validate spelling before duplicate names, then positional placement.\ntest(\"cli_definition_errors\", () {\n\tstop_int = (_ : String) -> Result(Int, String) {\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 318,
     "hash": "8d3ea72c4e34a18736f8911d0e6054cf1da831a5de61ff7601a517ec1c0c7a92",
     "old": "})\n\n// A2/A3: token spelling, separator ownership and values independent of readers.\ntest(\"cli_token_ownership\", () {\n\tlist.each([[\"--jobs\"], [\"--jobs\", \"--\"], [\"-j\"], [\"-j\", \"--\"]], (args) {\n",
     "new": "})\n\n// token spelling, separator ownership and values independent of readers.\ntest(\"cli_token_ownership\", () {\n\tlist.each([[\"--jobs\"], [\"--jobs\", \"--\"], [\"-j\"], [\"-j\", \"--\"]], (args) {\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 478,
     "hash": "c58b01b8de367124a5fc6991f02908ac2092c7b4b50fae446f16324a6a3ac353",
     "old": "})\n\n// A4: repetition precedes arity checking and aliases identify the same leaf.\ntest(\"cli_repetition\", () {\n\tassert(\n",
     "new": "})\n\n// repetition precedes arity checking and aliases identify the same leaf.\ntest(\"cli_repetition\", () {\n\tassert(\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 538,
     "hash": "7093cf136e7c487fe4920c6a3b4fbfda343423f03ca0d3c7b2585fc43973075e",
     "old": "})\n\n// A5/A6: allocation is completed before any missing/conversion callback runs.\ntest(\"cli_error_order\", () {\n\tassert(\n",
     "new": "})\n\n// allocation is completed before any missing/conversion callback runs.\ntest(\"cli_error_order\", () {\n\tassert(\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 680,
     "hash": "728a1d092590e4cd5b39b7a528c91a8ad67483e484448c55e947a67075f57e80",
     "old": "})\n\n// A5: optional absence and caller-supplied defaults; ordered positional rest.\ntest(\"cli_allocation\", () {\n\to = cli.optional(\n",
     "new": "})\n\n// optional absence and caller-supplied defaults; ordered positional rest.\ntest(\"cli_allocation\", () {\n\to = cli.optional(\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 729,
     "hash": "ec4d052f983705d4ac914d5153b1a72f64a9e7b671e4522f5e13dcf287d82204",
     "old": "})\n\n// A7: exactly std/int.parse's signed ASCII decimal grammar, with fixed error.\ntest(\"cli_converters\", () {\n\tlist.each([\n",
     "new": "})\n\n// exactly std/int.parse's signed ASCII decimal grammar, with fixed error.\ntest(\"cli_converters\", () {\n\tlist.each([\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 759,
     "hash": "df180624d9c4259baa1ae09f20a2e9d31e148126ebf3390b3a5089f48f812f43",
     "old": "})\n\n// A6 and the observation laws: heterogeneous types and every bucket consumed.\ntest(\"cli_composition_laws\", () {\n\tassert(\n",
     "new": "})\n\n// The bucket observation laws: heterogeneous types and every bucket consumed.\ntest(\"cli_composition_laws\", () {\n\tassert(\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 849,
     "hash": "08610202d9347ef2098be29098bb0717b9369767fe0d8d285a4c3b5115e98ec7",
     "old": "})\n\n// A8: byte-exact help, all display forms, verbatim content, no callbacks.\ntest(\"cli_help\", () {\n\tassert(\n",
     "new": "})\n\n// byte-exact help, all display forms, verbatim content, no callbacks.\ntest(\"cli_help\", () {\n\tassert(\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 981,
     "hash": "2467a8999a40216a0a5b2a8e6db93c6ea7b6b117c9910fee98c3f7b26274eeef",
     "old": "})\n\n// A2/A4 and §5.4: reverse accumulators preserve large inputs without suffix copies.\ntest(\"cli_long_inputs\", () {\n\tvalue = string.repeat(\"é\", 20000)\n",
     "new": "})\n\n// Reverse accumulators preserve large inputs without suffix copies.\ntest(\"cli_long_inputs\", () {\n\tvalue = string.repeat(\"é\", 20000)\n"
   },
   {
-    "file": "std/test/cli_test.i",
+    "file": "i/test/cli_test.i",
     "line": 1013,
     "hash": "a62398ef1937c80df66a88745c6698b555fe635facb7a76d0a0afacd741fa3fb",
-    "old": "\tNil\n})\n// §5.4: check the private decoder by compiling the production source as this\n// test module, with an internal test appended. This verifies supplied empty\n// buckets and the exact unused suffix. Restore this file even if a check fails.\n// Run from the lane after building target/release/i:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/cli_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/cli_test.i')\n//| original = path.read_text()\n//| implementation = Path('std/src/cli.i').read_text()\n//| case = '''\n//| @test\n//| cli_bucket_contract = () {\n//|   p = map2(pure(2), map2(flag(Names(\"verbose\", None), \"\"), optional(Names(\"jobs\", None), \"\", integer), (v, n) { (v, n) }), (a, pair: (Bool, Option(Int))) { (a, pair.0, pair.1) })\n//|   Parser(fields, decode) = p\n//|   assert(list.length(fields) == 2)\n//|   assert(decode([[], []]) == Ok(((2, False, None), [])))\n//|   sentinel = [Token(9, \"unused\")]\n//|   assert(decode([[Token(0, \"--verbose\")], [Token(1, \"4\")], sentinel]) == Ok(((2, True, Some(4)), [sentinel])))\n//|   assert(parse(p, []) == Ok((2, False, None)))\n//|   Nil\n//| }\n//| '''\n//| try:\n//|     path.write_text(implementation + '\\n' + case)\n//|     for level in ('0', '2'):\n//|         result = subprocess.run(['target/release/i', 'test', '--project', 'std', '--opt', level, 'cli_bucket_contract'], capture_output=True, text=True)\n//|         print('bucket contract opt ' + level, result.returncode, result.stdout, result.stderr, flush=True)\n//|         assert result.returncode == 0 and '1 passed, 0 failed' in result.stdout\n//| finally:\n//|     path.write_text(original)\n",
+    "old": "\tNil\n})\n// §5.4: check the private decoder by compiling the production source as this\n// test module, with an internal test appended. This verifies supplied empty\n// buckets and the exact unused suffix. Restore this file even if a check fails.\n// Run from the lane after building target/release/i:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"i/test/cli_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/cli_test.i')\n//| original = path.read_text()\n//| implementation = Path('std/src/cli.i').read_text()\n//| case = '''\n//| @test\n//| cli_bucket_contract = () {\n//|   p = map2(pure(2), map2(flag(Names(\"verbose\", None), \"\"), optional(Names(\"jobs\", None), \"\", integer), (v, n) { (v, n) }), (a, pair: (Bool, Option(Int))) { (a, pair.0, pair.1) })\n//|   Parser(fields, decode) = p\n//|   assert(list.length(fields) == 2)\n//|   assert(decode([[], []]) == Ok(((2, False, None), [])))\n//|   sentinel = [Token(9, \"unused\")]\n//|   assert(decode([[Token(0, \"--verbose\")], [Token(1, \"4\")], sentinel]) == Ok(((2, True, Some(4)), [sentinel])))\n//|   assert(parse(p, []) == Ok((2, False, None)))\n//|   Nil\n//| }\n//| '''\n//| try:\n//|     path.write_text(implementation + '\\n' + case)\n//|     for level in ('0', '2'):\n//|         result = subprocess.run(['target/release/i', 'test', '--project' , "stdlib", '--opt', level, 'cli_bucket_contract'], capture_output=True, text=True)\n//|         print('bucket contract opt ' + level, result.returncode, result.stdout, result.stderr, flush=True)\n//|         assert result.returncode == 0 and '1 passed, 0 failed' in result.stdout\n//| finally:\n//|     path.write_text(original)\n",
     "new": "\tNil\n})\n// Bucket consumption must preserve heterogeneous values without leaking needs.\n"
   },
   {
-    "file": "std/test/json_test.i",
+    "file": "i/test/json_test.i",
     "line": 891,
     "hash": "f18d162f5d72838452843d80ad91702bcb114133be5cad22ed25d8b1b7364de4",
     "old": "})\n\n// E4: successful operations return values, and the same parse error is data\n// only after catch (syntax-3 §2.10.6, Library style).\ntest(\"e4_json_parse_fail\", () {\n\tassert(json.parse(\"null\") == json.Null)\n",
     "new": "})\n\n// successful operations return values, and the same parse error is data\n// only after catch.\ntest(\"e4_json_parse_fail\", () {\n\tassert(json.parse(\"null\") == json.Null)\n"
   },
   {
-    "file": "std/test/list_test.i",
+    "file": "i/test/list_test.i",
     "line": 1867,
     "hash": "40fd95c2d60fca2437bc48bba0e45026d8ba46a505f8fbe95174ba6b54db603a",
     "old": "Yield(A) = (emit = (A) -> Nil)\n\n// A generator made with `i/control` (§9.4).\ncollect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {\n\tcontrol.boundary((b) {\n",
     "new": "Yield(A) = (emit = (A) -> Nil)\n\n// A generator made with `i/control`.\ncollect = <A, N>(body : () <- (Fail(Never), Yield(A), ..N) -> Nil) -> List(A) {\n\tcontrol.boundary((b) {\n"
   },
   {
-    "file": "std/test/log_test.i",
+    "file": "i/test/log_test.i",
     "line": 19,
     "hash": "436436aa75dde189ab5d91d8dd1a1a2f56766d0ab1ec11ec3c307e51e4af89ce",
     "old": "record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }\n\n// std-2 §7: finite, closed instantiations retain service and error types.\ndeliver : (log.Entry) <- (\n\tFail(String),\n",
     "new": "record = (event : Event) <- (capture : Capture) -> Nil { capture.record(event) }\n\n// Finite, closed instantiations retain service and error types.\ndeliver : (log.Entry) <- (\n\tFail(String),\n"
   },
   {
-    "file": "std/test/log_test.i",
+    "file": "i/test/log_test.i",
     "line": 45,
     "hash": "70e80e8e60a35dedf7b33e77c442268517da36120fe6334bd0c060ee7ab21e37",
     "old": "}\n\n// L1/L2 and the sequential service law: entry fields and timestamps are data.\ntest(\"log_delivery\", () {\n\toriginal = log.Entry(\n",
     "new": "}\n\n// Entry fields and timestamps remain data through sequential service calls.\ntest(\"log_delivery\", () {\n\toriginal = log.Entry(\n"
   },
   {
-    "file": "std/test/log_test.i",
+    "file": "i/test/log_test.i",
     "line": 80,
     "hash": "0f0a120fbfdc1719a143c91ae69aa5deed915362c769770c8529cbde92693b4a",
     "old": "})\n\n// L3: rejection suppresses both callbacks; eager arguments still evaluate.\ntest(\"log_lazy\", () {\n\ttrace = control.boundary((b) {\n",
     "new": "})\n\n// rejection suppresses both callbacks; eager arguments still evaluate.\ntest(\"log_lazy\", () {\n\ttrace = control.boundary((b) {\n"
   },
   {
-    "file": "std/test/log_test.i",
+    "file": "i/test/log_test.i",
     "line": 137,
     "hash": "7b451ba8efce388bf2773c616b4e5b3580c137c136dc3af6141982733fecf936",
     "old": "})\n\n// L4 and both filter laws: thresholds follow L1's four explicitly ordered levels.\ntest(\"log_filters\", () {\n\tlevels = [log.Debug, log.Info, log.Warning, log.Failure]\n",
     "new": "})\n\n// L4 and both filter laws: thresholds follow the four explicitly ordered levels.\ntest(\"log_filters\", () {\n\tlevels = [log.Debug, log.Info, log.Warning, log.Failure]\n"
   },
   {
-    "file": "std/test/log_test.i",
+    "file": "i/test/log_test.i",
     "line": 208,
     "hash": "b0e8835b944983c3b506643cacefdfaea9d33044799f0b6f28baf3d1dcda37de",
     "old": "\t})\n\tassert(trace == list.map(levels, (level) { Sent(entry(level)) }))\n\t// L4 requires new_accept before old_accept and short-circuiting.\n\t{\n\t\tassert(query(log.Info) == False)\n",
     "new": "\t})\n\tassert(trace == list.map(levels, (level) { Sent(entry(level)) }))\n\t// Filter composition requires new_accept before old_accept and short-circuiting.\n\t{\n\t\tassert(query(log.Info) == False)\n"
   },
   {
-    "file": "std/test/log_test.i",
+    "file": "i/test/log_test.i",
     "line": 227,
     "hash": "6643cff66b9f9928b89bdd42989504764ff160f1259b39068308600b8371fb0d",
     "old": ") -> Nil = log.write\n\n// L2/L5: a custom error is preserved, with no retry or swallowed failure.\ntest(\"log_errors\", () {\n\ttrace = control.boundary((b) {\n",
     "new": ") -> Nil = log.write\n\n// a custom error is preserved, with no retry or swallowed failure.\ntest(\"log_errors\", () {\n\ttrace = control.boundary((b) {\n"
   },
   {
-    "file": "std/test/log_test.i",
+    "file": "i/test/log_test.i",
     "line": 258,
     "hash": "5b292fa514c0b5663956978f65f3ec9108e71d392d8f19ebed4879b29e71cb32",
     "old": "})\n\n// L6: fixed expected bytes derive from the format rule, not core.inspect.\ntest(\"log_format\", () {\n\tassert(\n",
     "new": "})\n\n// fixed expected bytes derive from the format rule, not core.inspect.\ntest(\"log_format\", () {\n\tassert(\n"
   },
   {
-    "file": "std/test/path_test.i",
+    "file": "i/test/path_test.i",
     "line": 7,
     "hash": "f40815535804afb00f2e546f15f2ad82102a7599e1699b7552121c0f27a5b24f",
     "old": ")\n\n// Expected spellings in these tables are the examples and rules of std-1 §5.\ntest(\"path_clean_examples\", () {\n\tlist.each([\n",
     "new": ")\n\n// Expected spellings in these tables are the documented examples and rules of\n// path handling.\ntest(\"path_clean_examples\", () {\n\tlist.each([\n"
   },
   {
-    "file": "std/test/path_test.i",
+    "file": "i/test/path_test.i",
     "line": 97,
     "hash": "97fee2d5847c67e1b4e8c56d76725e35fa4d3654c311b34eef25524a0c79ad33",
     "old": "}\n\n// §5.3: clean idempotence, exact raw split, and the successful relative law.\ntest(\"path_exhaustive_laws\", () {\n\tpaths = short_paths(4)\n",
     "new": "}\n\n// Clean idempotence, exact raw split, and the successful relative law.\ntest(\"path_exhaustive_laws\", () {\n\tpaths = short_paths(4)\n"
   },
   {
-    "file": "std/test/path_test.i",
+    "file": "i/test/path_test.i",
     "line": 124,
     "hash": "3d389e89868a45b96438dab107bcde8758c89d833d37626f6d797f54a9106bec",
     "old": "})\n\n// §5.3 calls for 100,000 segments, multibyte names, and long dot/parent runs.\ntest(\"path_long_inputs\", () {\n\tnames = list.repeat(\"é猫\", 100000)\n",
     "new": "})\n\n// The path functions handle 100,000 segments, multibyte names, and long dot/parent runs.\ntest(\"path_long_inputs\", () {\n\tnames = list.repeat(\"é猫\", 100000)\n"
   },
   {
-    "file": "std/test/property_test.i",
+    "file": "i/test/property_test.i",
     "line": 670,
     "hash": "19b2be6644b9c0a2341b4687d74dd02e356a7cd072dfc00d85a360e51d3cceb5",
     "old": "\tten = find_ten(ints, 0)\n\tgen = property.make((_, _) { Some(ten) })\n\t// P7 also counts Discard; it never descends into that child.\n\tpredicate = (x : Int) -> property.Verdict {\n\t\t{ x >= 6 } |>\n",
     "new": "\tten = find_ten(ints, 0)\n\tgen = property.make((_, _) { Some(ten) })\n\t// The search also counts Discard; it never descends into that child.\n\tpredicate = (x : Int) -> property.Verdict {\n\t\t{ x >= 6 } |>\n"
   },
   {
-    "file": "std/test/sequence_test.i",
+    "file": "i/test/sequence_test.i",
     "line": 17,
     "hash": "742f342b8ca83d5a29aeef16b55201a66e73ad7132485efe2b3a8e64a1762b8e",
     "old": "}\n\n// std-1 §4.3's example table, Q1 and Q2, including saved source versions.\ntest(\"sequence_examples\", () {\n\tempty = sequence.new()\n",
     "new": "}\n\n// The example table of the sequence documentation, including saved source versions.\ntest(\"sequence_examples\", () {\n\tempty = sequence.new()\n"
   },
   {
-    "file": "std/test/sequence_test.i",
+    "file": "i/test/sequence_test.i",
     "line": 57,
     "hash": "ad346049eaee76cf3f539daf96b6e6b198d07151ec16d23e15b28ae1d52296f6",
     "old": "})\n\n// §4.3 laws compare observable elements, never private representation equality.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {\n\ta = sequence.from_list(xs)\n",
     "new": "})\n\n// Sequence laws compare observable elements, never private representation equality.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {\n\ta = sequence.from_list(xs)\n"
   },
   {
-    "file": "std/test/sequence_test.i",
+    "file": "i/test/sequence_test.i",
     "line": 188,
     "hash": "ba98808dea1f2518db0d12b757ac91def6be7e2956d05ab858b69a29d7a54ea0",
     "old": "})\n\n// A fixed generator branches from retained versions, as required by §4.3.\nprng = (seed : Int) -> Int { { seed * 1664525 + 1013904223 } % 4294967296 }\n\n",
     "new": "})\n\n// A fixed generator branches from retained versions, which must stay unchanged.\nprng = (seed : Int) -> Int { { seed * 1664525 + 1013904223 } % 4294967296 }\n\n"
   },
   {
-    "file": "std/test/sequence_test.i",
+    "file": "i/test/sequence_test.i",
     "line": 468,
     "hash": "d305ade77fd8e2cdbf9ecc84b412baaa77477d8c12f568046720b8630e33c661",
     "old": "})\n\n// Q4 and §4.3: unrelated shapes compare by elements. Both repeated insertion\n// directions exercise full digits, promoted middle nodes, and retained roots.\ntest(\"sequence_independent_histories\", () {\n",
     "new": "})\n\n// Unrelated shapes compare by elements. Both repeated insertion\n// directions exercise full digits, promoted middle nodes, and retained roots.\ntest(\"sequence_independent_histories\", () {\n"
   },
   {
-    "file": "std/test/sequence_test.i",
+    "file": "i/test/sequence_test.i",
     "line": 499,
     "hash": "1426810195013331a34bf8b78b7092d3509263f929e805680f99201664ee2197",
-    "old": "\tNil\n})\n// Development checks for std-1 §4.3. The Python program below temporarily adds\n// private rank/cache audits, then counts helper entries as node work. It restores\n// both owned files in finally, even when a check fails. No production exports or\n// costs change. Counts are deterministic operation counts, not timings.\n// Run from this lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/sequence_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import os, re, subprocess\n//| from pathlib import Path\n//| src = Path('std/src/sequence.i')\n//| test = Path('std/test/sequence_test.i')\n//| original_src, original_test = src.read_text(), test.read_text()\n//| compiler = '/home/agent/Programming/i/.rd/cache/bin/i-1df2fe0'\n//| header = re.compile(r'(?m)^([a-z_]\\w*(?:\\([^\\n]*\\))? = \\([\\s\\S]*?\\) -> [^\\n{]+) \\{')\n//| def effect(h, service):\n//|     if ' ! ' in h.rsplit(') -> ', 1)[-1]:\n//|         return h + ' | ' + service\n//|     return h + ' ! ' + service\n//| def exports(s, extra):\n//|     return s.replace('\\n\\tSequence\\n', '\\n\\tSequence\\n\\t' + extra + '\\n', 1)\n//| def run(filter):\n//|     subprocess.run([compiler, 'test', '--project', 'std', '--opt', '0', filter], check=True)\n//| audit = '''\n//| audit(A) = (s: Sequence(A)) -> Nil ! Assert {\n//|   Sequence(t) = s\n//|   audit_tree(t, 0)\n//|   Nil\n//| }\n//| audit_node(A) = (x: Node(A), rank: Int) -> Int ! Assert {\n//|   x |> {\n//|     Leaf(_) -> { assert(rank == 0) 1 }\n//|     Branch2(n, a, b) -> {\n//|       assert(rank > 0)\n//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|     Branch3(n, a, b, c) -> {\n//|       assert(rank > 0)\n//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1) + audit_node(c, rank - 1)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|   }\n//| }\n//| audit_digit(A) = (xs: List(Node(A)), rank: Int) -> Int ! Assert {\n//|   n = list.length(xs)\n//|   assert(n >= 1 && n <= 4)\n//|   list.fold(xs, 0, (acc, x) { acc + audit_node(x, rank) })\n//| }\n//| audit_tree(A) = (t: Tree(A), rank: Int) -> Int ! Assert {\n//|   t |> {\n//|     EmptyTree -> 0\n//|     Single(x) -> audit_node(x, rank)\n//|     Deep(n, left, middle, right) -> {\n//|       actual = audit_digit(left, rank) + audit_tree(middle, rank + 1) + audit_digit(right, rank)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|   }\n//| }\n//| '''\n//| edit_args = {\n//|   'new': '', 'wrap': 'item', 'from_list': 'items', 'push_front': 'to, item',\n//|   'push_back': 'to, item', 'pop_front': 'from', 'pop_back': 'from',\n//|   'set': 'in, index, value', 'append': 'first, second', 'split': 'sequence, at',\n//|   'take': 'from, up_to', 'drop': 'from, up_to', 'reverse': 'sequence', 'map': 'over, with'\n//| }\n//| def audit_edit(match):\n//|     h = match[1]\n//|     name = h.split('(', 1)[0]\n//|     h = effect(h, 'Assert')\n//|     if name not in edit_args:\n//|         return h + ' {'\n//|     checks = 'audit(result)'\n//|     if name == 'set':\n//|         checks = 'result |> { None -> Nil Some(s) -> audit(s) }'\n//|     elif name.startswith('pop_'):\n//|         checks = 'result |> { None -> Nil Some((_, s)) -> audit(s) }'\n//|     elif name == 'split':\n//|         checks = '(a, b) = result\\n audit(a)\\n audit(b)'\n//|     wrappers.append(h + ' {\\n result = unchecked_' + name + '(' + edit_args[name] + ')\\n ' + checks + '\\n result\\n}\\n')\n//|     return h.replace(name, 'unchecked_' + name, 1) + ' {'\n//| try:\n//|     wrappers = []\n//|     variant = header.sub(audit_edit, original_src)\n//|     src.write_text(exports(variant, 'audit') + audit + '\\n'.join(wrappers))\n//|     # All generated/edit results are audited, including every small/model edit.\n//|     # Large drains already run in the normal suite; omit their quadratic audits.\n//|     test.write_text(original_test.replace('drain(s, 0, n)', '{ n <= 257 } |> { True -> drain(s, 0, n) False -> Nil }'))\n//|     print('Private invariant audit: ranks, cached leaf counts, bounded nonempty digits', flush=True)\n//|     run('sequence')\n//|     def meter(match):\n//|         return effect(match[1], 'Meter') + ' {\\n touch()'\n//|     variant = header.sub(meter, original_src)\n//|     # Count the unbounded local loops too, so a flattening regression is visible.\n//|     variant = re.sub(r'(go = \\([^\\n]*\\) \\{)', r'\\1\\n touch()', variant)\n//|     src.write_text(exports(variant, 'Meter(..)') + '''\n//| Meter { Meter(touch: () -> Nil) }\n//| touch = (meter ! Meter) -> Nil ! Meter { meter.touch() }\n//| ''')\n//|     test.write_text('''\n//| (i/control, i/core, (Io) = i/io, sequence = std/sequence, list = std/list)\n//| count = (body: () -> Nil ! sequence.Meter) -> Int {\n//|   control.boundary((b) {\n//|     ! sequence.Meter = sequence.Meter(() {\n//|       control.suspend(b, (k) { 1 + control.resume(k, Nil) })\n//|     })\n//|     body()\n//|     0\n//|   })\n//| }\n//| height = (n: Int) -> Int { { n <= 1 } |> { True -> 1 False -> 1 + height(n / 2) } }\n//| @test\n//| sequence_node_counts = (io ! Io) {\n//|   ! sequence.Meter = sequence.Meter(() { Nil })\n//|   list.each([16, 64, 256, 1024, 4096, 16384, 65536, 100000], (n) {\n//|     s = sequence.from_list(list.range(0, n - 1))\n//|     small = sequence.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9])\n//|     list.each([0, n / 4, n / 2, n - 1], (i) {\n//|       a = count(() { sequence.at(s, i) Nil })\n//|       b = count(() { sequence.set(s, i, -1) Nil })\n//|       c = count(() { sequence.split(s, i) Nil })\n//|       // §4.3 requires height work, not these particular implementation constants.\n//|       assert(a <= 80 * height(n))\n//|       assert(b <= 80 * height(n))\n//|       assert(c <= 160 * height(n))\n//|       io.print(core.inspect((n, i, a, b, c)))\n//|     })\n//|     alias = count(() { sequence.append(s, s) Nil })\n//|     left = count(() { sequence.append(s, small) Nil })\n//|     right = count(() { sequence.append(small, s) Nil })\n//|     assert(alias <= 160 * height(n))\n//|     assert(left <= 160 * height(n))\n//|     assert(right <= 160 * height(n))\n//|     io.print(core.inspect((n, alias, left, right)))\n//|   })\n//|   Nil\n//| }\n//| ''')\n//|     print('Counts: (length, index, at, set, split); (length, append_alias, append_short_right, append_short_left)', flush=True)\n//|     run('sequence_node_counts')\n//| finally:\n//|     src.write_text(original_src)\n//|     test.write_text(original_test)\n",
+    "old": "\tNil\n})\n// Development checks for std-1 §4.3. The Python program below temporarily adds\n// private rank/cache audits, then counts helper entries as node work. It restores\n// both owned files in finally, even when a check fails. No production exports or\n// costs change. Counts are deterministic operation counts, not timings.\n// Run from this lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"i/test/sequence_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import os, re, subprocess\n//| from pathlib import Path\n//| src = Path('std/src/sequence.i')\n//| test = Path('std/test/sequence_test.i')\n//| original_src, original_test = src.read_text(), test.read_text()\n//| compiler = '/home/agent/Programming/i/.rd/cache/bin/i-1df2fe0'\n//| header = re.compile(r'(?m)^([a-z_]\\w*(?:\\([^\\n]*\\))? = \\([\\s\\S]*?\\) -> [^\\n{]+) \\{')\n//| def effect(h, service):\n//|     if ' ! ' in h.rsplit(') -> ', 1)[-1]:\n//|         return h + ' | ' + service\n//|     return h + ' ! ' + service\n//| def exports(s, extra):\n//|     return s.replace('\\n\\tSequence\\n', '\\n\\tSequence\\n\\t' + extra + '\\n', 1)\n//| def run(filter):\n//|     subprocess.run([compiler, 'test', '--project' , "stdlib", '--opt', '0', filter], check=True)\n//| audit = '''\n//| audit(A) = (s: Sequence(A)) -> Nil ! Assert {\n//|   Sequence(t) = s\n//|   audit_tree(t, 0)\n//|   Nil\n//| }\n//| audit_node(A) = (x: Node(A), rank: Int) -> Int ! Assert {\n//|   x |> {\n//|     Leaf(_) -> { assert(rank == 0) 1 }\n//|     Branch2(n, a, b) -> {\n//|       assert(rank > 0)\n//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|     Branch3(n, a, b, c) -> {\n//|       assert(rank > 0)\n//|       actual = audit_node(a, rank - 1) + audit_node(b, rank - 1) + audit_node(c, rank - 1)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|   }\n//| }\n//| audit_digit(A) = (xs: List(Node(A)), rank: Int) -> Int ! Assert {\n//|   n = list.length(xs)\n//|   assert(n >= 1 && n <= 4)\n//|   list.fold(xs, 0, (acc, x) { acc + audit_node(x, rank) })\n//| }\n//| audit_tree(A) = (t: Tree(A), rank: Int) -> Int ! Assert {\n//|   t |> {\n//|     EmptyTree -> 0\n//|     Single(x) -> audit_node(x, rank)\n//|     Deep(n, left, middle, right) -> {\n//|       actual = audit_digit(left, rank) + audit_tree(middle, rank + 1) + audit_digit(right, rank)\n//|       assert(n == actual)\n//|       actual\n//|     }\n//|   }\n//| }\n//| '''\n//| edit_args = {\n//|   'new': '', 'wrap': 'item', 'from_list': 'items', 'push_front': 'to, item',\n//|   'push_back': 'to, item', 'pop_front': 'from', 'pop_back': 'from',\n//|   'set': 'in, index, value', 'append': 'first, second', 'split': 'sequence, at',\n//|   'take': 'from, up_to', 'drop': 'from, up_to', 'reverse': 'sequence', 'map': 'over, with'\n//| }\n//| def audit_edit(match):\n//|     h = match[1]\n//|     name = h.split('(', 1)[0]\n//|     h = effect(h, 'Assert')\n//|     if name not in edit_args:\n//|         return h + ' {'\n//|     checks = 'audit(result)'\n//|     if name == 'set':\n//|         checks = 'result |> { None -> Nil Some(s) -> audit(s) }'\n//|     elif name.startswith('pop_'):\n//|         checks = 'result |> { None -> Nil Some((_, s)) -> audit(s) }'\n//|     elif name == 'split':\n//|         checks = '(a, b) = result\\n audit(a)\\n audit(b)'\n//|     wrappers.append(h + ' {\\n result = unchecked_' + name + '(' + edit_args[name] + ')\\n ' + checks + '\\n result\\n}\\n')\n//|     return h.replace(name, 'unchecked_' + name, 1) + ' {'\n//| try:\n//|     wrappers = []\n//|     variant = header.sub(audit_edit, original_src)\n//|     src.write_text(exports(variant, 'audit') + audit + '\\n'.join(wrappers))\n//|     # All generated/edit results are audited, including every small/model edit.\n//|     # Large drains already run in the normal suite; omit their quadratic audits.\n//|     test.write_text(original_test.replace('drain(s, 0, n)', '{ n <= 257 } |> { True -> drain(s, 0, n) False -> Nil }'))\n//|     print('Private invariant audit: ranks, cached leaf counts, bounded nonempty digits', flush=True)\n//|     run('sequence')\n//|     def meter(match):\n//|         return effect(match[1], 'Meter') + ' {\\n touch()'\n//|     variant = header.sub(meter, original_src)\n//|     # Count the unbounded local loops too, so a flattening regression is visible.\n//|     variant = re.sub(r'(go = \\([^\\n]*\\) \\{)', r'\\1\\n touch()', variant)\n//|     src.write_text(exports(variant, 'Meter(..)') + '''\n//| Meter { Meter(touch: () -> Nil) }\n//| touch = (meter ! Meter) -> Nil ! Meter { meter.touch() }\n//| ''')\n//|     test.write_text('''\n//| (i/control, i/core, (Io) = i/io, sequence = std/sequence, list = std/list)\n//| count = (body: () -> Nil ! sequence.Meter) -> Int {\n//|   control.boundary((b) {\n//|     ! sequence.Meter = sequence.Meter(() {\n//|       control.suspend(b, (k) { 1 + control.resume(k, Nil) })\n//|     })\n//|     body()\n//|     0\n//|   })\n//| }\n//| height = (n: Int) -> Int { { n <= 1 } |> { True -> 1 False -> 1 + height(n / 2) } }\n//| @test\n//| sequence_node_counts = (io ! Io) {\n//|   ! sequence.Meter = sequence.Meter(() { Nil })\n//|   list.each([16, 64, 256, 1024, 4096, 16384, 65536, 100000], (n) {\n//|     s = sequence.from_list(list.range(0, n - 1))\n//|     small = sequence.from_list([1, 2, 3, 4, 5, 6, 7, 8, 9])\n//|     list.each([0, n / 4, n / 2, n - 1], (i) {\n//|       a = count(() { sequence.at(s, i) Nil })\n//|       b = count(() { sequence.set(s, i, -1) Nil })\n//|       c = count(() { sequence.split(s, i) Nil })\n//|       // §4.3 requires height work, not these particular implementation constants.\n//|       assert(a <= 80 * height(n))\n//|       assert(b <= 80 * height(n))\n//|       assert(c <= 160 * height(n))\n//|       io.print(core.inspect((n, i, a, b, c)))\n//|     })\n//|     alias = count(() { sequence.append(s, s) Nil })\n//|     left = count(() { sequence.append(s, small) Nil })\n//|     right = count(() { sequence.append(small, s) Nil })\n//|     assert(alias <= 160 * height(n))\n//|     assert(left <= 160 * height(n))\n//|     assert(right <= 160 * height(n))\n//|     io.print(core.inspect((n, alias, left, right)))\n//|   })\n//|   Nil\n//| }\n//| ''')\n//|     print('Counts: (length, index, at, set, split); (length, append_alias, append_short_right, append_short_left)', flush=True)\n//|     run('sequence_node_counts')\n//| finally:\n//|     src.write_text(original_src)\n//|     test.write_text(original_test)\n",
     "new": "\tNil\n})\n// Cached sizes, ranks and bounded digits are the private sequence invariants.\n"
   },
   {
-    "file": "std/test/stream_test.i",
+    "file": "i/test/stream_test.i",
     "line": 10,
     "hash": "9ccf0516cfac3eae9ef93c6fdd60dddd2d7bbffabe59223e7728a42619dd1565",
     "old": ")\n\n// §3.4: constructing either factory needs no Bias service.\nBias = (value = Int)\n\n",
     "new": ")\n\n// Constructing either factory needs no Bias service.\nBias = (value = Int)\n\n"
   },
   {
-    "file": "std/test/stream_test.i",
+    "file": "i/test/stream_test.i",
     "line": 31,
     "hash": "04dd9cf9c8c95e560566eb8fa0359b674be1121c9262478460e342e811c61d33",
     "old": "}\n\n// §3.3's finite-observation laws, with distinct functions for composition.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {\n\ta = source(xs)\n",
     "new": "}\n\n// Finite-observation laws, with distinct functions for composition.\ncheck_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> Nil {\n\ta = source(xs)\n"
   },
   {
-    "file": "std/test/stream_test.i",
+    "file": "i/test/stream_test.i",
     "line": 507,
     "hash": "c1ee118dd2c40a135f2f9901e015bcf85c52ac5abc46640eb89140d1668dad66",
     "old": "})\n\n// S2: each attempted pull, including Done and repeated positions, reruns runner.\ntest(\"stream_runner_demand\", () {\n\ttrace = control.boundary((b) {\n",
     "new": "})\n\n// each attempted pull, including Done and repeated positions, reruns runner.\ntest(\"stream_runner_demand\", () {\n\ttrace = control.boundary((b) {\n"
   },
   {
-    "file": "std/test/stream_test.i",
+    "file": "i/test/stream_test.i",
     "line": 618,
     "hash": "f89f140e61aa6125fccf123025f7a83150521580b171eb214d0b5ea684856ce8",
     "old": "})\n\n// S3/S6: callbacks run in order, and no callback after a failing one is called.\ntest(\"stream_callback_order\", () {\n\ttrace = control.boundary((b) {\n",
     "new": "})\n\n// callbacks run in order, and no callback after a failing one is called.\ntest(\"stream_callback_order\", () {\n\ttrace = control.boundary((b) {\n"
   },
   {
-    "file": "std/test/stream_test.i",
+    "file": "i/test/stream_test.i",
     "line": 642,
     "hash": "9f7a5b450678c547030336d26f4641840383f795c4965cc36d7d649ad205eb14",
     "old": "})\n\n// S8: the caller keeps the scope through consumption; early termination does\n// not close a resource itself. S7: attempt does not intercept Assert failures.\ntest(\"stream_resource_scope\", () {\n\ttrace = control.boundary((b) {\n",
     "new": "})\n\n// the caller keeps the scope through consumption; early termination does\n// not close a resource itself. A failed attempt does not intercept Assert failures.\ntest(\"stream_resource_scope\", () {\n\ttrace = control.boundary((b) {\n"
   },
   {
-    "file": "std/test/stream_test.i",
+    "file": "i/test/stream_test.i",
     "line": 716,
     "hash": "c675de135cfabe41c268e69a6bb535c137a89f494e451c575253f70a3691f500",
-    "old": "})\n\n// Checker cases required by std-1 §3.3/§3.4 and §9. They are temporary additions\n// to this owned test file, never failing std tests. Each must report E0501;\n// restore the original file even if checking fails. Run from the lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/stream_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/stream_test.i')\n//| original = path.read_text()\n//| cases = {\n//|     'invariant environment (§3.4)': '''\n//| Sink(A) { Sink(put: (A) -> Nil) }\n//| bad_coerce = (source: stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(Int, Never, Sink(Never)) {\n//|   source\n//| }\n//| ''',\n//|     'pull requires Bias (S2)': 'bad = () -> List(Int) { stream.to_list(positive()) }',\n//|     'runner cannot erase Bias (§3.3)': '''\n//| bad_runner = (body: () -> stream.Step(Int, Never, Bias) ! Bias) -> stream.Step(Int, Never, Bias) {\n//|   body()\n//| }\n//| ''',\n//|     'pull exposes errors (S7)': 'bad = () -> List(Int) { stream.to_list(broken()) }',\n//| }\n//| try:\n//|     for name, source in cases.items():\n//|         path.write_text(original + '\\n' + source + '\\n')\n//|         result = subprocess.run(['target/release/i', 'check', '--project', 'std'], capture_output=True, text=True)\n//|         print(name, result.returncode, result.stderr, flush=True)\n//|         assert result.returncode == 1 and 'error[E0501]' in result.stderr\n//| finally:\n//|     path.write_text(original)\n\n// S1/S2/S7: defer and unfold run only on pulls; retry explicitly repeats work.\ntest(\"stream_factory_demand\", () {\n\ttrace = control.boundary((b) {\n",
+    "old": "})\n\n// Checker cases required by std-1 §3.3/§3.4 and §9. They are temporary additions\n// to this owned test file, never failing std tests. Each must report E0501;\n// restore the original file even if checking fails. Run from the lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"i/test/stream_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/stream_test.i')\n//| original = path.read_text()\n//| cases = {\n//|     'invariant environment (§3.4)': '''\n//| Sink(A) { Sink(put: (A) -> Nil) }\n//| bad_coerce = (source: stream.Stream(Int, Never, Sink(Int))) -> stream.Stream(Int, Never, Sink(Never)) {\n//|   source\n//| }\n//| ''',\n//|     'pull requires Bias (S2)': 'bad = () -> List(Int) { stream.to_list(positive()) }',\n//|     'runner cannot erase Bias (§3.3)': '''\n//| bad_runner = (body: () -> stream.Step(Int, Never, Bias) ! Bias) -> stream.Step(Int, Never, Bias) {\n//|   body()\n//| }\n//| ''',\n//|     'pull exposes errors (S7)': 'bad = () -> List(Int) { stream.to_list(broken()) }',\n//| }\n//| try:\n//|     for name, source in cases.items():\n//|         path.write_text(original + '\\n' + source + '\\n')\n//|         result = subprocess.run(['target/release/i', 'check', '--project' , "stdlib"], capture_output=True, text=True)\n//|         print(name, result.returncode, result.stderr, flush=True)\n//|         assert result.returncode == 1 and 'error[E0501]' in result.stderr\n//| finally:\n//|     path.write_text(original)\n\n// S1/S2/S7: defer and unfold run only on pulls; retry explicitly repeats work.\ntest(\"stream_factory_demand\", () {\n\ttrace = control.boundary((b) {\n",
     "new": "})\n\n// Stream runners retain their service needs and failure channel through pulls.\n\n// defer and unfold run only on pulls; retry explicitly repeats work.\ntest(\"stream_factory_demand\", () {\n\ttrace = control.boundary((b) {\n"
   },
   {
-    "file": "std/test/time_test.i",
+    "file": "i/test/time_test.i",
     "line": 7,
     "hash": "920c72cb1b313c7eff01ed740090e0e5a22d9980dcbb0d5fed12f40a2ebddc67",
     "old": ")\n\n// T1 requires every signed Int and exact unit multipliers.\ntest(\"time_units\", () {\n\tlist.each([\n",
     "new": ")\n\n// Unit conversion requires every signed Int and exact unit multipliers.\ntest(\"time_units\", () {\n\tlist.each([\n"
   },
   {
-    "file": "std/test/time_test.i",
+    "file": "i/test/time_test.i",
     "line": 42,
     "hash": "d79996ba5de245e053a86b16e189235926c168087cfdec7d2169c0ea8193333a",
     "old": "})\n\n// T2 explicitly uses truncating division, for either sign of the divisor.\ntest(\"time_arithmetic\", () {\n\tassert(\n",
     "new": "})\n\n// Duration arithmetic uses truncating division, for either sign of the divisor.\ntest(\"time_arithmetic\", () {\n\tassert(\n"
   },
   {
-    "file": "std/test/time_test.i",
+    "file": "i/test/time_test.i",
     "line": 116,
     "hash": "84ac601fcb07d783a2f83cd4e61707dd1a465f1e0cd9aae8e887fbe63855125c",
     "old": "\t\t\t\ttime.to_nanoseconds(time.scale(d, b)) == a * b,\n\t\t\t)\n\t\t\t// §3.3's duration arithmetic law.\n\t\t\tassert(\n\t\t\t\ttime.add(d, time.subtract(e, d)) == e,\n",
     "new": "\t\t\t\ttime.to_nanoseconds(time.scale(d, b)) == a * b,\n\t\t\t)\n\t\t\t// The duration arithmetic law.\n\t\t\tassert(\n\t\t\t\ttime.add(d, time.subtract(e, d)) == e,\n"
   },
   {
-    "file": "std/test/time_test.i",
+    "file": "i/test/time_test.i",
     "line": 134,
     "hash": "329b76c1704b87779844b36bea19e053f85eb0557e0673ed6d07bb4765ba31c8",
     "old": "})\n\n// T3's epoch and inverse laws apply to negative and arbitrarily large counts.\ntest(\"time_instants\", () {\n\tepoch = time.from_unix_nanoseconds(0)\n",
     "new": "})\n\n// The epoch and inverse laws apply to negative and arbitrarily large counts.\ntest(\"time_instants\", () {\n\tepoch = time.from_unix_nanoseconds(0)\n"
   },
   {
-    "file": "std/test/time_test.i",
+    "file": "i/test/time_test.i",
     "line": 177,
     "hash": "20f122f2b460a578797981fb928b3380b8e30e558614e4ec08ac8f535a033893",
     "old": "})\n\n// §3.4 specifically requires hours(10^100), and spec §11.2 forbids overflow.\ntest(\"time_huge_counts\", () {\n\thuge = 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\n",
     "new": "})\n\n// Durations from huge counts such as hours(10^100) must not overflow, since Int\n// is unbounded.\ntest(\"time_huge_counts\", () {\n\thuge = 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\n"
   },
   {
-    "file": "std/test/time_test.i",
+    "file": "i/test/time_test.i",
     "line": 207,
     "hash": "eda63209bd69b1967a0a98e1bc648af7ce3060d77eb20e3a9d07507d86fb9ba8",
-    "old": "\tNil\n})\n// T1/T3 nominal separation and §3.2 hidden constructors. These negative cases\n// are temporarily appended to this owned file; each must fail checking, and\n// the file is restored even if a check fails. Run from the lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"std/test/time_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/time_test.i')\n//| original = path.read_text()\n//| compiler = 'target/release/i'\n//| cases = {\n//|     'Instant cannot be added as a Duration (T1/T3)': ('E0501', 'bad = () { time.add(time.from_unix_nanoseconds(0), time.nanoseconds(1)) }'),\n//|     'Duration constructor is private (§3.2)': ('E0204', 'bad = () { time.Duration(0) }'),\n//|     'Instant constructor is private (§3.2)': ('E0204', 'bad = () { time.Instant(0) }'),\n//| }\n//| baseline = subprocess.run([compiler, 'check', '--project', 'std'], capture_output=True, text=True)\n//| assert baseline.returncode == 0, baseline.stderr\n//| try:\n//|     for name, (code, source) in cases.items():\n//|         path.write_text(original + '\\n' + source + '\\n')\n//|         result = subprocess.run([compiler, 'check', '--project', 'std'], capture_output=True, text=True)\n//|         print(name, result.returncode, result.stderr, flush=True)\n//|         assert result.returncode == 1 and f'error[{code}]' in result.stderr\n//| finally:\n//|     path.write_text(original)\n",
+    "old": "\tNil\n})\n// T1/T3 nominal separation and §3.2 hidden constructors. These negative cases\n// are temporarily appended to this owned file; each must fail checking, and\n// the file is restored even if a check fails. Run from the lane with:\n// direnv exec /home/agent/Programming/i python3 -c 'from pathlib import Path; exec(\"\\n\".join(x[4:] for x in Path(\"i/test/time_test.i\").read_text().splitlines() if x.startswith(\"//| \")))'\n//| import subprocess\n//| from pathlib import Path\n//| path = Path('std/test/time_test.i')\n//| original = path.read_text()\n//| compiler = 'target/release/i'\n//| cases = {\n//|     'Instant cannot be added as a Duration (T1/T3)': ('E0501', 'bad = () { time.add(time.from_unix_nanoseconds(0), time.nanoseconds(1)) }'),\n//|     'Duration constructor is private (§3.2)': ('E0204', 'bad = () { time.Duration(0) }'),\n//|     'Instant constructor is private (§3.2)': ('E0204', 'bad = () { time.Instant(0) }'),\n//| }\n//| baseline = subprocess.run([compiler, 'check', '--project' , "stdlib"], capture_output=True, text=True)\n//| assert baseline.returncode == 0, baseline.stderr\n//| try:\n//|     for name, (code, source) in cases.items():\n//|         path.write_text(original + '\\n' + source + '\\n')\n//|         result = subprocess.run([compiler, 'check', '--project' , "stdlib"], capture_output=True, text=True)\n//|         print(name, result.returncode, result.stderr, flush=True)\n//|         assert result.returncode == 1 and f'error[{code}]' in result.stderr\n//| finally:\n//|     path.write_text(original)\n",
     "new": "\tNil\n})\n// Duration and Instant stay nominally distinct, with private constructors.\n"
   },
   {
-    "file": "std/test/uri_test.i",
+    "file": "i/test/uri_test.i",
     "line": 9,
     "hash": "5852d14bbf480fb90656e72759422abd8bc1979c92684b4d1ead8aa95c83d156",
     "old": ")\n\n// U3 and §6.3: every successful route to Uri preserves raw spelling.\nround_trip = (u : uri.Uri) -> Nil {\n\tassert(\n",
     "new": ")\n\n// Every successful route to Uri preserves raw spelling.\nround_trip = (u : uri.Uri) -> Nil {\n\tassert(\n"
   },
   {
-    "file": "std/test/uri_test.i",
+    "file": "i/test/uri_test.i",
     "line": 106,
     "hash": "8d59d9ba92994cbfff1b220ddd2524af050062e48859a908f7d12798faaa5f7a",
     "old": "})\n\n// U1/U8 selection and translation, including byte counts rather than codepoints.\ntest(\"uri_parse_errors\", () {\n\tcases = [\n",
     "new": "})\n\n// Selection and translation count bytes rather than Unicode scalars.\ntest(\"uri_parse_errors\", () {\n\tcases = [\n"
   },
   {
-    "file": "std/test/uri_test.i",
+    "file": "i/test/uri_test.i",
     "line": 529,
     "hash": "804b7376b8b76ce5e6b2e992dc637b7d836d406ea0a0b61b4a31d77e820f2621",
     "old": "})\n\n// RFC 3986 §5.4 normal and abnormal examples; strict http:g behavior.\ntest(\"uri_rfc_resolution\", () {\n\tbase = parse_good(\"http://a/b/c/d;p?q\")\n",
     "new": "})\n\n// RFC 3986, section 5.4: normal and abnormal resolution examples; strict http:g behavior.\ntest(\"uri_rfc_resolution\", () {\n\tbase = parse_good(\"http://a/b/c/d;p?q\")\n"
   },
   {
-    "file": "std/test/uri_test.i",
+    "file": "i/test/uri_test.i",
     "line": 590,
     "hash": "cfeec494ecbb386cdbccc0b5d897e8d9cad1c8d5965eac36e2be7bf1c5d15a5e",
     "old": "\t\tround_trip(u)\n\t})\n\t// U5: no inherited base fragment; empty authority paths merge with a slash.\n\tOk(u) = {\n\t\te4_call_arg_0 = parse_good(\"x://h#old\")\n",
     "new": "\t\tround_trip(u)\n\t})\n\t// no inherited base fragment; empty authority paths merge with a slash.\n\tOk(u) = {\n\t\te4_call_arg_0 = parse_good(\"x://h#old\")\n"
   },
   {
-    "file": "std/test/uri_test.i",
+    "file": "i/test/uri_test.i",
     "line": 826,
     "hash": "c1206beb1fd5b86d8301a4abd59b3acc17dc45dfc3d1b0ce69aa13b686d734fc",
     "old": "})\n\n// Generated valid Parts use U4's preservation law; short arbitrary ASCII\n// strings use U1/U3, without treating self-produced expectations as grammar.\ntest(\"uri_generated_round_trips\", () {\n\tschemes = [None, Some(\"x\"), Some(\"HTTP+1.-\")]\n",

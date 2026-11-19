@@ -8,17 +8,17 @@ pub fn new_manifest(name: &str) -> String {
     // A package named `std` cannot depend on itself; `i new` uses another key.
     let dependency = if name == "std" { "stdlib" } else { "std" };
     format!(
-        "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\n{dependency} = {{ path = \"std\" }}\n"
+        "name = {name:?}\n[test]\ncollection = \"i/test.tests\"\n[dependencies]\n{dependency} = {{ path = \"std\" }}\n"
     )
 }
 
 pub fn manifest(name: &str) -> String {
     let std = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../std")
+        .join("../../stdlib")
         .canonicalize()
         .unwrap();
     format!(
-        "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n",
+        "name = {name:?}\n[test]\ncollection = \"i/test.tests\"\n[dev-dependencies]\nstd = {{ path = {:?} }}\n",
         std.to_str().unwrap()
     )
 }
@@ -27,10 +27,10 @@ pub fn configure(project: &Path) {
     let path = project.join("i.toml");
     let mut manifest: toml_edit::DocumentMut =
         std::fs::read_to_string(&path).unwrap().parse().unwrap();
-    manifest["test"]["collection"] = toml_edit::value("std/test.tests");
+    manifest["test"]["collection"] = toml_edit::value("i/test.tests");
     manifest["dev-dependencies"]["std"]["path"] = toml_edit::value(
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../std")
+            .join("../../stdlib")
             .to_str()
             .unwrap(),
     );
@@ -83,7 +83,7 @@ pub fn selected(project: &Path, generated: bool) -> SelectedTests {
     let exports = entries
         .iter()
         .filter(|e| {
-            p.module(e.collection.module).path == "std/test" && p.def(e.collection).name == "tests"
+            p.module(e.collection.module).path == "i/test" && p.def(e.collection).name == "tests"
         })
         .map(|e| {
             let name = &e.data.iter().find(|(key, _)| key == "name").unwrap().1;

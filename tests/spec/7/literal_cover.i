@@ -3,7 +3,7 @@
 
 // §5.3/§5.5: written finite item sets cover shared places without narrowing them.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 Pair(A) = (A, A)

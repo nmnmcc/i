@@ -11,7 +11,7 @@ fn check_export(source: &str, export: bool) -> (Vec<(String, String)>, Vec<Strin
         dir.path().join("i.toml"),
         format!(
             "name = \"app\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std")
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib")
         ),
     )
     .unwrap();

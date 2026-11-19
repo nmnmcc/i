@@ -4,7 +4,7 @@
 (
   i/fail
   decode = json/decode
-  opt = (Option, Some) = std/option
+  opt = (Option, Some) = i/option
 )
 
 (main, User(..), Shape)

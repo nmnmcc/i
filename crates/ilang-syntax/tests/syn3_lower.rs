@@ -174,7 +174,7 @@ fn forms_of_later_stages_are_errors() {
 /// surrounding source tree.
 #[test]
 fn lisp_surface_round_trip() {
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../std/src/test.is");
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../stdlib/src/test.is");
     let source = std::fs::read_to_string(path).unwrap();
     // Accept either input encoding so the migration adapter can compare
     // repository sources without changing the file under test.

@@ -1,7 +1,7 @@
 name = "macro_tests"
 
 [test]
-collection = "std/test.tests"
+collection = "i/test.tests"
 
 [dev-dependencies]
-std = { path = "../../std" }
+i = { path = "../../stdlib" }

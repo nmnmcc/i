@@ -3,7 +3,7 @@
 // A type test of a custom type with no constructors, when it is the only
 // one at its place, or tested together with the others.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 Window = Opaque

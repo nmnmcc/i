@@ -7,8 +7,8 @@ Find the source and test directory for a behavior you want to change.
 
 ```i test stdout=exact package=layout title="test/bool_test.i"
 (
-	testlib = (test) = std/test
-	std/bool
+	testlib = (test) = i/test
+	i/bool
 )
 
 test("negation", () { assert(bool.not(False) == True) })
@@ -19,7 +19,7 @@ pass layout/bool_test.negation
 1 passed, 0 failed
 ```
 
-Follow [std/src/bool.i](https://github.com/nmnmcc/i/blob/main/std/src/bool.i) to the export and its documentation; [std/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/std/test/bool_test.i) holds the neighboring cases.
+Follow [i/src/bool.i](https://github.com/nmnmcc/i/blob/main/i/src/bool.i) to the export and its documentation; [i/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/i/test/bool_test.i) holds the neighboring cases.
 
 ## Directories
 
@@ -27,7 +27,7 @@ Follow [std/src/bool.i](https://github.com/nmnmcc/i/blob/main/std/src/bool.i) to
 | --- | --- |
 | `crates/` | Compiler workspace; every crate is a member. |
 | `lib/i/` | Compiler-supplied `i/` modules. |
-| `std/` | Standard library sources and tests. |
+| `stdlib/` | Standard library sources and tests. |
 | `tests/spec/` | Cases grouped by standard section. |
 | `tests/review/` | Review projects, observations, and semantic requirements. |
 | `tests/` | Other test fixtures as well as spec and review cases. |

@@ -221,7 +221,7 @@ def main():
             print(f'{f["mod"]}.{f["name"]}: {compact(f["old"])} => {compact(f["new"])}')
         return
     assert funcs, 'already applied'
-    paths = sorted([*(ROOT / 'std').rglob('*.i'), *(ROOT / 'examples').rglob('*.i')])
+    paths = sorted([*(ROOT / "stdlib").rglob('*.i'), *(ROOT / 'examples').rglob('*.i')])
     callers = {(f['mod'], f['name']): [] for f in funcs}
     sources = {p: p.read_text() for p in paths}
     for p, s in sources.items():
