@@ -49,7 +49,8 @@ new = <A>() -> Sequence(A) { Sequence(EmptyTree) }
 /// A sequence of one item, in O(1) work.
 ///
 /// ```i
-/// sequence.singleton(5) |> sequence.to_list  // [5]
+/// one = sequence.singleton(5)
+/// list = sequence.to_list(one)  // [5]
 /// ```
 singleton = <A>(item : A) -> Sequence(A) { Sequence(Single(Leaf(item))) }
 
@@ -207,7 +208,7 @@ to_list = <A>(sequence : Sequence(A)) -> List(A) {
 /// ```i
 /// a = sequence.from_list([1, 2])
 /// b = sequence.push_front(sequence.push_front(sequence.new(), 2), 1)
-/// sequence.same_elements(a, b)  // True
+/// same = sequence.same_elements(a, b)  // True
 /// ```
 same_elements = <A>(first : Sequence(A), second : Sequence(A)) -> Bool {
 	length(first) == length(second) && to_list(first) == to_list(second)

@@ -170,7 +170,7 @@ is_disjoint = <A>(first : Set(A), from : Set(A)) -> Bool {
 /// in. This takes O(n log n) steps (see `dict.same_entries`).
 ///
 /// ```i
-/// set.same_elements(set.from_list([1, 2]), set.from_list([2, 1]))  // True
+/// same = set.same_elements(set.from_list([1, 2]), set.from_list([2, 1]))  // True
 /// ```
 same_elements = <A>(first : Set(A), second : Set(A)) -> Bool {
 	Set(a) = first

@@ -549,7 +549,7 @@ group = <V, K, N>(list : List(V), by : (V) <- N -> K) -> Dict(K, List(V)) {
 /// ```i
 /// a = dict.new() |> dict.insert("x", 1) |> dict.insert("y", 2)
 /// b = dict.new() |> dict.insert("y", 2) |> dict.insert("x", 1)
-/// dict.same_entries(a, b)  // True
+/// same = dict.same_entries(a, b)  // True
 /// ```
 same_entries = <K, V>(first : Dict(K, V), second : Dict(K, V)) -> Bool {
 	size(first) == size(second) &&
