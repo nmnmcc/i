@@ -1118,7 +1118,7 @@ mod tests {
             ..Program::default()
         };
         program.modules.push(Module {
-            path: "i/prelude".into(),
+            path: "$prelude".into(),
             package: 0,
             source: ilang_package::SourceId(0),
             kind: ilang_package::ModuleKind::Prelude,

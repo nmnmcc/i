@@ -28,6 +28,24 @@ pub fn expect_unused(diags: &[Diagnostic], names: &[&str]) {
 
 /// Writes a package named `app` with the given files into a new directory,
 /// then loads and checks it.
+/// Like [`check_files`], but parses every module of the graph, for tests of
+/// the library itself rather than of one program's closure.
+pub fn check_all_files(files: &[(&str, &str)]) -> (PackageGraph, Option<Program>, Vec<Diagnostic>) {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    for (path, text) in files {
+        let p = dir.path().join(path);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, text).unwrap();
+    }
+    let (graph, mut diags) = ilang_package::load(dir.path());
+    let (parsed, parse_diags) = ilang_check::parse_all(&graph);
+    diags.extend(parse_diags);
+    let checked = ilang_check::check_parsed(&graph, &parsed);
+    diags.extend(checked.diags);
+    (graph, checked.program, diags)
+}
+
 pub fn check_files(files: &[(&str, &str)]) -> (PackageGraph, Option<Program>, Vec<Diagnostic>) {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();

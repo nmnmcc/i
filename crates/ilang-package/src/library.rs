@@ -33,7 +33,7 @@ pub const MODULES: &[(&str, &str)] = &[
 /// compiler program that selects only an import closure.
 pub const RUNTIME: &[&str] = &["i/float_text", "i/big", "i/bits"];
 
-pub const PRELUDE: (&str, &str) = ("i/prelude", include_str!("../../../lib/prelude.i"));
+pub const PRELUDE: (&str, &str) = ("$prelude", include_str!("../../../lib/prelude.i"));
 
 /// Adds the package `i` to an empty graph, as package 0.
 pub(crate) fn add(graph: &mut PackageGraph) {

@@ -659,7 +659,12 @@ fn report(graph: &PackageGraph) -> Result<Report> {
     if diags.iter().any(Diagnostic::is_error) {
         return Err(problems(graph, &diags));
     }
-    let program = program.expect("resolved permission report");
+    let _ = program.expect("resolved permission report");
+    // Permission reports cover every module of the packages the program uses,
+    // including modules that no root import reaches.
+    let (scan_parsed, _) = ilang_check::parse_all(graph);
+    let (scan_program, _) = ilang_check::resolve_parsed(graph, &scan_parsed);
+    let program = scan_program.expect("resolved permission report");
     let root = graph
         .root
         .ok_or_else(|| anyhow!("the package could not be read"))?;
