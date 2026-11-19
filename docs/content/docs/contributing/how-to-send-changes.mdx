@@ -51,6 +51,8 @@ A language change includes its spec text, `tests/spec` case, and an account of i
 
 ## Submission
 
+Before merging, confirm that the head commit of the pull request has one complete, successful run. Do not put `[skip ci]` on a pull request head: it starts no run, but it enters the same concurrency group and cancels the run that was still going, so the merged tree is never checked by the full gate. To add documentation, rebase it into the code commit or accept one new complete run.
+
 Do not commit acceptance reports, proofs or run logs; keep them in the pull request description or git history.
 
 Use a plain English commit subject describing the change, following recent commits. The [README](https://github.com/nmnmcc/i/blob/main/README.md) and [development guide](https://github.com/nmnmcc/i/blob/main/docs/development.md) describe checks but provide no submission procedure; ask through the [issue tracker](https://github.com/nmnmcc/i/issues) for `nmnmcc/i`.
