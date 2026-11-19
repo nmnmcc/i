@@ -104,3 +104,5 @@ jobs:
           path: out/
           if-no-files-found: error
           retention-days: 14
+
+# Triggered runs use the run ids above; the artifact names are i-release-<name>.
