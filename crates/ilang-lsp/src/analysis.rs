@@ -158,7 +158,7 @@ fn analyze(job: &Job) -> (Analysis, bool) {
             let path = match m.kind {
                 ModuleKind::Src => dir.join("src").join(file),
                 ModuleKind::Test => dir.join("test").join(file),
-                ModuleKind::Prelude => dir.join(file),
+                ModuleKind::Prelude => dir.join(format!("prelude.{extension}")),
             };
             paths.insert(m.source, path);
         }

@@ -12,6 +12,14 @@ fn write(dir: &Path, files: &[(&str, &str)]) {
     }
 }
 
+/// A small package named `i`, at `dir`, for the dependency `i` that every
+/// compiled package has.
+const LIBRARY: [(&str, &str); 2] = [("i.toml", "name = \"i\"\n"), ("src/core.i", "x = 1\n")];
+
+fn library(dir: &Path) {
+    write(dir, &LIBRARY);
+}
+
 #[test]
 fn source_entries_do_not_load_test_dependencies() {
     let dir = tempfile::tempdir().unwrap();
@@ -20,7 +28,7 @@ fn source_entries_do_not_load_test_dependencies() {
         &[
             (
                 "i.toml",
-                "name = \"app\"\n[entries]\nrun = \"app.run\"\n[dev-dependencies]\nmissing = { path = \"missing\" }\n",
+                "name = \"app\"\n[entries]\nrun = \"app.run\"\n[dependencies]\ni = { path = \"stdlib\" }\n[dev-dependencies]\nmissing = { path = \"missing\" }\n",
             ),
             ("src/app.i", "run = () { Nil }\n"),
             ("test/broken.i", "not i source\n"),
@@ -31,6 +39,7 @@ fn source_entries_do_not_load_test_dependencies() {
         tests: false,
         ..Default::default()
     };
+    library(&dir.path().join("stdlib"));
     let (graph, diags) = ilang_package::load_with(dir.path(), &options);
     assert!(diags.is_empty(), "{diags:?}");
     let root = &graph.packages[graph.root.unwrap()];
@@ -51,7 +60,7 @@ fn test_module_entries_load_test_dependencies() {
         &[
             (
                 "i.toml",
-                "name = \"app\"\n[entries]\nrun = \"worker.run\"\n[dev-dependencies]\ndep = { path = \"dep\" }\n",
+                "name = \"app\"\n[entries]\nrun = \"worker.run\"\n[dependencies]\ni = { path = \"stdlib\" }\n[dev-dependencies]\ndep = { path = \"dep\" }\n",
             ),
             ("test/worker.i", "run = () { Nil }\n"),
             ("dep/i.toml", "name = \"dep\"\n"),
@@ -62,6 +71,7 @@ fn test_module_entries_load_test_dependencies() {
         tests: false,
         ..Default::default()
     };
+    library(&dir.path().join("stdlib"));
     let (graph, diags) = ilang_package::load_with(dir.path(), &options);
     assert!(diags.is_empty(), "{diags:?}");
     let root = &graph.packages[graph.root.unwrap()];
@@ -85,7 +95,7 @@ fn graph_with_path_dependencies() {
         &[
             (
                 "app/i.toml",
-                "name = \"app\"\n[dependencies]\nu = { path = \"../util\" }\nv = { path = \"../util\" }\n[dev-dependencies]\nt = { path = \"../tools\" }\n",
+                "name = \"app\"\n[dependencies]\nu = { path = \"../util\" }\nv = { path = \"../util\" }\n[dev-dependencies]\nt = { path = \"../tools\" }\ni = { path = \"../stdlib\" }\n",
             ),
             ("app/src/main.i", "x = 1\n"),
             ("app/src/a/b.i", "x = 1\n"),
@@ -99,10 +109,12 @@ fn graph_with_path_dependencies() {
             ("tools/i.toml", "name = \"tools\"\n"),
         ],
     );
+    library(&dir.path().join("stdlib"));
     let (graph, diags) = load(&dir.path().join("app"));
     assert!(diags.is_empty(), "{diags:?}");
-    // `i`, app, util, tools. One package for one directory.
-    assert_eq!(graph.packages.len(), 4);
+    // `i`, app, util, tools, and the path package named `i`. One package for
+    // one directory.
+    assert_eq!(graph.packages.len(), 5);
     let root = &graph.packages[graph.root.unwrap()];
     assert_eq!(root.dependencies[0].1, root.dependencies[1].1);
     let paths: Vec<(&str, ModuleKind)> = root
@@ -133,7 +145,7 @@ fn graph_with_path_dependencies() {
     assert_eq!(
         paths,
         [
-            "i/prelude",
+            "$prelude",
             "i/fail",
             "i/control",
             "i/resource",
@@ -167,7 +179,7 @@ fn circles_and_missing() {
         &[
             (
                 "a/i.toml",
-                "name = \"a\"\n[dependencies]\nb = { path = \"../b\" }\n",
+                "name = \"a\"\n[dependencies]\nb = { path = \"../b\" }\ni = { path = \"../stdlib\" }\n",
             ),
             (
                 "b/i.toml",
@@ -179,6 +191,7 @@ fn circles_and_missing() {
             ),
         ],
     );
+    library(&dir.path().join("stdlib"));
     let (_, diags) = load(&dir.path().join("a"));
     let codes: Vec<_> = diags.iter().map(|d| d.code).collect();
     assert_eq!(codes, [code::PACKAGE_CIRCLE]);
@@ -244,7 +257,7 @@ fn dependency_defaults_cannot_replace_the_roots_explicit_entry() {
         &[
             (
                 "app/i.toml",
-                "name=\"app\"\n[dependencies]\ndep={path=\"../dep\"}\n[entries]\nnative=\"main.main\"\n[providers.\"dep/main.S\"]\nhost=\"app/main.fake\"\n",
+                "name=\"app\"\n[dependencies]\ndep={path=\"../dep\"}\ni={path=\"../stdlib\"}\n[entries]\nnative=\"main.main\"\n[providers.\"dep/main.S\"]\nhost=\"app/main.fake\"\n",
             ),
             (
                 "app/src/main.i",
@@ -260,6 +273,7 @@ fn dependency_defaults_cannot_replace_the_roots_explicit_entry() {
             ),
         ],
     );
+    library(&dir.path().join("stdlib"));
     let (graph, diagnostics) = load(&dir.path().join("app"));
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let root = &graph.packages[graph.root.unwrap()];
@@ -271,5 +285,103 @@ fn dependency_defaults_cannot_replace_the_roots_explicit_entry() {
     assert!(
         dep.entries.is_empty(),
         "a dependency cannot select an entry"
+    );
+}
+
+/// The `E0641` diagnostics of loading the package in `dir`, rendered.
+fn no_library(dir: &Path) -> Vec<String> {
+    let (graph, diags) = load(dir);
+    let found: Vec<_> = diags
+        .iter()
+        .filter(|d| d.code == code::NO_LIBRARY)
+        .cloned()
+        .collect();
+    graph.sources.render_all(&found)
+}
+
+#[test]
+fn a_package_without_the_standard_library_is_an_error() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &[("i.toml", "name = \"app\"\n"), ("src/app.i", "x = 1\n")],
+    );
+    assert_eq!(
+        no_library(dir.path()),
+        [
+            "i.toml:1:8: error[E0641]: the standard library is not resolved for this package; \
+          add `i = \"github.com/nmnmcc/i//stdlib@X.Y.Z\"` to [dependencies]"
+        ]
+    );
+    let (_, diags) = load(dir.path());
+    let d = diags.iter().find(|d| d.code == code::NO_LIBRARY).unwrap();
+    assert!(d.is_error());
+    assert_eq!(d.message, ilang_package::NO_LIBRARY_MESSAGE);
+}
+
+#[test]
+fn the_standard_library_as_a_path_dependency() {
+    for table in ["dependencies", "dev-dependencies"] {
+        let dir = tempfile::tempdir().unwrap();
+        write(
+            dir.path(),
+            &[
+                (
+                    "app/i.toml",
+                    &format!("name = \"app\"\n[{table}]\ni = {{ path = \"../stdlib\" }}\n"),
+                ),
+                ("app/src/app.i", "x = 1\n"),
+                ("stdlib/i.toml", "name = \"i\"\n"),
+                ("stdlib/src/core.i", "x = 1\n"),
+            ],
+        );
+        let app = dir.path().join("app");
+        let (graph, diags) = load(&app);
+        let rendered = graph.sources.render_all(&diags);
+        assert!(rendered.is_empty(), "{table}: {rendered:#?}");
+        let root = &graph.packages[graph.root.unwrap()];
+        let deps = if table == "dependencies" {
+            &root.dependencies
+        } else {
+            &root.dev_dependencies
+        };
+        let (name, id) = &deps[0];
+        assert_eq!(name, "i");
+        let library = &graph.packages[id.unwrap()];
+        assert_eq!(library.name, "i");
+        assert_eq!(library.modules[0].path, "i/core");
+    }
+}
+
+#[test]
+fn a_package_named_i_needs_no_standard_library() {
+    let dir = tempfile::tempdir().unwrap();
+    write(
+        dir.path(),
+        &[("i.toml", "name = \"i\"\n"), ("src/core.i", "x = 1\n")],
+    );
+    let (graph, diags) = load(dir.path());
+    let rendered = graph.sources.render_all(&diags);
+    assert!(rendered.is_empty(), "{rendered:#?}");
+}
+
+#[test]
+fn the_prelude_has_a_path_that_no_import_names() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), &[("i.toml", "name = \"i\"\n")]);
+    let (graph, _) = load(dir.path());
+    let lib = &graph.packages[graph.library];
+    let prelude: Vec<_> = lib
+        .modules
+        .iter()
+        .filter(|m| m.kind == ModuleKind::Prelude)
+        .collect();
+    assert_eq!(prelude.len(), 1);
+    assert_eq!(prelude[0].path, ilang_package::library::PRELUDE_PATH);
+    assert_eq!(prelude[0].path, "$prelude");
+    assert!(lib.modules.iter().all(|m| m.path != "i/prelude"));
+    assert_eq!(
+        graph.sources.get(prelude[0].source).display,
+        "<i>/prelude.i"
     );
 }

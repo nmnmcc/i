@@ -1158,7 +1158,8 @@ impl<'a> Resolver<'a> {
             self.error(
                 code::NO_MODULE,
                 item.span,
-                format!("there is no module `{written}`"),
+                hints::prelude_import_message(&written)
+                    .unwrap_or_else(|| format!("there is no module `{written}`")),
             );
             return None;
         };

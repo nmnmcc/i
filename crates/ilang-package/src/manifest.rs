@@ -150,11 +150,12 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
         }
         return (None, diags);
     };
-    if !is_name(&name) || name == "i" {
+    // `i` is the name of the standard library, and of a fork of it.
+    if !is_name(&name) {
         diags.push(err(
             code::MANIFEST_NAME,
             name_span,
-            format!("the package name `{name}` must be a name, and not `i`"),
+            format!("the package name `{name}` must be a name"),
         ));
     }
     // The dependency names.
@@ -162,12 +163,13 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
     let mut keep = |list: Vec<Dependency>, diags: &mut Vec<Diagnostic>| {
         let mut out = Vec::new();
         for d in list {
-            if !is_name(&d.name) || d.name == "i" || d.name == name {
+            // `i` is the dependency name of the standard library.
+            if !is_name(&d.name) || d.name == name {
                 diags.push(err(
                     code::DEPENDENCY_NAME,
                     d.span,
                     format!(
-                        "the dependency name `{}` must be a name, not `i`, and not the name of this package",
+                        "the dependency name `{}` must be a name, and not the name of this package",
                         d.name
                     ),
                 ));

@@ -276,7 +276,7 @@ fn audit(
             })
             .join(format!("{relative}.i"))
         } else {
-            root.join(if m.path == "i/prelude" {
+            root.join(if m.path == "$prelude" {
                 "lib/prelude.i".into()
             } else {
                 format!("lib/{}.i", m.path)

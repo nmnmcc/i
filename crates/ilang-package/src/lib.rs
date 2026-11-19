@@ -56,7 +56,16 @@ pub mod code {
     pub const CACHE: &str = "E0636";
     /// `i.lock` could not be written.
     pub const LOCK_WRITE: &str = "E0637";
+    /// The compiled package has no dependency `i`, the standard library,
+    /// and is not itself named `i`.
+    pub const NO_LIBRARY: &str = "E0641";
 }
+
+/// The dependency name of the standard library.
+pub const LIBRARY_NAME: &str = "i";
+
+/// The message of [`code::NO_LIBRARY`].
+pub const NO_LIBRARY_MESSAGE: &str = "the standard library is not resolved for this package; add `i = \"github.com/nmnmcc/i//stdlib@X.Y.Z\"` to [dependencies]";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Severity {
@@ -399,7 +408,9 @@ pub fn load_with(root: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagn
     {
         let mut effective = options.clone();
         effective.tests = loader.tests;
+        let before = loader.diags.len();
         let located = locations::resolve(&mut loader, &dir, &effective);
+        library_offline_context(&loader.graph.sources, &mut loader.diags[before..]);
         loader.located = Some(located);
         for p in std::mem::take(&mut loader.pending) {
             let found = loader.located.as_ref().and_then(|l| l.get(&p.key)).cloned();
@@ -528,6 +539,14 @@ impl Loader {
             ..d
         }));
         let manifest = manifest?;
+        if is_root && manifest.name != LIBRARY_NAME && !has_library(&manifest) {
+            self.diags.push(Diagnostic::error(
+                code::NO_LIBRARY,
+                Some(source),
+                manifest.name_span,
+                NO_LIBRARY_MESSAGE,
+            ));
+        }
         if is_root && !self.tests {
             self.tests = manifest.entries.iter().any(|(_, entry)| {
                 let module = entry.module.replace('.', "/");
@@ -707,6 +726,37 @@ impl Loader {
             out.push((d.name.clone(), id));
         }
         out
+    }
+}
+
+/// Whether a package has the standard library as a dependency or a
+/// dev-dependency.
+fn has_library(manifest: &Manifest) -> bool {
+    manifest
+        .dependencies
+        .iter()
+        .chain(&manifest.dev_dependencies)
+        .any(|d| d.name == LIBRARY_NAME)
+}
+
+/// Says, in an offline error on the dependency `i`, that it is the standard
+/// library that is not in the cache. The code and the rest of the message
+/// are kept.
+fn library_offline_context(sources: &Sources, diags: &mut [Diagnostic]) {
+    for d in diags {
+        let Some(source) = d.source else { continue };
+        if d.code != code::OFFLINE {
+            continue;
+        }
+        let text = &sources.get(source).text;
+        let key = text
+            .get(d.span.start as usize..d.span.end as usize)
+            .map(|k| k.trim_matches(|c| c == '"' || c == '\''));
+        if key == Some(LIBRARY_NAME) {
+            d.message.push_str(
+                "; the standard library `i` is not in the cache; run once online to fetch it",
+            );
+        }
     }
 }
 
