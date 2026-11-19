@@ -801,10 +801,12 @@ pub(crate) fn lower_tests_numeric(
     l.run();
     if l.diags.is_empty() {
         l.out.numeric = numeric;
-        if numeric == crate::Numeric::Scalars {
-            crate::numeric::run(&mut l.out);
-        }
-        crate::control::split(&mut l.out);
+        let may = if numeric == crate::Numeric::Scalars {
+            crate::numeric::run(&mut l.out)
+        } else {
+            crate::control::may_suspend(&l.out)
+        };
+        crate::control::split(&mut l.out, &may);
         Ok((l.out, l.bindings))
     } else {
         Err(l.diags)
@@ -859,10 +861,12 @@ pub(crate) fn lower_selected_numeric(
     let is_async = l.selected_async;
     if l.diags.is_empty() {
         l.out.numeric = numeric;
-        if numeric == crate::Numeric::Scalars {
-            crate::numeric::run(&mut l.out);
-        }
-        crate::control::split(&mut l.out);
+        let may = if numeric == crate::Numeric::Scalars {
+            crate::numeric::run(&mut l.out)
+        } else {
+            crate::control::may_suspend(&l.out)
+        };
+        crate::control::split(&mut l.out, &may);
         Ok((l.out, l.bindings, is_async))
     } else {
         ilang_check::map_expansion_diagnostics(program, &graph.sources, &mut l.diags);
@@ -910,6 +914,7 @@ struct Lowerer<'a> {
     /// once: hashing every source of the package per import was measured at
     /// a twentieth of a test build.
     package_hashes: HashMap<PackageId, String>,
+    module_hashes: HashMap<ilang_package::SourceId, String>,
     /// The services that an environment statement may provide lazily
     /// (`lazy_provide`), found before lowering: a call `x.f(…)` of an
     /// environment parameter of one of them is a `Callee::Lazy`.
@@ -955,6 +960,7 @@ impl<'a> Lowerer<'a> {
             bindings: Vec::new(),
             external_funcs: HashMap::new(),
             package_hashes: HashMap::new(),
+            module_hashes: HashMap::new(),
             lazy_candidates: HashSet::new(),
             out: ir::Program::default(),
             diags: Vec::new(),
@@ -2057,16 +2063,19 @@ impl<'a> Lowerer<'a> {
             let source_module = self.program.module(site.0);
             let package = &self.graph.packages[source_module.package];
             use ilang_package::lock::{FileKind, PackageFile, hash};
-            let module_file = PackageFile {
-                path: source_module.path.clone(),
-                kind: FileKind::Regular,
-                bytes: self
-                    .graph
-                    .sources
-                    .get(source_module.source)
-                    .text
-                    .as_bytes()
-                    .to_vec(),
+            let source_id = source_module.source;
+            let module_digest = match self.module_hashes.get(&source_id) {
+                Some(digest) => digest.clone(),
+                None => {
+                    let file = PackageFile {
+                        path: source_module.path.clone(),
+                        kind: FileKind::Regular,
+                        bytes: self.graph.sources.get(source_id).text.as_bytes().to_vec(),
+                    };
+                    let digest = hash(&[file]);
+                    self.module_hashes.insert(source_id, digest.clone());
+                    digest
+                }
             };
             let package_hash = match &package.location {
                 Some(location) => location.hash.clone(),
@@ -2097,7 +2106,7 @@ impl<'a> Lowerer<'a> {
             let binding = serde_json::json!({
                 "package": package_hash,
                 "module": source_module.path,
-                "module_digest": hash(&[module_file]),
+                "module_digest": module_digest,
                 "declaration": declaration,
                 "namespace": module,
                 "name": name,

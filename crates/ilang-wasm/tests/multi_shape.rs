@@ -453,7 +453,8 @@ fn build(numeric: ilang_wasm::Numeric) -> Built {
     ];
     p.globals = 9;
     p.start = Some(start);
-    control::split(&mut p);
+    let may = control::may_suspend(&p);
+    control::split(&mut p, &may);
     Built { program: p }
 }
 

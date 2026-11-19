@@ -350,14 +350,14 @@ fn has_numeric(f: &Func) -> bool {
     found
 }
 
-pub fn run(p: &mut Program) {
+pub fn run(p: &mut Program) -> Vec<bool> {
     if p.numeric_locals.values().all(HashMap::is_empty)
         && !p
             .funcs
             .iter()
             .any(|f| matches!(f, FuncKind::Code(f) if has_numeric(f)))
     {
-        return;
+        return crate::control::may_suspend(p);
     }
     assert!(
         p.points.is_empty(),
@@ -769,6 +769,7 @@ pub fn run(p: &mut Program) {
             "suspending worker has scalar result"
         );
     }
+    after
 }
 
 #[allow(clippy::too_many_arguments)]

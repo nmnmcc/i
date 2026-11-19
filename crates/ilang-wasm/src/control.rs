@@ -38,8 +38,7 @@ use crate::ir::*;
 use std::collections::{BTreeSet, HashMap};
 
 /// Splits every function of the program that may suspend.
-pub fn split(p: &mut Program) {
-    let may = may_suspend(p);
+pub fn split(p: &mut Program, may: &[bool]) {
     for i in 0..p.funcs.len() {
         if !may[i] {
             continue;
@@ -49,7 +48,7 @@ pub fn split(p: &mut Program) {
         };
         let first = p.points.len() as PointId;
         let mut next = first;
-        mark(&mut f.body, &may, &mut next);
+        mark(&mut f.body, may, &mut next);
         if next == first {
             continue;
         }
@@ -237,7 +236,7 @@ fn mentioned(
 /// Whether each function may suspend: it calls a closure, an operation that
 /// may suspend, or a function that may suspend. Tail calls count here: the
 /// frame of the caller of such a function is on the stack when it suspends.
-pub(crate) fn may_suspend(p: &Program) -> Vec<bool> {
+pub fn may_suspend(p: &Program) -> Vec<bool> {
     let mut may: Vec<bool> = p
         .funcs
         .iter()
@@ -814,7 +813,8 @@ mod tests {
             services: 2,
             ..Program::default()
         };
-        split(&mut p);
+        let may = may_suspend(&p);
+        split(&mut p, &may);
         assert_eq!(p.points.len(), 1);
         let point = &p.points[0];
         assert_eq!(point.params, vec![1, 2]);
@@ -897,7 +897,8 @@ mod tests {
             services: 3,
             ..Program::default()
         };
-        split(&mut p);
+        let may = may_suspend(&p);
+        split(&mut p, &may);
         assert_eq!(p.joins.len(), 1);
         assert_eq!(p.joins[0].params, vec![0, 1, 2, 3]);
         assert_eq!(p.points[1].envs.len(), 3);
