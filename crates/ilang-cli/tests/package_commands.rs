@@ -129,13 +129,19 @@ impl World {
 
     /// Adds a version to the repository of `example.com/<name>`.
     fn tag(&self, name: &str, version: &str, files: &[(&str, &str)]) {
+        self.tag_as(name, &format!("v{version}"), files);
+    }
+
+    /// Commits exactly `files` in the repository of `example.com/<name>`,
+    /// tags the commit `tag`, and pushes both.
+    fn tag_as(&self, name: &str, tag: &str, files: &[(&str, &str)]) {
         let work = self.path().join("work").join(name);
         let bare = self.path().join("remotes").join(name);
         git(&work, &["rm", "-rq", "--ignore-unmatch", "."]);
         write(&work, files);
         git(&work, &["add", "-A"]);
-        git(&work, &["commit", "-q", "--allow-empty", "-m", version]);
-        git(&work, &["tag", &format!("v{version}")]);
+        git(&work, &["commit", "-q", "--allow-empty", "-m", tag]);
+        git(&work, &["tag", tag]);
         let bare = bare.display().to_string();
         git(&work, &["push", "-q", "-f", &bare, "HEAD:refs/heads/main"]);
         git(&work, &["push", "-q", "-f", &bare, "--tags"]);
@@ -1795,4 +1801,172 @@ fn publish_compares_interfaces_after_macro_generated_exports() {
     );
     assert!(!ok, "{out}");
     assert!(out.contains("changed value api.answer"), "{out}");
+}
+
+// ---- Packages in a directory of a repository ----
+
+const SUB_SRC: &str = " (x)\n\nx = 1\n";
+
+/// The repository `example.com/mono`: a root package with the tags `v0.1.5`
+/// and `v0.9.0`, and the package `//stdlib` with the tags `stdlib-v0.1.0`,
+/// `stdlib-v0.1.1` and `stdlib-v1.0.0`.
+fn mono_repo(w: &World) {
+    w.repo("mono", &[]);
+    let root: &[(&str, &str)] = &[("i.toml", "name = \"mono\"\n"), ("src/m.i", SUB_SRC)];
+    let stdlib: &[(&str, &str)] = &[
+        ("stdlib/i.toml", "name = \"stdlib\"\n"),
+        ("stdlib/src/text.i", SUB_SRC),
+    ];
+    w.tag_as("mono", "stdlib-v0.1.0", stdlib);
+    w.tag_as("mono", "v0.1.5", root);
+    w.tag_as("mono", "stdlib-v0.1.1", stdlib);
+    w.tag_as("mono", "v0.9.0", root);
+    w.tag_as("mono", "stdlib-v1.0.0", stdlib);
+}
+
+#[test]
+fn add_and_update_use_the_tags_of_the_subpackage() {
+    let w = World::new();
+    mono_repo(&w);
+    let dir = app(&w);
+    let project = dir.display().to_string();
+    // With no version: the newest `stdlib-v*` tag, not a root tag.
+    let out = w.ok(&[
+        "add",
+        "stdlib",
+        "example.com/mono//stdlib",
+        "--project",
+        &project,
+    ]);
+    assert!(
+        out.contains("added `stdlib = example.com/mono//stdlib@1.0.0`"),
+        "{out}"
+    );
+    // The root package keeps its own tags.
+    let out = w.ok(&["add", "mono", "example.com/mono", "--project", &project]);
+    assert!(
+        out.contains("added `mono = example.com/mono@0.9.0`"),
+        "{out}"
+    );
+    w.ok(&[
+        "add",
+        "old",
+        "example.com/mono//stdlib@0.1.0",
+        "--dev",
+        "--project",
+        &project,
+    ]);
+    let lock = read(&dir.join("i.lock"));
+    assert!(lock.contains("example.com/mono//stdlib 0.1.0 "), "{lock}");
+    assert!(lock.contains("example.com/mono//stdlib 1.0.0 "), "{lock}");
+    assert!(lock.contains("example.com/mono 0.9.0 "), "{lock}");
+
+    // `i update old`: the newest `stdlib-v0.*`, not the root's v0.9.0.
+    let out = w.ok(&["update", "old", "--project", &project]);
+    assert!(
+        out.contains("updated old: example.com/mono//stdlib 0.1.0 -> 0.1.1"),
+        "{out}"
+    );
+    let toml = read(&dir.join("i.toml"));
+    assert!(
+        toml.contains("old = \"example.com/mono//stdlib@0.1.1\"\n"),
+        "{toml}"
+    );
+    let out = w.ok(&["update", "--project", &project]);
+    assert!(out.contains("newest version"), "{out}");
+
+    // A new root tag is not a version of `//stdlib`; a new stdlib tag is.
+    w.tag_as(
+        "mono",
+        "v0.9.9",
+        &[("i.toml", "name = \"mono\"\n"), ("src/m.i", SUB_SRC)],
+    );
+    w.tag_as(
+        "mono",
+        "stdlib-v0.1.2",
+        &[
+            ("stdlib/i.toml", "name = \"stdlib\"\n"),
+            ("stdlib/src/text.i", SUB_SRC),
+        ],
+    );
+    let out = w.ok(&["update", "--project", &project]);
+    assert!(
+        out.contains("updated old: example.com/mono//stdlib 0.1.1 -> 0.1.2"),
+        "{out}"
+    );
+    assert!(
+        out.contains("updated mono: example.com/mono 0.9.0 -> 0.9.9"),
+        "{out}"
+    );
+    assert!(!out.contains("updated stdlib:"), "{out}");
+
+    // A subpackage with no tags of its own has no version.
+    let err = w.fails(&[
+        "add",
+        "none",
+        "example.com/mono//none",
+        "--project",
+        &project,
+    ]);
+    assert!(err.contains("has no tag `none-vX.Y.Z`"), "{err}");
+}
+
+#[test]
+fn publish_a_package_in_a_directory_of_the_repository() {
+    let w = World::new();
+    let top = w.path().join("mono");
+    let dir = top.join("stdlib");
+    write(
+        &dir,
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/api.i", API_1),
+            (
+                "test/api_test.i",
+                "(\n\ttestlib = (test) = std/test\n\tpub/api\n)\n\ntest(\"works\", () { api.one |> (1) { Nil } & (other) { panic(\"no\") } })\n",
+            ),
+        ],
+    );
+    write(&top, &[("README", "mono\n")]);
+    test_project::configure(&dir);
+    git(&top, &["init", "-q"]);
+    commit(&top, "first");
+    // A root tag that is newer is not a version of this package.
+    git(&top, &["tag", "v5.0.0"]);
+    let project = dir.display().to_string();
+
+    let out = w.ok(&["publish", "0.1.0", "--dry-run", "--project", &project]);
+    assert!(out.contains("no earlier version"), "{out}");
+    assert!(
+        out.contains("dry run: every check passed; the tag stdlib-v0.1.0 was not made"),
+        "{out}"
+    );
+    assert_eq!(tags(&top), "v5.0.0");
+
+    let out = w.ok(&["publish", "0.1.0", "--project", &project]);
+    assert!(out.contains("made the tag stdlib-v0.1.0"), "{out}");
+    assert!(out.contains("git push origin stdlib-v0.1.0"), "{out}");
+    assert_eq!(tags(&top), "stdlib-v0.1.0\nv5.0.0");
+    assert_eq!(
+        git(&top, &["rev-parse", "stdlib-v0.1.0^{commit}"]),
+        git(&top, &["rev-parse", "HEAD"])
+    );
+
+    // Not newer than the previous `stdlib-v*` tag.
+    for old in ["0.1.0", "0.0.9"] {
+        let err = w.fails(&["publish", old, "--project", &project]);
+        assert!(err.contains("must be newer than every tag"), "{err}");
+        assert!(err.contains("the newest is stdlib-v0.1.0"), "{err}");
+    }
+    assert_eq!(tags(&top), "stdlib-v0.1.0\nv5.0.0");
+
+    // The interface is compared with the previous `stdlib-v*` tag.
+    write(&dir, &[("src/api.i", &format!("{API_1}\nhidden = 3\n"))]);
+    commit(&top, "internal");
+    let out = w.ok(&["publish", "0.1.1", "--dry-run", "--project", &project]);
+    assert!(out.contains("stdlib-v0.1.0"), "{out}");
+    assert!(!out.contains("v5.0.0"), "{out}");
+    assert!(out.contains("the tag stdlib-v0.1.1 was not made"), "{out}");
+    assert_eq!(tags(&top), "stdlib-v0.1.0\nv5.0.0");
 }

@@ -41,7 +41,8 @@ pub enum PackageCommand {
         /// The dependency name.
         name: String,
         /// `location` or `location@version`. With no version, the newest
-        /// tag `vX.Y.Z` of the repository is used.
+        /// tag `vX.Y.Z` of the repository is used, or for `repo//dir` the
+        /// newest tag `dir-vX.Y.Z` (`/` in the directory written as `-`).
         #[arg(required_unless_present = "path", conflicts_with = "path")]
         location: Option<String>,
         /// A package in a directory on this computer, in place of a location.
@@ -69,8 +70,9 @@ pub enum PackageCommand {
         #[arg(long, default_value = ".")]
         project: PathBuf,
     },
-    /// Check the package and tag a new version `vX.Y.Z` in git. Nothing is
-    /// pushed.
+    /// Check the package and tag a new version `vX.Y.Z` in git, or
+    /// `dir-vX.Y.Z` for a package in the directory `dir` of the repository.
+    /// Nothing is pushed.
     Publish {
         /// The version, as `1.4.0`.
         version: String,
@@ -237,13 +239,15 @@ fn git() -> Result<Git> {
     Ok(Git::new(cache, options.offline, options.git_urls))
 }
 
-/// The versions of the tags `vX.Y.Z` of `repository`, newest last. The
-/// repository is fetched first, unless offline.
-fn fetched_tags(git: &mut Git, repository: &str) -> Result<Vec<Version>> {
+/// The versions of the tags `<prefix>vX.Y.Z` of the package at `place` (a
+/// location with its `//dir`, without a version), newest last: `vX.Y.Z` for
+/// the root package of a repository, `stdlib-vX.Y.Z` for `//stdlib`. The
+/// tags are fetched first, unless offline.
+fn fetched_tags(git: &mut Git, place: &str) -> Result<Vec<Version>> {
     if !LoadOptions::from_env().offline {
-        git.fetch(repository).map_err(|e| anyhow!(e.message))?;
+        git.fetch(place).map_err(|e| anyhow!(e.message))?;
     }
-    git.tags(repository).map_err(|e| anyhow!(e.message))
+    git.tags(place).map_err(|e| anyhow!(e.message))
 }
 
 // ---- i.toml ----
@@ -482,12 +486,13 @@ fn add(
                 None => {
                     let place = parse_location(&format!("{location}@0.0.0"))
                         .map_err(|(_, m)| anyhow!(m))?;
-                    let tags = fetched_tags(&mut git()?, &place.repository)?;
+                    let place = place.place();
+                    let tags = fetched_tags(&mut git()?, &place)?;
                     let newest = tags.last().ok_or_else(|| {
-                        anyhow!(
-                            "`{}` has no tag `vX.Y.Z`, so it has no version",
-                            place.repository
-                        )
+                        let prefix = ilang_package::git::tag_prefix(
+                            ilang_package::git::split_place(&place).1,
+                        );
+                        anyhow!("`{place}` has no tag `{prefix}vX.Y.Z`, so it has no version")
                     })?;
                     format!("{location}@{newest}")
                 }
@@ -571,6 +576,8 @@ fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
     }
     let before = report_before(project);
     let mut git = git()?;
+    // By repository and tag prefix, as `place` is: one repository may hold
+    // the tags of several packages.
     let mut fetched: HashSet<String> = HashSet::new();
     let mut changes = Vec::new();
     for (dev, d) in &all {
@@ -583,10 +590,11 @@ fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
             }
             continue;
         };
-        let tags = if fetched.insert(loc.repository.clone()) {
-            fetched_tags(&mut git, &loc.repository)?
+        let place = loc.place();
+        let tags = if fetched.insert(place.clone()) {
+            fetched_tags(&mut git, &place)?
         } else {
-            git.tags(&loc.repository).map_err(|e| anyhow!(e.message))?
+            git.tags(&place).map_err(|e| anyhow!(e.message))?
         };
         // A new major version is another package.
         let Some(&newest) = tags
@@ -596,7 +604,6 @@ fn update(project: &Path, names: &[String]) -> Result<ExitCode> {
         else {
             continue;
         };
-        let place = loc.place();
         file.set(*dev, &d.name, Value::from(format!("{place}@{newest}")))?;
         changes.push(format!("{}: {place} {} -> {newest}", d.name, loc.version));
     }
@@ -910,29 +917,37 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
     // Checking may have written `i.lock`.
     check_clean(project).context("`i.lock` was changed by the check")?;
 
-    // 3. The version is newer than every tag.
-    let tags: Vec<Version> = git_in(project, &["tag", "--list", "v*"])?
+    // 3. The version is newer than every tag of this package: `vX.Y.Z` at
+    // the top of the repository, `<dir>-vX.Y.Z` in a directory of it.
+    let prefix = publish_tag_prefix(project)?;
+    let tags: Vec<Version> = git_in(project, &["tag", "--list", &format!("{prefix}v*")])?
         .lines()
-        .filter_map(|t| t.strip_prefix('v').and_then(parse_version))
+        .filter_map(|t| {
+            t.strip_prefix(prefix.as_str())
+                .and_then(|t| t.strip_prefix('v'))
+                .and_then(parse_version)
+        })
         .collect();
     let previous = tags.iter().copied().max();
     if let Some(p) = previous
         && version <= p
     {
-        bail!("the version {version} must be newer than every tag; the newest is v{p}");
+        bail!(
+            "the version {version} must be newer than every tag {prefix}v*; the newest is {prefix}v{p}"
+        );
     }
-    println!("ok: {version} is newer than every tag");
+    println!("ok: {version} is newer than every tag {prefix}v*");
 
     // 4. The public interface, compared with the newest tag.
     let now = interface_of(project, false)?
         .map_err(|e| e.context("the interface of the package could not be worked out"))?;
     match previous {
         None => println!("ok: there is no earlier version to compare with"),
-        Some(p) => compare_with(project, p, version, &now)?,
+        Some(p) => compare_with(project, &format!("{prefix}v{p}"), p, version, &now)?,
     }
 
     // 5. The tag.
-    let tag = format!("v{version}");
+    let tag = format!("{prefix}v{version}");
     if dry_run {
         println!("dry run: every check passed; the tag {tag} was not made");
         return Ok(ExitCode::SUCCESS);
@@ -1015,16 +1030,29 @@ fn check_and_test(project: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Compares the interface `now` with the one of the tag `v<previous>`, and
-/// fails when `version` is not a big enough step for the changes.
+/// The prefix of the version tags of the package in `project`, from where
+/// it is in its git repository: `""` at the top, and otherwise the directory
+/// with `/` as `-` and a `-` after it (`stdlib-`, `tools-text-`), as
+/// [`ilang_package::git::tag_prefix`] gives it for a location `//dir`.
+fn publish_tag_prefix(project: &Path) -> Result<String> {
+    let dir = git_in(project, &["rev-parse", "--show-prefix"])?;
+    let dir = dir.trim_end_matches('/');
+    Ok(ilang_package::git::tag_prefix(
+        (!dir.is_empty()).then_some(dir),
+    ))
+}
+
+/// Compares the interface `now` with the one of the tag `tag` (the version
+/// `previous`), and fails when `version` is not a big enough step for the
+/// changes.
 fn compare_with(
     project: &Path,
+    tag: &str,
     previous: Version,
     version: Version,
     now: &Interface,
 ) -> Result<()> {
-    let tag = format!("v{previous}");
-    let earlier = earlier_interface(project, &tag)?;
+    let earlier = earlier_interface(project, tag)?;
     let step = if version.major > previous.major {
         Step::Major
     } else if version.minor > previous.minor {
