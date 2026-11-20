@@ -16,7 +16,8 @@
 //// scope has ended raises an `FsError` whose `reason` is `Closed`.
 ////
 //// The scope belongs to the task that made it: a child task opens its own
-//// `resource.scoped` before it opens a file (spec §9.5); attaching to a
+//// `resource.scoped` before it opens a file (the specification's resource
+//// contract); attaching to a
 //// scope from another task stops.
 (
 	i/request
