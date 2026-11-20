@@ -1,7 +1,7 @@
 // spec: 4.8, 6.12, 7.3
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 f = (n : { 0 | 1 }) -> 2 { n |> (0 | 1) { 2 } }

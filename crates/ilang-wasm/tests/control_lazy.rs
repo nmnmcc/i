@@ -18,7 +18,19 @@ fn checked(
     tempfile::TempDir,
 ) {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!(
+            "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../stdlib")
+                .canonicalize()
+                .unwrap()
+                .to_str()
+                .unwrap()
+        ),
+    )
+    .unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
     let (graph, diags) = ilang_package::load(dir.path());
@@ -887,7 +899,7 @@ fn bench_source(depth: u32, rounds: u32, capture_only: bool) -> String {
                 .path
                 .iter()
                 .map(|part| part.name.as_str())
-                .eq(["std", "test"])
+                .eq(["i", "test"])
         })
         .expect("benchmark imports its test macros")
         .span

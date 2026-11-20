@@ -1,5 +1,5 @@
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 fd = (a : Int, b : Int) -> Int {

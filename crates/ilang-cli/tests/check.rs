@@ -15,6 +15,7 @@ fn check_types() {
     }
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    test_project::depend_on_library(dir.path());
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
@@ -44,6 +45,7 @@ fn check_types_tolerates_a_closed_reader() {
     }
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    test_project::depend_on_library(dir.path());
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     let source: String = (0..5000).map(|n| format!("n{n} = {n}\n")).collect();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
@@ -76,6 +78,7 @@ fn check_types_tolerates_a_closed_reader() {
 fn check_reports_type_errors() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    test_project::depend_on_library(dir.path());
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), "x : String = 1\n").unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_i"))
@@ -122,6 +125,7 @@ fn blind_expected_subject_is_checked_before_audit_codegen() {
 fn front_end_project(source: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    test_project::depend_on_library(dir.path());
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), source).unwrap();
     dir
@@ -383,7 +387,7 @@ fn disjoint_comparisons_are_warnings_in_check_and_test() {
     std::fs::create_dir_all(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/comparison.i"),
-        "(testlib = (test) = std/test)\n\nvalue = 1 == 2\n\ntest(\"comparison\", () { assert(1 != 2) })\n",
+        "(testlib = (test) = i/test)\n\nvalue = 1 == 2\n\ntest(\"comparison\", () { assert(1 != 2) })\n",
     )
     .unwrap();
     for args in [

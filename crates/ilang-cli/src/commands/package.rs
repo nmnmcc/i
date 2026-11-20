@@ -119,38 +119,38 @@ pub fn run(command: PackageCommand) -> Result<ExitCode> {
 
 // ---- i new ----
 
+/// The standard library: the package in the directory `stdlib` of the
+/// repository of the language. `i new` makes every package depend on it, at
+/// the newest tag `stdlib-vX.Y.Z` when the package is made.
+const LIBRARY_PLACE: &str = "github.com/nmnmcc/i//stdlib";
+
 fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
-    if !is_name(name) || name == "i" {
+    if !is_name(name) {
         bail!(
-            "the package name `{name}` must be a name: a lowercase letter, then lowercase letters, digits and `_`; and it may not be `i`"
+            "the package name `{name}` must be a name: a lowercase letter, then lowercase letters, digits and `_`"
         );
+    }
+    if name == "i" {
+        bail!("the package name `i` is reserved for the standard library");
     }
     let dir = path.unwrap_or_else(|| PathBuf::from(name));
     if dir.exists() && std::fs::read_dir(&dir)?.next().is_some() {
         bail!("`{}` is already there and is not empty", dir.display());
     }
-    // A package named `std` cannot depend on a dependency also named `std`;
-    // the copied package gets another dependency key. Nothing else changes.
-    let dependency = if name == "std" { "stdlib" } else { "std" };
-    let mut files = vec![
+    // The version of the standard library is resolved before anything is
+    // written, so that a package is made whole or not at all.
+    let newest = newest_library()?;
+    let files = [
         (
-            "i.toml".to_string(),
-            // `std` is an ordinary dependency, copied next to the program by
-            // `i new`, so the manifest has no local absolute path.
+            "i.toml",
             format!(
-                "name = {name:?}\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\n{dependency} = {{ path = \"std\" }}\n"
+                "name = {name:?}\n[test]\ncollection = \"i/test.tests\"\n[dependencies]\ni = \"{LIBRARY_PLACE}@{newest}\"\n"
             ),
         ),
-        (".gitignore".to_string(), "/build/\n".to_string()),
-        ("src/main.i".to_string(), formatted(main_module(name))),
-        (
-            "test/main_test.i".to_string(),
-            formatted(test_module(name, dependency)),
-        ),
+        (".gitignore", "/build/\n".to_string()),
+        ("src/main.i", formatted(main_module(name))),
+        ("test/main_test.i", formatted(test_module(name))),
     ];
-    for (relative, text) in ilang_cli::std_package::STD_FILES {
-        files.push((format!("std/{relative}"), text.to_string()));
-    }
     for (file, text) in &files {
         let p = dir.join(file);
         if let Some(parent) = p.parent() {
@@ -162,6 +162,26 @@ fn new(name: &str, path: Option<PathBuf>) -> Result<ExitCode> {
     outln!("made the package `{name}` in `{}`", dir.display());
     outln!("run it with `i run --project {}`", dir.display());
     Ok(ExitCode::SUCCESS)
+}
+
+/// The newest version of the standard library, from the tags
+/// `stdlib-vX.Y.Z` of its repository: fetched, or when offline, in the cache.
+fn newest_library() -> Result<Version> {
+    let cannot = |why: String| {
+        anyhow!(
+            "the newest version of the standard library `{LIBRARY_PLACE}` could not be found, so no package was made: {why}"
+        )
+    };
+    let mut git = git().map_err(|e| cannot(e.to_string()))?;
+    let tags = fetched_tags(&mut git, LIBRARY_PLACE).map_err(|e| cannot(e.to_string()))?;
+    tags.last().copied().ok_or_else(|| {
+        let why = if LoadOptions::from_env().offline {
+            "it has no tag `stdlib-vX.Y.Z` in the cache, and the network may not be used (offline)"
+        } else {
+            "it has no tag `stdlib-vX.Y.Z`"
+        };
+        cannot(why.to_string())
+    })
 }
 
 /// The source as `i fmt` writes it, so that `i fmt --check` passes on a new
@@ -189,10 +209,10 @@ main = () <- (io : Io) {{
     )
 }
 
-fn test_module(name: &str, dependency: &str) -> String {
+fn test_module(name: &str) -> String {
     format!(
         r#"(
-	testlib = (test) = {dependency}/test
+	testlib = (test) = i/test
 	{name}/main)
 
 
@@ -691,8 +711,11 @@ fn report(graph: &PackageGraph) -> Result<Report> {
         }
     };
     let mut out = Report::default();
+    // The language (the built-in package and the standard library `i`) is
+    // not listed: the host services of a library module are shown for the
+    // packages whose modules import it.
     for (id, p) in graph.packages.iter().enumerate() {
-        if id == graph.library {
+        if graph.is_language(id) {
             continue;
         }
         let shown = match (&p.location, &p.dir) {
@@ -729,10 +752,10 @@ fn report(graph: &PackageGraph) -> Result<Report> {
         }
     }
     for m in &program.modules {
-        if m.package == graph.library {
+        if graph.is_language(m.package) {
             continue;
         }
-        for t in library_hosts(&program, graph.library, m) {
+        for t in library_hosts(&program, graph, m) {
             let def = program.ty(t);
             let Some(host) = &def.host else { continue };
             let from = program.module(def.module);
@@ -757,13 +780,13 @@ fn report(graph: &PackageGraph) -> Result<Report> {
 /// module imports `i/io` can print as if it declared the service itself.
 fn library_hosts<'a>(
     program: &'a hir::Program,
-    library: PackageId,
+    graph: &'a PackageGraph,
     m: &'a hir::Module,
 ) -> impl Iterator<Item = hir::TypeId> + 'a {
     m.imports
         .iter()
         .map(|&i| program.module(i))
-        .filter(move |i| i.package == library)
+        .filter(move |i| graph.is_language(i.package))
         .flat_map(|i| i.types.iter().copied())
         .filter(|&t| program.ty(t).host.is_some())
 }
@@ -1452,7 +1475,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
             .types
             .iter()
             .copied()
-            .chain(library_hosts(program, graph.library, m));
+            .chain(library_hosts(program, &graph, m));
         for t in types {
             let def = program.ty(t);
             let shown = TypeShow::new(def, &shown_names, false);
@@ -2200,8 +2223,8 @@ mod syntax_templates {
     fn new_package_sources_parse() {
         for source in [
             super::main_module("example"),
-            super::test_module("example", "std"),
-            super::test_module("std", "stdlib"),
+            super::test_module("example"),
+            super::test_module("std"),
         ] {
             assert!(ilang_syntax::parse_module(&source).1.is_empty(), "{source}");
         }
@@ -2267,7 +2290,18 @@ mod value_type_interfaces {
     fn interface(source: &str) -> Interface {
         let dir = tempfile::tempdir().unwrap();
         fs::create_dir_all(dir.path().join("src")).unwrap();
-        fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../stdlib")
+            .canonicalize()
+            .unwrap();
+        fs::write(
+            dir.path().join("i.toml"),
+            format!(
+                "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+                library.to_str().unwrap()
+            ),
+        )
+        .unwrap();
         fs::write(dir.path().join("src/api.i"), source).unwrap();
         interface_of(dir.path(), false).unwrap().unwrap()
     }

@@ -62,7 +62,7 @@ message = () <- (g : Greeting) -> String { "hello, " <> g.read() }
 
 ```i test stdout=exact package=tour title="test/greeting_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	(Greeting, message) = tour/greeting
 )
 
@@ -76,7 +76,7 @@ pass tour/greeting_test.a fake greeting
 1 passed, 0 failed
 ```
 
-The test runner supplies assertions; the project manifest needs `std` and `[test] collection = "std/test.tests"`. The [macros page](/docs/tour/macros) shows test registration.
+The test runner supplies assertions; the project manifest needs the dependency `i` and `[test] collection = "i/test.tests"`, as `i new` writes them. The [macros page](/docs/tour/macros) shows test registration.
 
 ## Forwarded needs
 
@@ -106,7 +106,7 @@ A written `() -> String` would leave `Greeting` unsupplied and be rejected. Need
 	i/fail
 	i/core
 	(Io) = i/io
-	std/int
+	i/int
 )
 
 main = () <- (io : Io) {
@@ -132,7 +132,7 @@ Error(())
 (
 	i/core
 	(Io) = i/io
-	std/list
+	i/list
 )
 
 main = () <- (io : Io) {
@@ -151,7 +151,7 @@ Some(7)
 None
 ```
 
-`Option` comes from `std/option`. Match its cases with the [branches](/docs/tour/functions-and-branches) used earlier.
+`Option` comes from `i/option`. Match its cases with the [branches](/docs/tour/functions-and-branches) used earlier.
 
 ## Raised errors
 
@@ -204,7 +204,7 @@ Error("bad input")
 
 ```i test stdout=exact package=tour title="test/clock_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/fail
 )
 

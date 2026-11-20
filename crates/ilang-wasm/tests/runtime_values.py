@@ -54,7 +54,7 @@ TESTS = """
   (local.set $a (call $int_from_i64(i64.const 1099511627776)))
   (local.set $b (call $int_from_i64(i64.const 1099511627776)))
   ;; Comparing two large Ints of one sign, also for equality, is i code
-  ;; (lib/i/big.i), which this module does not have.
+  ;; (stdlib/src/big.i), which this module does not have.
   (call $assert (i32.eq(call $value_hash_u32(local.get $a))(call $value_hash_u32(local.get $b))))
   (call $assert (i32.eq(call $value_compare_i32(call $int_neg(local.get $a))(local.get $b))(i32.const -1)))
   (local.set $a {{STRING_A}})

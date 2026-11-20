@@ -1,4 +1,4 @@
-(testlib = (test) = std/test)
+(testlib = (test) = i/test)
 
 test("force expansion", () {
     index = (r) { r.0 }

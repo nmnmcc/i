@@ -1,4 +1,4 @@
-# Direct transcription of RFC 3986 5.2.4; this is a model, not std/uri.
+# Direct transcription of RFC 3986 5.2.4; this is a model, not i/uri.
 import re
 
 def remove_dot_segments(path):

@@ -7,7 +7,7 @@ Generate code at compile time, then use it through ordinary module imports.
 
 ```i test stdout=exact package=tour title="test/example_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 test("addition", () { assert(2 + 3 == 5) })
@@ -18,7 +18,7 @@ pass tour/example_test.addition
 1 passed, 0 failed
 ```
 
-`test` registers a function in the package’s test collection; `assert` uses the runner’s assertion service. The manifest needs `std` and `[test] collection = "std/test.tests"`.
+`test` registers a function in the package’s test collection; `assert` uses the runner’s assertion service. The manifest needs the dependency `i` and `[test] collection = "i/test.tests"`; `i new` writes both.
 
 ## A syntax template
 
@@ -178,7 +178,7 @@ Template references resolve in the defining module. Macros have no host file, ne
 
 ```i test stdout=exact package=tour title="test/sugar_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/fail
 	sugar = (if) = tour/sugar
 )

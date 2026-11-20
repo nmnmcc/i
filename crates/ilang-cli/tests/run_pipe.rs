@@ -1,6 +1,9 @@
 //! `i run | head -1`: when standard output's reader goes away, the running
 //! program stops quietly with status 0, like the CLI's own output.
 
+#[path = "common/test_project.rs"]
+mod test_project;
+
 use std::{
     io::{BufRead, BufReader, Read},
     process::{Command, Stdio},
@@ -26,7 +29,11 @@ main = () {
 #[test]
 fn run_stops_quietly_when_stdout_reader_goes_away() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"pipe\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("name = \"pipe\"\n{}", test_project::stdlib_dependency()),
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), MAIN).unwrap();
 

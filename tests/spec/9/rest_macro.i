@@ -1,7 +1,7 @@
 // spec: 4.8, 9.2, 9.4, 14
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 Db = (value = Int)
 read = () <- (db: Db) { db.value }

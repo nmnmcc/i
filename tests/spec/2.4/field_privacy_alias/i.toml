@@ -1,3 +1,6 @@
 # spec: 2.4, 6.7; aliases and forwarded values retain the original nominal constructor visibility.
 # expect: compile-error E0204
 name = "app"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

@@ -15,7 +15,7 @@
 "Some"  meta.header.i entity.name.type.i
 ")"  meta.header.i punctuation.brackets.round.i
 "="  meta.header.i keyword.operator.assignment.i
-"std/option"  meta.header.i entity.name.namespace.i
+"i/option"  meta.header.i entity.name.namespace.i
 ")"  meta.header.i punctuation.definition.header.end.i
 "("  meta.header.i punctuation.definition.header.begin.i
 "main"  meta.header.i entity.name.namespace.alias.i

@@ -2,7 +2,7 @@
 // expect: pass
 // Guarded literals never enter the prefix of rows that cover later rows.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 f = (s : { "a" | "b" }) { s |> ("a" ? False) { 0 } & ("a") { 1 } & ("b") { 2 } }

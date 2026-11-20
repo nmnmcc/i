@@ -233,11 +233,19 @@ class RunnerTests(unittest.TestCase):
             runner.prepare(examples[1], project)
             manifest = tomllib.loads((project / 'i.toml').read_text())
             self.assertEqual(manifest['name'], 'passing')
-            self.assertEqual(manifest['test']['collection'], 'std/test.tests')
-            self.assertEqual(manifest['dev-dependencies']['std']['path'], str(runner.ROOT / 'std'))
+            self.assertEqual(manifest['test']['collection'], 'i/test.tests')
+            self.assertEqual(manifest['dependencies']['i']['path'], str(runner.ROOT / 'stdlib'))
+            self.assertNotIn('dev-dependencies', manifest)
             self.assertTrue((project / 'src/helper.i').is_file())
             self.assertTrue((project / 'src/lisp.is').is_file())
             self.assertTrue((project / 'test/passing_test.i').is_file())
+        with tempfile.TemporaryDirectory() as scratch:
+            # Every compiled package depends on this checkout's library.
+            project = Path(scratch)
+            runner.prepare(examples[0], project)
+            manifest = tomllib.loads((project / 'i.toml').read_text())
+            self.assertEqual(manifest['dependencies']['i']['path'], str(runner.ROOT / 'stdlib'))
+            self.assertNotIn('dev-dependencies', manifest)
         with tempfile.TemporaryDirectory() as scratch:
             project = Path(scratch)
             runner.prepare(examples[-1], project)

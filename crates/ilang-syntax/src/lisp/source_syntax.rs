@@ -552,7 +552,7 @@ mod tests {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let mut files = Vec::new();
         let mut dirs = vec![
-            root.join("std"),
+            root.join("stdlib"),
             root.join("lib"),
             root.join("examples"),
             root.join("tests/spec"),

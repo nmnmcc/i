@@ -5,7 +5,6 @@ import json
 import os
 import re
 import subprocess
-import tempfile
 from spec_links import unlink_spec_references
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,46 +32,9 @@ def checked_types(project):
 def inferred_types(modules):
     if not BINARY.is_file() or not os.access(BINARY, os.X_OK):
         raise SystemExit(f'Build target/release/i or set I_BIN to an executable compiler: {BINARY}')
-    types = checked_types(ROOT / 'std')
-    # --types prints only the root package. Return each exported i value from a
-    # function in a temporary root to obtain its scheme, including needs and
-    # Fail. The function defers compiler-owned syntax operations, which cannot
-    # be read by an ordinary module's initialization.
-    # Import the module's own exported types so those names stay unqualified,
-    # just as they are in the original module's checked signatures.
-    with tempfile.TemporaryDirectory(prefix='i-library-reference-') as directory:
-        project = Path(directory)
-        (project / 'src').mkdir()
-        (project / 'i.toml').write_text('name = "library_reference"\n')
-        for module, source in modules:
-            if not module.startswith('i/'):
-                continue
-            names = next(groups(source), [])
-            values = [name for name in names if name[0].islower() or name[0] == '_']
-            if not values:
-                continue
-            own_types = [name for name in names if name[0].isupper()]
-            # A fixed alias cannot collide with an exported binding or type.
-            alias = 'library_module'
-            while re.search(r'\b' + alias + r'\b', source):
-                alias += '_'
-            imports = f'{alias} = '
-            if own_types:
-                imports += '(' + ', '.join(own_types) + ') = '
-            imports += module
-            original_imports = next((group for group in headers(source)
-                                     if '/' in re.sub(r'//[^\n]*', '', group)), '')
-            text = '(\n' + original_imports + '\n' + imports + '\n)\n'
-            text += '(' + ', '.join(values) + ')\n'
-            text += ''.join(f'{name} = () {{ {alias}.{name} }}\n' for name in values)
-            (project / 'src' / (module.split('/')[1] + '.i')).write_text(text)
-        for (module, name), signature in checked_types(project).items():
-            module = module.replace('library_reference/', 'i/', 1)
-            # The target module's own exported types were imported by name;
-            # any remaining qualified types belong to other library modules.
-            if not signature.startswith('() -> '):
-                raise SystemExit(f'Expected a signature getter for {module}.{name}: {signature}')
-            types[(module, name)] = signature.removeprefix('() -> ')
+    # The library is one package, the root of `stdlib/`, and --types prints
+    # every exported value of the root package with its needs and Fail.
+    types = checked_types(ROOT / 'stdlib')
     missing = [(module, name) for module, source in modules
                for name in next(groups(source), [])
                if (name[0].islower() or name[0] == '_') and (module, name) not in types]
@@ -146,7 +108,7 @@ def declaration(source, name):
 
 def generate():
     modules = [(prefix + '/' + file.stem, file.read_text())
-               for prefix, directory in [('i', ROOT / 'lib/i'), ('std', ROOT / 'std/src')]
+               for prefix, directory in [('i', ROOT / 'stdlib/src')]
                for file in sorted(directory.glob('*.i'))]
     types = inferred_types(modules)
     # Do not replace any generated pages unless every value has a checked type.

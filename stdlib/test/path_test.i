@@ -1,0 +1,155 @@
+(
+	i/fail
+	testlib = (test) = i/test
+	path = i/path
+	list = i/list
+	string = i/string
+)
+
+// Expected spellings in these tables are the documented examples and rules of
+// path handling.
+test("path_clean_examples", () {
+	list.each([
+		("", "."),
+		("a//b/../", "a"),
+		("/../../a", "/a"),
+		("a/../../b", "../b"),
+		("//server///x", "/server/x"),
+		("C:\\a\\b", "C:\\a\\b"),
+		("%2e%2e/x", "%2e%2e/x"),
+		("././", "."),
+		("../../..", "../../.."),
+		("///", "/"),
+		("é/../猫", "猫"),
+		("é/É", "é/É"),
+		("~/a", "~/a"),
+		("a\u{0}/b", "a\u{0}/b"),
+		("A/a", "A/a"),
+	], (pair) {
+		(input, expected) = pair
+		assert(path.clean(input) == expected)
+	})
+	assert(path.join([]) == "")
+	assert(path.join(["", ""]) == "")
+	assert(path.join(["a", "/b", "..", "c"]) == "a/c")
+	assert(path.join(["", "/", "", "a"]) == "/a")
+	()
+})
+
+test("path_parts_examples", () {
+	assert(path.split("a//b/") == ("a//b/", ""))
+	assert(path.split("a//b") == ("a//", "b"))
+	assert(path.split("") == ("", ""))
+	assert(path.base("a/../") == "..")
+	assert(path.base("///") == "/")
+	assert(path.base("") == ".")
+	assert(path.dir("a/b/") == "a/b")
+	assert(path.dir("a") == ".")
+	assert(path.extension(".profile") == ".profile")
+	assert(path.extension("a.") == ".")
+	assert(path.extension("a.txt/") == "")
+	assert(path.extension("a.b.c") == ".c")
+	assert(path.extension("a.b/c") == "")
+	assert(path.extension("é.猫") == ".猫")
+	assert(path.is_absolute("/a"))
+	assert(path.is_absolute("//"))
+	assert(path.is_absolute("C:/a") == False)
+	assert(path.is_absolute("") == False)
+	()
+})
+
+test("path_relative_examples", () {
+	assert(fail.catch(() { path.relative("/a/b", "/a/c") }) == Ok("../c"))
+	assert(fail.catch(() { path.relative("../a", "../b") }) == Ok("../b"))
+	assert(fail.catch(() { path.relative("..", "../a") }) == Ok("a"))
+	assert(
+		fail.catch(() { path.relative("..", ".") }) ==
+			Error(path.UnknownParent),
+	)
+	assert(
+		fail.catch(() { path.relative("a", "/a") }) ==
+			Error(path.DifferentRoots),
+	)
+	assert(
+		fail.catch(() { path.relative("/a", "a") }) ==
+			Error(path.DifferentRoots),
+	)
+	assert(fail.catch(() { path.relative("/a/./", "/a") }) == Ok("."))
+	assert(fail.catch(() { path.relative("", "") }) == Ok("."))
+	assert(fail.catch(() { path.relative(".", "../é") }) == Ok("../é"))
+	assert(
+		fail.catch(() { path.relative("../../a", "../a") }) ==
+			Error(path.UnknownParent),
+	)
+	()
+})
+
+short_paths = (depth : Int) -> List(String) {
+	depth |>
+		(0) { [""] }
+		& (_) {
+			[
+				"",
+				..list.flat_map(short_paths(depth - 1), (prefix) {
+					list.map(["/", ".", "a", "é", "\\"], (c) { prefix <> c })
+				}),
+			]
+		}
+}
+
+// Clean idempotence, exact raw split, and the successful relative law.
+test("path_exhaustive_laws", () {
+	paths = short_paths(4)
+	list.each(paths, (p) {
+		assert(
+			path.clean(path.clean(p)) == path.clean(p),
+		)
+		(a, b) = path.split(p)
+		assert(a <> b == p)
+	})
+	list.each(short_paths(3), (from) {
+		list.each(short_paths(3), (to) {
+			fail.catch(() { path.relative(from, to) }) |>
+				(Error(_)) { () }
+				& (Ok(r)) {
+					assert(
+						path.clean(
+							path.join([path.clean(from), r]),
+						) ==
+							path.clean(to),
+					)
+				}
+		})
+	})
+	()
+})
+
+// The path functions handle 100,000 segments, multibyte names, and long dot/parent runs.
+test("path_long_inputs", () {
+	names = list.repeat("é猫", 100000)
+	long = string.join(names, "/")
+	assert(path.clean(long) == long)
+	assert(path.join(names) == long)
+	assert(path.base(long) == "é猫")
+	assert(
+		path.split(long) ==
+			(string.join(list.repeat("é猫", 99999), "/") <> "/", "é猫"),
+	)
+	assert(
+		path.clean(
+			string.join(list.repeat(".", 100000), "/"),
+		) ==
+			".",
+	)
+	parents = string.join(list.repeat("..", 100000), "/")
+	assert(path.clean(parents) == parents)
+	assert(path.clean("/" <> parents) == "/")
+	assert(
+		path.clean(path.join([long, parents])) == ".",
+	)
+	name = string.repeat("é", 100000)
+	assert(path.clean(name) == name)
+	assert(path.split(name) == ("", name))
+	assert(fail.catch(() { path.relative(long, long) }) == Ok("."))
+	()
+})

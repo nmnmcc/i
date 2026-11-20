@@ -183,22 +183,31 @@ def prepare(example, project):
     sources = {**example.shared_files, **example.files, main: example.source}
     manifest = tomllib.loads(sources.pop('i.toml', ''))
     manifest['name'] = name
-    std = {'path': str(ROOT / 'std')}
+    # The standard library is the package `i`, and every package that is
+    # compiled names it under [dependencies], as `i new` writes it: by its
+    # location and version. The runner uses this checkout's `stdlib/` in its
+    # place, so examples run offline and against the library they document.
     for table in ('dependencies', 'dev-dependencies', 'test'):
         if table in manifest and not isinstance(manifest[table], dict):
             raise ValueError(f'manifest {table} must be a table')
-    if any(re.search(r'\bstd/', source) for path, source in sources.items()
-           if Path(path).suffix in ('.i', '.is') and (not testing or path.startswith('src/'))):
-        manifest.setdefault('dependencies', {})['std'] = std
+    manifest.get('dev-dependencies', {}).pop('i', None)
+    if not manifest.get('dev-dependencies', True):
+        del manifest['dev-dependencies']
+    manifest.setdefault('dependencies', {})['i'] = {'path': str(ROOT / 'stdlib')}
     if testing:
-        manifest.setdefault('test', {})['collection'] = 'std/test.tests'
-        # The manifest forbids repeating a name across dependency tables.
-        # Source modules need a regular dependency; test-only imports use dev.
-        if 'std' in manifest.get('dependencies', {}):
-            manifest['dependencies']['std'] = std
-            manifest.get('dev-dependencies', {}).pop('std', None)
-        else:
-            manifest.setdefault('dev-dependencies', {})['std'] = std
+        manifest.setdefault('test', {})['collection'] = 'i/test.tests'
+    # A path dependency of the example that names the library names it
+    # relative to the page's directory; in the scratch project that path
+    # leads nowhere, so it gets this checkout's `stdlib/` too.
+    for path in list(sources):
+        if Path(path).name == 'i.toml':
+            other = tomllib.loads(sources[path])
+            if any('i' in other.get(table, {}) for table in ('dependencies', 'dev-dependencies')):
+                for table in ('dependencies', 'dev-dependencies'):
+                    if 'i' in other.get(table, {}):
+                        other[table]['i'] = {'path': str(ROOT / 'stdlib')}
+                sources[path] = ''.join(json.dumps(key) + ' = ' + toml_value(value) + '\n'
+                                        for key, value in other.items())
     # Inline TOML tables preserve any supplementary manifest configuration.
     (project / 'i.toml').write_text(''.join(json.dumps(key) + ' = ' + toml_value(value) + '\n'
                                          for key, value in manifest.items()))

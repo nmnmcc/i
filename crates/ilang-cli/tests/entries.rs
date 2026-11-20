@@ -2,9 +2,25 @@
 use ilang_cli::{BuildOptions, Level, Target, build, build_entry};
 use std::path::Path;
 
+/// The standard library `i` of this repository, which every root package
+/// depends on (E0641).
+fn library_dependency() -> String {
+    let library = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!("i = {{ path = {:?} }}\n", library.to_str().unwrap())
+}
+
+/// A package with `manifest`, which has no `[dependencies]` table, and the
+/// standard library as its dependency.
 fn project(manifest: &str, files: &[(&str, &str)]) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("{manifest}[dependencies]\n{}", library_dependency()),
+    )
+    .unwrap();
     for (path, source) in files {
         let file = dir.path().join(path);
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
@@ -102,7 +118,10 @@ fn dependency_conventions_and_entry_tables_have_no_effect() {
     std::fs::create_dir_all(app.join("src")).unwrap();
     std::fs::write(
         app.join("i.toml"),
-        "name = \"app\"\n[dependencies]\ndep = { path = \"../dep\" }\n",
+        format!(
+            "name = \"app\"\n[dependencies]\ndep = {{ path = \"../dep\" }}\n{}",
+            library_dependency()
+        ),
     )
     .unwrap();
     std::fs::write(app.join("src/main.i"), "main = () { () }\n").unwrap();

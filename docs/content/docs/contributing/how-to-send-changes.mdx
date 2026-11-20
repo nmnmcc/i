@@ -31,8 +31,8 @@ The filtered command for the existing case is `cargo test -p ilang-cli --test sp
 
 ```i test stdout=exact package=changes title="test/bool_test.i"
 (
-	testlib = (test) = std/test
-	std/bool
+	testlib = (test) = i/test
+	i/bool
 )
 
 test("negation", () { assert(bool.not(False) == True) })

@@ -25,9 +25,8 @@ class LibraryPages(unittest.TestCase):
     def test_missing_types_fail_before_replacing_pages(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / 'lib/i').mkdir(parents=True)
-            (root / 'std/src').mkdir(parents=True)
-            (root / 'lib/i/fs.i').write_text('(read_file)\nread_file = (path) { path }\n')
+            (root / 'stdlib/src').mkdir(parents=True)
+            (root / 'stdlib/src/fs.i').write_text('(read_file)\nread_file = (path) { path }\n')
             out = root / 'pages'
             out.mkdir()
             page = out / 'i-fs.mdx'

@@ -15,8 +15,12 @@ fn package(files: &[(&str, &str)]) -> tempfile::TempDir {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
     }
-    if files.iter().any(|(_, source)| source.contains("std/test")) {
+    // Every package depends on the standard library `i`; one that uses
+    // `i/test` also collects its tests.
+    if files.iter().any(|(_, source)| source.contains("i/test")) {
         test_project::configure(dir.path());
+    } else {
+        test_project::depend_on_library(dir.path());
     }
     dir
 }
@@ -281,7 +285,7 @@ fn test_runs_each_test() {
         ("src/lib.i", " (twice)\n\ntwice = (n : Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { () } & (_) { panic(\"no\") } })\n\ntest(\"bad\", () { panic(\"bad\") })\n",
+            "(\n\ttestlib = (test) = i/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { () } & (_) { panic(\"no\") } })\n\ntest(\"bad\", () { panic(\"bad\") })\n",
         ),
     ]);
     let out = i(&["test"], dir.path());
@@ -684,7 +688,7 @@ fn async_entry_points_and_needed_services() {
             offline: false,
             target: Default::default(),
         },
-        Some("std/test.tests"),
+        Some("i/test.tests"),
     )
     .unwrap();
     let program = Program::from_bytes(&built.wasm).unwrap();
@@ -738,7 +742,7 @@ fn run_gives_the_standard_services() {
         ),
         (
             "test/main_test.i",
-            "(\n\ttestlib = (test) = std/test\n\ti/io\n)\n\ntest(\"prints\", () <- (out : io.Io) { out.print(\"in a test\") })\n",
+            "(\n\ttestlib = (test) = i/test\n\ti/io\n)\n\ntest(\"prints\", () <- (out : io.Io) { out.print(\"in a test\") })\n",
         ),
     ]);
     let out = i(&["run"], dir.path());
@@ -766,7 +770,7 @@ fn an_error_stops_a_test() {
         ("i.toml", "name = \"app\"\n"),
         (
             "test/app_test.i",
-            " (\n\ttestlib = (test) = std/test\n\ti/fail)\n\nf = (n) { fail.raise(n) }\n\n\ntest(\"raises\", () {\n  f(\"oops\")\n  ()\n})\n",
+            " (\n\ttestlib = (test) = i/test\n\ti/fail)\n\nf = (n) { fail.raise(n) }\n\n\ntest(\"raises\", () {\n  f(\"oops\")\n  ()\n})\n",
         ),
     ]);
     for opt in [Level::O0, Level::O2] {
@@ -778,14 +782,14 @@ fn an_error_stops_a_test() {
                 offline: false,
                 target: Default::default(),
             },
-            Some("std/test.tests"),
+            Some("i/test.tests"),
         )
         .unwrap();
         let program = Program::from_bytes(&built.wasm).unwrap();
         match ilang_cli::run_test(&program, "i.tool.0") {
             ilang_host::TestResult::Stopped(stop) => assert_eq!(
                 stop.message.as_deref(),
-                Some("error: \"oops\"\napp/app_test:8:1\nexpanded from std/test:13:17")
+                Some("error: \"oops\"\napp/app_test:8:1\nexpanded from i/test:13:17")
             ),
             other => panic!("{other:?}"),
         }

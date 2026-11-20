@@ -72,26 +72,71 @@ impl World {
         self.tmp.path()
     }
 
-    /// Runs `i` in the world's directory, with its cache and URLs.
-    fn i(&self, args: &[&str]) -> Output {
-        self.i_with(args, &[])
-    }
-
-    /// Runs `i` as [`World::i`] does, with `env` set as well.
-    fn i_with(&self, args: &[&str], env: &[(&str, &std::ffi::OsStr)]) -> Output {
+    /// `i` in the world's directory, with its cache and URLs: `example.com/`
+    /// from `remotes/`, and the standard library's repository
+    /// `github.com/nmnmcc/i` from `remotes/nmnmcc-i` (see [`World::library`]).
+    fn command(&self) -> Command {
         let remotes = self.path().join("remotes");
-        git_env(&mut Command::new(env!("CARGO_BIN_EXE_i")))
-            .envs(env.iter().copied())
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_i"));
+        git_env(&mut cmd)
             .current_dir(self.path())
             .env("ILANG_CACHE", self.path().join("cache"))
             .env(
                 "ILANG_GIT_URLS",
-                format!("example.com/=file://{}/", remotes.display()),
+                format!(
+                    "example.com/=file://{remotes}/ {LIBRARY_REPOSITORY}=file://{remotes}/{LIBRARY_REMOTE}",
+                    remotes = remotes.display()
+                ),
             )
-            .env_remove("ILANG_OFFLINE")
+            .env_remove("ILANG_OFFLINE");
+        cmd
+    }
+
+    /// Runs `i` in the world's directory, with its cache and URLs.
+    fn i(&self, args: &[&str]) -> Output {
+        self.command().args(args).output().unwrap()
+    }
+
+    /// Runs `i` as [`World::i`] does, with `env` set as well.
+    fn i_with(&self, args: &[&str], env: &[(&str, &std::ffi::OsStr)]) -> Output {
+        self.command()
+            .envs(env.iter().copied())
             .args(args)
             .output()
             .unwrap()
+    }
+
+    /// Runs `i` as [`World::i`], offline.
+    fn i_offline(&self, args: &[&str]) -> Output {
+        self.command()
+            .env("ILANG_OFFLINE", "1")
+            .args(args)
+            .output()
+            .unwrap()
+    }
+
+    /// The repository of the standard library, `github.com/nmnmcc/i`, got
+    /// from `remotes/nmnmcc-i`: the package `//stdlib`, which is this
+    /// repository's `stdlib/`, tagged `stdlib-v0.1.0` and then, later and
+    /// at an older version, `stdlib-v0.0.9`; and a root tag `v9.9.9`, which
+    /// is not a version of `//stdlib`. The newest version is 0.1.0.
+    fn library(&self) {
+        self.repo(LIBRARY_REMOTE, &[]);
+        let files = library_files();
+        let files: Vec<(&str, &str)> = files
+            .iter()
+            .map(|(path, text)| (path.as_str(), text.as_str()))
+            .collect();
+        self.tag_as(LIBRARY_REMOTE, "stdlib-v0.1.0", &files);
+        self.tag_as(LIBRARY_REMOTE, "stdlib-v0.0.9", &files);
+        self.tag_as(
+            LIBRARY_REMOTE,
+            "v9.9.9",
+            &[
+                ("i.toml", "name = \"root\"\n"),
+                ("src/m.i", " (x)\n\nx = 1\n"),
+            ],
+        );
     }
 
     /// Runs `i` and checks that it succeeds; gives its standard output.
@@ -161,6 +206,63 @@ impl World {
     }
 }
 
+/// The repository of the standard library, and where [`World::library`]
+/// puts it under `remotes/`.
+const LIBRARY_REPOSITORY: &str = "github.com/nmnmcc/i";
+const LIBRARY_REMOTE: &str = "nmnmcc-i";
+/// The version of the standard library that `i new` resolves in a world
+/// with [`World::library`].
+const LIBRARY_NEWEST: &str = "0.1.0";
+
+/// The `[dependencies]` line that makes this repository's `stdlib/` the
+/// dependency `i` by path, as every compiled package needs (E0641). A
+/// package got by location may not have it.
+fn stdlib_dependency() -> String {
+    format!(
+        "i = {{ path = {:?} }}\n",
+        test_project::library_dir().to_str().unwrap()
+    )
+}
+
+/// Makes the package in `dir` collect tests with `i/test` and have the
+/// library `i` as a normal dependency by location, from [`World::library`]:
+/// for a package that is published and then got by location, which may
+/// not have a path dependency.
+fn configure_tests_by_location(dir: &Path) {
+    let path = dir.join("i.toml");
+    let mut manifest: toml_edit::DocumentMut = read(&path).parse().unwrap();
+    manifest["test"]["collection"] = toml_edit::value("i/test.tests");
+    manifest["dependencies"]["i"] =
+        toml_edit::value(format!("{LIBRARY_REPOSITORY}//stdlib@{LIBRARY_NEWEST}"));
+    fs::write(path, manifest.to_string()).unwrap();
+}
+
+/// This repository's `stdlib/`, as files under `stdlib/` of a repository:
+/// its `i.toml`, licence and every file of `src/`, `test/` and `bench/`,
+/// without build output.
+fn library_files() -> Vec<(String, String)> {
+    let source = test_project::library_dir();
+    let mut files = Vec::new();
+    for relative in ["i.toml", "UNICODE-LICENSE"] {
+        files.push((format!("stdlib/{relative}"), read(&source.join(relative))));
+    }
+    for dir in ["src", "test", "bench"] {
+        if !source.join(dir).is_dir() {
+            continue;
+        }
+        let mut found = Vec::new();
+        files_under(&source.join(dir), Path::new(dir), &mut found);
+        for relative in found {
+            if relative.components().any(|c| c.as_os_str() == "build") {
+                continue;
+            }
+            let path = relative.to_str().unwrap().replace('\\', "/");
+            files.push((format!("stdlib/{path}"), read(&source.join(&relative))));
+        }
+    }
+    files
+}
+
 fn read(path: &Path) -> String {
     fs::read_to_string(path).unwrap()
 }
@@ -209,12 +311,18 @@ twice = (n : Int) { n * 2 }
     );
 }
 
-const APP_TOML: &str = "# The app.\nname = \"app\"\n\n[dependencies] # what it uses\n";
+/// The manifest of the package `app`, which depends on the library `i`.
+fn app_toml() -> String {
+    format!(
+        "# The app.\nname = \"app\"\n\n[dependencies] # what it uses\n{}",
+        stdlib_dependency()
+    )
+}
 
 fn app(w: &World) -> PathBuf {
     w.project(
         "app",
-        &[("i.toml", APP_TOML), ("src/main.i", " (x)\n\nx = 1\n")],
+        &[("i.toml", &app_toml()), ("src/main.i", " (x)\n\nx = 1\n")],
     )
 }
 
@@ -223,12 +331,13 @@ fn app(w: &World) -> PathBuf {
 #[test]
 fn new_makes_a_package_that_checks_runs_and_tests() {
     let w = World::new();
+    w.library();
     let out = w.ok(&["new", "demo"]);
     assert!(out.contains("demo"), "{out}");
     let dir = w.path().join("demo");
     assert_eq!(
         read(&dir.join("i.toml")),
-        test_project::new_manifest("demo")
+        test_project::new_manifest("demo", LIBRARY_NEWEST)
     );
     assert_eq!(read(&dir.join(".gitignore")), "/build/\n");
     assert!(read(&dir.join("src/main.i")).contains("(Io) = i/io"));
@@ -249,6 +358,7 @@ fn new_makes_a_package_that_checks_runs_and_tests() {
 #[test]
 fn two_new_packages_work_together() {
     let w = World::new();
+    w.library();
     w.ok(&["new", "greet"]);
     w.ok(&["new", "app"]);
     let app = w.path().join("app");
@@ -310,20 +420,58 @@ fn text_block(markdown: &str, want: usize) -> &str {
     }
 }
 
+/// The files of a package made by `i new`, as paths relative to its
+/// directory, sorted.
+fn new_package_files(dir: &Path) -> Vec<String> {
+    let mut files = Vec::new();
+    files_under(dir, Path::new(""), &mut files);
+    let mut files: Vec<String> = files
+        .iter()
+        .map(|p| p.to_str().unwrap().replace('\\', "/"))
+        .collect();
+    files.sort();
+    files
+}
+
+/// The dependency names of the table `table` of the manifest `text`.
+fn dependency_names(text: &str, table: &str) -> Vec<String> {
+    let manifest: toml_edit::DocumentMut = text.parse().unwrap();
+    manifest
+        .get(table)
+        .and_then(|t| t.as_table_like())
+        .map(|t| t.iter().map(|(k, _)| k.to_string()).collect())
+        .unwrap_or_default()
+}
+
 #[test]
 fn new_package_is_portable_and_runs_the_readme_program() {
     let w = World::new();
+    w.library();
     w.ok(&["new", "demo"]);
     let dir = w.path().join("demo");
     let manifest = read(&dir.join("i.toml"));
-    // No machine path; `std` is an ordinary dependency copied with the package.
-    assert_eq!(manifest, test_project::new_manifest("demo"));
+    // No machine path and no copied library: the library `i` is an
+    // ordinary dependency by location, at the newest `stdlib-v*` tag.
+    assert_eq!(manifest, test_project::new_manifest("demo", LIBRARY_NEWEST));
+    assert!(
+        manifest.contains("\ni = \"github.com/nmnmcc/i//stdlib@0.1.0\"\n"),
+        "{manifest}"
+    );
     assert!(!manifest.contains(env!("CARGO_MANIFEST_DIR")), "{manifest}");
-    assert!(dir.join("std/i.toml").is_file());
-    assert!(dir.join("std/src/int.i").is_file());
+    assert!(!manifest.contains("path"), "{manifest}");
+    assert_eq!(dependency_names(&manifest, "dependencies"), ["i"]);
+    assert!(dependency_names(&manifest, "dev-dependencies").is_empty());
+    assert!(!manifest.contains("std ="), "{manifest}");
+    assert_eq!(
+        new_package_files(&dir),
+        [".gitignore", "i.toml", "src/main.i", "test/main_test.i"]
+    );
+    assert!(!dir.join("std").exists());
+    assert!(!dir.join("stdlib").exists());
+    assert!(!dir.join("i").exists());
 
-    // The first README example imports `std/int` from a program, which now
-    // resolves as an ordinary dependency.
+    // The first README example imports `i/int` from a program, which
+    // resolves through the dependency `i`.
     let readme = include_str!("../../../README.md");
     write(&dir, &[("src/main.i", text_block(readme, 1))]);
     let out = w.ok(&["run", "--project", &dir.display().to_string()]);
@@ -333,6 +481,7 @@ fn new_package_is_portable_and_runs_the_readme_program() {
 #[test]
 fn new_package_tests_the_readme_service_example() {
     let w = World::new();
+    w.library();
     w.ok(&["new", "svc"]);
     let dir = w.path().join("svc");
     let readme = include_str!("../../../README.md");
@@ -345,20 +494,25 @@ fn new_package_tests_the_readme_service_example() {
     assert!(out.contains("0 failed"), "{out}");
 }
 
+/// `std` is an ordinary package name now: the package depends on the
+/// library `i` like any other.
 #[test]
-fn new_package_named_std_uses_another_dependency_key() {
+fn new_package_named_std_is_an_ordinary_package() {
     let w = World::new();
+    w.library();
     w.ok(&["new", "std"]);
     let dir = w.path().join("std");
     let manifest = read(&dir.join("i.toml"));
-    assert_eq!(manifest, test_project::new_manifest("std"));
-    assert!(!manifest.contains(env!("CARGO_MANIFEST_DIR")), "{manifest}");
-    assert!(
-        manifest.contains("stdlib = { path = \"std\" }"),
-        "{manifest}"
+    assert_eq!(manifest, test_project::new_manifest("std", LIBRARY_NEWEST));
+    assert_eq!(dependency_names(&manifest, "dependencies"), ["i"]);
+    assert!(!manifest.contains("stdlib ="), "{manifest}");
+    assert_eq!(
+        new_package_files(&dir),
+        [".gitignore", "i.toml", "src/main.i", "test/main_test.i"]
     );
-    assert!(dir.join("std/src/int.i").is_file());
-    assert!(read(&dir.join("test/main_test.i")).contains("stdlib/test"));
+    let test = read(&dir.join("test/main_test.i"));
+    assert!(test.contains("i/test"), "{test}");
+    assert!(test.contains("std/main"), "{test}");
 
     let project = dir.display().to_string();
     w.ok(&["check", "--project", &project]);
@@ -368,25 +522,125 @@ fn new_package_named_std_uses_another_dependency_key() {
     assert!(out.contains("1 passed, 0 failed"), "{out}");
 }
 
+/// The library is got by location and locked; the files that a package
+/// made by `i new` uses are this repository's `stdlib/`, with its licence
+/// and the notices in its sources, though nothing of it is copied.
 #[test]
-fn new_package_copies_the_std_licenses_and_notices() {
+fn new_package_gets_the_library_by_location() {
     let w = World::new();
+    w.library();
     w.ok(&["new", "demo"]);
     let dir = w.path().join("demo");
-    // The Unicode licence lives beside `src/`, not inside it.
-    assert_eq!(
-        read(&dir.join("std/UNICODE-LICENSE")),
-        include_str!("../../../std/UNICODE-LICENSE")
+    w.ok(&["check", "--project", &dir.display().to_string()]);
+    let lock = read(&dir.join("i.lock"));
+    let commit = git(
+        &w.path().join("work").join(LIBRARY_REMOTE),
+        &["rev-parse", "stdlib-v0.1.0^{commit}"],
     );
-    // Notices inside the sources must survive the copy unchanged.
-    for (path, expected) in [
-        ("std/src/float.i", include_str!("../../../std/src/float.i")),
-        ("std/src/regex.i", include_str!("../../../std/src/regex.i")),
-    ] {
-        assert_eq!(read(&dir.join(path)), expected, "{path}");
+    assert!(
+        lock.starts_with(&format!(
+            "github.com/nmnmcc/i//stdlib 0.1.0 {commit} sha256-"
+        )),
+        "{lock}"
+    );
+    assert_eq!(lock.lines().count(), 1, "{lock}");
+
+    // The package in the cache: exactly the files of `stdlib/`, at the
+    // root of the package.
+    let place = w.path().join("cache").join("pkg");
+    let places: Vec<_> = fs::read_dir(&place)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.is_dir())
+        .collect();
+    assert_eq!(places.len(), 1, "{places:?}");
+    let package = places[0].join(&commit);
+    assert!(package.is_dir(), "{}", package.display());
+    let source = test_project::library_dir();
+    let mut expected: Vec<String> = library_files()
+        .into_iter()
+        .map(|(path, _)| path.strip_prefix("stdlib/").unwrap().to_string())
+        .collect();
+    expected.sort();
+    assert_eq!(new_package_files(&package), expected);
+    for relative in &expected {
+        assert_eq!(
+            read(&package.join(relative)),
+            read(&source.join(relative)),
+            "{relative}"
+        );
     }
-    assert!(read(&dir.join("std/src/float.i")).contains("BSD-style license"));
-    assert!(read(&dir.join("std/src/regex.i")).contains("Unicode license"));
+    // The licence and the notices inside the sources are there unchanged.
+    assert_eq!(
+        read(&package.join("UNICODE-LICENSE")),
+        include_str!("../../../stdlib/UNICODE-LICENSE")
+    );
+    assert!(read(&package.join("src/float.i")).contains("BSD-style license"));
+    assert!(read(&package.join("src/regex.i")).contains("Unicode license"));
+}
+
+/// `i new` resolves the newest `stdlib-vX.Y.Z` when it makes the package:
+/// a newer tag is used by the next `i new`, and the packages already made
+/// keep their version.
+#[test]
+fn new_resolves_the_newest_library_tag_each_time() {
+    let w = World::new();
+    w.library();
+    w.ok(&["new", "first"]);
+    let files = library_files();
+    let files: Vec<(&str, &str)> = files
+        .iter()
+        .map(|(path, text)| (path.as_str(), text.as_str()))
+        .collect();
+    w.tag_as(LIBRARY_REMOTE, "stdlib-v0.2.0", &files);
+    w.ok(&["new", "second"]);
+    assert_eq!(
+        read(&w.path().join("first/i.toml")),
+        test_project::new_manifest("first", "0.1.0")
+    );
+    assert_eq!(
+        read(&w.path().join("second/i.toml")),
+        test_project::new_manifest("second", "0.2.0")
+    );
+}
+
+/// Offline, `i new` uses the tags in the cache; with none there, or when
+/// the repository cannot be reached, it fails and makes nothing.
+#[test]
+fn new_needs_the_library_tags_and_otherwise_makes_nothing() {
+    let w = World::new();
+    // No repository at all.
+    let err = w.fails(&["new", "demo"]);
+    assert!(err.contains("standard library"), "{err}");
+    assert!(err.contains("github.com/nmnmcc/i//stdlib"), "{err}");
+    assert!(err.contains("no package was made"), "{err}");
+    assert!(!w.path().join("demo").exists());
+
+    // Offline with an empty cache.
+    w.library();
+    let out = w.i_offline(&["new", "demo"]);
+    let err = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!out.status.success(), "{err}");
+    assert!(err.contains("offline"), "{err}");
+    assert!(err.contains("no package was made"), "{err}");
+    assert!(!w.path().join("demo").exists());
+
+    // Online once, then offline from the cache.
+    w.ok(&["new", "demo"]);
+    let out = w.i_offline(&["new", "again"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        read(&w.path().join("again/i.toml")),
+        test_project::new_manifest("again", LIBRARY_NEWEST)
+    );
 }
 
 /// Every regular file under `dir`, as paths relative to `dir`.
@@ -403,46 +657,29 @@ fn files_under(dir: &std::path::Path, prefix: &std::path::Path, out: &mut Vec<Pa
 }
 
 #[test]
-fn new_package_copies_every_std_source_file() {
-    let w = World::new();
-    w.ok(&["new", "demo"]);
-    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
-    let copy = w.path().join("demo/std");
-    let mut files = Vec::new();
-    files_under(&source.join("src"), Path::new("src"), &mut files);
-    assert!(!files.is_empty());
-    for relative in files {
-        assert_eq!(
-            read(&copy.join(&relative)),
-            read(&source.join(&relative)),
-            "{}",
-            relative.display()
-        );
-    }
-    for relative in ["i.toml", "UNICODE-LICENSE"] {
-        assert_eq!(
-            read(&copy.join(relative)),
-            read(&source.join(relative)),
-            "{relative}"
-        );
-    }
-}
-
-#[test]
 fn new_with_a_path_and_bad_names() {
     let w = World::new();
+    w.library();
     w.ok(&["new", "tool", "--path", "nested/place"]);
     assert_eq!(
         read(&w.path().join("nested/place/i.toml")),
-        test_project::new_manifest("tool")
+        test_project::new_manifest("tool", LIBRARY_NEWEST)
     );
     // The directory is not empty now.
     let err = w.fails(&["new", "tool", "--path", "nested/place"]);
     assert!(err.contains("not empty"), "{err}");
-    for bad in ["i", "Big", "1x", "__bad", "a-b"] {
+    for bad in ["Big", "1x", "__bad", "a-b"] {
         let err = w.fails(&["new", bad]);
         assert!(err.contains("must be a name"), "{bad}: {err}");
+        assert!(!w.path().join(bad).exists(), "{bad}");
     }
+    // `i` is the standard library.
+    let err = w.fails(&["new", "i"]);
+    assert!(
+        err.contains("the package name `i` is reserved for the standard library"),
+        "{err}"
+    );
+    assert!(!w.path().join("i").exists());
 }
 
 // ---- i add ----
@@ -457,7 +694,7 @@ fn add_takes_the_newest_tag_and_keeps_comments() {
     assert!(out.contains("added `lib = example.com/lib@2.0.0`"), "{out}");
     assert_eq!(
         read(&dir.join("i.toml")),
-        format!("{APP_TOML}lib = \"example.com/lib@2.0.0\"\n")
+        format!("{}lib = \"example.com/lib@2.0.0\"\n", app_toml())
     );
     let lock = read(&dir.join("i.lock"));
     assert!(lock.starts_with("example.com/lib 2.0.0 "), "{lock}");
@@ -565,11 +802,11 @@ fn add_puts_i_toml_back_when_loading_fails() {
     let project = dir.display().to_string();
     let err = w.fails(&["add", "lib", "example.com/lib@1.9.0", "--project", &project]);
     assert!(err.contains("E0631"), "{err}");
-    assert_eq!(read(&dir.join("i.toml")), APP_TOML);
+    assert_eq!(read(&dir.join("i.toml")), app_toml());
     assert!(!dir.join("i.lock").exists());
     let err = w.fails(&["add", "none", "example.com/none", "--project", &project]);
     assert!(err.contains("could not be fetched"), "{err}");
-    assert_eq!(read(&dir.join("i.toml")), APP_TOML);
+    assert_eq!(read(&dir.join("i.toml")), app_toml());
 }
 
 // ---- i remove ----
@@ -603,8 +840,10 @@ fn remove_takes_the_entry_and_the_lock_line_out() {
     w.ok(&["remove", "lib", "--project", &project]);
     assert_eq!(read(&dir.join("i.lock")), "");
     let toml = read(&dir.join("i.toml"));
-    assert!(toml.starts_with(APP_TOML), "{toml}");
-    assert!(!toml.contains("lib"), "{toml}");
+    assert!(toml.starts_with(&app_toml()), "{toml}");
+    // The path of the library `i` ends in `stdlib`.
+    assert!(!toml.contains("lib ="), "{toml}");
+    assert!(!toml.contains("example.com/lib"), "{toml}");
 
     let err = w.fails(&["remove", "lib", "--project", &project]);
     assert!(err.contains("is not a dependency"), "{err}");
@@ -727,11 +966,11 @@ fn published(w: &World, src: &str) -> PathBuf {
             ("src/api.i", src),
             (
                 "test/api_test.i",
-                "(\n\ttestlib = (test) = std/test\n\tpub/api\n)\n\ntest(\"works\", () { api.one |> (1) { () } & (other) { panic(\"no\") } })\n",
+                "(\n\ttestlib = (test) = i/test\n\tpub/api\n)\n\ntest(\"works\", () { api.one |> (1) { () } & (other) { panic(\"no\") } })\n",
             ),
         ],
     );
-    test_project::configure(&dir);
+    test_project::configure_tests_only(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     dir
@@ -942,6 +1181,7 @@ fn publish_compares_the_interface() {
 #[test]
 fn new_makes_files_that_are_formatted() {
     let w = World::new();
+    w.library();
     w.ok(&["new", "demo"]);
     let project = w.path().join("demo").display().to_string();
     w.ok(&["fmt", "--check", "--project", &project]);
@@ -979,7 +1219,7 @@ fn a_failed_add_or_update_leaves_i_toml_and_i_lock_as_they_were() {
         &project,
     ]);
     assert!(err.contains("E0623"), "{err}");
-    assert_eq!(read(&dir.join("i.toml")), APP_TOML);
+    assert_eq!(read(&dir.join("i.toml")), app_toml());
     assert!(!dir.join("i.lock").exists());
 
     // With an `i.lock`, it stays as it was.
@@ -1016,7 +1256,10 @@ fn a_failed_add_or_update_leaves_i_toml_and_i_lock_as_they_were() {
 fn update_and_add_keep_the_comments_of_an_entry() {
     let w = World::new();
     lib_repo(&w);
-    let toml = "name = \"app\"\n\n[dependencies]\n# why we use lib\nlib = \"example.com/lib@1.0.0\" # pinned\n# the other one\nother = \"example.com/lib@2.0.0\"\n";
+    let toml = &format!(
+        "name = \"app\"\n\n[dependencies]\n# why we use lib\nlib = \"example.com/lib@1.0.0\" # pinned\n# the other one\nother = \"example.com/lib@2.0.0\"\n{}",
+        stdlib_dependency()
+    );
     let dir = w.project(
         "app",
         &[("i.toml", toml), ("src/main.i", " (x)\n\nx = 1\n")],
@@ -1038,8 +1281,10 @@ fn update_and_add_keep_the_comments_of_an_entry() {
 fn add_and_update_keep_crlf_line_ends() {
     let w = World::new();
     lib_repo(&w);
-    let toml =
-        "# The app.\r\nname = \"app\"\r\n\r\n[dependencies]\r\nlib = \"example.com/lib@1.0.0\"\r\n";
+    let toml = &format!(
+        "# The app.\r\nname = \"app\"\r\n\r\n[dependencies]\r\nlib = \"example.com/lib@1.0.0\"\r\n{}",
+        stdlib_dependency().replace('\n', "\r\n")
+    );
     let dir = w.project(
         "app",
         &[("i.toml", toml), ("src/main.i", " (x)\n\nx = 1\n")],
@@ -1091,7 +1336,7 @@ fn two_types(w: &World, name: &str, api: &str) -> PathBuf {
             ("src/api.i", api),
         ],
     );
-    test_project::configure(&dir);
+    test_project::configure_tests_only(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -1202,9 +1447,9 @@ fn publish_sees_a_new_major_version_of_a_dependency() {
             ("src/api.i", api),
         ],
     );
+    test_project::configure_tests_only(&dir);
     let project = dir.display().to_string();
     w.ok(&["check", "--project", &project]);
-    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     w.ok(&["publish", "1.0.0", "--project", &project]);
@@ -1234,7 +1479,7 @@ fn publish_sees_what_the_host_must_give() {
             ("src/api.i", api),
         ],
     );
-    test_project::configure(&dir);
+    test_project::configure_tests_only(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -1282,7 +1527,7 @@ fn publish_sees_the_standard_service_of_i_io() {
             ("src/api.i", api),
         ],
     );
-    test_project::configure(&dir);
+    test_project::configure_tests_only(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -1339,9 +1584,9 @@ fn publish_tells_apart_types_that_are_shown_alike() {
             ("src/m.i", " (pa/m)\n (h)\n\nh = m.get\n"),
         ],
     );
+    test_project::configure_tests_only(&dir);
     let project = dir.display().to_string();
     w.ok(&["check", "--project", &project]);
-    test_project::configure(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     w.ok(&["publish", "1.0.0", "--project", &project]);
@@ -1377,7 +1622,7 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
             ("src/api.i", api),
         ],
     );
-    test_project::configure(&dir);
+    test_project::configure_tests_only(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -1452,13 +1697,18 @@ fn publish_sees_what_the_host_must_give_though_it_is_not_exported() {
 fn add_over_a_dependency_written_as_a_table_keeps_its_comments() {
     let w = World::new();
     lib_repo(&w);
+    let library = stdlib_dependency();
     for name in ["util", "util2"] {
         w.project(
             name,
             &[("i.toml", "name = \"util\"\n"), ("src/u.i", "x = 1\n")],
         );
     }
-    let toml = "name = \"app\"\n\n# the util\n[dependencies.lib]\npath = \"../util\" # p\n\n[wasm]\nexports = []\n";
+    // The library `i` is a normal dependency, as every root package needs.
+    let toml = &format!(
+        "name = \"app\"\n\n# the util\n[dependencies]\n{}\n[dependencies.lib]\npath = \"../util\" # p\n\n[wasm]\nexports = []\n",
+        stdlib_dependency()
+    );
     let main = ("src/main.i", " (x)\n\nx = 1\n");
 
     // Another path: the table stays, with its comments.
@@ -1475,17 +1725,23 @@ fn add_over_a_dependency_written_as_a_table_keeps_its_comments() {
     w.ok(&["add", "lib", "example.com/lib@1.2.0", "--project", &project]);
     assert_eq!(
         read(&dir.join("i.toml")),
-        "name = \"app\"\n\n# the util\n[dependencies]\nlib = \"example.com/lib@1.2.0\"\n\n[wasm]\nexports = []\n"
+        format!(
+            "name = \"app\"\n\n# the util\n[dependencies]\n{library}lib = \"example.com/lib@1.2.0\"\n\n[wasm]\nexports = []\n"
+        )
     );
 
     // When `[dependencies]` has a header, the comments go above the entry.
-    let toml = "name = \"app\"\n\n[dependencies]\nother = \"example.com/lib@2.0.0\"\n\n# the util\n[dependencies.lib] # mine\npath = \"../util\"\n";
+    let toml = &format!(
+        "name = \"app\"\n\n[dependencies]\n{library}other = \"example.com/lib@2.0.0\"\n\n# the util\n[dependencies.lib] # mine\npath = \"../util\"\n"
+    );
     let dir = w.project("app2", &[("i.toml", toml), main]);
     let project = dir.display().to_string();
     w.ok(&["add", "lib", "example.com/lib@1.2.0", "--project", &project]);
     assert_eq!(
         read(&dir.join("i.toml")),
-        "name = \"app\"\n\n[dependencies]\nother = \"example.com/lib@2.0.0\"\n# the util\nlib = \"example.com/lib@1.2.0\" # mine\n"
+        format!(
+            "name = \"app\"\n\n[dependencies]\n{library}other = \"example.com/lib@2.0.0\"\n# the util\nlib = \"example.com/lib@1.2.0\" # mine\n"
+        )
     );
 }
 
@@ -1506,7 +1762,10 @@ fn build_and_check_explain_an_old_syntax_dependency_tag() {
         &[
             (
                 "i.toml",
-                "name = \"app\"\n[dependencies]\nlegacy = \"example.com/legacy@1.0.0\"\n",
+                &format!(
+                    "name = \"app\"\n[dependencies]\nlegacy = \"example.com/legacy@1.0.0\"\n{}",
+                    stdlib_dependency()
+                ),
             ),
             ("src/main.i", "(legacy/api)\nx = api.f()\n"),
         ],
@@ -1537,6 +1796,7 @@ fn publish_skips_an_old_syntax_interface_and_allows_a_patch() {
             ("src/api.i", "export (f)\nf = () { 1 }\n"),
         ],
     );
+    test_project::depend_on_library(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "old syntax");
     git(&dir, &["tag", "v1.0.0"]);
@@ -1569,7 +1829,7 @@ fn publish_keeps_literal_alias_values_beyond_hover_limits() {
             ("src/api.i", &api),
         ],
     );
-    test_project::configure(&dir);
+    test_project::configure_tests_only(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "first");
     let project = dir.display().to_string();
@@ -1597,6 +1857,7 @@ fn publish_rejects_committed_source_links_before_reading_their_targets() {
         "pub",
         &[("i.toml", "name = \"pub\"\n"), (".gitignore", "/build/\n")],
     );
+    test_project::depend_on_library(&package);
     fs::create_dir(package.join("src")).unwrap();
     std::os::unix::fs::symlink(outside.join("lib.i"), package.join("src/lib.i")).unwrap();
     git(&package, &["init", "-q"]);
@@ -1640,7 +1901,7 @@ fn add_rejects_dependency_with_source_link() {
             "--tags",
         ],
     );
-    let manifest = "name = \"app\"\n";
+    let manifest = &format!("name = \"app\"\n[dependencies]\n{}", stdlib_dependency());
     let app = w.project(
         "app",
         &[("i.toml", manifest), ("src/main.i", "main = () { () }\n")],
@@ -1653,7 +1914,7 @@ fn add_rejects_dependency_with_source_link() {
         app.to_str().unwrap(),
     ]);
     assert!(err.contains("symbolic link"), "{err}");
-    assert_eq!(read(&app.join("i.toml")), manifest);
+    assert_eq!(read(&app.join("i.toml")), *manifest);
     assert!(!app.join("i.lock").exists());
 }
 
@@ -1675,7 +1936,10 @@ fn package_commands_reject_tampered_cache() {
         &[
             (
                 "i.toml",
-                "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n",
+                &format!(
+                    "name = \"app\"\n[dependencies]\ndep = \"example.com/dep@1.0.0\"\n{}",
+                    stdlib_dependency()
+                ),
             ),
             ("src/main.i", "main = () { () }\n"),
         ],
@@ -1735,7 +1999,7 @@ fn package_commands_reject_moved_superseded_resolution_input() {
         )],
     );
     let app = w.project("app", &[
-        ("i.toml", "name = \"app\"\n[dependencies]\na = \"example.com/a@1.0.0\"\nb = \"example.com/b@1.0.0\"\n"),
+        ("i.toml", &format!("name = \"app\"\n[dependencies]\na = \"example.com/a@1.0.0\"\nb = \"example.com/b@1.0.0\"\n{}", stdlib_dependency())),
         ("src/main.i", include_str!("../../../tests/spec/2.8/mp03_main.i")),
     ]);
     let project = app.to_str().unwrap();
@@ -1780,6 +2044,7 @@ fn publish_pins_macro_kind_call_contract_and_compile_time_source() {
             ("src/macros.is", macros),
         ],
     );
+    test_project::depend_on_library(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "original macro");
     let project = dir.to_str().unwrap();
@@ -1810,6 +2075,7 @@ fn publish_macro_contract_includes_imported_compile_time_initializers() {
         ("src/helper.i", "(answer)\nanswer = 42\n"),
         ("src/macros.is", "(, (= helper (/ pub helper)))\n(, m)\n(@ macro (= m (-> (, value) _ {(. helper answer) value})))\n"),
     ]);
+    test_project::depend_on_library(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "original helper");
     w.ok(&["publish", "1.0.0", "--project", dir.to_str().unwrap()]);
@@ -1831,6 +2097,7 @@ fn publish_compares_interfaces_after_macro_generated_exports() {
         ("src/macros.is", "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, name value) (<- _ (, (: items (. syntax Items)))) {((. items expose) name) `(= ~name ~value)})))\n"),
         ("src/api.i", "(m = pub/macros)\nm.emit(answer, 42)\n"),
     ]);
+    test_project::depend_on_library(&dir);
     git(&dir, &["init", "-q"]);
     commit(&dir, "generated API");
     w.ok(&["publish", "1.0.0", "--project", dir.to_str().unwrap()]);
@@ -1858,11 +2125,11 @@ fn with_collection(dir: &Path, value: toml_edit::Item) -> String {
 fn publish_a_missing_collection_is_an_error_not_zero_tests() {
     let w = World::new();
     let dir = published(&w, API_1);
-    let manifest = with_collection(&dir, toml_edit::value("std/test.nothing"));
+    let manifest = with_collection(&dir, toml_edit::value("i/test.nothing"));
     let (ok, out) = try_publish(&w, &dir, &[("i.toml", &manifest)], "1.0.0");
     assert!(!ok, "{out}");
     assert!(
-        out.contains("there is no test collection \"std/test.nothing\""),
+        out.contains("there is no test collection \"i/test.nothing\""),
         "{out}"
     );
     assert!(!out.contains("tests passed"), "{out}");
@@ -1892,7 +2159,7 @@ fn publish_rejects_duplicate_test_names() {
         &dir,
         &[(
             "test/dup_test.i",
-            "(\n\ttestlib = (test) = std/test\n)\n\ntest(\"same\", () { () })\n\ntest(\"same\", () { () })\n",
+            "(\n\ttestlib = (test) = i/test\n)\n\ntest(\"same\", () { () })\n\ntest(\"same\", () { () })\n",
         )],
         "1.0.0",
     );
@@ -1940,16 +2207,8 @@ fn two_processes_fetching_one_package_share_the_cache() {
     w.ok(&["add", "lib", "example.com/lib@1.0.0", "--project", &project]);
     // Both processes start with no cache at all, so both fetch the package.
     fs::remove_dir_all(w.path().join("cache")).unwrap();
-    let remotes = w.path().join("remotes");
     let spawn = || {
-        git_env(&mut Command::new(env!("CARGO_BIN_EXE_i")))
-            .current_dir(w.path())
-            .env("ILANG_CACHE", w.path().join("cache"))
-            .env(
-                "ILANG_GIT_URLS",
-                format!("example.com/=file://{}/", remotes.display()),
-            )
-            .env_remove("ILANG_OFFLINE")
+        w.command()
             .args(["check", "--project", &project])
             .spawn()
             .unwrap()
@@ -1962,4 +2221,278 @@ fn two_processes_fetching_one_package_share_the_cache() {
     assert!(b.success(), "second process failed");
     // The cache is intact and usable after the race.
     w.ok(&["check", "--offline", "--project", &project]);
+}
+
+// ---- Packages in a directory of a repository ----
+
+const SUB_SRC: &str = " (x)\n\nx = 1\n";
+
+/// The repository `example.com/mono`: a root package with the tags `v0.1.5`
+/// and `v0.9.0`, and the package `//stdlib` with the tags `stdlib-v0.1.0`,
+/// `stdlib-v0.1.1` and `stdlib-v1.0.0`.
+fn mono_repo(w: &World) {
+    w.repo("mono", &[]);
+    let root: &[(&str, &str)] = &[("i.toml", "name = \"mono\"\n"), ("src/m.i", SUB_SRC)];
+    let stdlib: &[(&str, &str)] = &[
+        ("stdlib/i.toml", "name = \"stdlib\"\n"),
+        ("stdlib/src/text.i", SUB_SRC),
+    ];
+    w.tag_as("mono", "stdlib-v0.1.0", stdlib);
+    w.tag_as("mono", "v0.1.5", root);
+    w.tag_as("mono", "stdlib-v0.1.1", stdlib);
+    w.tag_as("mono", "v0.9.0", root);
+    w.tag_as("mono", "stdlib-v1.0.0", stdlib);
+}
+
+#[test]
+fn add_and_update_use_the_tags_of_the_subpackage() {
+    let w = World::new();
+    mono_repo(&w);
+    let dir = app(&w);
+    let project = dir.display().to_string();
+    // With no version: the newest `stdlib-v*` tag, not a root tag.
+    let out = w.ok(&[
+        "add",
+        "stdlib",
+        "example.com/mono//stdlib",
+        "--project",
+        &project,
+    ]);
+    assert!(
+        out.contains("added `stdlib = example.com/mono//stdlib@1.0.0`"),
+        "{out}"
+    );
+    // The root package keeps its own tags.
+    let out = w.ok(&["add", "mono", "example.com/mono", "--project", &project]);
+    assert!(
+        out.contains("added `mono = example.com/mono@0.9.0`"),
+        "{out}"
+    );
+    w.ok(&[
+        "add",
+        "old",
+        "example.com/mono//stdlib@0.1.0",
+        "--dev",
+        "--project",
+        &project,
+    ]);
+    let lock = read(&dir.join("i.lock"));
+    assert!(lock.contains("example.com/mono//stdlib 0.1.0 "), "{lock}");
+    assert!(lock.contains("example.com/mono//stdlib 1.0.0 "), "{lock}");
+    assert!(lock.contains("example.com/mono 0.9.0 "), "{lock}");
+
+    // `i update old`: the newest `stdlib-v0.*`, not the root's v0.9.0.
+    let out = w.ok(&["update", "old", "--project", &project]);
+    assert!(
+        out.contains("updated old: example.com/mono//stdlib 0.1.0 -> 0.1.1"),
+        "{out}"
+    );
+    let toml = read(&dir.join("i.toml"));
+    assert!(
+        toml.contains("old = \"example.com/mono//stdlib@0.1.1\"\n"),
+        "{toml}"
+    );
+    let out = w.ok(&["update", "--project", &project]);
+    assert!(out.contains("newest version"), "{out}");
+
+    // A new root tag is not a version of `//stdlib`; a new stdlib tag is.
+    w.tag_as(
+        "mono",
+        "v0.9.9",
+        &[("i.toml", "name = \"mono\"\n"), ("src/m.i", SUB_SRC)],
+    );
+    w.tag_as(
+        "mono",
+        "stdlib-v0.1.2",
+        &[
+            ("stdlib/i.toml", "name = \"stdlib\"\n"),
+            ("stdlib/src/text.i", SUB_SRC),
+        ],
+    );
+    let out = w.ok(&["update", "--project", &project]);
+    assert!(
+        out.contains("updated old: example.com/mono//stdlib 0.1.1 -> 0.1.2"),
+        "{out}"
+    );
+    assert!(
+        out.contains("updated mono: example.com/mono 0.9.0 -> 0.9.9"),
+        "{out}"
+    );
+    assert!(!out.contains("updated stdlib:"), "{out}");
+
+    // A subpackage with no tags of its own has no version.
+    let err = w.fails(&[
+        "add",
+        "none",
+        "example.com/mono//none",
+        "--project",
+        &project,
+    ]);
+    assert!(err.contains("has no tag `none-vX.Y.Z`"), "{err}");
+}
+
+#[test]
+fn publish_a_package_in_a_directory_of_the_repository() {
+    let w = World::new();
+    let top = w.path().join("mono");
+    let dir = top.join("stdlib");
+    write(
+        &dir,
+        &[
+            ("i.toml", "name = \"pub\"\n"),
+            (".gitignore", "/build/\n"),
+            ("src/api.i", API_1),
+            (
+                "test/api_test.i",
+                "(\n\ttestlib = (test) = i/test\n\tpub/api\n)\n\ntest(\"works\", () { api.one |> (1) { () } & (other) { panic(\"no\") } })\n",
+            ),
+        ],
+    );
+    write(&top, &[("README", "mono\n")]);
+    // The rest of a big repository, which the package's tags must not reach.
+    for n in 0..200 {
+        write(
+            &top,
+            &[
+                (&format!("crates/c{n}/src/lib.rs"), &format!("// {n}\n")),
+                (&format!("docs/page{n}.md"), &format!("# {n}\n")),
+            ],
+        );
+    }
+    // The package is got by location below, so it may not have a path
+    // dependency: its tests get the library by location, and `i test`
+    // writes the `i.lock` that is committed with it.
+    w.library();
+    configure_tests_by_location(&dir);
+    w.ok(&["test", "--project", &dir.display().to_string()]);
+    git(&top, &["init", "-q"]);
+    commit(&top, "first");
+    // A root tag that is newer is not a version of this package.
+    git(&top, &["tag", "v5.0.0"]);
+    let project = dir.display().to_string();
+
+    let out = w.ok(&["publish", "0.1.0", "--dry-run", "--project", &project]);
+    assert!(out.contains("no earlier version"), "{out}");
+    assert!(
+        out.contains("dry run: every check passed; the tag stdlib-v0.1.0 was not made"),
+        "{out}"
+    );
+    assert_eq!(tags(&top), "v5.0.0");
+
+    let out = w.ok(&["publish", "0.1.0", "--project", &project]);
+    assert!(out.contains("made the tag stdlib-v0.1.0"), "{out}");
+    assert!(out.contains("git push origin stdlib-v0.1.0"), "{out}");
+    assert_eq!(tags(&top), "stdlib-v0.1.0\nv5.0.0");
+    // The tag is on a commit of the package's subtree only, with no parent.
+    let tagged = git(&top, &["rev-parse", "stdlib-v0.1.0^{commit}"]);
+    assert_ne!(tagged, git(&top, &["rev-parse", "HEAD"]));
+    assert_eq!(
+        git(&top, &["rev-list", "--parents", "-n1", &tagged]),
+        tagged
+    );
+    assert_eq!(
+        git(&top, &["rev-parse", "stdlib-v0.1.0^{tree}"]),
+        git(&top, &["rev-parse", "HEAD:stdlib"])
+    );
+    assert_eq!(
+        git(&top, &["log", "-1", "--format=%s", &tagged]),
+        "stdlib 0.1.0"
+    );
+    let objects = git(&top, &["rev-list", "--objects", "stdlib-v0.1.0"]);
+    let count = objects.lines().count();
+    eprintln!("objects reachable from stdlib-v0.1.0: {count}");
+    assert!(count < 300, "{count}");
+    assert!(
+        !objects
+            .lines()
+            .any(|o| o.contains(" crates/") || o.contains(" docs/") || o.contains(" stdlib/")),
+        "{objects}"
+    );
+    assert!(
+        objects.lines().any(|o| o.ends_with(" src/api.i")),
+        "{objects}"
+    );
+
+    // Got by location, the package is the root of the tagged tree.
+    let remote = w.path().join("remotes").join("mono");
+    fs::create_dir_all(&remote).unwrap();
+    git(&remote, &["init", "-q", "--bare"]);
+    let push_tags = |top: &Path| {
+        let remote = remote.display().to_string();
+        git(top, &["push", "-q", "-f", &remote, "HEAD:refs/heads/main"]);
+        git(top, &["push", "-q", "-f", &remote, "--tags"]);
+    };
+    push_tags(&top);
+    let app = w.project(
+        "app",
+        &[
+            (
+                "i.toml",
+                "name = \"app\"\n[dependencies]\npub = \"example.com/mono//stdlib@0.1.0\"\ni = \"github.com/nmnmcc/i//stdlib@0.1.0\"\n",
+            ),
+            ("src/main.i", " (pub/api)\n (x)\n\nx = api.one\n"),
+        ],
+    );
+    let app_project = app.display().to_string();
+    w.ok(&["check", "--project", &app_project]);
+    let lock = read(&app.join("i.lock"));
+    assert!(
+        lock.starts_with(&format!("example.com/mono//stdlib 0.1.0 {tagged} sha256-")),
+        "{lock}"
+    );
+    let cache_repo = w
+        .path()
+        .join("cache")
+        .join("git")
+        .join("example.com%2fmono");
+    assert_eq!(
+        git(&cache_repo, &["for-each-ref", "--format=%(refname)"]),
+        "refs/tags/stdlib-v0.1.0"
+    );
+    let cached = git(&cache_repo, &["rev-list", "--objects", "--all"]);
+    eprintln!(
+        "objects in the cache after the fetch: {}",
+        cached.lines().count()
+    );
+    assert!(cached.lines().count() < 300);
+    assert!(!cached.contains(" crates/") && !cached.contains(" docs/"));
+
+    // Not newer than the previous `stdlib-v*` tag.
+    for old in ["0.1.0", "0.0.9"] {
+        let err = w.fails(&["publish", old, "--project", &project]);
+        assert!(err.contains("must be newer than every tag"), "{err}");
+        assert!(err.contains("the newest is stdlib-v0.1.0"), "{err}");
+    }
+    assert_eq!(tags(&top), "stdlib-v0.1.0\nv5.0.0");
+
+    // The interface is compared with the previous `stdlib-v*` tag.
+    write(&dir, &[("src/api.i", &format!("{API_1}\nhidden = 3\n"))]);
+    commit(&top, "internal");
+    let out = w.ok(&["publish", "0.1.1", "--dry-run", "--project", &project]);
+    assert!(
+        out.contains("the public interface is the same as in stdlib-v0.1.0"),
+        "{out}"
+    );
+    assert!(!out.contains("v5.0.0"), "{out}");
+    assert!(out.contains("the tag stdlib-v0.1.1 was not made"), "{out}");
+    assert_eq!(tags(&top), "stdlib-v0.1.0\nv5.0.0");
+    // An addition since the subtree tag needs a minor version.
+    let added = API_1
+        .replace("\tone\n", "\tone\n\ttwo\n")
+        .replace("one = 1\n", "one = 1\n\ntwo = 2\n");
+    write(&dir, &[("src/api.i", &added)]);
+    commit(&top, "two");
+    let err = w.fails(&["publish", "0.1.1", "--project", &project]);
+    assert!(
+        err.contains("something was added since stdlib-v0.1.0"),
+        "{err}"
+    );
+    let out = w.ok(&["publish", "0.2.0", "--project", &project]);
+    assert!(out.contains("git push origin stdlib-v0.2.0"), "{out}");
+    let tagged = git(&top, &["rev-parse", "stdlib-v0.2.0^{commit}"]);
+    assert_eq!(
+        git(&top, &["rev-list", "--parents", "-n1", &tagged]),
+        tagged
+    );
+    assert_eq!(tags(&top), "stdlib-v0.1.0\nstdlib-v0.2.0\nv5.0.0");
 }

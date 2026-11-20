@@ -1,121 +1,6 @@
 $prelude.panic : (String) -> Never
 $prelude.assert : (Bool) <- (Assert) -> ()
-i/fail.raise : (A) <- (Fail(A)) -> Never
-i/fail.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
-i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
-i/fail.map_error : (() <- (Fail(B), ..N) -> A, (B) <- N -> C) <- (Fail(C), ..N) -> A
-i/control.boundary : ((Boundary(A, B)) <- B -> A) <- B -> A
-i/control.suspend : (Boundary(A, B), (Continuation(C, A, B)) <- B -> A) -> C
-i/control.escape : (Boundary(A, B), A) -> Never
-i/control.resume : (Continuation(A, B, C), A) <- C -> B
-i/control.cancel : (Continuation(A, B, C)) <- C -> ()
-i/control.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B
-i/resource.ensure : (() <- N -> A, () <- N -> ()) <- N -> A
-i/resource.gate_ready : (A) -> Request(A)
-i/resource.gate_state : (Request(A)) -> Result(A, Int)
-i/resource.gate_take : (Request(A)) -> A
-i/resource.pure_release : ((A) <- N -> ()) <- N -> (A) -> ()
-i/resource.acquire : (() <- (Fail(B), ..N) -> A, (A) <- N -> ()) <- (Fail(B), Scope, ..N) -> A
-i/resource.scoped : (() <- (Scope, ..N) -> A) <- N -> A
 i/assertion.catch : (() <- N -> A) <- (N - Assert) -> Result(A, AssertionFailure)
-i/request.new_root : (Key(())) -> Key(())
-i/request.end_root : (Key(())) -> ()
-i/request.new_owner : (Key(())) -> Key(())
-i/request.end_owner : (Key(())) -> ()
-i/request.group_count : (Key(())) -> Int
-i/request.root_count : (Key(())) -> Int
-i/request.cancel_group : (Key(())) -> ()
-i/request.cancel_root : (Key(())) -> ()
-i/request.observe_owner : (Key(())) -> Request(())
-i/request.observe_root : (Key(())) -> Request(())
-i/request.open_root : () <- (Root) -> Root
-i/request.close_root : (Root) -> ()
-i/request.open_owner : () <- (Root) -> Owner
-i/request.close_owner : (Owner) -> ()
-i/request.count : (Owner) -> Int
-i/request.count_root : (Root) -> Int
-i/request.settled_owner : (Owner) -> Bool
-i/request.settled_root : (Root) -> Bool
-i/request.cancel_all : (Owner) -> ()
-i/request.cancel_all_root : (Root) -> ()
-i/request.retain : (A) -> A
-i/request.within : (() <- N -> A) <- (N - Owner, Root) -> A
-i/request.wait_none : (Owner) <- (Await) -> ()
-i/request.wait_none_root : (Root) <- (Await) -> ()
-i/request.ready : (A) -> Request(A)
-i/request.ticket : (Request(A)) -> Ticket
-i/request.read_state : (Request(A)) -> Result(A, Int)
-i/request.take : (Request(A)) -> A
-i/request.settled : (Ticket) -> Bool
-i/request.cancel : (Ticket) -> ()
-i/request.state : (Request(A)) -> RequestState(A)
-i/request.await : (Request(A)) <- (Await) -> A
-i/request.await_owned : (Request(A)) <- (Await) -> A
-i/request.wait_any : (List(Ticket)) -> ()
-i/request.poll : () -> ()
-i/request.entry_root : () -> Key(())
-i/request.entry_end : () -> ()
-i/request._entry : (() <- N -> A) <- (N - Await - Owner - Root) -> A
-i/request._provider_root : (List(Root), Key(())) -> Root
-i/request._provider_owner : (List(Owner)) <- (Root) -> Owner
-i/request._provider_await : (List(Await)) -> Await
-i/key.new : () -> Key(A)
-i/key.wrap : (Key(A), A) -> Keyed
-i/key.read : (Key(A), Keyed) -> Result(A, ())
-i/key.unwrap : (Key(A), Keyed) -> Lookup(A)
-i/core.not : (Bool) -> Bool
-i/core.to_float : (Int) -> Float
-i/core.truncate : (Float) -> Int
-i/core.floor : (Float) -> Float
-i/core.ceiling : (Float) -> Float
-i/core.sqrt : (Float) -> Float
-i/core.float_to_bits : (Float) -> Int
-i/core.float_from_bits : (Int) -> Float
-i/core.bit_and : (Int, Int) -> Int
-i/core.bit_or : (Int, Int) -> Int
-i/core.bit_xor : (Int, Int) -> Int
-i/core.bit_not : (Int) -> Int
-i/core.shift_left : (Int, Int) -> Int
-i/core.shift_right : (Int, Int) -> Int
-i/core.concat : (List(String)) -> String
-i/core.byte_size : (String) -> Int
-i/core.byte_slice : (String, Int, Int) -> Result(String, ())
-i/core.codepoints : (String) -> List(UtfCodepoint)
-i/core.from_codepoints : (List(UtfCodepoint)) -> String
-i/core.codepoint_to_int : (UtfCodepoint) -> Int
-i/core.int_to_codepoint : (Int) -> Result(UtfCodepoint, ())
-i/core.to_upper : (String) -> String
-i/core.to_lower : (String) -> String
-i/core.index_of : (String, String, Int) -> Result(Int, ())
-i/core.bit_size : (BitArray) -> Int
-i/core.bit_array_to_string : (BitArray) -> Result(String, ())
-i/core.bit_array_concat : (List(BitArray)) -> BitArray
-i/core.inspect : (A) -> String
-i/core.hash : (A) -> Int
-i/core.portable : (A) -> Bool
-i/float_text.to_string : (Float) -> String
-i/float_text.positive : (Int, Int) -> List(String)
-i/float_text.floor_divide : (Int, Int) -> Int
-i/float_text.power_of_ten : (Int) -> Int
-i/float_text.small_power : (Int, Int) -> Int
-i/float_text.sixteens : (Int) -> Int
-i/float_text.grow : (Int, Int, Int) -> (Int, Int)
-i/float_text.shrink : (Int, Int, Int, Int, Int) -> (Int, Int, Int, Int)
-i/float_text.generate : (Int, Int, Int, Int, Bool, List(Int), Int) -> (List(Int), Int)
-i/float_text.carry : (List(Int)) -> (List(Int), Bool)
-i/float_text.trim : (List(Int)) -> List(Int)
-i/float_text.reverse_onto : (List(Int), List(Int)) -> List(Int)
-i/float_text.length : (List(Int), Int) -> Int
-i/float_text.layout : (List(Int), Int, Int, Bool) -> List(String)
-i/float_text.split : (List(Int), Int, List(String)) -> List(String)
-i/float_text.reverse_texts : (List(String), List(String)) -> List(String)
-i/float_text.append : (List(String), List(String)) -> List(String)
-i/float_text.zeros : (Int, List(String)) -> List(String)
-i/float_text.texts : (List(Int), List(String)) -> List(String)
-i/float_text.digit_list : (List(Int), List(String)) -> List(String)
-i/float_text.int_text : (Int) -> List(String)
-i/float_text.int_digits : (Int, List(String)) -> List(String)
-i/float_text.digit_text : (Int) -> String
 i/big.sign : (Int) -> Int
 i/big.digits : (Int) -> List(Int)
 i/big.from_digits : (Int, List(Int)) -> Int
@@ -166,6 +51,39 @@ i/big.chunk_of : (Int, Int, Int) -> (Int, Int)
 i/big.text_chunks : (List(Int), Int, Int, Int, List(String)) -> List(String)
 i/big.chunk_text : (Int, Int, Int, Bool, List(String)) -> List(String)
 i/big.digit_text : (Int) -> String
+i/bit_array.from_string : (String) -> BitArray
+i/bit_array._to_string_result : (BitArray) -> Result(String, ())
+i/bit_array.is_utf8 : (BitArray) -> Bool
+i/bit_array.bit_size : (BitArray) -> Int
+i/bit_array.byte_size : (BitArray) -> Int
+i/bit_array.append : (BitArray, BitArray) -> BitArray
+i/bit_array.concat : (List(BitArray)) -> BitArray
+i/bit_array.reverse : (List(A)) -> List(A)
+i/bit_array._slice_result : (BitArray, Int, Int) -> Result(BitArray, ())
+i/bit_array.starts_with : (BitArray, BitArray) -> Bool
+i/bit_array.pad_to_bytes : (BitArray) -> BitArray
+i/bit_array.compare : (BitArray, BitArray) -> Order
+i/bit_array.int_order : (Int, Int) -> Order
+i/bit_array.inspect : (BitArray) -> String
+i/bit_array.hex_digits : "0123456789ABCDEF"
+i/bit_array.char_at : (String, Int) -> String
+i/bit_array.base16_encode : (BitArray) -> String
+i/bit_array.hex_value : (Int) -> Int
+i/bit_array._base16_decode_result : (String) -> Result(BitArray, ())
+i/bit_array.standard : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+i/bit_array.url_safe : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+i/bit_array.encode64 : (BitArray, String, Bool) -> String
+i/bit_array.base64_encode : (BitArray, Bool) -> String
+i/bit_array.base64_url_encode : (BitArray, Bool) -> String
+i/bit_array.value64 : (Int, Int, Int) -> Int
+i/bit_array.decode64 : (String, Int, Int) -> Result(BitArray, ())
+i/bit_array._base64_decode_result : (String) -> Result(BitArray, ())
+i/bit_array._base64_url_decode_result : (String) -> Result(BitArray, ())
+i/bit_array.to_string : (BitArray) <- (Fail(())) -> String
+i/bit_array.slice : (BitArray, Int, Int) <- (Fail(())) -> BitArray
+i/bit_array.base16_decode : (String) <- (Fail(())) -> BitArray
+i/bit_array.base64_decode : (String) <- (Fail(())) -> BitArray
+i/bit_array.base64_url_decode : (String) <- (Fail(())) -> BitArray
 i/bits.read_unsigned : (BitArray, Int, Int) -> Int
 i/bits.from_unsigned : (Int, Int) -> BitArray
 i/bits.read_int : (BitArray, Int, Int, Bool, Bool) -> Int
@@ -176,6 +94,1247 @@ i/bits.write_big : (Int, Int, List(BitArray)) -> List(BitArray)
 i/bits.write_little : (Int, Int, List(BitArray)) -> List(BitArray)
 i/bits.reverse : (List(BitArray), List(BitArray)) -> List(BitArray)
 i/bits.min : (Int, Int) -> Int
+i/bool.not : (Bool) -> Bool
+i/bool.and : (Bool, Bool) -> Bool
+i/bool.or : (Bool, Bool) -> Bool
+i/bool.xor : (Bool, Bool) -> Bool
+i/bool.nand : (Bool, Bool) -> Bool
+i/bool.nor : (Bool, Bool) -> Bool
+i/bool.exclusive_nor : (Bool, Bool) -> Bool
+i/bool.to_string : (Bool) -> String
+i/bool.to_int : (Bool) -> Int
+i/bool.compare : (Bool, Bool) -> Order
+i/bool.guard : (Bool, A, () <- N -> A) <- N -> A
+i/bool.lazy_guard : (Bool, () <- N -> A, () <- N -> A) <- N -> A
+i/calendar.is_leap_year : (Int) -> Bool
+i/calendar._days_in_month_result : (Int, Int) -> Result(Int, CalendarError)
+i/calendar._date_result : (Int, Int, Int) -> Result(Date, CalendarError)
+i/calendar._time_of_day_result : (Int, Int, Int, Int) -> Result(TimeOfDay, CalendarError)
+i/calendar._offset_result : (Int) -> Result(Offset, CalendarError)
+i/calendar.utc : () -> Offset
+i/calendar.date_parts : (Date) -> (Int, Int, Int)
+i/calendar.time_parts : (TimeOfDay) -> (Int, Int, Int, Int)
+i/calendar.offset_minutes : (Offset) -> Int
+i/calendar.floor_divide : (Int, Int) -> Int
+i/calendar.modulo : (Int, Int) -> Int
+i/calendar.day_number : (Date) -> Int
+i/calendar.from_day_number : (Int) -> Date
+i/calendar.weekday : (Date) -> Weekday
+i/calendar.add_days : (Date, Int) -> Date
+i/calendar.days_between : (Date, Date) -> Int
+i/calendar.at : (time.Instant, Offset) -> Civil
+i/calendar.to_instant : (Civil, Offset) -> time.Instant
+i/calendar.require_text : (Bool) <- (Fail(BadText)) -> ()
+i/calendar.expect : (List(Int), Int) <- (Fail(BadText)) -> List(Int)
+i/calendar.digits : (List(Int), Int, Int) <- (Fail(BadText)) -> (Int, List(Int))
+i/calendar.scan_digits : (List(Int), Int, Int) -> (Int, Int, List(Int))
+i/calendar.read_year : (List(Int)) <- (Fail(BadText)) -> (Int, List(Int))
+i/calendar.power_of_ten : (Int) -> Int
+i/calendar.read_fraction : (List(Int)) <- (Fail(BadText)) -> (Int, List(Int))
+i/calendar.read_offset : (List(Int)) <- (Fail(BadText)) -> Offset
+i/calendar._parse_result : (String) -> Result((Civil, Offset), CalendarError)
+i/calendar.padded : (Int, Int) -> String
+i/calendar.year_text : (Int) -> String
+i/calendar.fraction_text : (Int) -> String
+i/calendar.offset_text : (Offset) -> String
+i/calendar.format : (Civil, Offset) -> String
+i/calendar.now : () <- (Fail(i/clock.ClockError), i/clock.Clock, i/request.Await, i/request.Owner) -> Civil
+i/calendar.format_now : () <- (Fail(i/clock.ClockError), i/clock.Clock, i/request.Await, i/request.Owner) -> String
+i/calendar.days_in_month : (Int, Int) <- (Fail(CalendarError)) -> Int
+i/calendar.date : (Int, Int, Int) <- (Fail(CalendarError)) -> Date
+i/calendar.time_of_day : (Int, Int, Int, Int) <- (Fail(CalendarError)) -> TimeOfDay
+i/calendar.offset : (Int) <- (Fail(CalendarError)) -> Offset
+i/calendar.parse : (String) <- (Fail(CalendarError)) -> (Civil, Offset)
+i/cli.pure : (A) -> Parser(A)
+i/cli.flag : (Names, String) -> Parser(Bool)
+i/cli.convert : (Token, String, (String) -> Result(A, String)) -> Result(A, CliError)
+i/cli.required : (Field, String, (String) -> Result(A, String)) -> Parser(A)
+i/cli.option : (Names, String, (String) -> Result(A, String)) -> Parser(A)
+i/cli.argument : (String, String, (String) -> Result(A, String)) -> Parser(A)
+i/cli.optional : (Names, String, (String) -> Result(A, String)) -> Parser(Option(A))
+i/cli.convert_all : (List(Token), String, (String) -> Result(A, String)) -> Result(List(A), CliError)
+i/cli.repeated : (Field, String, (String) -> Result(A, String)) -> Parser(List(A))
+i/cli.many : (Names, String, (String) -> Result(A, String)) -> Parser(List(A))
+i/cli.rest : (String, String, (String) -> Result(A, String)) -> Parser(List(A))
+i/cli.map : (Parser(A), (A) -> B) -> Parser(B)
+i/cli.map2 : (Parser(A), Parser(B), (A, B) -> C) -> Parser(C)
+i/cli.text : (String) -> Result(String, String)
+i/cli.integer : (String) -> Result(Int, String)
+i/cli.ascii_lower : (Int) -> Bool
+i/cli.ascii_letter : (Int) -> Bool
+i/cli.valid_name : (String) -> Bool
+i/cli.valid_short : (String) -> Bool
+i/cli.positional : (Kind) -> Bool
+i/cli.validate : (List(Field)) -> Result((), DefinitionError)
+i/cli.lookup : (List(Field), String, Bool) -> Option((Int, Field))
+i/cli.bucket_at : (List(List(Token)), Int) -> List(Token)
+i/cli.put : (List(List(Token)), Int, Token) -> List(List(Token))
+i/cli.option_token : (String) -> Option((String, Bool, Option(String)))
+i/cli.scan : (List(Field), List(String)) -> Result((List(List(Token)), List(Token)), CliError)
+i/cli.allocate : (List(Field), List(List(Token)), List(Token)) -> Result(List(List(Token)), CliError)
+i/cli._parse_result : (Parser(A), List(String)) -> Result(A, CliError)
+i/cli.show_field : (Field) -> String
+i/cli._help_result : (Parser(A), String) -> Result(String, DefinitionError)
+i/cli._read_result : (Parser(A)) <- (Fail(process.ProcessError), i/request.Await, i/request.Owner, process.Arguments) -> Result(A, CliError)
+i/cli.run : (Parser(A), String, (A) <- N -> ()) <- (Fail(process.ProcessError | stdio.StdioError | CliError), i/request.Await, i/request.Owner, process.Arguments, stdio.Stdio, ..N) -> ()
+i/cli.parse : (Parser(A), List(String)) <- (Fail(CliError)) -> A
+i/cli.help : (Parser(A), String) <- (Fail(DefinitionError)) -> String
+i/cli.read : (Parser(A)) <- (Fail(process.ProcessError | CliError), i/request.Await, i/request.Owner, process.Arguments) -> A
+i/clock.monotonic_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
+i/clock.unix_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
+i/clock.sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> ()
+i/control.boundary : ((Boundary(A, B)) <- B -> A) <- B -> A
+i/control.suspend : (Boundary(A, B), (Continuation(C, A, B)) <- B -> A) -> C
+i/control.escape : (Boundary(A, B), A) -> Never
+i/control.resume : (Continuation(A, B, C), A) <- C -> B
+i/control.cancel : (Continuation(A, B, C)) <- C -> ()
+i/control.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B
+i/core.not : (Bool) -> Bool
+i/core.to_float : (Int) -> Float
+i/core.truncate : (Float) -> Int
+i/core.floor : (Float) -> Float
+i/core.ceiling : (Float) -> Float
+i/core.sqrt : (Float) -> Float
+i/core.float_to_bits : (Float) -> Int
+i/core.float_from_bits : (Int) -> Float
+i/core.bit_and : (Int, Int) -> Int
+i/core.bit_or : (Int, Int) -> Int
+i/core.bit_xor : (Int, Int) -> Int
+i/core.bit_not : (Int) -> Int
+i/core.shift_left : (Int, Int) -> Int
+i/core.shift_right : (Int, Int) -> Int
+i/core.concat : (List(String)) -> String
+i/core.byte_size : (String) -> Int
+i/core.byte_slice : (String, Int, Int) -> Result(String, ())
+i/core.codepoints : (String) -> List(UtfCodepoint)
+i/core.from_codepoints : (List(UtfCodepoint)) -> String
+i/core.codepoint_to_int : (UtfCodepoint) -> Int
+i/core.int_to_codepoint : (Int) -> Result(UtfCodepoint, ())
+i/core.to_upper : (String) -> String
+i/core.to_lower : (String) -> String
+i/core.index_of : (String, String, Int) -> Result(Int, ())
+i/core.bit_size : (BitArray) -> Int
+i/core.bit_array_to_string : (BitArray) -> Result(String, ())
+i/core.bit_array_concat : (List(BitArray)) -> BitArray
+i/core.inspect : (A) -> String
+i/core.hash : (A) -> Int
+i/core.portable : (A) -> Bool
+i/crypto.xor3 : (Int, Int, Int) -> Int
+i/crypto.word : (Int, Int) -> Int
+i/crypto.rotate : (Int, Int, Int) -> Int
+i/crypto.nth : (List(Int), Int) -> Int
+i/crypto.add_words : (Words, Words, Int) -> Words
+i/crypto.serialize : (Words, Int) -> BitArray
+i/crypto.constants32 : List(113926993 | 264347078 | 275423344 | 310598401 | 338241895 | 430227734 | 506948616 | 604807628 | 607225278 | 659060556 | 666307205 | 770255983 | 773529912 | 883997877 | 958139571 | 961987163 | 1116352408 | 1249150122 | 1294757372 | 1322822218 | 1396182291 | 1426881987 | 1508970993 | 1537002063 | 1555081692 | 1695183700 | 1747873779 | 1899447441 | 1925078388 | 1955562222 | 1986661051 | 1996064986 | 2024104815 | 2162078206 | 2177026350 | 2227730452 | 2361852424 | 2428436474 | 2453635748 | 2456956037 | 2554220882 | 2614888103 | 2730485921 | 2756734187 | 2820302411 | 2821834349 | 2870763221 | 2952996808 | 3049323471 | 3204031479 | 3210313671 | 3248222580 | 3259730800 | 3329325298 | 3336571891 | 3345764771 | 3516065817 | 3584528711 | 3600352804 | 3624381080 | 3835390401 | 3921009573 | 4022224774 | 4094571909)
+i/crypto.sha256 : (BitArray) -> BitArray
+i/crypto.blocks32 : (BitArray, Words) -> Words
+i/crypto.rounds32 : (BitArray, List(Int), List(Int), Words) -> Words
+i/crypto.constants64 : List(489312712824947311 | 500013540394364858 | 748580250866718886 | 1135362057144423861 | 1182934255886127544 | 1242879168328830382 | 1334009975649890238 | 1452737877330783856 | 1847814050463011016 | 1977374033974150939 | 2177327727835720531 | 2597628984639134821 | 2608012711638119052 | 2830643537854262169 | 2861767655752347644 | 2944078676154940804 | 3308224258029322869 | 3322285676063803686 | 3659926193048069267 | 3796741975233480872 | 4115178125766777443 | 4131703408338449720 | 4368137639120453308 | 4794697086780616226 | 4836135668995329356 | 5365058923640841347 | 5532061633213252278 | 5560940570517711597 | 5681478168544905931 | 5996557281743188959 | 6128411473006802146 | 6448918945643986474 | 6480981068601479193 | 6601373596472566643 | 6679025012923562964 | 6902733635092675308 | 7280758554555802590 | 7507060721942968483 | 7801388544844847127 | 8158064640168781261 | 8268148722764581231 | 8399075790359081724 | 8532644243296465576 | 8573033837759648693 | 8693463985226723168 | 9286055187155687089 | 9350256976987008742 | 9568029438360202098 | 10144078919501101548 | 10430055236837252648 | 10538285296894168987 | 10552545826968843579 | 10970295158949994411 | 11230858885718282805 | 11727347734174303076 | 11840083180663258601 | 12113106623233404929 | 12119686244451234320 | 12329834152419229976 | 12683024718118986047 | 13096744586834688815 | 13761210420658862357 | 13788192230050041572 | 13951009754708518548 | 14000437183269869457 | 14299343276471374635 | 14330467153632333762 | 14369950271660146224 | 14566680578165727644 | 15097957966210449927 | 15101387698204529176 | 15395433587784984357 | 15463397548674623760 | 15566598209576043074 | 16472876342353939154 | 16840607885511220156 | 16922976911328602910 | 17275323862435702243 | 17586052441742319658 | 17689382322260857208)
+i/crypto.sha512 : (BitArray) -> BitArray
+i/crypto.blocks64 : (BitArray, Words) -> Words
+i/crypto.rounds64 : (BitArray, List(Int), List(Int), Words) -> Words
+i/crypto.aligned : (List(BitArray)) -> Bool
+i/crypto.key_pad : (BitArray, Int, (BitArray) -> BitArray) -> BitArray
+i/crypto.xor_byte : (BitArray, Int) -> BitArray
+i/crypto.prepare : (BitArray, Int, (BitArray) -> BitArray) -> Mac
+i/crypto.authenticate : (Mac, BitArray) -> BitArray
+i/crypto.hmac : (BitArray, BitArray, Int, (BitArray) -> BitArray) -> Result(BitArray, CryptoError)
+i/crypto._hmac_sha256_result : (BitArray, BitArray) -> Result(BitArray, CryptoError)
+i/crypto._hmac_sha512_result : (BitArray, BitArray) -> Result(BitArray, CryptoError)
+i/crypto._hkdf_extract_sha256_result : (BitArray, BitArray) -> Result(BitArray, CryptoError)
+i/crypto._hkdf_extract_sha512_result : (BitArray, BitArray) -> Result(BitArray, CryptoError)
+i/crypto.expand : (BitArray, BitArray, Int, Int, Int, (BitArray) -> BitArray) -> Result(BitArray, CryptoError)
+i/crypto._hkdf_expand_sha256_result : (BitArray, BitArray, Int) -> Result(BitArray, CryptoError)
+i/crypto._hkdf_expand_sha512_result : (BitArray, BitArray, Int) -> Result(BitArray, CryptoError)
+i/crypto._hkdf_sha256_result : (BitArray, BitArray, BitArray, Int) -> Result(BitArray, CryptoError)
+i/crypto._hkdf_sha512_result : (BitArray, BitArray, BitArray, Int) -> Result(BitArray, CryptoError)
+i/crypto.xor_bits : (BitArray, BitArray) -> BitArray
+i/crypto._pbkdf2_sha256_result : (BitArray, BitArray, Int, Int) -> Result(BitArray, CryptoError)
+i/crypto.constant_time_equal : (BitArray, BitArray) -> Bool
+i/crypto._random_bytes_result : (Int) <- (Fail(process.ProcessError), process.Entropy, request.Await, request.Owner) -> Result(BitArray, CryptoError)
+i/crypto.hmac_sha256 : (BitArray, BitArray) <- (Fail(CryptoError)) -> BitArray
+i/crypto.hmac_sha512 : (BitArray, BitArray) <- (Fail(CryptoError)) -> BitArray
+i/crypto.hkdf_extract_sha256 : (BitArray, BitArray) <- (Fail(CryptoError)) -> BitArray
+i/crypto.hkdf_extract_sha512 : (BitArray, BitArray) <- (Fail(CryptoError)) -> BitArray
+i/crypto.hkdf_expand_sha256 : (BitArray, BitArray, Int) <- (Fail(CryptoError)) -> BitArray
+i/crypto.hkdf_expand_sha512 : (BitArray, BitArray, Int) <- (Fail(CryptoError)) -> BitArray
+i/crypto.hkdf_sha256 : (BitArray, BitArray, BitArray, Int) <- (Fail(CryptoError)) -> BitArray
+i/crypto.hkdf_sha512 : (BitArray, BitArray, BitArray, Int) <- (Fail(CryptoError)) -> BitArray
+i/crypto.pbkdf2_sha256 : (BitArray, BitArray, Int, Int) <- (Fail(CryptoError)) -> BitArray
+i/crypto.random_bytes : (Int) <- (Fail(process.ProcessError | CryptoError), process.Entropy, request.Await, request.Owner) -> BitArray
+i/csv.defaults : () -> Options
+i/csv._options_result : (String, Int, Bool) -> Result(Options, CsvError)
+i/csv.raw : (Cursor(A, B)) <- (Fail(A), ..B) -> (Option(Int), Cursor(A, B))
+i/csv.next : (Cursor(A, B)) <- (Fail(A), ..B) -> (Option(Int), Cursor(A, B))
+i/csv.text : (List(Int)) -> String
+i/csv.cursor_line : (Cursor(A, B)) -> Int
+i/csv.read_row : (Cursor(A, B), Options, Int, List(Int), List(String), Bool, Int) <- (Fail(A), ..B) -> Result((Option(ReadRow), Cursor(A, B)), CsvError)
+i/csv.row_stream : (Cursor(A, B), Options, Int) -> stream.Stream(Result(ReadRow, CsvError), A, B)
+i/csv.rows : (stream.Stream(String, A, B), Options) -> stream.Stream(Result(List(String), CsvError), A, B)
+i/csv._parse_result : (String) -> Result(List(List(String)), CsvError)
+i/csv._parse_with_result : (String, Options) -> Result(List(List(String)), CsvError)
+i/csv.header : (List(String), Int) -> Result(List(String), CsvError)
+i/csv.named : (List(String), List(String), Int) -> Result(dict.Dict(String, String), CsvError)
+i/csv.record_stream : (stream.Stream(Result(ReadRow, CsvError), A, B), List(String)) -> stream.Stream(Result(dict.Dict(String, String), CsvError), A, B)
+i/csv.records : (stream.Stream(String, A, B), Options) -> stream.Stream(Result(dict.Dict(String, String), CsvError), A, B)
+i/csv._parse_header_result : (String, Options) -> Result(List(dict.Dict(String, String)), CsvError)
+i/csv._decode_result : (schema.Schema(A, B), dict.Dict(String, String)) -> Result(A, B)
+i/csv.quote : (String, String, Bool) -> String
+i/csv.print : (List(List(String))) -> String
+i/csv.print_with : (List(List(String)), Options) -> String
+i/csv.options : (String, Int, Bool) <- (Fail(CsvError)) -> Options
+i/csv.parse : (String) <- (Fail(CsvError)) -> List(List(String))
+i/csv.parse_with : (String, Options) <- (Fail(CsvError)) -> List(List(String))
+i/csv.parse_header : (String, Options) <- (Fail(CsvError)) -> List(dict.Dict(String, String))
+i/csv.decode : (schema.Schema(A, B), dict.Dict(String, String)) <- (Fail(B)) -> A
+i/dict.new : () -> Dict(Never, Never)
+i/dict.size : (Dict(A, B)) -> Int
+i/dict.is_empty : (Dict(A, B)) -> Bool
+i/dict.slot : (Int, Int) -> Int
+i/dict.get : (Dict(A, B), C) -> Option(B)
+i/dict.find : (Empty | One(A, B) | Many(C, B) | Branch(D, B), Int, F, Int) -> Option(B)
+i/dict.find_entry : (List((A, B)), C) -> Option(B)
+i/dict.has : (Dict(A, B), C) -> Bool
+i/dict.insert : (Dict(A, B), A, B) -> Dict(A, B)
+i/dict.put : (Node(A, B), Int, A, B, Int) -> (Node(A, B), Bool)
+i/dict.put_entry : (List((A, B)), A, B, List((A, B))) -> (List((A, B)), Bool)
+i/dict.join : (Int, Node(A, B), Int, Node(A, B), Int) -> Node(A, B)
+i/dict.place : (Int, Node(A, B), Node(A, B)) -> Node(A, B)
+i/dict.delete : (Dict(A, B), A) -> Dict(A, B)
+i/dict.remove : (Node(A, B), Int, A, Int) -> (Node(A, B), Bool)
+i/dict.shrink : (Node(A, B)) -> Node(A, B)
+i/dict.remove_entry : (List((A, B)), A, List((A, B))) -> Option(List((A, B)))
+i/dict.upsert : (Dict(A, B), A, (Option(B)) <- N -> B) <- N -> Dict(A, B)
+i/dict.update : (Dict(A, B), A, (B) <- N -> B) <- N -> Dict(A, B)
+i/dict.from_list : (List((A, B))) -> Dict(A, B)
+i/dict.fold : (Dict(A, B), C, (C, A, B) <- N -> C) <- N -> C
+i/dict.fold_node : (Node(A, B), C, (C, A, B) <- N -> C) <- N -> C
+i/dict.fold_entries : (List((A, B)), C, (C, A, B) <- N -> C) <- N -> C
+i/dict.to_list : (Dict(A, B)) -> List((A, B))
+i/dict.keys : (Dict(A, B)) -> List(A)
+i/dict.values : (Dict(A, B)) -> List(B)
+i/dict.each : (Dict(A, B), (A, B) <- N -> C) <- N -> ()
+i/dict.map_values : (Dict(A, B), (A, B) <- N -> C) <- N -> Dict(A, C)
+i/dict.map_node : (Node(A, B), (A, B) <- N -> C) <- N -> Node(A, C)
+i/dict.map_entries : (List((A, B)), (A, B) <- N -> C, List((A, C))) <- N -> List((A, C))
+i/dict.filter : (Dict(A, B), (A, B) <- N -> Bool) <- N -> Dict(A, B)
+i/dict.take : (Dict(A, B), List(A)) -> Dict(A, B)
+i/dict.drop : (Dict(A, B), List(A)) -> Dict(A, B)
+i/dict.merge : (Dict(A, B), Dict(A, B)) -> Dict(A, B)
+i/dict.combine : (Dict(A, B), Dict(A, B), (B, B) <- N -> B) <- N -> Dict(A, B)
+i/dict.group : (List(A), (A) <- N -> B) <- N -> Dict(B, List(A))
+i/dict.same_entries : (Dict(A, B), Dict(C, D)) -> Bool
+i/dict.reverse_onto : (List(A), List(A)) -> List(A)
+i/fail.raise : (A) <- (Fail(A)) -> Never
+i/fail.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
+i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
+i/fail.map_error : (() <- (Fail(B), ..N) -> A, (B) <- N -> C) <- (Fail(C), ..N) -> A
+i/fetch.open : (String, String, String, BitArray) <- (Fail(String), Fetch, request.Await, request.Owner) -> Response
+i/fetch.status : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> Int
+i/fetch.headers : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> String
+i/fetch.read : (Response, Int) <- (Fail(String), Fetch, request.Await, request.Owner) -> BitArray
+i/fetch.close : (Response) <- (Fetch, request.Await, request.Owner) -> ()
+i/float.max_finite : Float
+i/float.min_positive : Float
+i/float.pi : Float
+i/float.tau : Float
+i/float.sign_mask : 9223372036854775808
+i/float.sign_bit : (Float) -> Bool
+i/float.copy_sign : (Float, Float) -> Float
+i/float.fraction_unit : 4503599627370496
+i/float.significand_limit : 9007199254740992
+i/float.to_string : (Float) -> String
+i/float._parse_result : (String) -> Result(Float, ())
+i/float.is_digit : (Int) -> Bool
+i/float.whole : (BitArray, Bool, Int, Int, Int) -> Result(Float, ())
+i/float.fraction : (BitArray, Bool, Int, Int, Int) -> Result(Float, ())
+i/float.count_significant : (Int, Int) -> Int
+i/float.exponent : (BitArray, Int, Int, Int) -> Result(Int, ())
+i/float.decimal : (Bool, Int, Int, Int) -> Result(Float, ())
+i/float.ratio_bits : (Int, Int) -> Result(Int, ())
+i/float.radix_order : (Int, Int, Int) -> Int
+i/float.order_factors : (Int, Int, Int, Int, List((Int, Int))) -> (Int, Int)
+i/float.order_search : (Int, Int, List((Int, Int)), Int) -> (Int, Int)
+i/float.round_ratio : (Int, Int) -> Int
+i/float.int_power : (Int, Int) -> Int
+i/float.compare : (Float, Float) -> Order
+i/float.loosely_compare : (Float, Float, Float) -> Order
+i/float.loosely_equals : (Float, Float, Float) -> Bool
+i/float.min : (Float, Float) -> Float
+i/float.max : (Float, Float) -> Float
+i/float.clamp : (Float, Float, Float) -> Float
+i/float.abs : (Float) -> Float
+i/float.negate : (Float) -> Float
+i/float.ceiling : (Float) -> Float
+i/float.floor : (Float) -> Float
+i/float.round : (Float) -> Int
+i/float.round_positive : (Float) -> Int
+i/float.truncate : (Float) -> Int
+i/float.is_integer : (Float) -> Bool
+i/float.to_precision : (Float, Int) -> Float
+i/float._power_result : (Float, Int) -> Result(Float, ())
+i/float._square_root_result : (Float) -> Result(Float, ())
+i/float.sum : (List(Float)) -> Float
+i/float.product : (List(Float)) -> Float
+i/float._divide_result : (Float, Float) -> Result(Float, ())
+i/float._modulo_result : (Float, Float) -> Result(Float, ())
+i/float.add : (Float, Float) -> Float
+i/float.subtract : (Float, Float) -> Float
+i/float.multiply : (Float, Float) -> Float
+i/float._exponential_result : (Float) -> Result(Float, ())
+i/float._logarithm_result : (Float) -> Result(Float, ())
+i/float._real_power_result : (Float, Float) -> Result(Float, ())
+i/float.word : 4294967296
+i/float.mantissa_unit : 4503599627370496
+i/float.ln2_hi : Float
+i/float.ln2_lo : Float
+i/float.inverse_ln2 : Float
+i/float.bits_of : (Float) -> Int
+i/float.from_bits : (Int) -> Float
+i/float.abs_bits : (Float) -> Float
+i/float.high : (Float) -> Int
+i/float.positive_high : (Float) -> Int
+i/float.with_high : (Float, Int) -> Float
+i/float.without_low : (Float) -> Float
+i/float.two_power : (Int) -> Float
+i/float.scale : (Float, Int) -> Float
+i/float.exp_polynomial : (Float) -> Float
+i/float.exp_finite : (Float) -> Float
+i/float.log_positive : (Float) -> Float
+i/float.log2_split : (Float) -> (Float, Float)
+i/float.log2_close_to_one : (Float) -> (Float, Float)
+i/float.pow : (Float, Float) -> Result(Float, ())
+i/float.is_odd_whole : (Float) -> Bool
+i/float.pow_extreme : (Float, Float, Float) -> Result(Float, ())
+i/float.pow_exp2 : (Float, Float, Float, Float) -> Result(Float, ())
+i/float.asin_ratio : (Float) -> Float
+i/float._asin_result : (Float) -> Result(Float, ())
+i/float._acos_result : (Float) -> Result(Float, ())
+i/float.atan_kernel : (Float, Float, Float, Bool) -> Float
+i/float.atan : (Float) -> Float
+i/float.atan2 : (Float, Float) -> Float
+i/float.radians : (Float) -> Float
+i/float._degrees_result : (Float) -> Result(Float, ())
+i/float.hypot_square : (Float) -> (Float, Float)
+i/float._hypot_result : (Float, Float) -> Result(Float, ())
+i/float.trig_reduce : (Float) -> (Int, Float, Float)
+i/float.trig_sin : (Float, Float) -> Float
+i/float.trig_cos : (Float, Float) -> Float
+i/float.sin : (Float) -> Float
+i/float.cos : (Float) -> Float
+i/float.trig_tan : (Float, Float, Bool) -> Float
+i/float._tan_result : (Float) -> Result(Float, ())
+i/float.parse : (String) <- (Fail(())) -> Float
+i/float.power : (Float, Int) <- (Fail(())) -> Float
+i/float.square_root : (Float) <- (Fail(())) -> Float
+i/float.divide : (Float, Float) <- (Fail(())) -> Float
+i/float.modulo : (Float, Float) <- (Fail(())) -> Float
+i/float.exponential : (Float) <- (Fail(())) -> Float
+i/float.logarithm : (Float) <- (Fail(())) -> Float
+i/float.real_power : (Float, Float) <- (Fail(())) -> Float
+i/float.asin : (Float) <- (Fail(())) -> Float
+i/float.acos : (Float) <- (Fail(())) -> Float
+i/float.degrees : (Float) <- (Fail(())) -> Float
+i/float.hypot : (Float, Float) <- (Fail(())) -> Float
+i/float.tan : (Float) <- (Fail(())) -> Float
+i/float_text.to_string : (Float) -> String
+i/float_text.positive : (Int, Int) -> List(String)
+i/float_text.floor_divide : (Int, Int) -> Int
+i/float_text.power_of_ten : (Int) -> Int
+i/float_text.small_power : (Int, Int) -> Int
+i/float_text.sixteens : (Int) -> Int
+i/float_text.grow : (Int, Int, Int) -> (Int, Int)
+i/float_text.shrink : (Int, Int, Int, Int, Int) -> (Int, Int, Int, Int)
+i/float_text.generate : (Int, Int, Int, Int, Bool, List(Int), Int) -> (List(Int), Int)
+i/float_text.carry : (List(Int)) -> (List(Int), Bool)
+i/float_text.trim : (List(Int)) -> List(Int)
+i/float_text.reverse_onto : (List(Int), List(Int)) -> List(Int)
+i/float_text.length : (List(Int), Int) -> Int
+i/float_text.layout : (List(Int), Int, Int, Bool) -> List(String)
+i/float_text.split : (List(Int), Int, List(String)) -> List(String)
+i/float_text.reverse_texts : (List(String), List(String)) -> List(String)
+i/float_text.append : (List(String), List(String)) -> List(String)
+i/float_text.zeros : (Int, List(String)) -> List(String)
+i/float_text.texts : (List(Int), List(String)) -> List(String)
+i/float_text.digit_list : (List(Int), List(String)) -> List(String)
+i/float_text.int_text : (Int) -> List(String)
+i/float_text.int_digits : (Int, List(String)) -> List(String)
+i/float_text.digit_text : (Int) -> String
+i/fs.mode_string : (OpenMode) -> "append" | "read" | "read_write" | "truncate"
+i/fs.open : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner) -> File
+i/fs.read : (File, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
+i/fs.write : (File, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.flush : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.close : (File) <- (Fs, request.Await, request.Owner) -> ()
+i/fs.remove : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.rename : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.mkdir : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.slice : (String, Int, Int) -> String
+i/fs.list_parts : (String, Int) -> List(String)
+i/fs.list : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
+i/fs.metadata : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Metadata
+i/fs.temp_dir : () <- (Fail(FsError), Fs, request.Await, request.Owner) -> String
+i/fs.read_chunks : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
+i/fs.read_file : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
+i/fs.write_file : (String, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.line_parts : (String, Int) -> List(String)
+i/fs.read_lines : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
+i/http.content_length : "Content-Length"
+i/http.content_type : "Content-Type"
+i/http.transfer_encoding : "Transfer-Encoding"
+i/http.host : "Host"
+i/http.connection : "Connection"
+i/http.request : (Method, String) -> Request
+i/http.response : (Status) -> Response
+i/http.header : (AnyHeaders, String) -> Option(String)
+i/http.header_bytes : (AnyHeaders, String) -> Option(BitArray)
+i/http.headers : (AnyHeaders, String) -> List(String)
+i/http.add_header : (AnyHeaders, String, String) -> AnyHeaders
+i/http._parse_query_result : (String) -> Result(List((String, String)), uri.CodecError)
+i/http.build_query : (List((String, String))) -> String
+i/http.feed_request : (BitArray, BitArray) -> Progress(Request)
+i/http.feed_response : (BitArray, BitArray) -> Progress(Response)
+i/http.feed_response_for : (BitArray, BitArray, Method, Bool, Int) -> Progress(Response)
+i/http.feed_request_limit : (BitArray, BitArray, Int) -> Progress(Request)
+i/http.check_head : (List(Int), Int) <- (Fail(BadMessage)) -> ()
+i/http.parse_request : (List(Int)) <- (Fail(NeedMore | BadMessage)) -> (Request, List(Int))
+i/http.parse_request_head : (List(Int)) <- (Fail(NeedMore | BadMessage)) -> (Request, List(Int))
+i/http.parse_response : (List(Int)) <- (Fail(NeedMore | BadMessage)) -> (Response, List(Int))
+i/http.parse_response_for : (List(Int), Method, Bool) <- (Fail(NeedMore | BadMessage)) -> (Response, List(Int))
+i/http.read_headers : (List(Int), List((String, BitArray))) <- (Fail(NeedMore | BadMessage)) -> (AnyHeaders, List(Int))
+i/http.make_headers : (List((String, BitArray))) -> AnyHeaders
+i/http.text_unchecked : (List(Int)) -> String
+i/http.validate_framing : (AnyHeaders) <- (Fail(BadMessage)) -> ()
+i/http.read_body : (AnyHeaders, List(Int)) <- (Fail(BadMessage | NeedMore)) -> (BitArray, AnyHeaders, List(Int))
+i/http.transfer_codings : (AnyHeaders) <- (Fail(BadMessage)) -> List(String)
+i/http.parse_length : (String) <- (Fail(BadMessage)) -> Int
+i/http.chunks : (List(Int), List(BitArray)) <- (Fail(NeedMore | BadMessage)) -> (BitArray, AnyHeaders, List(Int))
+i/http.chunk_size : (List(Int)) <- (Fail(BadMessage)) -> Int
+i/http.valid_trailers : (AnyHeaders) <- (Fail(BadMessage)) -> ()
+i/http.token_prefix : (List(Int), List(Int)) -> (List(Int), List(Int))
+i/http.validate_extensions : (List(Int)) <- (Fail(BadMessage)) -> ()
+i/http.extension_quoted : (List(Int)) <- (Fail(BadMessage)) -> List(Int)
+i/http.line : (List(Int)) <- (Fail(NeedMore | BadMessage)) -> (List(Int), List(Int))
+i/http.take : (List(Int), Int, List(Int)) <- (Fail(NeedMore)) -> (List(Int), List(Int))
+i/http.cut : (List(Int), Int) -> (List(Int), List(Int), Bool)
+i/http.trim : (List(Int)) -> List(Int)
+i/http.space : (Int) -> Bool
+i/http.field_value : (Int) -> Bool
+i/http.digit : (Int) -> Bool
+i/http.hex : (Int) -> Int
+i/http.token : (Int) -> Bool
+i/http.require : (Bool, String) <- (Fail(BadMessage)) -> ()
+i/http.octets : (BitArray) -> List(Int)
+i/http.bits : (List(Int)) -> BitArray
+i/http.text : (List(Int)) <- (Fail(BadMessage)) -> String
+i/http.serialize_request : (Request) -> BitArray
+i/http.serialize_response : (Response) -> BitArray
+i/http.serialize : (String, AnyHeaders, BitArray, AnyHeaders) -> BitArray
+i/http.raw_pairs : (AnyHeaders) -> List((String, BitArray))
+i/http.header_lines : (List((String, BitArray))) -> BitArray
+i/http.reason : (Int) -> String
+i/http.hex_string : (Int) -> String
+i/http.lowercase : (String) -> String
+i/http.serve : (net.Listener, (Request) <- (Fail(A), ..N) -> Response) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
+i/http.serve_stream : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(A), ..N) -> Response) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
+i/http.accept_loop : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(B), N & { Fail(A) | task.Scheduler | task.Runner | requests.Await | { Fail(Never) | requests.Await | task.Runner | task.Scheduler | N } & { task.Scheduler | N } }) -> Response, task.Group(A)) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
+i/http.connection_loop : (net.Stream, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(A), ..N) -> Response, BitArray) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> ()
+i/http.write_server_reply : (net.Stream, Response, Bool) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner) -> ()
+i/http.request_framing : (AnyHeaders) <- (Fail(BadMessage)) -> BodyFraming
+i/http.read_request_piece : (net.Stream, task.Ref(BodyCursor), Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray
+i/http.body_more : (net.Stream, BodyCursor) <- (Fail(net.NetError | BadMessage), net.Net, requests.Await, requests.Owner) -> BodyCursor
+i/http.body_piece : (net.Stream, BodyCursor, Int) <- (Fail(net.NetError | BadMessage), net.Net, requests.Await, requests.Owner) -> (BitArray, BodyCursor)
+i/http.split_bytes : (BitArray, Int) -> (BitArray, BitArray)
+i/http.collect_body : ((65536) <- N -> BitArray, List(BitArray)) <- N -> BitArray
+i/http.drain_body : ((65536) <- N -> BitArray) <- N -> ()
+i/http.native_client : () <- (net.Net, tls.Tls) -> Client
+i/http.client : () <- (Client, requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), send = (Request) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response, stream = (Request) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> BitArray))
+i/http.send : (Request) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
+i/http.fetch_error : (String) <- (Fail(Dns | Protocol | Connect)) -> Never
+i/http.fetch_reply : (() <- (Fail(String), ..N) -> A) <- (Fail(HttpError), ..N) -> A
+i/http.fetch_headers : (List(String)) -> List((String, String))
+i/http.fetch_open : (Request) <- (Fail(HttpError), fetch.Fetch, requests.Await, requests.Owner) -> fetch.Response
+i/http.fetch_stream : (Request) <- (Fail(HttpError), fetch.Fetch, requests.Await, requests.Owner) -> (close = () <- (requests.Await, requests.Owner) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner) -> BitArray)
+i/http.fetch_client : () <- (fetch.Fetch) -> Client
+i/http.send_stream : (Request) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> BitArray)
+i/http.network_client : () <- (task.Scheduler) -> (close = () <- (net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> (), send = (Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response)
+i/http.close_connection : (Connection) <- (net.Net, requests.Await, requests.Owner, tls.Tls) -> ()
+i/http.close_client : (task.Ref(Pool)) <- (net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> ()
+i/http.pool_take : (List(Idle), Bool, String, Int) -> (List(Idle), Option(Idle))
+i/http.get : (String) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
+i/http.post : (String, BitArray) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
+i/http._body_text_result : (Response) -> Result(String, ())
+i/http.follow : (task.Ref(Pool), Request, Int) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
+i/http.redirect_headers : (AnyHeaders, uri.Uri, uri.Uri, Bool) -> AnyHeaders
+i/http.send_once : (task.Ref(Pool), Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
+i/http.dial : (Bool, String, Int) <- (Fail(Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, tls.Tls) -> Connection
+i/http.exchange : (task.Ref(Pool), Idle, Request, BitArray) <- (Fail(Connect | Tls | Protocol | PeerClosed), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
+i/http.read_reply : ((read = (65536) <- N -> BitArray, write = A), Method, BitArray) <- (Fail(Protocol | PeerClosed), ..N) -> (Response, BitArray, Bool)
+i/http.read_progress : ((read = (65536) <- N -> BitArray, write = A), Method, BitArray, B & Bool) <- (Fail(Protocol | PeerClosed), ..N) -> (Response, BitArray, B | Bool)
+i/http._body_json_result : (Response) -> Result(json.Json, BodyError)
+i/http._body_decode_result : (Response, schema.Schema(A, schema.SchemaError)) -> Result(A, BodyError)
+i/http.send_with : ((Request) <- N -> Response, Request) <- N -> Response
+i/http.send_timeout : ((Request) <- (Fail(A | HttpError), requests.Await, task.Runner, task.Scheduler, { Fail(Never) | requests.Await | task.Runner | task.Scheduler | N } & { Fail(A) | N }) -> Response, Request, Int) <- (Fail(A | HttpError | clock.ClockError), clock.Clock, requests.Owner, task.Scheduler, ..N) -> Response
+i/http.route : (Method, String, Request) -> Option(List((String, String)))
+i/http.match_segments : (List(String), List(String)) -> Option(List((String, String)))
+i/http.net_transport : (net.Stream) -> (read = (Int) <- (Fail(Connect), net.Net, requests.Await, requests.Owner) -> BitArray, write = (BitArray) <- (Fail(Connect), net.Net, requests.Await, requests.Owner) -> ())
+i/http.tls_transport : (tls.Stream) -> (read = (Int) <- (Fail(Tls), requests.Await, requests.Owner, tls.Tls) -> BitArray, write = (BitArray) <- (Fail(Tls), requests.Await, requests.Owner, tls.Tls) -> ())
+i/http.has_token : (AnyHeaders, String, String) -> Bool
+i/http.parse_query : (String) <- (Fail(uri.CodecError)) -> List((String, String))
+i/http.body_text : (Response) <- (Fail(())) -> String
+i/http.body_json : (Response) <- (Fail(BodyError)) -> json.Json
+i/http.body_decode : (Response, schema.Schema(A, schema.SchemaError)) <- (Fail(BodyError)) -> A
+i/int.to_string : (Int) -> String
+i/int._parse_result : (String) -> Result(Int, ())
+i/int._parse_base_result : (String, Int) -> Result(Int, ())
+i/int.parse_digits : (BitArray, Int, Int, Bool) -> Result(Int, ())
+i/int.digit_value : (Int) -> Int
+i/int._to_base_result : (Int, Int) -> Result(String, ())
+i/int.base_string : (Int, Int) -> String
+i/int.digit_char : (Int) -> String
+i/int.to_base2 : (Int) -> String
+i/int.to_base8 : (Int) -> String
+i/int.to_base16 : (Int) -> String
+i/int.to_base36 : (Int) -> String
+i/int.to_float : (Int) -> Float
+i/int.abs : (Int) -> Int
+i/int.negate : (Int) -> Int
+i/int.min : (Int, Int) -> Int
+i/int.max : (Int, Int) -> Int
+i/int.clamp : (Int, Int, Int) -> Int
+i/int.compare : (Int, Int) -> Order
+i/int.is_even : (Int) -> Bool
+i/int.is_odd : (Int) -> Bool
+i/int._power_result : (Int, Int) -> Result(Int, ())
+i/int.int_power : (Int, Int, Int) -> Int
+i/int._square_root_result : (Int) -> Result(Float, ())
+i/int.sum : (List(Int)) -> Int
+i/int.product : (List(Int)) -> Int
+i/int._digits_result : (Int, Int) -> Result(List(Int), ())
+i/int._undigits_result : (List(Int), Int) -> Result(Int, ())
+i/int._divide_result : (Int, Int) -> Result(Int, ())
+i/int._remainder_result : (Int, Int) -> Result(Int, ())
+i/int._modulo_result : (Int, Int) -> Result(Int, ())
+i/int._floor_divide_result : (Int, Int) -> Result(Int, ())
+i/int.add : (Int, Int) -> Int
+i/int.subtract : (Int, Int) -> Int
+i/int.multiply : (Int, Int) -> Int
+i/int.bitwise_and : (Int, Int) -> Int
+i/int.bitwise_or : (Int, Int) -> Int
+i/int.bitwise_xor : (Int, Int) -> Int
+i/int.bitwise_not : (Int) -> Int
+i/int.bitwise_shift_left : (Int, Int) -> Int
+i/int.bitwise_shift_right : (Int, Int) -> Int
+i/int.range : (Int, Int, A, (A, Int) <- N -> A) <- N -> A
+i/int.parse : (String) <- (Fail(())) -> Int
+i/int.parse_base : (String, Int) <- (Fail(())) -> Int
+i/int.to_base : (Int, Int) <- (Fail(())) -> String
+i/int.power : (Int, Int) <- (Fail(())) -> Int
+i/int.square_root : (Int) <- (Fail(())) -> Float
+i/int.digits : (Int, Int) <- (Fail(())) -> List(Int)
+i/int.undigits : (List(Int), Int) <- (Fail(())) -> Int
+i/int.divide : (Int, Int) <- (Fail(())) -> Int
+i/int.remainder : (Int, Int) <- (Fail(())) -> Int
+i/int.modulo : (Int, Int) <- (Fail(())) -> Int
+i/int.floor_divide : (Int, Int) <- (Fail(())) -> Int
+i/json._parse_result : (String) -> Result(Json, JsonError)
+i/json.whitespace : (List(Int), Int) -> (List(Int), Int)
+i/json.value : (List(Int), Int) <- (Fail(JsonError)) -> (Json, List(Int), Int)
+i/json.array_start : (List(Int), Int) <- (Fail(JsonError)) -> (Json, List(Int), Int)
+i/json.array_items : (List(Int), Int, List(Json)) <- (Fail(JsonError)) -> (Json, List(Int), Int)
+i/json.object_start : (List(Int), Int) <- (Fail(JsonError)) -> (Json, List(Int), Int)
+i/json.object_items : (List(Int), Int, List((String, Json))) <- (Fail(JsonError)) -> (Json, List(Int), Int)
+i/json.read_string : (List(Int), Int, List(BitArray)) <- (Fail(JsonError)) -> (String, List(Int), Int)
+i/json.escape : (List(Int), Int, List(BitArray)) <- (Fail(JsonError)) -> (String, List(Int), Int)
+i/json.hex4 : (List(Int), Int) <- (Fail(JsonError)) -> (Int, List(Int), Int)
+i/json.hex : (Int) -> Int
+i/json.scalar : (Int) -> BitArray
+i/json.digit : (Int) -> Bool
+i/json.number : (List(Int), Int) <- (Fail(JsonError)) -> (Json, List(Int), Int)
+i/json.digits : (List(Int), Int, List(Int)) -> (List(Int), List(Int), Int)
+i/json.octets : (BitArray) -> List(Int)
+i/json.text_bytes : (List(Int)) -> String
+i/json.field : (Json, String) -> Option(Json)
+i/json.index : (Json, Int) -> Option(Json)
+i/json.as_bool : (Json) -> Option(Bool)
+i/json.as_int : (Json) -> Option(Int)
+i/json.as_float : (Json) -> Option(Float)
+i/json.as_string : (Json) -> Option(String)
+i/json.as_array : (Json) -> Option(List(Json))
+i/json.as_object : (Json) -> Option(List((String, Json)))
+i/json.print : (Json) -> String
+i/json.pretty : (Json, Int) -> String
+i/json.render : (Json, String, Int, Bool) -> String
+i/json.collection : (String, String, List(String), String, Int, Bool) -> String
+i/json.quote : (String) -> String
+i/json.hex_char : (Int) -> Int
+i/json.parse : (String) <- (Fail(JsonError)) -> Json
+i/key.new : () -> Key(A)
+i/key.wrap : (Key(A), A) -> Keyed
+i/key.read : (Key(A), Keyed) -> Result(A, ())
+i/key.unwrap : (Key(A), Keyed) -> Lookup(A)
+i/list.length : (List(A)) -> Int
+i/list.count : (List(A), (A) <- N -> Bool) <- N -> Int
+i/list.reverse : (List(A)) -> List(A)
+i/list.reverse_onto : (List(A), List(A)) -> List(A)
+i/list.is_empty : (List(A)) -> Bool
+i/list.contains : (List(A), B) -> Bool
+i/list.first : (List(A)) -> Option(A)
+i/list.rest : (List(A)) -> Option(List(A))
+i/list.last : (List(A)) -> Option(A)
+i/list.at : (List(A), Int) -> Option(A)
+i/list.index_of : (List(A), B) -> Option(Int)
+i/list.group : (List(A), (A) <- N -> B) <- N -> Dict(B, List(A))
+i/list.filter : (List(A), (A) <- N -> Bool) <- N -> List(A)
+i/list.filter_map : (List(A), (A) <- N -> Option(B)) <- N -> List(B)
+i/list.map : (List(A), (A) <- N -> B) <- N -> List(B)
+i/list.map2 : (List(A), List(B), (A, B) <- N -> C) <- N -> List(C)
+i/list.map_fold : (List(A), B, (B, A) <- N -> (B, C)) <- N -> (B, List(C))
+i/list.index_map : (List(A), (A, Int) <- N -> B) <- N -> List(B)
+i/list.try_map : (List(A), (A) <- N -> Result(B, C)) <- N -> Result(List(B), C)
+i/list.drop : (List(A), Int) -> List(A)
+i/list.take : (List(A), Int) -> List(A)
+i/list.new : () -> List(Never)
+i/list.wrap : (A) -> List(A)
+i/list.append : (List(A), List(A)) -> List(A)
+i/list.prepend : (List(A), A) -> List(A)
+i/list.concat : (List(List(A))) -> List(A)
+i/list.flat_map : (List(A), (A) <- N -> List(B)) <- N -> List(B)
+i/list.fold : (List(A), B, (B, A) <- N -> B) <- N -> B
+i/list.fold_right : (List(A), B, (B, A) <- N -> B) <- N -> B
+i/list.index_fold : (List(A), B, (B, A, Int) <- N -> B) <- N -> B
+i/list.try_fold : (List(A), B, (B, A) <- N -> Result(B, C)) <- N -> Result(B, C)
+i/list.fold_until : (List(A), B, (B, A) <- N -> ContinueOrStop(B)) <- N -> B
+i/list.find : (List(A), (A) <- N -> Bool) <- N -> Option(A)
+i/list.find_map : (List(A), (A) <- N -> Option(B)) <- N -> Option(B)
+i/list.all : (List(A), (A) <- N -> Bool) <- N -> Bool
+i/list.any : (List(A), (A) <- N -> Bool) <- N -> Bool
+i/list.zip : (List(A), List(B)) -> List((A, B))
+i/list._strict_zip_result : (List(A), List(B)) -> Result(List((A, B)), ())
+i/list.unzip : (List((A, B))) -> (List(A), List(B))
+i/list.intersperse : (List(A), A) -> List(A)
+i/list.unique : (List(A)) -> List(A)
+i/list.sort : (List(A), (A, A) <- N -> Order) <- N -> List(A)
+i/list.runs : (List(A), (A, A) <- N -> Order, List(List(A))) <- N -> List(List(A))
+i/list.ascending : (List(A), A, List(A), (A, A) <- N -> Order, List(List(A))) <- N -> List(List(A))
+i/list.descending : (List(A), A, List(A), (A, A) <- N -> Order, List(List(A))) <- N -> List(List(A))
+i/list.merge_all : (List(List(A)), (A, A) <- N -> Order) <- N -> List(A)
+i/list.merge_pairs : (List(List(A)), (A, A) <- N -> Order, List(List(A))) <- N -> List(List(A))
+i/list.merge : (List(A), List(A), (A, A) <- N -> Order, List(A)) <- N -> List(A)
+i/list.range : (Int, Int) -> List(Int)
+i/list.repeat : (A, Int) -> List(A)
+i/list.split : (List(A), Int) -> (List(A), List(A))
+i/list.split_while : (List(A), (A) <- N -> Bool) <- N -> (List(A), List(A))
+i/list.key_find : (List((A, B)), C) -> Option(B)
+i/list.key_filter : (List((A, B)), C) -> List(B)
+i/list.key_pop : (List((A, B)), A) -> Option((B, List((A, B))))
+i/list.key_set : (List((A, B)), A, B) -> List((A, B))
+i/list.each : (List(A), (A) <- N -> B) <- N -> ()
+i/list.try_each : (List(A), (A) <- N -> Result(B, C)) <- N -> Result((), C)
+i/list.partition : (List(A), (A) <- N -> Bool) <- N -> (List(A), List(A))
+i/list.permutations : (List(A)) -> List(List(A))
+i/list.window : (List(A), Int) -> List(List(A))
+i/list.window_by_2 : (List(A)) -> List((A, A))
+i/list.drop_while : (List(A), (A) <- N -> Bool) <- N -> List(A)
+i/list.take_while : (List(A), (A) <- N -> Bool) <- N -> List(A)
+i/list.chunk : (List(A), (A) <- N -> B) <- N -> List(List(A))
+i/list.sized_chunk : (List(A), Int) -> List(List(A))
+i/list.reduce : (List(A), (A, A) <- N -> A) <- N -> Option(A)
+i/list.scan : (List(A), B, (B, A) <- N -> B) <- N -> List(B)
+i/list.combinations : (List(A), Int) -> List(List(A))
+i/list.combination_pairs : (List(A)) -> List((A, A))
+i/list.interleave : (List(List(A))) -> List(A)
+i/list.transpose : (List(List(A))) -> List(List(A))
+i/list.max : (List(A), (A, A) <- N -> Order) <- N -> Option(A)
+i/list.min : (List(A), (A, A) <- N -> Order) <- N -> Option(A)
+i/list.strict_zip : (List(A), List(B)) <- (Fail(())) -> List((A, B))
+i/log.make : ((Level) -> Bool, (Entry) <- (Fail(A), ..N) -> ()) -> Sink(A, N)
+i/log.silent : () -> Sink(Never, A)
+i/log.filter : (Sink(A, B), (Level) -> Bool) -> Sink(A, B)
+i/log.minimum : (Sink(A, B), Level) -> Sink(A, B)
+i/log.enabled : (Level) <- (Sink(A, B)) -> Bool
+i/log.write : (Entry) <- (Fail(A), Sink(A, N), ..N) -> ()
+i/log.lazy : (Level, () <- (Fail(A), ..N) -> String) <- (Fail(A | B), Sink(B, N), ..N) -> ()
+i/log.format : (Entry) -> String
+i/log.rank : (Level) -> Int
+i/log.level_text : (Level) -> String
+i/log.quote : (String) -> String
+i/log.escape : (UtfCodepoint) -> String
+i/log.stderr : () -> Sink(stdio.StdioError, request.Await | request.Owner | stdio.Stdio)
+i/log.stdout : () -> Sink(stdio.StdioError, request.Await | request.Owner | stdio.Stdio)
+i/log.file : (String) -> Sink(fs.FsError, A)
+i/log.timestamped : (Entry) <- (Fail(i/clock.ClockError), i/clock.Clock, request.Await, request.Owner) -> Entry
+i/net.listen : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Listener
+i/net.connect : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
+i/net.accept : (Listener) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
+i/net.local_port : (Listener | Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> Int
+i/net.read : (Stream, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray
+i/net.write : (Stream, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
+i/net.shutdown_write : (Stream) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
+i/net.close_stream : (Stream) <- (Net, request.Await, request.Owner) -> ()
+i/net.close_listener : (Listener) <- (Net, request.Await, request.Owner) -> ()
+i/net.slice : (String, Int, Int) -> String
+i/net.parts : (String, Int) -> List(String)
+i/net.resolve : (String) <- (Fail(NetError), Net, request.Await, request.Owner) -> List(String)
+i/net.stream_number : (Stream) -> Int
+i/net.byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> (), read = (Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(NetError), Net, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ())
+i/net.bind : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Datagram
+i/net.send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
+i/net.receive_from : (Datagram, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> (address = String, data = BitArray, port = Int)
+i/net.decode_datagram : (A) -> (address = String, data = BitArray, port = Int)
+i/net.local_address : (Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> String
+i/net.close_datagram : (Datagram) <- (Net, request.Await, request.Owner) -> ()
+i/option.is_some : (Option(A)) -> Bool
+i/option.is_none : (Option(A)) -> Bool
+i/option.map : (Option(A), (A) <- N -> B) <- N -> Option(B)
+i/option.then : (Option(A), (A) <- N -> Option(B)) <- N -> Option(B)
+i/option.flatten : (Option(Option(A))) -> Option(A)
+i/option.unwrap : (Option(A), A) -> A
+i/option.lazy_unwrap : (Option(A), () <- N -> A) <- N -> A
+i/option.or : (Option(A), Option(A)) -> Option(A)
+i/option.lazy_or : (Option(A), () <- N -> Option(A)) <- N -> Option(A)
+i/option.to_result : (Option(A), B) -> Result(A, B)
+i/option.from_result : (Result(A, B)) -> Option(A)
+i/option.all : (List(Option(A))) -> Option(List(A))
+i/option.values : (List(Option(A))) -> List(A)
+i/option.filter : (Option(A), (A) <- N -> Bool) <- N -> Option(A)
+i/option.map2 : (Option(A), Option(B), (A, B) <- N -> C) <- N -> Option(C)
+i/option.reverse : (List(A)) -> List(A)
+i/order.negate : (Order) -> Order
+i/order.reverse : ((A, A) <- N -> Order) -> (A, A) <- N -> Order
+i/order.to_int : (Order) -> Int
+i/order.compare : (Order, Order) -> Order
+i/order.max : (Order, Order) -> Order
+i/order.min : (Order, Order) -> Order
+i/order.break_tie : (Order, Order) -> Order
+i/order.lazy_break_tie : (Order, () <- N -> Order) <- N -> Order
+i/order.is_less : (Order) -> Bool
+i/order.is_equal : (Order) -> Bool
+i/order.is_greater : (Order) -> Bool
+i/pair.new : (A, B) -> (A, B)
+i/pair.first : ((A, B)) -> A
+i/pair.second : ((A, B)) -> B
+i/pair.swap : ((A, B)) -> (B, A)
+i/pair.map_first : ((A, B), (A) <- N -> C) <- N -> (C, B)
+i/pair.map_second : ((A, B), (B) <- N -> C) <- N -> (A, C)
+i/path.clean : (String) -> String
+i/path.join : (List(String)) -> String
+i/path.split : (String) -> (String, String)
+i/path.base : (String) -> String
+i/path.dir : (String) -> String
+i/path.extension : (String) -> String
+i/path.is_absolute : (String) -> Bool
+i/path._relative_result : (String, String) -> Result(String, RelativeError)
+i/path.segments : (String) -> List(String)
+i/path.render : (List(String), Bool) -> String
+i/path.clean_segments : (String) -> List(String)
+i/path.relative : (String, String) <- (Fail(RelativeError)) -> String
+i/process.length : (List(A)) -> Int
+i/process.u32 : (Int) -> BitArray
+i/process.encode_items : (List(String)) <- (Fail(ProcessError)) -> BitArray
+i/process.encode_args : (List(String)) <- (Fail(ProcessError)) -> BitArray
+i/process.decode_items : (A, Int) -> List(String)
+i/process.decode_args : (A) -> List(String)
+i/process.args : () <- (Arguments, Fail(ProcessError), request.Await, request.Owner) -> List(String)
+i/process.env : (String) <- (Environment, Fail(ProcessError), request.Await, request.Owner) -> String
+i/process.cwd : () <- (Fail(ProcessError), WorkingDirectory, request.Await, request.Owner) -> String
+i/process.entropy : (Int) <- (Entropy, Fail(ProcessError), request.Await, request.Owner) -> BitArray
+i/process.spawn : (String, List(String)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
+i/process.wait : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Int
+i/process.terminate : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+i/process.close : (Child) <- (Process, request.Await, request.Owner) -> ()
+i/process.stdio_mode : (Stdio) -> "inherit" | "null" | "piped"
+i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
+i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
+i/process.read_stdout : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
+i/process.read_stderr : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
+i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+i/process.close_stdin : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+i/property.defaults : () -> Config
+i/property.make : ((Int, random.Generator) -> Option(Tree(A))) -> Gen(A)
+i/property.sample : (Gen(A), Int, random.Generator) -> Option(Tree(A))
+i/property.nonnegative : (Int) -> Int
+i/property.tree : (A, () -> List(Tree(A))) -> Tree(A)
+i/property.constant : (A) -> Gen(A)
+i/property.map_tree : (Tree(A), (A) -> B) -> Tree(B)
+i/property.map : (Gen(A), (A) -> B) -> Gen(B)
+i/property.bind_node : (Tree(A), Tree(B), (A) -> Gen(B), Int, random.Generator) -> Tree(B)
+i/property.bind_outer : (Tree(A), (A) -> Gen(B), Int, random.Generator) -> Option(Tree(B))
+i/property.flat_map : (Gen(A), (A) -> Gen(B)) -> Gen(B)
+i/property.pair : (Gen(A), Gen(B)) -> Gen((A, B))
+i/property.filter_tree : (Tree(A), (A) -> Bool) -> Option(Tree(A))
+i/property.filter : (Gen(A), (A) -> Bool) -> Gen(A)
+i/property.sized : ((Int) -> Gen(A)) -> Gen(A)
+i/property.resize : (Gen(A), Int) -> Gen(A)
+i/property.draw_int : (random.Generator, Int) -> Option(Int)
+i/property.at_path : (random.Generator, List(Int)) -> Option(random.Generator)
+i/property.integer_tree : (Int, Int) -> Tree(Int)
+i/property._int_result : (Int, Int) -> Result(Gen(Int), BuildError)
+i/property.range : (Int, Int) -> Gen(Int)
+i/property.bool : () -> Gen(Bool)
+i/property._element_result : (List(A)) -> Result(Gen(A), BuildError)
+i/property.list_tree : (List(Tree(A)), Int) -> Tree(List(A))
+i/property.draw_items : (Gen(A), Int, Int, random.Generator, Int, List(Tree(A))) -> Option(List(Tree(A)))
+i/property._list_result : (Gen(A), Int, Int) -> Result(Gen(List(A)), BuildError)
+i/property.float : () -> Gen(Float)
+i/property.utf_codepoint : () -> Gen(UtfCodepoint)
+i/property._string_result : (Int) -> Result(Gen(String), BuildError)
+i/property.shrink : (Tree(A), String, Int, List(Int), Int, (A) -> Verdict) -> (Tree(A), String, List(Int), Int, Bool)
+i/property.scan : (Tree(A), String, List(Tree(A)), Int, List(Int), Int, Int, (A) -> Verdict) -> (Tree(A), String, List(Int), Int, Bool)
+i/property.attempts : (Gen(A), Config, (A) -> Verdict, Int, Int, Int, Int) -> Report(A)
+i/property.check : (Gen(A), Config, (A) -> Verdict) -> Report(A)
+i/property.follow : (Tree(A), List(Int)) -> Option(A)
+i/property.replay : (Gen(A), Int, Int, Int, List(Int)) -> Option(A)
+i/property.format : (Report(A), (A) -> String) -> String
+i/property.test : (Gen(A), Config, (A) <- (Assert) -> (), (A) -> String) <- (Assert) -> ()
+i/property.int : (Int, Int) <- (Fail(BuildError)) -> Gen(Int)
+i/property.element : (List(A)) <- (Fail(BuildError)) -> Gen(A)
+i/property.list : (Gen(A), Int, Int) <- (Fail(BuildError)) -> Gen(List(A))
+i/property.string : (Int) <- (Fail(BuildError)) -> Gen(String)
+i/random.word_size : () -> Int
+i/random.mask : (Int) -> Int
+i/random.xor_shift : (Int, Int) -> Int
+i/random.mix : (Int) -> Int
+i/random.variant : (Int) -> Int
+i/random.popcount : (Int, Int) -> Int
+i/random.mix_gamma : (Int) -> Int
+i/random.from_seed : (Int) -> Generator
+i/random.word : (Generator) -> (Int, Generator)
+i/random.space_for : (Int, Int) -> Int
+i/random.word_group : (Generator, Int, Int, Int) -> (Int, Generator)
+i/random.bounded : (Generator, Int, Int, Int) -> (Int, Generator)
+i/random.int : (Generator, Int) <- (Fail(InvalidBound)) -> (Int, Generator)
+i/random.float : (Generator) -> (Float, Generator)
+i/random.native_split : (State) -> (State, State)
+i/random.edge : (State, Int) -> State
+i/random.split : (Generator) -> (Generator, Generator)
+i/random.valid_path : (List(Int)) -> Bool
+i/random.binary : (Int, List(Int), Int) -> (List(Int), Int)
+i/random.zeros : (State, Int) -> State
+i/random.follow : (State, List(Int)) -> State
+i/random.derive_path : (Generator, List(Int)) -> Generator
+i/random.at_path : (Generator, List(Int)) <- (Fail(InvalidPath)) -> Generator
+i/regex.bump : (Parser) -> Parser
+i/regex.syntax_error : (Parser, String) <- (Fail(RegexError)) -> Never
+i/regex.peek : (Parser) -> Int
+i/regex.digit : (Int) -> Bool
+i/regex.name_char : (Int) -> Bool
+i/regex.scalar : (Int) -> String
+i/regex.parse_alternation : (Parser) <- (Fail(RegexError)) -> (Ast, Parser)
+i/regex.parse_sequence : (Parser, List(Ast)) <- (Fail(RegexError)) -> (Ast, Parser)
+i/regex.parse_atom : (Parser) <- (Fail(RegexError)) -> (Ast, Parser)
+i/regex.escape_class : (Parser) <- (Fail(RegexError)) -> (Class, Parser)
+i/regex.hex_value : (Int) -> Int
+i/regex.hex_digits : (Parser, Int, Int, Bool, Bool) <- (Fail(RegexError)) -> (Class, Parser)
+i/regex.hex_escape : (Parser, Int) <- (Fail(RegexError)) -> (Class, Parser)
+i/regex.escape_atom : (Parser) <- (Fail(RegexError)) -> (Ast, Parser)
+i/regex.class_item : (Parser) <- (Fail(RegexError)) -> (Class, Parser)
+i/regex.class_items : (Parser, List(Class)) <- (Fail(RegexError)) -> (Class, Parser)
+i/regex.parse_class : (Parser) <- (Fail(RegexError)) -> (Class, Parser)
+i/regex.read_name : (Parser, List(String)) <- (Fail(RegexError)) -> (String, Parser)
+i/regex.finish_group : (Parser, Flags, Int) <- (Fail(RegexError)) -> (Ast, Parser)
+i/regex.flag_group : (Parser, Flags, Bool, Bool) <- (Fail(RegexError)) -> (Ast, Parser)
+i/regex.parse_group : (Parser) <- (Fail(RegexError)) -> (Ast, Parser)
+i/regex.number : (Parser, Int, Bool) <- (Fail(RegexError)) -> (Int, Parser)
+i/regex.bounds : (Parser) <- (Fail(RegexError)) -> (Int, Int, Parser)
+i/regex.parse_repeat : (Ast, Parser) <- (Fail(RegexError)) -> (Ast, Parser)
+i/regex.emit : (Inst, Build) -> (Int, Build)
+i/regex.sequence_code : (List(Ast), Int, Build) -> (Int, Build)
+i/regex.optional_code : (Ast, Int, Bool, Int, Build) -> (Int, Build)
+i/regex.required_code : (Ast, Int, Int, Build) -> (Int, Build)
+i/regex.nullable : (Ast) -> Bool
+i/regex.at_least_code : (Ast, Int, Bool, Int, Build) -> (Int, Build)
+i/regex.lower : (Ast, Int, Build) -> (Int, Build)
+i/regex._compile_result : (String) -> Result(Regex, RegexError)
+i/regex.in_ranges : (BitArray, Int) -> Bool
+i/regex.class_has : (Class, Int) -> Bool
+i/regex.fold_class : (Class) -> Class
+i/regex.input : (String) -> Input
+i/regex.byte_width : (Int) -> Int
+i/regex.advance : (Input) -> Input
+i/regex.at_end : (Input) -> Bool
+i/regex.word_at : (Int) -> Bool
+i/regex.assertion : (Int, Input) -> Bool
+i/regex.instruction : (Regex, Int) -> Inst
+i/regex.closure : (Regex, List(Thread), Input, dict.Dict(Int, Bool), List(Thread)) -> List(Thread)
+i/regex.step_threads : (Regex, List(Thread), Input, List(Thread), Option(Captures)) -> (List(Thread), Option(Captures))
+i/regex.search_loop : (Regex, Input, List(Thread), Option(Captures)) -> Option(Captures)
+i/regex.bytes : (String, Int, Int) -> String
+i/regex.group : (Captures, Int) -> Option(Match)
+i/regex.named : (Captures, String) -> Option(Match)
+i/regex.whole : (Captures) -> Match
+i/regex.captures : (Regex, String) -> Option(Captures)
+i/regex.regex_input : (String) -> Input
+i/regex.find : (Regex, String) -> Option(Match)
+i/regex.is_match : (Regex, String) -> Bool
+i/regex.move_to : (Input, Int) -> Input
+i/regex.scan_all : (Regex, Input, Int, List(Captures)) -> List(Captures)
+i/regex.find_all : (Regex, String) -> List(Match)
+i/regex.slot : (Captures, Int) -> Offset
+i/regex.replacement_value : (Captures, String) -> String
+i/regex.replacement_name : (List(Int), Bool, List(String)) -> (String, List(Int), Bool)
+i/regex.expand_replacement : (List(Int), Captures, List(String)) -> String
+i/regex.replace_captures : (List(Captures), String, List(Int), Int, List(String)) -> String
+i/regex.replace : (Regex, String, String) -> String
+i/regex.replace_all : (Regex, String, String) -> String
+i/regex.split : (Regex, String) -> List(String)
+i/regex.unicode_word : BitArray
+i/regex.unicode_digit : BitArray
+i/regex.unicode_space : BitArray
+i/regex.fold_pairs : BitArray
+i/regex.table : (String) -> BitArray
+i/regex.compile : (String) <- (Fail(RegexError)) -> Regex
+i/request.new_root : (Key(())) -> Key(())
+i/request.end_root : (Key(())) -> ()
+i/request.new_owner : (Key(())) -> Key(())
+i/request.end_owner : (Key(())) -> ()
+i/request.group_count : (Key(())) -> Int
+i/request.root_count : (Key(())) -> Int
+i/request.cancel_group : (Key(())) -> ()
+i/request.cancel_root : (Key(())) -> ()
+i/request.observe_owner : (Key(())) -> Request(())
+i/request.observe_root : (Key(())) -> Request(())
+i/request.open_root : () <- (Root) -> Root
+i/request.close_root : (Root) -> ()
+i/request.open_owner : () <- (Root) -> Owner
+i/request.close_owner : (Owner) -> ()
+i/request.count : (Owner) -> Int
+i/request.count_root : (Root) -> Int
+i/request.settled_owner : (Owner) -> Bool
+i/request.settled_root : (Root) -> Bool
+i/request.cancel_all : (Owner) -> ()
+i/request.cancel_all_root : (Root) -> ()
+i/request.retain : (A) -> A
+i/request.within : (() <- N -> A) <- (N - Owner, Root) -> A
+i/request.wait_none : (Owner) <- (Await) -> ()
+i/request.wait_none_root : (Root) <- (Await) -> ()
+i/request.ready : (A) -> Request(A)
+i/request.ticket : (Request(A)) -> Ticket
+i/request.read_state : (Request(A)) -> Result(A, Int)
+i/request.take : (Request(A)) -> A
+i/request.settled : (Ticket) -> Bool
+i/request.cancel : (Ticket) -> ()
+i/request.state : (Request(A)) -> RequestState(A)
+i/request.await : (Request(A)) <- (Await) -> A
+i/request.await_owned : (Request(A)) <- (Await) -> A
+i/request.wait_any : (List(Ticket)) -> ()
+i/request.poll : () -> ()
+i/request.entry_root : () -> Key(())
+i/request.entry_end : () -> ()
+i/request._entry : (() <- N -> A) <- (N - Await - Owner - Root) -> A
+i/request._provider_root : (List(Root), Key(())) -> Root
+i/request._provider_owner : (List(Owner)) <- (Root) -> Owner
+i/request._provider_await : (List(Await)) -> Await
+i/resource.ensure : (() <- N -> A, () <- N -> ()) <- N -> A
+i/resource.gate_ready : (A) -> Request(A)
+i/resource.gate_state : (Request(A)) -> Result(A, Int)
+i/resource.gate_take : (Request(A)) -> A
+i/resource.pure_release : ((A) <- N -> ()) <- N -> (A) -> ()
+i/resource.acquire : (() <- (Fail(B), ..N) -> A, (A) <- N -> ()) <- (Fail(B), Scope, ..N) -> A
+i/resource.scoped : (() <- (Scope, ..N) -> A) <- N -> A
+i/result.is_ok : (Result(A, B)) -> Bool
+i/result.is_error : (Result(A, B)) -> Bool
+i/result.map : (Result(A, B), (A) <- N -> C) <- N -> Result(C, B)
+i/result.map_error : (Result(A, B), (B) <- N -> C) <- N -> Result(A, C)
+i/result.then : (Result(A, B), (A) <- N -> Result(C, B)) <- N -> Result(C, B)
+i/result.flatten : (Result(Result(A, B), B)) -> Result(A, B)
+i/result.unwrap : (Result(A, B), A) -> A
+i/result.lazy_unwrap : (Result(A, B), () <- N -> A) <- N -> A
+i/result.unwrap_error : (Result(A, B), B) -> B
+i/result.unwrap_both : (Result(A, A)) -> A
+i/result.or : (Result(A, B), Result(A, B)) -> Result(A, B)
+i/result.lazy_or : (Result(A, B), () <- N -> Result(A, B)) <- N -> Result(A, B)
+i/result.all : (List(Result(A, B))) -> Result(List(A), B)
+i/result.partition : (List(Result(A, B))) -> (List(A), List(B))
+i/result.values : (List(Result(A, B))) -> List(A)
+i/result.replace : (Result(A, B), C) -> Result(C, B)
+i/result.replace_error : (Result(A, B), C) -> Result(A, C)
+i/result.recover : (Result(A, B), (B) <- N -> Result(A, C)) <- N -> Result(A, C)
+i/result.reverse : (List(A)) -> List(A)
+i/schema._decode_result : (Schema(A, B), json.Json) -> Result(A, B)
+i/schema.encode : (Schema(A, B), A) -> json.Json
+i/schema._parse_result : (Schema(A, SchemaError), String) -> Result(A, ParseError)
+i/schema.print : (Schema(A, B), A) -> String
+i/schema.error : (String) -> SchemaError
+i/schema.at : (Path, SchemaError) -> SchemaError
+i/schema.int : Schema(Int, SchemaError)
+i/schema.float : Schema(Float, SchemaError)
+i/schema.string : Schema(String, SchemaError)
+i/schema.bool : Schema(A & Bool, SchemaError)
+i/schema.null : Schema(A, SchemaError)
+i/schema.literal_string : (A & String) -> Schema(A & String, SchemaError)
+i/schema.literal_int : (A & Int) -> Schema(A & Int, SchemaError)
+i/schema.nullable : (Schema(A, SchemaError)) -> Schema(Option(A), SchemaError)
+i/schema.optional : (Schema(A, SchemaError)) -> Schema(Option(A), SchemaError)
+i/schema.list : (Schema(A, SchemaError)) -> Schema(List(A), SchemaError)
+i/schema.read_list : (Schema(A, SchemaError), List(json.Json), Int) -> Result(List(A), SchemaError)
+i/schema.dict : (Schema(A, SchemaError)) -> Schema(ds.Dict(String, A), SchemaError)
+i/schema.read_dict : (Schema(A, SchemaError), List((String, json.Json))) -> Result(ds.Dict(String, A), SchemaError)
+i/schema.tuple : (Schema(A, SchemaError), Schema(B, SchemaError)) -> Schema((A, B), SchemaError)
+i/schema.object : (A) -> Schema(A, SchemaError)
+i/schema.field : (Schema(A, SchemaError), String, Schema(B, SchemaError), (A) -> B, (A, B) -> A) -> Schema(A, SchemaError)
+i/schema.optional_field : (Schema(A, SchemaError), String, Schema(B, SchemaError), (A) -> Option(B), (A, Option(B)) -> A) -> Schema(A, SchemaError)
+i/schema.map : (Schema(A, SchemaError), (A) -> B, (B) -> A) -> Schema(B, SchemaError)
+i/schema.transform : (Schema(A, SchemaError), (A) -> B, (B) -> A) -> Schema(B, SchemaError)
+i/schema.refine : (Schema(A, SchemaError), (A) -> Bool, String) -> Schema(A, SchemaError)
+i/schema.lazy : (() -> Schema(A, SchemaError)) -> Schema(A, SchemaError)
+i/schema.union : (List(Schema(A, SchemaError)), (A) -> Int) -> Schema(A, SchemaError)
+i/schema.read_union : (List(Schema(A, SchemaError)), json.Json) -> Result(A, SchemaError)
+i/schema.tagged_union : (String, List((String, Schema(A, SchemaError))), (A) -> String) -> Schema(A, SchemaError)
+i/schema.decode : (Schema(A, B), json.Json) <- (Fail(B)) -> A
+i/schema.parse : (Schema(A, SchemaError), String) <- (Fail(ParseError)) -> A
+i/sequence.new : () -> Sequence(Never)
+i/sequence.singleton : (A) -> Sequence(A)
+i/sequence.from_list : (List(A)) -> Sequence(A)
+i/sequence.length : (Sequence(A)) -> Int
+i/sequence.is_empty : (Sequence(A)) -> Bool
+i/sequence.first : (Sequence(A)) -> Option(A)
+i/sequence.last : (Sequence(A)) -> Option(A)
+i/sequence.push_front : (Sequence(A), A) -> Sequence(A)
+i/sequence.push_back : (Sequence(A), A) -> Sequence(A)
+i/sequence.pop_front : (Sequence(A)) -> Option((A, Sequence(A)))
+i/sequence.pop_back : (Sequence(A)) -> Option((A, Sequence(A)))
+i/sequence.at : (Sequence(A), Int) -> Option(A)
+i/sequence.set : (Sequence(A), Int, A) -> Option(Sequence(A))
+i/sequence.append : (Sequence(A), Sequence(A)) -> Sequence(A)
+i/sequence.split : (Sequence(A), Int) -> (Sequence(A), Sequence(A))
+i/sequence.take : (Sequence(A), Int) -> Sequence(A)
+i/sequence.drop : (Sequence(A), Int) -> Sequence(A)
+i/sequence.reverse : (Sequence(A)) -> Sequence(A)
+i/sequence.map : (Sequence(A), (A) <- N -> B) <- N -> Sequence(B)
+i/sequence.fold : (Sequence(A), B, (B, A) <- N -> B) <- N -> B
+i/sequence.each : (Sequence(A), (A) <- N -> B) <- N -> ()
+i/sequence.to_list : (Sequence(A)) -> List(A)
+i/sequence.same_elements : (Sequence(A), Sequence(B)) -> Bool
+i/sequence.node_size : (Leaf(A) | Branch2(B) | Branch3(C)) -> Int
+i/sequence.tree_size : (EmptyTree | Single(A) | Deep(B)) -> Int
+i/sequence.digit_size : (List(Leaf(A) | Branch2(B) | Branch3(C))) -> Int
+i/sequence.branch2 : (Node(A), Node(A)) -> Node(A)
+i/sequence.branch3 : (Node(A), Node(A), Node(A)) -> Node(A)
+i/sequence.deep : (List(Node(A)), Tree(A), List(Node(A))) -> Tree(A)
+i/sequence.children : (Node(A)) -> List(Node(A))
+i/sequence.leaf_value : (Node(A)) -> A
+i/sequence.shallow : (List(Node(A))) -> Tree(A)
+i/sequence.push_left : (Tree(A), Node(A)) -> Tree(A)
+i/sequence.push_right : (Tree(A), Node(A)) -> Tree(A)
+i/sequence.left_deep : (List(Node(A)), Tree(A), List(Node(A))) -> Tree(A)
+i/sequence.right_deep : (List(Node(A)), Tree(A), List(Node(A))) -> Tree(A)
+i/sequence.view_left : (Tree(A)) -> Option((Node(A), Tree(A)))
+i/sequence.view_right : (Tree(A)) -> Option((Node(A), Tree(A)))
+i/sequence.group_nodes : (List(Node(A))) -> List(Node(A))
+i/sequence.join_trees : (Tree(A), List(Node(A)), Tree(A)) -> Tree(A)
+i/sequence.build_tree : (List(Node(A))) -> Tree(A)
+i/sequence.split_nodes : (List(Node(A)), Int) -> (List(Node(A)), Node(A), Int, List(Node(A)))
+i/sequence.split_tree : (Tree(A), Int) -> (Tree(A), Node(A), Int, Tree(A))
+i/sequence.find_nodes : (List(Node(A)), Int) -> A
+i/sequence.find_node : (Node(A), Int) -> A
+i/sequence.find_tree : (Tree(A), Int) -> A
+i/sequence.set_nodes : (List(Node(A)), Int, A) -> List(Node(A))
+i/sequence.set_node : (Node(A), Int, A) -> Node(A)
+i/sequence.set_tree : (Tree(A), Int, A) -> Tree(A)
+i/sequence.reverse_node : (Node(A)) -> Node(A)
+i/sequence.reverse_tree : (Tree(A)) -> Tree(A)
+i/sequence.map_node : (Node(A), (A) <- N -> B) <- N -> Node(B)
+i/sequence.map_tree : (Tree(A), (A) <- N -> B) <- N -> Tree(B)
+i/sequence.fold_node : (Node(A), B, (B, A) <- N -> B) <- N -> B
+i/sequence.fold_tree : (Tree(A), B, (B, A) <- N -> B) <- N -> B
+i/set.new : () -> Set(Never)
+i/set.size : (Set(A)) -> Int
+i/set.is_empty : (Set(A)) -> Bool
+i/set.insert : (Set(A), A) -> Set(A)
+i/set.delete : (Set(A), A) -> Set(A)
+i/set.contains : (Set(A), B) -> Bool
+i/set.to_list : (Set(A)) -> List(A)
+i/set.from_list : (List(A)) -> Set(A)
+i/set.fold : (Set(A), B, (B, A) <- N -> B) <- N -> B
+i/set.each : (Set(A), (A) <- N -> B) <- N -> ()
+i/set.map : (Set(A), (A) <- N -> B) <- N -> Set(B)
+i/set.filter : (Set(A), (A) <- N -> Bool) <- N -> Set(A)
+i/set.take : (Set(A), List(A)) -> Set(A)
+i/set.drop : (Set(A), List(A)) -> Set(A)
+i/set.union : (Set(A), Set(A)) -> Set(A)
+i/set.intersection : (Set(A), Set(A)) -> Set(A)
+i/set.difference : (Set(A), Set(A)) -> Set(A)
+i/set.symmetric_difference : (Set(A), Set(A)) -> Set(A)
+i/set.is_subset : (Set(A), Set(B)) -> Bool
+i/set.is_disjoint : (Set(A), Set(B)) -> Bool
+i/set.same_elements : (Set(A), Set(B)) -> Bool
+i/set.by_size : (Set(A), Set(A)) -> (Set(A), Set(A))
+i/stdio.read : (Int) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> BitArray
+i/stdio.write : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.write_error : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.flush : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.flush_error : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.print : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stream.new : () -> Stream(Never, Never, A)
+i/stream.wrap : (A) -> Stream(A, Never, B)
+i/stream.from_list : (List(A)) -> Stream(A, Never, B)
+i/stream.make : (() <- (Fail(B), ..C) -> Step(A, B, C)) -> Stream(A, B, C)
+i/stream.defer : (() <- (Fail(B), ..C) -> Stream(A, B, C)) -> Stream(A, B, C)
+i/stream.unfold : (A, (A) <- (Fail(C), ..N) -> Option((B, A))) -> Stream(B, C, N)
+i/stream.pull : (Stream(A, B, C)) <- (Fail(B), ..C) -> Step(A, B, C)
+i/stream.map : (Stream(A, B, C), (A) <- (Fail(F), ..C) -> D) -> Stream(D, B | F, C)
+i/stream.filter : (Stream(A, B, C), (A) <- (Fail(D), ..C) -> Bool) -> Stream(A, B | D, C)
+i/stream.filter_map : (Stream(A, B, C), (A) <- (Fail(F), ..C) -> Option(D)) -> Stream(D, B | F, C)
+i/stream.flat_map : (Stream(A, B, C), (A) <- (Fail(G), ..C) -> Stream(D, F, C)) -> Stream(D, B | F | G, C)
+i/stream.append : (Stream(A, B, C), Stream(A, D, C)) -> Stream(A, B | D, C)
+i/stream.zip : (Stream(A, B, C), Stream(D, F, C)) -> Stream((A, D), B | F, C)
+i/stream.take : (Stream(A, B, C), Int) -> Stream(A, B, C)
+i/stream.drop : (Stream(A, B, C), Int) -> Stream(A, B, C)
+i/stream.take_while : (Stream(A, B, C), (A) <- (Fail(D), ..C) -> Bool) -> Stream(A, B | D, C)
+i/stream.fold : (Stream(A, B, C), D, (D, A) <- (Fail(F), ..C) -> D) <- (Fail(B | F), ..C) -> D
+i/stream.fold_until : (Stream(A, B, C), D, (D, A) <- (Fail(F), ..C) -> list.ContinueOrStop(D)) <- (Fail(B | F), ..C) -> D
+i/stream.each : (Stream(A, B, C), (A) <- (Fail(F), ..C) -> D) <- (Fail(B | F), ..C) -> ()
+i/stream.to_list : (Stream(A, B, C)) <- (Fail(B), ..C) -> List(A)
+i/stream.from_results : (List(Result(A, B))) -> Stream(A, B, C)
+i/stream.attempt : (Stream(A, B, C)) -> Stream(Result(A, B), Never, C)
+i/stream.map_environment : (Stream(A, B, C), (() <- (Fail(B), ..C) -> Step(A, B, C)) <- (Fail(B), ..N) -> Step(A, B, C)) -> Stream(A, B, N)
+i/stream.flatten : (Stream(A, B, C), Stream(D, F, C), (A) <- (Fail(G), ..C) -> Stream(D, F, C)) -> Stream(D, B | F | G, C)
+i/string.length : (String) -> Int
+i/string.byte_size : (String) -> Int
+i/string.is_empty : (String) -> Bool
+i/string.concat : (List(String)) -> String
+i/string.append : (String, String) -> String
+i/string.join : (List(String), String) -> String
+i/string.repeat : (String, Int) -> String
+i/string.split : (String, String) -> List(String)
+i/string.from_reversed : (List(UtfCodepoint)) -> String
+i/string.byte_range : (String, Int, Int) -> String
+i/string.split_once : (String, String) -> Option((String, String))
+i/string.lines : (String) -> List(String)
+i/string.is_space : (UtfCodepoint) -> Bool
+i/string.trim : (String) -> String
+i/string.trim_start : (String) -> String
+i/string.trim_end : (String) -> String
+i/string.starts_with : (String, String) -> Bool
+i/string.ends_with : (String, String) -> Bool
+i/string.contains : (String, String) -> Bool
+i/string.replace : (String, String, String) -> String
+i/string.slice : (String, Int, Int) -> String
+i/string.drop_start : (String, Int) -> String
+i/string.drop_end : (String, Int) -> String
+i/string.first : (String) -> Option(String)
+i/string.last : (String) -> Option(String)
+i/string.pop_codepoint : (String) -> Option((String, String))
+i/string.crop : (String, String) -> String
+i/string.remove_prefix : (String, String) -> String
+i/string.remove_suffix : (String, String) -> String
+i/string.to_upper : (String) -> String
+i/string.to_lower : (String) -> String
+i/string.capitalise : (String) -> String
+i/string.reverse : (String) -> String
+i/string.padding : (Int, String) -> String
+i/string.pad_left : (String, Int, String) -> String
+i/string.pad_right : (String, Int, String) -> String
+i/string.to_codepoints : (String) -> List(UtfCodepoint)
+i/string.from_codepoints : (List(UtfCodepoint)) -> String
+i/string.to_codepoint_strings : (String) -> List(String)
+i/string._utf_codepoint_result : (Int) -> Result(UtfCodepoint, ())
+i/string.utf_codepoint_to_int : (UtfCodepoint) -> Int
+i/string.compare : (String, String) -> Order
+i/string.compare_bytes : (BitArray, BitArray) -> Order
+i/string.inspect : (A) -> String
+i/string.to_option : (String) -> Option(String)
+i/string.at : (String, Int) -> Option(String)
+i/string.scalar_prefix : (List(UtfCodepoint), List(UtfCodepoint)) -> Bool
+i/string.search_scalars : (List(UtfCodepoint), List(UtfCodepoint), Int, Bool) -> Option(Int)
+i/string.index_of : (String, String, Int) -> Option(Int)
+i/string.last_index_of : (String, String, Int) -> Option(Int)
+i/string.count : (String, String) -> Int
+i/string.take_start : (String, Int) -> String
+i/string.take_end : (String, Int) -> String
+i/string.split_once_last : (String, String) -> Option((String, String))
+i/string.replace_n : (String, String, String, Int) -> String
+i/string.split_when : (String, (UtfCodepoint) <- N -> Bool) <- N -> List(String)
+i/string.words : (String) -> List(String)
+i/string.map : (String, (UtfCodepoint) <- N -> UtfCodepoint) <- N -> String
+i/string.filter : (String, (UtfCodepoint) <- N -> Bool) <- N -> String
+i/string.fold : (String, A, (A, UtfCodepoint) <- N -> A) <- N -> A
+i/string.utf_codepoint : (Int) <- (Fail(())) -> UtfCodepoint
+i/syntax.definition : (Syntax) <- (Definitions, Fail(SyntaxError)) -> Syntax
+i/syntax.raw_note : (String) -> ()
+i/syntax._diagnostics : () -> Diagnostics
+i/syntax.raw_metadata_new : () -> ItemMetadata
+i/syntax.raw_metadata_push : (ItemMetadata, String, String) -> ItemMetadata
+i/syntax.raw_items_add : (Syntax, Syntax, ItemMetadata, Syntax) -> ItemResult
+i/syntax.raw_items_expose : (Syntax) -> ItemResult
+i/syntax.raw_items_ok : (ItemResult) -> Bool
+i/syntax.raw_items_message : (ItemResult) -> String
+i/syntax.raw_items_at : (ItemResult) -> Syntax
+i/syntax.build_metadata : (List((String, String)), ItemMetadata) -> ItemMetadata
+i/syntax.item_result : (ItemResult) <- (Fail(SyntaxError)) -> ()
+i/syntax._items : () -> Items
+i/syntax._report_error : (String, Syntax) -> Syntax
+i/syntax.raw_definition : (Syntax) -> DefinitionResult
+i/syntax.raw_definition_ok : (DefinitionResult) -> Bool
+i/syntax.raw_definition_value : (DefinitionResult) -> Syntax
+i/syntax.raw_definition_message : (DefinitionResult) -> String
+i/syntax.raw_definition_at : (DefinitionResult) -> Syntax
+i/syntax._definitions : () -> Definitions
+i/syntax._match : (Syntax, Syntax) -> MatchResult
+i/syntax._match_ok : (MatchResult) -> Bool
+i/syntax._match_one : (MatchResult, Int) -> Syntax
+i/syntax.raw_match_many_len : (MatchResult, Int) -> Int
+i/syntax.raw_match_many_child : (MatchResult, Int, Int) -> Syntax
+i/syntax._template : (Int) -> Syntax
+i/syntax.raw_rebuild : (Syntax, SyntaxList) -> Syntax
+i/syntax.raw_kind : (Syntax) -> Int
+i/syntax.raw_text : (Syntax) -> String
+i/syntax.raw_int : (Syntax) -> Int
+i/syntax.raw_float : (Syntax) -> Float
+i/syntax.raw_length : (Syntax) -> Int
+i/syntax.raw_child : (Syntax, Int) -> Syntax
+i/syntax.raw_list_new : () -> SyntaxList
+i/syntax.raw_list_push : (SyntaxList, Syntax) -> SyntaxList
+i/syntax.raw_make_text : (Int, String, Syntax) -> SyntaxResult
+i/syntax.raw_make_int : (Int, Syntax) -> SyntaxResult
+i/syntax.raw_make_float : (Float, Syntax) -> SyntaxResult
+i/syntax.raw_make_list : (Int, SyntaxList, Syntax) -> SyntaxResult
+i/syntax.raw_make_one : (Int, Syntax, Syntax) -> SyntaxResult
+i/syntax.raw_syntax_ok : (SyntaxResult) -> Bool
+i/syntax.raw_syntax_value : (SyntaxResult) -> Syntax
+i/syntax.raw_syntax_error : (SyntaxResult) -> String
+i/syntax.raw_same_code : (Syntax, Syntax) -> Bool
+i/syntax.raw_show : (Syntax) -> String
+i/syntax.raw_show_as : (Syntax, Int) -> TextResult
+i/syntax.raw_text_ok : (TextResult) -> Bool
+i/syntax.raw_text_value : (TextResult) -> String
+i/syntax.raw_text_error : (TextResult) -> String
+i/syntax.raw_text_error_at : (TextResult) -> Syntax
+i/syntax.reverse : (List(Syntax), List(Syntax)) -> List(Syntax)
+i/syntax.match_children : (MatchResult, Int, Int, Int, List(Syntax)) -> List(Syntax)
+i/syntax._match_many : (MatchResult, Int) -> List(Syntax)
+i/syntax.prepend_reversed : (List(Syntax), List(Syntax)) -> List(Syntax)
+i/syntax._append : (List(Syntax), List(Syntax)) -> List(Syntax)
+i/syntax.children : (Syntax, Int, Int, List(Syntax)) -> List(Syntax)
+i/syntax.node : (Syntax) -> Node
+i/syntax.build_list : (List(Syntax), SyntaxList) -> SyntaxList
+i/syntax._rebuild : (Syntax, List(Syntax)) -> Syntax
+i/syntax.raw_type_handle : (Syntax) -> TypeHandle
+i/syntax.make : (Node, Syntax) <- (Fail(SyntaxError)) -> Syntax
+i/syntax.same_code : (Syntax, Syntax) -> Bool
+i/syntax.show : (Syntax) -> String
+i/syntax.position_id : (Position) -> Int
+i/syntax.show_as : (Syntax, Position) <- (Fail(SyntaxError)) -> String
+i/syntax.raw_type_of : (Syntax) -> TypeResult
+i/syntax.raw_signature : () -> TypeResult
+i/syntax.raw_subtype : (Syntax, Syntax) -> TypeResult
+i/syntax.raw_members : (Syntax) -> TypeResult
+i/syntax.raw_type_ok : (TypeResult) -> Bool
+i/syntax.raw_type_value : (TypeResult) -> Syntax
+i/syntax.raw_type_truth : (TypeResult) -> Int
+i/syntax.raw_type_len : (TypeResult) -> Int
+i/syntax.raw_type_child : (TypeResult, Int) -> Syntax
+i/syntax.raw_type_message : (TypeResult) -> String
+i/syntax.raw_type_at : (TypeResult) -> Syntax
+i/syntax.type_result : (TypeResult) <- (Fail(SyntaxError)) -> Syntax
+i/syntax.type_members : (TypeResult, Int, Int) -> List(Syntax)
+i/syntax._types : () -> Types
+i/syntax.type_of : (Syntax) <- (Fail(SyntaxError), Types) -> Syntax
+i/syntax.signature : () <- (Types) -> Syntax
+i/syntax.subtype : (Syntax, Syntax) <- (Fail(SyntaxError), Types) -> Truth
+i/syntax.members : (Syntax) <- (Fail(SyntaxError), Types) -> List(Syntax)
 i/task.finalizing : (Continuation(A, B, C), Boundary(D, F)) -> Bool
 i/task.no_waiters : WaitQueue
 i/task.address_key : Key(Address)
@@ -421,175 +1580,26 @@ i/task.relay_notice : (State, TaskState, Continuation(StepAnswer, Turn, Never), 
 i/task.notice_hops : (ForeignNotice) -> List(Hop)
 i/task._provider_runner : (List(Runner)) <- (request.Root) -> Runner
 i/task._provider_scheduler : (List(Scheduler)) -> Scheduler
-i/clock.monotonic_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
-i/clock.unix_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
-i/clock.sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> ()
-i/random.word_size : () -> Int
-i/random.mask : (Int) -> Int
-i/random.xor_shift : (Int, Int) -> Int
-i/random.mix : (Int) -> Int
-i/random.variant : (Int) -> Int
-i/random.popcount : (Int, Int) -> Int
-i/random.mix_gamma : (Int) -> Int
-i/random.from_seed : (Int) -> Generator
-i/random.word : (Generator) -> (Int, Generator)
-i/random.space_for : (Int, Int) -> Int
-i/random.word_group : (Generator, Int, Int, Int) -> (Int, Generator)
-i/random.bounded : (Generator, Int, Int, Int) -> (Int, Generator)
-i/random.int : (Generator, Int) <- (Fail(InvalidBound)) -> (Int, Generator)
-i/random.float : (Generator) -> (Float, Generator)
-i/random.native_split : (State) -> (State, State)
-i/random.edge : (State, Int) -> State
-i/random.split : (Generator) -> (Generator, Generator)
-i/random.valid_path : (List(Int)) -> Bool
-i/random.binary : (Int, List(Int), Int) -> (List(Int), Int)
-i/random.zeros : (State, Int) -> State
-i/random.follow : (State, List(Int)) -> State
-i/random.derive_path : (Generator, List(Int)) -> Generator
-i/random.at_path : (Generator, List(Int)) <- (Fail(InvalidPath)) -> Generator
-i/syntax.definition : (Syntax) <- (Definitions, Fail(SyntaxError)) -> Syntax
-i/syntax.raw_note : (String) -> ()
-i/syntax._diagnostics : () -> Diagnostics
-i/syntax.raw_metadata_new : () -> ItemMetadata
-i/syntax.raw_metadata_push : (ItemMetadata, String, String) -> ItemMetadata
-i/syntax.raw_items_add : (Syntax, Syntax, ItemMetadata, Syntax) -> ItemResult
-i/syntax.raw_items_expose : (Syntax) -> ItemResult
-i/syntax.raw_items_ok : (ItemResult) -> Bool
-i/syntax.raw_items_message : (ItemResult) -> String
-i/syntax.raw_items_at : (ItemResult) -> Syntax
-i/syntax.build_metadata : (List((String, String)), ItemMetadata) -> ItemMetadata
-i/syntax.item_result : (ItemResult) <- (Fail(SyntaxError)) -> ()
-i/syntax._items : () -> Items
-i/syntax._report_error : (String, Syntax) -> Syntax
-i/syntax.raw_definition : (Syntax) -> DefinitionResult
-i/syntax.raw_definition_ok : (DefinitionResult) -> Bool
-i/syntax.raw_definition_value : (DefinitionResult) -> Syntax
-i/syntax.raw_definition_message : (DefinitionResult) -> String
-i/syntax.raw_definition_at : (DefinitionResult) -> Syntax
-i/syntax._definitions : () -> Definitions
-i/syntax._match : (Syntax, Syntax) -> MatchResult
-i/syntax._match_ok : (MatchResult) -> Bool
-i/syntax._match_one : (MatchResult, Int) -> Syntax
-i/syntax.raw_match_many_len : (MatchResult, Int) -> Int
-i/syntax.raw_match_many_child : (MatchResult, Int, Int) -> Syntax
-i/syntax._template : (Int) -> Syntax
-i/syntax.raw_rebuild : (Syntax, SyntaxList) -> Syntax
-i/syntax.raw_kind : (Syntax) -> Int
-i/syntax.raw_text : (Syntax) -> String
-i/syntax.raw_int : (Syntax) -> Int
-i/syntax.raw_float : (Syntax) -> Float
-i/syntax.raw_length : (Syntax) -> Int
-i/syntax.raw_child : (Syntax, Int) -> Syntax
-i/syntax.raw_list_new : () -> SyntaxList
-i/syntax.raw_list_push : (SyntaxList, Syntax) -> SyntaxList
-i/syntax.raw_make_text : (Int, String, Syntax) -> SyntaxResult
-i/syntax.raw_make_int : (Int, Syntax) -> SyntaxResult
-i/syntax.raw_make_float : (Float, Syntax) -> SyntaxResult
-i/syntax.raw_make_list : (Int, SyntaxList, Syntax) -> SyntaxResult
-i/syntax.raw_make_one : (Int, Syntax, Syntax) -> SyntaxResult
-i/syntax.raw_syntax_ok : (SyntaxResult) -> Bool
-i/syntax.raw_syntax_value : (SyntaxResult) -> Syntax
-i/syntax.raw_syntax_error : (SyntaxResult) -> String
-i/syntax.raw_same_code : (Syntax, Syntax) -> Bool
-i/syntax.raw_show : (Syntax) -> String
-i/syntax.raw_show_as : (Syntax, Int) -> TextResult
-i/syntax.raw_text_ok : (TextResult) -> Bool
-i/syntax.raw_text_value : (TextResult) -> String
-i/syntax.raw_text_error : (TextResult) -> String
-i/syntax.raw_text_error_at : (TextResult) -> Syntax
-i/syntax.reverse : (List(Syntax), List(Syntax)) -> List(Syntax)
-i/syntax.match_children : (MatchResult, Int, Int, Int, List(Syntax)) -> List(Syntax)
-i/syntax._match_many : (MatchResult, Int) -> List(Syntax)
-i/syntax.prepend_reversed : (List(Syntax), List(Syntax)) -> List(Syntax)
-i/syntax._append : (List(Syntax), List(Syntax)) -> List(Syntax)
-i/syntax.children : (Syntax, Int, Int, List(Syntax)) -> List(Syntax)
-i/syntax.node : (Syntax) -> Node
-i/syntax.build_list : (List(Syntax), SyntaxList) -> SyntaxList
-i/syntax._rebuild : (Syntax, List(Syntax)) -> Syntax
-i/syntax.raw_type_handle : (Syntax) -> TypeHandle
-i/syntax.make : (Node, Syntax) <- (Fail(SyntaxError)) -> Syntax
-i/syntax.same_code : (Syntax, Syntax) -> Bool
-i/syntax.show : (Syntax) -> String
-i/syntax.position_id : (Position) -> Int
-i/syntax.show_as : (Syntax, Position) <- (Fail(SyntaxError)) -> String
-i/syntax.raw_type_of : (Syntax) -> TypeResult
-i/syntax.raw_signature : () -> TypeResult
-i/syntax.raw_subtype : (Syntax, Syntax) -> TypeResult
-i/syntax.raw_members : (Syntax) -> TypeResult
-i/syntax.raw_type_ok : (TypeResult) -> Bool
-i/syntax.raw_type_value : (TypeResult) -> Syntax
-i/syntax.raw_type_truth : (TypeResult) -> Int
-i/syntax.raw_type_len : (TypeResult) -> Int
-i/syntax.raw_type_child : (TypeResult, Int) -> Syntax
-i/syntax.raw_type_message : (TypeResult) -> String
-i/syntax.raw_type_at : (TypeResult) -> Syntax
-i/syntax.type_result : (TypeResult) <- (Fail(SyntaxError)) -> Syntax
-i/syntax.type_members : (TypeResult, Int, Int) -> List(Syntax)
-i/syntax._types : () -> Types
-i/syntax.type_of : (Syntax) <- (Fail(SyntaxError), Types) -> Syntax
-i/syntax.signature : () <- (Types) -> Syntax
-i/syntax.subtype : (Syntax, Syntax) <- (Fail(SyntaxError), Types) -> Truth
-i/syntax.members : (Syntax) <- (Fail(SyntaxError), Types) -> List(Syntax)
-i/fs.mode_string : (OpenMode) -> "append" | "read" | "read_write" | "truncate"
-i/fs.open : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner) -> File
-i/fs.read : (File, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-i/fs.write : (File, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.flush : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.close : (File) <- (Fs, request.Await, request.Owner) -> ()
-i/fs.remove : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.rename : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.mkdir : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.slice : (String, Int, Int) -> String
-i/fs.list_parts : (String, Int) -> List(String)
-i/fs.list : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
-i/fs.metadata : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Metadata
-i/fs.temp_dir : () <- (Fail(FsError), Fs, request.Await, request.Owner) -> String
-i/fs.read_chunks : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-i/fs.read_file : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-i/fs.write_file : (String, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.line_parts : (String, Int) -> List(String)
-i/fs.read_lines : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
-i/process.length : (List(A)) -> Int
-i/process.u32 : (Int) -> BitArray
-i/process.encode_items : (List(String)) <- (Fail(ProcessError)) -> BitArray
-i/process.encode_args : (List(String)) <- (Fail(ProcessError)) -> BitArray
-i/process.decode_items : (A, Int) -> List(String)
-i/process.decode_args : (A) -> List(String)
-i/process.args : () <- (Arguments, Fail(ProcessError), request.Await, request.Owner) -> List(String)
-i/process.env : (String) <- (Environment, Fail(ProcessError), request.Await, request.Owner) -> String
-i/process.cwd : () <- (Fail(ProcessError), WorkingDirectory, request.Await, request.Owner) -> String
-i/process.entropy : (Int) <- (Entropy, Fail(ProcessError), request.Await, request.Owner) -> BitArray
-i/process.spawn : (String, List(String)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
-i/process.wait : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Int
-i/process.terminate : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
-i/process.close : (Child) <- (Process, request.Await, request.Owner) -> ()
-i/process.stdio_mode : (Stdio) -> "inherit" | "null" | "piped"
-i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
-i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
-i/process.read_stdout : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.read_stderr : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
-i/process.close_stdin : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
-i/net.listen : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Listener
-i/net.connect : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
-i/net.accept : (Listener) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
-i/net.local_port : (Listener | Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> Int
-i/net.read : (Stream, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray
-i/net.write : (Stream, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
-i/net.shutdown_write : (Stream) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
-i/net.close_stream : (Stream) <- (Net, request.Await, request.Owner) -> ()
-i/net.close_listener : (Listener) <- (Net, request.Await, request.Owner) -> ()
-i/net.slice : (String, Int, Int) -> String
-i/net.parts : (String, Int) -> List(String)
-i/net.resolve : (String) <- (Fail(NetError), Net, request.Await, request.Owner) -> List(String)
-i/net.stream_number : (Stream) -> Int
-i/net.byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> (), read = (Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(NetError), Net, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ())
-i/net.bind : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Datagram
-i/net.send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
-i/net.receive_from : (Datagram, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> (address = String, data = BitArray, port = Int)
-i/net.decode_datagram : (A) -> (address = String, data = BitArray, port = Int)
-i/net.local_address : (Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> String
-i/net.close_datagram : (Datagram) <- (Net, request.Await, request.Owner) -> ()
+i/time.nanoseconds : (Int) -> Duration
+i/time.milliseconds : (Int) -> Duration
+i/time.seconds : (Int) -> Duration
+i/time.minutes : (Int) -> Duration
+i/time.hours : (Int) -> Duration
+i/time.to_nanoseconds : (Duration) -> Int
+i/time.add : (Duration, Duration) -> Duration
+i/time.subtract : (Duration, Duration) -> Duration
+i/time.scale : (Duration, Int) -> Duration
+i/time._divide_result : (Duration, Int) -> Result(Duration, DivisionByZero)
+i/time.compare : (Duration, Duration) -> Order
+i/time.from_unix_nanoseconds : (Int) -> Instant
+i/time.unix_nanoseconds : (Instant) -> Int
+i/time.shift : (Instant, Duration) -> Instant
+i/time.between : (Instant, Instant) -> Duration
+i/time.compare_instants : (Instant, Instant) -> Order
+i/time.now : () <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner) -> Instant
+i/time.sleep : (Duration) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner) -> ()
+i/time.measure : (() <- N -> A) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> (A, Duration)
+i/time.divide : (Duration, Int) <- (Fail(DivisionByZero)) -> Duration
 i/tls.options : () -> (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)
 i/tls.identity : (BitArray, BitArray) -> (cert = BitArray, key = BitArray)
 i/tls.join : (List(String)) -> String
@@ -605,15 +1615,64 @@ i/tls.write : (Stream, BitArray) <- (Fail(TlsError), Tls, request.Await, request
 i/tls.shutdown_write : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ()
 i/tls.close : (Stream) <- (Tls, request.Await, request.Owner) -> ()
 i/tls.byte_stream : (Stream) -> (close = () <- (Tls, request.Await, request.Owner) -> (), read = (Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(TlsError), Tls, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ())
-i/fetch.open : (String, String, String, BitArray) <- (Fail(String), Fetch, request.Await, request.Owner) -> Response
-i/fetch.status : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> Int
-i/fetch.headers : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> String
-i/fetch.read : (Response, Int) <- (Fail(String), Fetch, request.Await, request.Owner) -> BitArray
-i/fetch.close : (Response) <- (Fetch, request.Await, request.Owner) -> ()
-i/stdio.read : (Int) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> BitArray
-i/stdio.write : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.write_error : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.flush : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.flush_error : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.print : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/uri._parse_result : (String) -> Result(Uri, UriError)
+i/uri._build_result : (Parts) -> Result(Uri, UriError)
+i/uri.parts : (Uri) -> Parts
+i/uri.to_string : (Uri) -> String
+i/uri.has_scheme : (Uri) -> Bool
+i/uri._resolve_result : (Uri, Uri) -> Result(Uri, UriError)
+i/uri.encode_component : (String) -> String
+i/uri._encode_bytes_result : (BitArray) -> Result(String, CodecError)
+i/uri._decode_component_result : (String) -> Result(String, CodecError)
+i/uri._decode_bytes_result : (String) -> Result(BitArray, CodecError)
+i/uri._parse_query_result : (String) -> Result(List((String, String)), CodecError)
+i/uri.build_query : (List((String, String))) -> String
+i/uri.validated : (Parts, Bool) -> Result(Uri, UriError)
+i/uri.validate : (Parts, Bool) <- (Fail(UriError)) -> ()
+i/uri.path_constraints : (Parts) <- (Fail(UriError)) -> ()
+i/uri.problem : (UriPart, Int, UriProblem) <- (Fail(UriError)) -> Never
+i/uri.require : (Bool, UriPart, Int, UriProblem) <- (Fail(UriError)) -> ()
+i/uri.scan_option : (Option(String), UriPart) <- (Fail(UriError)) -> ()
+i/uri.lexical : (List(Int), UriPart) <- (Fail(UriError)) -> ()
+i/uri.grammar_option : (Option(String), UriPart, UriProblem, (Int) -> Bool) <- (Fail(UriError)) -> ()
+i/uri.grammar : (List(Int), UriPart, UriProblem, (Int) -> Bool, Int) <- (Fail(UriError)) -> ()
+i/uri.read_authority : (List(Int), Int) <- (Fail(UriError)) -> (Authority, List((UriPart, Int)))
+i/uri.alpha : (Int) -> Bool
+i/uri.digit : (Int) -> Bool
+i/uri.unreserved : (Int) -> Bool
+i/uri.subdelim : (Int) -> Bool
+i/uri.reg_char : (Int) -> Bool
+i/uri.user_char : (Int) -> Bool
+i/uri.pchar : (Int) -> Bool
+i/uri.path_char : (Int) -> Bool
+i/uri.query_char : (Int) -> Bool
+i/uri.uri_char : (Int) -> Bool
+i/uri.no_colon : (Int) -> Bool
+i/uri.scheme_char : (Int) -> Bool
+i/uri.valid_scheme : (List(Int)) -> Bool
+i/uri.hex : (Int) -> Int
+i/uri.host_text : (Host) -> String
+i/uri.valid_ip : (String) -> Bool
+i/uri.future : (List(Int)) -> Bool
+i/uri.groups : (String, Bool) -> Option(Int)
+i/uri.ipv4 : (String) -> Bool
+i/uri.bytes : (String) -> List(Int)
+i/uri.octets : (BitArray) -> List(Int)
+i/uri.text_bytes : (List(Int)) -> String
+i/uri.cut : (List(Int), Int) -> (List(Int), List(Int), Bool)
+i/uri.optional_text : (List(Int), Bool) -> Option(String)
+i/uri.delimited : (Option(String), String, String) -> String
+i/uri.remove_dots : (String) -> String
+i/uri.pop_segment : (List(String)) -> List(String)
+i/uri.merge_path : (Parts, String) -> String
+i/uri.hex_digit : (Int) -> Int
+i/uri.encode_octets : (List(Int), Bool) -> String
+i/uri.decode_raw : (List(Int), Bool) <- (Fail(BadEscape | NonAscii)) -> BitArray
+i/uri.decode_text : (String, Bool) <- (Fail(BadEscape | NonAscii | InvalidUtf8)) -> String
+i/uri.parse : (String) <- (Fail(UriError)) -> Uri
+i/uri.build : (Parts) <- (Fail(UriError)) -> Uri
+i/uri.resolve : (Uri, Uri) <- (Fail(UriError)) -> Uri
+i/uri.encode_bytes : (BitArray) <- (Fail(CodecError)) -> String
+i/uri.decode_component : (String) <- (Fail(CodecError)) -> String
+i/uri.decode_bytes : (String) <- (Fail(CodecError)) -> BitArray
+i/uri.parse_query : (String) <- (Fail(CodecError)) -> List((String, String))

@@ -3,6 +3,19 @@ use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 fn source(n: usize, value: bool, reverse: bool) -> String {
     let mut defs = vec![if value {
         "A0 = v".to_string()
@@ -62,7 +75,11 @@ fn completed_alias_chains_are_linear_in_both_declaration_orders() {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| env!("CARGO_BIN_EXE_i").into());
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"scale\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("name = \"scale\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
     for n in [64, 128, 256, 512, 1024, 2048, 4096] {
         let ordinary = measure(&binary, dir.path(), &source(n, false, false));

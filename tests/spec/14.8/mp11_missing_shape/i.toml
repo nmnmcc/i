@@ -1,3 +1,6 @@
 # spec: 14.8
 # expect: compile-error E0303
 name = "probe"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

@@ -2,8 +2,8 @@
 // expect: pass
 
 (
-    list = std/list,
-    testlib = (test) = std/test
+    list = i/list,
+    testlib = (test) = i/test
 )
 
 Box(A) = (value = A)

@@ -2,10 +2,10 @@
 # expect: pass
 name = "app"
 [dependencies]
+i = { path = "../../../../stdlib" }
 model = { path = "model" }
 
 [test]
-collection = "std/test.tests"
+collection = "i/test.tests"
 
 [dev-dependencies]
-std = { path = "../../../../std" }

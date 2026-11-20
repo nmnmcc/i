@@ -4,3 +4,6 @@ name = "spec"
 
 [wasm]
 exports = ["spec/main.out"]
+
+[dependencies]
+i = { path = "../../../../stdlib" }

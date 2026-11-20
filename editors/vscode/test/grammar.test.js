@@ -165,7 +165,7 @@ test("token scopes of sample.i", async () => {
     has(f, "storage.type.format.i");
   }
   has("i/fail", "entity.name.namespace.i");
-  has("std/option", "entity.name.namespace.i");
+  has("i/option", "entity.name.namespace.i");
   has("decode", "entity.name.namespace.alias.i");
   has("__ignored", "variable.language.discard.i");
   has("plus", "entity.name.function.definition.i");

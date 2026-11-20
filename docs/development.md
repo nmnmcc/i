@@ -23,7 +23,7 @@ The workspace is built and tested with Cargo:
 ```sh
 cargo build
 cargo test -p ilang-wasm
-cargo run --bin i -- test --project std
+cargo run --bin i -- test --project stdlib
 ```
 
 The workspace builds the `i` command, the code generator, the Wasmtime host,
@@ -40,7 +40,7 @@ four independent parts:
 - `rust`: the Rust formatting, Clippy, the snippet checks, and the workspace
   tests (`rust-lint` and `rust-test` run the two halves).
 - `i`: builds the release `i`, checks the formatting of the i sources
-  (`i fmt --check lib std bench examples`), runs the tests of `std`,
+  (`i fmt --check lib stdlib bench examples`), runs the tests of `stdlib`,
   `examples/hello`, and `bench` with `i test` at `--opt 0` and `--opt 2`,
   and runs `scripts/wasi-smoke` (WASI-target builds in Wasmtime and in Node's
   `node:wasi`), the review corpus, and the generated programs.

@@ -36,6 +36,12 @@ pub use refs::{Edit, Reference, RenameError};
 /// the local names are kept (`Typed::locals`).
 pub fn check_for_queries(graph: &PackageGraph) -> Checked {
     let (parsed, diags) = parse(graph);
+    // `i/test` is a Lisp macro module, expanded before resolution by the
+    // build driver; checker-only queries leave it out.
+    let parsed: Vec<_> = parsed
+        .into_iter()
+        .filter(|m| !(m.path == "i/test" && Some(m.package) != graph.root))
+        .collect();
     check_parsed_for_queries(graph, &parsed, diags)
 }
 

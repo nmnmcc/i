@@ -322,7 +322,7 @@ def comment_lines(path, t):
 def in_scope(path):
     return (not Path(path).is_absolute() and ".." not in Path(path).parts and
             (path.endswith(".rs") or path in EXTRA_I or
-             (path.startswith(("std/", "lib/")) and path.endswith((".i", ".is")))))
+             (path.startswith(("stdlib/", "lib/")) and path.endswith((".i", ".is")))))
 
 
 def tracked():
@@ -455,7 +455,7 @@ def inventory(base=None):
             continue
         text = revision(base, path) if base else read(path)
         comments, strings = lex(path, text)
-        scope = "rust" if path.endswith(".rs") else "library" if path.startswith(("std/", "lib/")) else "fixture"
+        scope = "rust" if path.endswith(".rs") else "library" if path.startswith(("stdlib/", "lib/")) else "fixture"
         example_text = {text for block in doc_examples(path, text) for text in block}
         for line in comment_lines(path, text):
             example = (line.doc and (line.text[1:] if line.text.startswith(" ") else line.text) in example_text)

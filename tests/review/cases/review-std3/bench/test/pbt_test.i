@@ -1,9 +1,9 @@
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	review/pbt
 	i/random
-	std/list
-	(Some) = std/option
+	i/list
+	(Some) = i/option
 )
 
 walk = (t : pbt.Tree((Int, Int)), depth : Int) -> () {

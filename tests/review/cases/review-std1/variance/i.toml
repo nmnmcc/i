@@ -1,1 +1,4 @@
 name = "variance"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

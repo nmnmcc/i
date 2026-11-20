@@ -1,3 +1,4 @@
 name="client"
 [dependencies]
+i = { path = "../../../../../stdlib" }
 app={path="../pkg_app"}

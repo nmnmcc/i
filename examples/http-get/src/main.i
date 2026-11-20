@@ -1,8 +1,8 @@
 (
 	i/fail
 	i/stdio
-	std/http
-	std/string
+	i/http
+	i/string
 )
 
 main = () {

@@ -1,0 +1,1178 @@
+(
+	testlib = (test) = i/test
+	i/core
+	i/control
+	i/fail
+	i/csv
+	i/list
+	i/stream
+	i/string
+	i/dict
+	i/schema
+	(Some, None) = i/option
+)
+
+config = (delimiter : String, fields : Int, crlf : Bool) -> csv.Options {
+	fail.catch(() { csv.options(delimiter, fields, crlf) }) |>
+		(Ok(c)) { c }
+		& (Error(_)) { panic("test options") }
+}
+
+PullProbe = (note = () -> ())
+
+note_pull = () <- (probe : PullProbe) -> () { probe.note() }
+
+test("parse_empty", () {
+	assert(fail.catch(() { csv.parse("") }) == Ok([]))
+	()
+})
+
+test("parse_one", () {
+	assert(fail.catch(() { csv.parse("a") }) == Ok([["a"]]))
+	()
+})
+
+test("parse_one_lf", () {
+	assert(fail.catch(() { csv.parse("a\n") }) == Ok([["a"]]))
+	()
+})
+
+test("parse_one_crlf", () {
+	assert(fail.catch(() { csv.parse("a\r\n") }) == Ok([["a"]]))
+	()
+})
+
+test("parse_row", () {
+	assert(fail.catch(() { csv.parse("a,b,c") }) == Ok([["a", "b", "c"]]))
+	()
+})
+
+test("parse_rows", () {
+	assert(
+		fail.catch(() { csv.parse("a,b\nc,d\n") }) ==
+			Ok([["a", "b"], ["c", "d"]]),
+	)
+	()
+})
+
+test("parse_empty_fields", () {
+	assert(fail.catch(() { csv.parse(",,") }) == Ok([["", "", ""]]))
+	()
+})
+
+test("parse_trailing", () {
+	assert(fail.catch(() { csv.parse("a,") }) == Ok([["a", ""]]))
+	()
+})
+
+test("parse_leading", () {
+	assert(fail.catch(() { csv.parse(",b") }) == Ok([["", "b"]]))
+	()
+})
+
+test("parse_quoted_empty", () {
+	assert(fail.catch(() { csv.parse("\"\"") }) == Ok([[""]]))
+	()
+})
+
+test("parse_quoted", () {
+	assert(fail.catch(() { csv.parse("\"a\",b") }) == Ok([["a", "b"]]))
+	()
+})
+
+test("parse_quoted_delimiter", () {
+	assert(fail.catch(() { csv.parse("\"a,b\",c") }) == Ok([["a,b", "c"]]))
+	()
+})
+
+test("parse_escaped_quote", () {
+	assert(fail.catch(() { csv.parse("\"a\"\"b\"") }) == Ok([["a\"b"]]))
+	()
+})
+
+test("parse_just_quote", () {
+	assert(fail.catch(() { csv.parse("\"\"\"\"") }) == Ok([["\""]]))
+	()
+})
+
+test("parse_embedded_lf", () {
+	assert(fail.catch(() { csv.parse("\"a\nb\",c") }) == Ok([["a\nb", "c"]]))
+	()
+})
+
+test("parse_embedded_crlf", () {
+	assert(fail.catch(() { csv.parse("\"a\r\nb\",c") }) == Ok([["a\nb", "c"]]))
+	()
+})
+
+test("parse_bare_cr", () {
+	assert(fail.catch(() { csv.parse("a\rb") }) == Ok([["a\rb"]]))
+	()
+})
+
+test("parse_quoted_cr", () {
+	assert(fail.catch(() { csv.parse("\"a\rb\"") }) == Ok([["a\rb"]]))
+	()
+})
+
+test("parse_spaces", () {
+	assert(fail.catch(() { csv.parse(" a , b ") }) == Ok([[" a ", " b "]]))
+	()
+})
+
+test("parse_blank_lines", () {
+	assert(fail.catch(() { csv.parse("\n\r\na\n\n") }) == Ok([["a"]]))
+	()
+})
+
+test("parse_space_line", () {
+	assert(fail.catch(() { csv.parse(" \n") }) == Ok([[" "]]))
+	()
+})
+
+test("parse_unicode", () {
+	assert(
+		fail.catch(() { csv.parse("名字,值\n🦀,é") }) ==
+			Ok([["名字", "值"], ["🦀", "é"]]),
+	)
+	()
+})
+
+test("parse_nul", () {
+	assert(fail.catch(() { csv.parse("a\u{0000}b") }) == Ok([["a\u{0000}b"]]))
+	()
+})
+
+test("parse_no_final_lf", () {
+	assert(
+		fail.catch(() { csv.parse("a,b\nc,d") }) ==
+			Ok([["a", "b"], ["c", "d"]]),
+	)
+	()
+})
+
+test("parse_crlf_empty", () {
+	assert(fail.catch(() { csv.parse("\r\n") }) == Ok([]))
+	()
+})
+
+test("parse_quoted_delimiter_only", () {
+	assert(fail.catch(() { csv.parse("\",\"") }) == Ok([[","]]))
+	()
+})
+
+test("parse_quote_after_delimiter", () {
+	assert(fail.catch(() { csv.parse("a,\"b\"") }) == Ok([["a", "b"]]))
+	()
+})
+
+test("parse_embedded_blank", () {
+	assert(fail.catch(() { csv.parse("\"\n\n\"") }) == Ok([["\n\n"]]))
+	()
+})
+
+test("parse_last_empty", () {
+	assert(fail.catch(() { csv.parse("\"\",") }) == Ok([["", ""]]))
+	()
+})
+
+test("parse_bom", () {
+	assert(fail.catch(() { csv.parse("﻿a,b") }) == Ok([["﻿a", "b"]]))
+	()
+})
+
+test("error_bare_quote", () {
+	assert(
+		fail.catch(() { csv.parse("a\"b") }) ==
+			Error(csv.CsvError(line = 1, column = 2, reason = "bare quote")),
+	)
+	()
+})
+
+test("error_after_quote", () {
+	assert(
+		fail.catch(() { csv.parse("\"a\"b") }) ==
+			Error(
+				csv.CsvError(
+					line = 1,
+					column = 4,
+					reason = "data after closing quote",
+				),
+			),
+	)
+	()
+})
+
+test("error_space_after_quote", () {
+	assert(
+		fail.catch(() { csv.parse("\"a\" ") }) ==
+			Error(
+				csv.CsvError(
+					line = 1,
+					column = 4,
+					reason = "data after closing quote",
+				),
+			),
+	)
+	()
+})
+
+test("error_missing_quote", () {
+	assert(
+		fail.catch(() { csv.parse("\"a") }) ==
+			Error(
+				csv.CsvError(
+					line = 1,
+					column = 3,
+					reason = "unterminated quoted field",
+				),
+			),
+	)
+	()
+})
+
+test("error_multiline_quote", () {
+	assert(
+		fail.catch(() { csv.parse("\"a\nb") }) ==
+			Error(
+				csv.CsvError(
+					line = 2,
+					column = 2,
+					reason = "unterminated quoted field",
+				),
+			),
+	)
+	()
+})
+
+test("error_unicode_position", () {
+	assert(
+		fail.catch(() { csv.parse("é\"") }) ==
+			Error(csv.CsvError(line = 1, column = 2, reason = "bare quote")),
+	)
+	()
+})
+
+test("invalid_delimiter_0", () {
+	fail.catch(() { csv.options("", 0, False) }) |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("invalid delimiter") }
+	()
+})
+
+test("invalid_delimiter_1", () {
+	fail.catch(() { csv.options("ab", 0, False) }) |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("invalid delimiter") }
+	()
+})
+
+test("invalid_delimiter_2", () {
+	fail.catch(() { csv.options("\n", 0, False) }) |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("invalid delimiter") }
+	()
+})
+
+test("invalid_delimiter_3", () {
+	fail.catch(() { csv.options("\r", 0, False) }) |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("invalid delimiter") }
+	()
+})
+
+test("invalid_delimiter_4", () {
+	fail.catch(() { csv.options("\"", 0, False) }) |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("invalid delimiter") }
+	()
+})
+
+test("invalid_delimiter_5", () {
+	fail.catch(() { csv.options("\u{0000}", 0, False) }) |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("invalid delimiter") }
+	()
+})
+
+test("invalid_delimiter_6", () {
+	fail.catch(() { csv.options("�", 0, False) }) |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("invalid delimiter") }
+	()
+})
+
+test("delimiter_semicolon", () {
+	assert(
+		{
+			e4_call_arg_0 = "a;b\nc;d"
+			e4_call_arg_1 = config(";", 0, False)
+			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([["a", "b"], ["c", "d"]]),
+	)
+	()
+})
+
+test("delimiter_unicode", () {
+	assert(
+		{
+			e4_call_arg_0 = "a🦀b\nc🦀d"
+			e4_call_arg_1 = config("🦀", 0, False)
+			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([["a", "b"], ["c", "d"]]),
+	)
+	()
+})
+
+test("delimiter_tab", () {
+	assert(
+		{
+			e4_call_arg_0 = "a\tb"
+			e4_call_arg_1 = config("\t", 0, False)
+			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([["a", "b"]]),
+	)
+	()
+})
+
+test("width_infer_error", () {
+	fail.catch(() { csv.parse("a,b\nc") }) |>
+		(Error(csv.CsvError(reason = reason, ..))) {
+			assert(reason == "wrong number of fields")
+		}
+		& (Ok(_)) { panic("width") }
+	()
+})
+
+test("width_explicit", () {
+	assert(
+		{
+			e4_call_arg_0 = "a,b"
+			e4_call_arg_1 = config(",", 2, False)
+			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([["a", "b"]]),
+	)
+	()
+})
+
+test("width_explicit_error", () {
+	{
+		e4_call_arg_0 = "a,b"
+		e4_call_arg_1 = config(",", 3, False)
+		fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
+	} |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("width") }
+	()
+})
+
+test("width_variable", () {
+	assert(
+		{
+			e4_call_arg_0 = "a\nb,c"
+			e4_call_arg_1 = config(",", -1, False)
+			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([["a"], ["b", "c"]]),
+	)
+	()
+})
+
+test("print_plain", () {
+	assert(csv.print([["a", "b"]]) == "a,b\n")
+	()
+})
+
+test("print_quote", () {
+	assert(csv.print([["a\"b"]]) == "\"a\"\"b\"\n")
+	()
+})
+
+test("print_delimiter", () {
+	assert(csv.print([["a,b"]]) == "\"a,b\"\n")
+	()
+})
+
+test("print_lf", () {
+	assert(csv.print([["a\nb"]]) == "\"a\nb\"\n")
+	()
+})
+
+test("print_cr", () {
+	assert(csv.print([["a\rb"]]) == "\"a\rb\"\n")
+	()
+})
+
+test("print_spaces", () {
+	assert(csv.print([[" a "]]) == " a \n")
+	()
+})
+
+test("print_single_empty", () {
+	assert(csv.print([[""]]) == "\"\"\n")
+	()
+})
+
+test("print_empty_fields", () {
+	assert(csv.print([["", ""]]) == ",\n")
+	()
+})
+
+test("print_empty_rows", () {
+	assert(csv.print([[]]) == "\"\"\n")
+	()
+})
+
+test("print_none", () {
+	assert(csv.print([]) == "")
+	()
+})
+
+test("print_unicode", () {
+	assert(csv.print([["é", "🦀"]]) == "é,🦀\n")
+	()
+})
+
+test("print_crlf", () {
+	assert(
+		csv.print_with([["a", "b"], ["c", "d"]], config(",", 0, True)) ==
+			"a,b\r\nc,d\r\n",
+	)
+	()
+})
+
+test("print_custom_delimiter", () {
+	assert(
+		csv.print_with([["a;b", "c"]], config(";", 0, False)) == "\"a;b\";c\n",
+	)
+	()
+})
+
+test("stream_boundaries_0", () {
+	cases = [["", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_1", () {
+	cases = [["", "a"], ["a", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_2", () {
+	cases = [["", "a\n"], ["a", "\n"], ["a\n", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_3", () {
+	cases = [["", "a\r\n"], ["a", "\r\n"], ["a\r", "\n"], ["a\r\n", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_4", () {
+	cases = [
+		["", "a,b,c"],
+		["a", ",b,c"],
+		["a,", "b,c"],
+		["a,b", ",c"],
+		["a,b,", "c"],
+		["a,b,c", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a", "b", "c"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_5", () {
+	cases = [
+		["", "a,b\nc,d\n"],
+		["a", ",b\nc,d\n"],
+		["a,", "b\nc,d\n"],
+		["a,b", "\nc,d\n"],
+		["a,b\n", "c,d\n"],
+		["a,b\nc", ",d\n"],
+		["a,b\nc,", "d\n"],
+		["a,b\nc,d", "\n"],
+		["a,b\nc,d\n", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a", "b"]), Ok(["c", "d"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_6", () {
+	cases = [["", ",,"], [",", ","], [",,", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["", "", ""])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_7", () {
+	cases = [["", "a,"], ["a", ","], ["a,", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a", ""])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_8", () {
+	cases = [["", ",b"], [",", "b"], [",b", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["", "b"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_9", () {
+	cases = [["", "\"\""], ["\"", "\""], ["\"\"", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok([""])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_10", () {
+	cases = [
+		["", "\"a\",b"],
+		["\"", "a\",b"],
+		["\"a", "\",b"],
+		["\"a\"", ",b"],
+		["\"a\",", "b"],
+		["\"a\",b", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a", "b"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_11", () {
+	cases = [
+		["", "\"a,b\",c"],
+		["\"", "a,b\",c"],
+		["\"a", ",b\",c"],
+		["\"a,", "b\",c"],
+		["\"a,b", "\",c"],
+		["\"a,b\"", ",c"],
+		["\"a,b\",", "c"],
+		["\"a,b\",c", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a,b", "c"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_12", () {
+	cases = [
+		["", "\"a\"\"b\""],
+		["\"", "a\"\"b\""],
+		["\"a", "\"\"b\""],
+		["\"a\"", "\"b\""],
+		["\"a\"\"", "b\""],
+		["\"a\"\"b", "\""],
+		["\"a\"\"b\"", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a\"b"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_13", () {
+	cases = [
+		["", "\"\"\"\""],
+		["\"", "\"\"\""],
+		["\"\"", "\"\""],
+		["\"\"\"", "\""],
+		["\"\"\"\"", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["\""])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_14", () {
+	cases = [
+		["", "\"a\nb\",c"],
+		["\"", "a\nb\",c"],
+		["\"a", "\nb\",c"],
+		["\"a\n", "b\",c"],
+		["\"a\nb", "\",c"],
+		["\"a\nb\"", ",c"],
+		["\"a\nb\",", "c"],
+		["\"a\nb\",c", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a\nb", "c"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_15", () {
+	cases = [
+		["", "\"a\r\nb\",c"],
+		["\"", "a\r\nb\",c"],
+		["\"a", "\r\nb\",c"],
+		["\"a\r", "\nb\",c"],
+		["\"a\r\n", "b\",c"],
+		["\"a\r\nb", "\",c"],
+		["\"a\r\nb\"", ",c"],
+		["\"a\r\nb\",", "c"],
+		["\"a\r\nb\",c", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a\nb", "c"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_16", () {
+	cases = [["", "a\rb"], ["a", "\rb"], ["a\r", "b"], ["a\rb", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a\rb"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_17", () {
+	cases = [
+		["", "\"a\rb\""],
+		["\"", "a\rb\""],
+		["\"a", "\rb\""],
+		["\"a\r", "b\""],
+		["\"a\rb", "\""],
+		["\"a\rb\"", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a\rb"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_18", () {
+	cases = [
+		["", " a , b "],
+		[" ", "a , b "],
+		[" a", " , b "],
+		[" a ", ", b "],
+		[" a ,", " b "],
+		[" a , ", "b "],
+		[" a , b", " "],
+		[" a , b ", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok([" a ", " b "])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_19", () {
+	cases = [
+		["", "\n\r\na\n\n"],
+		["\n", "\r\na\n\n"],
+		["\n\r", "\na\n\n"],
+		["\n\r\n", "a\n\n"],
+		["\n\r\na", "\n\n"],
+		["\n\r\na\n", "\n"],
+		["\n\r\na\n\n", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_20", () {
+	cases = [["", " \n"], [" ", "\n"], [" \n", ""]]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok([" "])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_21", () {
+	cases = [
+		["", "名字,值\n🦀,é"],
+		["名", "字,值\n🦀,é"],
+		["名字", ",值\n🦀,é"],
+		["名字,", "值\n🦀,é"],
+		["名字,值", "\n🦀,é"],
+		["名字,值\n", "🦀,é"],
+		["名字,值\n🦀", ",é"],
+		["名字,值\n🦀,", "é"],
+		["名字,值\n🦀,é", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["名字", "值"]), Ok(["🦀", "é"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_22", () {
+	cases = [
+		["", "a\u{0000}b"],
+		["a", "\u{0000}b"],
+		["a\u{0000}", "b"],
+		["a\u{0000}b", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a\u{0000}b"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_boundaries_23", () {
+	cases = [
+		["", "a,b\nc,d"],
+		["a", ",b\nc,d"],
+		["a,", "b\nc,d"],
+		["a,b", "\nc,d"],
+		["a,b\n", "c,d"],
+		["a,b\nc", ",d"],
+		["a,b\nc,", "d"],
+		["a,b\nc,d", ""],
+	]
+	list.each(cases, (chunks) {
+		assert(
+			stream.to_list(
+				csv.rows(stream.from_list(chunks), csv.defaults()),
+			) ==
+				[Ok(["a", "b"]), Ok(["c", "d"])],
+		)
+		()
+	})
+	()
+})
+
+test("stream_scalar_chunks", () {
+	chunks = string.to_codepoint_strings("名字,\"🦀\r\né\"\r\n")
+	assert(
+		stream.to_list(
+			csv.rows(stream.from_list(chunks), csv.defaults()),
+		) ==
+			[Ok(["名字", "🦀\né"])],
+	)
+	()
+})
+
+test("stream_stops_on_error", () {
+	assert(
+		stream.to_list(
+			csv.rows(stream.from_list(["a\"\nb\n"]), csv.defaults()),
+		) ==
+			[Error(csv.CsvError(line = 1, column = 2, reason = "bare quote"))],
+	)
+	()
+})
+
+test("stream_early_termination", () {
+	tail = stream.make(() -> stream.Step(String, Never, Never) {
+		panic("tail must not be pulled")
+	})
+	source = stream.make(() { stream.Next("a,b\n", tail) })
+	assert(
+		stream.to_list(
+			stream.take(
+				csv.rows(source, csv.defaults()),
+				1,
+			),
+		) ==
+			[Ok(["a", "b"])],
+	)
+	()
+})
+
+test("stream_source_error", () {
+	source = stream.make(() -> stream.Step(String, String, Never) {
+		fail.raise("source error")
+	})
+	assert(
+		fail.catch(() {
+			stream.to_list(
+				csv.rows(source, csv.defaults()),
+			)
+		}) ==
+			Error("source error"),
+	)
+	()
+})
+
+test("stream_replay", () {
+	rows = csv.rows(stream.from_list(["a,b\nc,d"]), csv.defaults())
+	assert(stream.to_list(rows) == stream.to_list(rows))
+	()
+})
+
+test("header", () {
+	result = {
+		e4_call_arg_0 = "name,age\ni,1\n"
+		e4_call_arg_1 = csv.defaults()
+		fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
+	}
+	assert(result == Ok([dict.from_list([("name", "i"), ("age", "1")])]))
+	()
+})
+
+test("header_empty", () {
+	assert(
+		{
+			e4_call_arg_0 = ""
+			e4_call_arg_1 = csv.defaults()
+			fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([]),
+	)
+	()
+})
+
+test("header_only", () {
+	assert(
+		{
+			e4_call_arg_0 = "a,b"
+			e4_call_arg_1 = csv.defaults()
+			fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([]),
+	)
+	()
+})
+
+test("header_duplicate", () {
+	assert(
+		{
+			e4_call_arg_0 = "a,a\n1,2"
+			e4_call_arg_1 = csv.defaults()
+			fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Error(
+				csv.CsvError(line = 1, column = 1, reason = "duplicate header"),
+			),
+	)
+	()
+})
+
+test("header_width", () {
+	{
+		e4_call_arg_0 = "a,b\n1"
+		e4_call_arg_1 = config(",", -1, False)
+		fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
+	} |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("header width") }
+	()
+})
+
+test("header_empty_name", () {
+	assert(
+		{
+			e4_call_arg_0 = ",b\n1,2"
+			e4_call_arg_1 = csv.defaults()
+			fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Ok([dict.from_list([("", "1"), ("b", "2")])]),
+	)
+	()
+})
+
+test("stream_records", () {
+	assert(
+		stream.to_list(
+			csv.records(stream.from_list(["a,b\n", "1,2\n"]), csv.defaults()),
+		) ==
+			[Ok(dict.from_list([("a", "1"), ("b", "2")]))],
+	)
+	()
+})
+
+test("schema", () {
+	codec = schema.dict(schema.string)
+	row = dict.from_list([("a", "one"), ("b", "two")])
+	assert(fail.catch(() { csv.decode(codec, row) }) == Ok(row))
+	()
+})
+
+test("schema_error", () {
+	codec = schema.dict(schema.int)
+	{
+		e4_call_arg_0 = codec
+		e4_call_arg_1 = dict.from_list([("a", "one")])
+		fail.catch(() { csv.decode(e4_call_arg_0, e4_call_arg_1) })
+	} |>
+		(Error(_)) { () }
+		& (Ok(_)) { panic("string must not coerce") }
+	()
+})
+
+test("large_roundtrip", () {
+	rows = list.repeat(["hello", "quoted,field", "é🦀"], 2000)
+	assert(
+		{
+			e4_call_arg_0 = csv.print(rows)
+			fail.catch(() { csv.parse(e4_call_arg_0) })
+		} ==
+			Ok(rows),
+	)
+	()
+})
+
+test("width_error_record_line", () {
+	assert(
+		fail.catch(() { csv.parse("a,b\n\nc\n") }) ==
+			Error(
+				csv.CsvError(
+					line = 3,
+					column = 1,
+					reason = "wrong number of fields",
+				),
+			),
+	)
+	()
+})
+
+test("header_width_error_line", () {
+	assert(
+		{
+			e4_call_arg_0 = "a,b\n\n1\n"
+			e4_call_arg_1 = config(",", -1, False)
+			fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Error(
+				csv.CsvError(
+					line = 3,
+					column = 1,
+					reason = "header width differs from row",
+				),
+			),
+	)
+	()
+})
+
+test("duplicate_header_error_line", () {
+	assert(
+		{
+			e4_call_arg_0 = "\n\na,a\n"
+			e4_call_arg_1 = csv.defaults()
+			fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
+		} ==
+			Error(
+				csv.CsvError(line = 3, column = 1, reason = "duplicate header"),
+			),
+	)
+	()
+})
+
+test("bare_cr_lookahead_pulls_once", () -> () {
+	events = control.boundary((boundary) {
+		{
+			last = stream.make(() -> stream.Step(String, Never, PullProbe) {
+				note_pull()
+				stream.Next("b\n", stream.new())
+			})
+			source = stream.append(stream.from_list(["a\r"]), last)
+			assert(
+				stream.to_list(
+					csv.rows(source, csv.defaults()),
+				) ==
+					[Ok(["a\rb"])],
+			)
+			[]
+		} <- (
+			PullProbe(
+				note = () {
+					control.suspend(boundary, (continuation) {
+						[1, ..control.resume(continuation, ())]
+					})
+				},
+			),
+		)
+	})
+	assert(events == [1])
+	()
+})
+
+test("bare_cr_eof_pulls_once", () -> () {
+	events = control.boundary((boundary) {
+		{
+			last = stream.make(() -> stream.Step(String, Never, PullProbe) {
+				note_pull()
+				stream.Done
+			})
+			source = stream.append(stream.from_list(["a\r"]), last)
+			assert(
+				stream.to_list(
+					csv.rows(source, csv.defaults()),
+				) ==
+					[Ok(["a\r"])],
+			)
+			[]
+		} <- (
+			PullProbe(
+				note = () {
+					control.suspend(boundary, (continuation) {
+						[1, ..control.resume(continuation, ())]
+					})
+				},
+			),
+		)
+	})
+	assert(events == [1])
+	()
+})

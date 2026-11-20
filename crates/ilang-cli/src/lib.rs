@@ -7,10 +7,22 @@ use std::path::Path;
 pub use ilang_binaryen::Level;
 pub use ilang_wasm::Target;
 
-/// The `std` package sources, embedded by build.rs and written by `i new`.
-/// They are ordinary package files; the compiler gives them no extra trust.
-pub mod std_package {
-    include!(concat!(env!("OUT_DIR"), "/std_package.rs"));
+/// The hash of the language that the host trusts with its own imports: the
+/// modules of the built-in prelude and of the standard library `i`, which is
+/// a dependency chosen by the package loader, never by a caller's name. It
+/// is the same as the one that `ilang_macro::run` grants.
+pub fn trusted_package(graph: &PackageGraph) -> String {
+    use ilang_package::lock::{FileKind, PackageFile, hash};
+    let files = (0..graph.packages.len())
+        .filter(|&id| graph.is_language(id))
+        .flat_map(|id| &graph.packages[id].modules)
+        .map(|m| PackageFile {
+            path: m.path.clone(),
+            kind: FileKind::Regular,
+            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
+        })
+        .collect::<Vec<_>>();
+    hash(&files)
 }
 
 /// What to build.
@@ -135,7 +147,7 @@ pub fn diagnostic_lines(graph: &PackageGraph, diags: &[Diagnostic]) -> Vec<Strin
         }
     }
     for (id, package) in graph.packages.iter().enumerate() {
-        if Some(id) == graph.root || id == graph.library {
+        if Some(id) == graph.root || graph.is_language(id) {
             continue;
         }
         if package.modules.iter().any(|m| {
@@ -240,17 +252,7 @@ pub fn build_entry(
         .map_err(|error| BuildError::Internal(error.to_string()))?;
     let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
     // The library is selected by the package loader, never by a caller's name.
-    use ilang_package::lock::{FileKind, PackageFile, hash};
-    let files: Vec<_> = graph.packages[graph.library]
-        .modules
-        .iter()
-        .map(|m| PackageFile {
-            path: m.path.clone(),
-            kind: FileKind::Regular,
-            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
-        })
-        .collect();
-    let trusted_package = hash(&files);
+    let trusted_package = trusted_package(&graph);
     Ok(Built {
         name: graph.packages[root].name.clone(),
         wasm,
@@ -344,17 +346,7 @@ pub fn build_tests(
         .map_err(|error| BuildError::Internal(error.to_string()))?;
     let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
     // The library is selected by the package loader, never by a caller's name.
-    use ilang_package::lock::{FileKind, PackageFile, hash};
-    let files: Vec<_> = graph.packages[graph.library]
-        .modules
-        .iter()
-        .map(|m| PackageFile {
-            path: m.path.clone(),
-            kind: FileKind::Regular,
-            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
-        })
-        .collect();
-    let trusted_package = hash(&files);
+    let trusted_package = trusted_package(&graph);
     Ok((
         Built {
             name: graph.packages[root].name.clone(),
@@ -724,21 +716,11 @@ pub fn build_collection(
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| BuildError::Internal(e.to_string()))?;
     let binding_plan = ilang_host::bindings::BindingPlan::new(&wasm, declarations);
-    use ilang_package::lock::{FileKind, PackageFile, hash};
-    let files: Vec<_> = graph.packages[graph.library]
-        .modules
-        .iter()
-        .map(|m| PackageFile {
-            path: m.path.clone(),
-            kind: FileKind::Regular,
-            bytes: graph.sources.get(m.source).text.as_bytes().to_vec(),
-        })
-        .collect();
     let built = Built {
         name: graph.packages[root].name.clone(),
         wasm,
         binding_plan,
-        trusted_package: hash(&files),
+        trusted_package: trusted_package(&graph),
         warnings: graph.sources.render_all(
             &diags
                 .iter()

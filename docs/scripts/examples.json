@@ -1,21 +1,21 @@
 {
-  "docs/content/docs/library/generated/std-set.mdx:57c2ca2ae9b79fdd": {
+  "docs/content/docs/library/generated/i-set.mdx:57c2ca2ae9b79fdd": {
     "prefix": "example = ",
     "reason": "This example is an expression; place it in a binding for the module parser."
   },
-  "docs/content/docs/library/generated/std-dict.mdx:99b10f384dd5e56b": {
+  "docs/content/docs/library/generated/i-dict.mdx:99b10f384dd5e56b": {
     "prefix": "example = ",
     "reason": "This example is an expression; place it in a binding for the module parser."
   },
-  "docs/content/docs/library/generated/std-dict.mdx:36b945cdb95004ca": {
+  "docs/content/docs/library/generated/i-dict.mdx:36b945cdb95004ca": {
     "prefix": "example = ",
     "reason": "This example is an expression; place it in a binding for the module parser."
   },
-  "docs/content/docs/library/generated/std-dict.mdx:fe5f26885ce8e4bb": {
+  "docs/content/docs/library/generated/i-dict.mdx:fe5f26885ce8e4bb": {
     "prefix": "example = ",
     "reason": "This example is an expression; place it in a binding for the module parser."
   },
-  "docs/content/docs/library/generated/std-dict.mdx:1b81a26241972cf9": {
+  "docs/content/docs/library/generated/i-dict.mdx:1b81a26241972cf9": {
     "prefix": "example = ",
     "reason": "This example is an expression; place it in a binding for the module parser."
   }

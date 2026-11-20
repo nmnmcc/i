@@ -5,7 +5,7 @@
 // The pinned source supplies constants and seed-1337 doctest words.
 // Other values are independently computed from spec §9.10; see reference.py.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/random
 	i/core
 )

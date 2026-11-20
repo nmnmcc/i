@@ -57,7 +57,7 @@ rustPlatform.buildRustPackage {
   pname = "i";
   inherit version;
 
-  # Only what the build reads: the workspace, the embedded `lib` and `std`
+  # Only what the build reads: the workspace, the built-in `lib` and the `stdlib` package
   # sources, and the spec that `i spec` embeds. A README or CI change does not
   # rebuild the compiler.
   src = lib.fileset.toSource {
@@ -68,7 +68,7 @@ rustPlatform.buildRustPackage {
       ../rust-toolchain.toml
       ../crates
       ../lib
-      ../std
+      ../stdlib
       ../docs/spec.md
     ];
   };
@@ -103,6 +103,10 @@ rustPlatform.buildRustPackage {
       binary="target/release/i"
     fi
     install -Dm755 "$binary" "$out/bin/i"
+    # The library package travels with the distribution, so that `i new`
+    # can build a local repository for offline use.
+    mkdir -p "$out/share/i"
+    cp -a stdlib "$out/share/i/stdlib"
     runHook postInstall
   '';
 

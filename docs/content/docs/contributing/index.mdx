@@ -7,8 +7,8 @@ Turn a small behavior into a regression test, then change its implementation.
 
 ```i test stdout=exact package=contributing title="test/regression_test.i"
 (
-	testlib = (test) = std/test
-	std/bool
+	testlib = (test) = i/test
+	i/bool
 )
 
 test("a regression", () { assert(bool.not(True) == False) })
@@ -19,7 +19,7 @@ pass contributing/regression_test.a regression
 1 passed, 0 failed
 ```
 
-For this change, the source is [std/src/bool.i](https://github.com/nmnmcc/i/blob/main/std/src/bool.i) and neighboring tests live in [std/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/std/test/bool_test.i). For language behavior, begin with the relevant [standard](/docs/standard) text, then a case under `tests/spec`.
+For this change, the source is [stdlib/src/bool.i](https://github.com/nmnmcc/i/blob/main/stdlib/src/bool.i) and neighboring tests live in [stdlib/test/bool_test.i](https://github.com/nmnmcc/i/blob/main/stdlib/test/bool_test.i). For language behavior, begin with the relevant [standard](/docs/standard) text, then a case under `tests/spec`.
 
 ## Sources
 
@@ -44,4 +44,4 @@ The gap register's probe names refer to external review inputs; add repository r
 
 ## Documentation
 
-Edit authored pages under `docs/content`; the home page is `docs/content/home/index.mdx`. Complete examples run at both optimization levels. The [library generator](https://github.com/nmnmcc/i/blob/main/docs/scripts/generate-library.py) reads `lib/i` and `std/src`; improve their documentation comments to change generated pages. [Design notes](/docs/contributing/design-notes) distinguish implementation context from proposals.
+Edit authored pages under `docs/content`; the home page is `docs/content/home/index.mdx`. Complete examples run at both optimization levels. The [library generator](https://github.com/nmnmcc/i/blob/main/docs/scripts/generate-library.py) reads `stdlib/src`; improve its documentation comments to change generated pages. [Design notes](/docs/contributing/design-notes) distinguish implementation context from proposals.

@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 # Proves that a copy of `i` can make a package, and check, run and test it, on
-# a machine that has no source tree of `i`: no `lib/`, no `std/`, no runner, no
-# Binaryen, no build cache. It also runs the first two examples of README.md,
+# a machine that has no source tree of `i`: no `lib/`, no `stdlib/`, no runner,
+# no Binaryen, no build cache. It also runs the first two examples of README.md,
 # which a new reader meets first, in packages of their own, and checks the
 # outputs the README promises (`42`, and the passing test).
+#
+# The standard library is the versioned package `github.com/nmnmcc/i//stdlib`.
+# There is no network here, so a local git repository stands in for the
+# repository of the language: scripts/dev-library-repo makes it from `stdlib/`
+# with the one tag `stdlib-v0.1.0`, before the trees are hidden, and
+# ILANG_GIT_URLS points the location at it. The test asserts that `i new`
+# names that version and copies nothing of the library, that `i new i` is
+# refused, that `i new std` makes an ordinary package, and that `i.lock` pins
+# the library at the commit of its tag.
 #
 #   scripts/dev-new-machine <path to i> [--evidence DIR]
 #
@@ -80,10 +89,52 @@ inner() {
     fi
   }
 
+  # The library as `i new` names it: the location and the version of the one
+  # tag of the stand-in repository.
+  local library="github.com/nmnmcc/i//stdlib" version commit
+  version=$(cat "$work/library-version")
+  commit=$(cat "$work/library-commit")
+
+  library_named() { # package directory
+    local want="i = \"$library@$version\""
+    echo "\$ grep -x '$want' $1/i.toml"
+    if grep -qxF -- "$want" "$1/i.toml" 2>/dev/null; then
+      echo "  the library is a versioned dependency"
+    else
+      echo "  i.toml does not name the library at $version  <-- FAILED"
+      status=1
+    fi
+  }
+
+  nothing_copied() { # package directory
+    local path
+    for path in "$1/std" "$1/stdlib" "$1/src/int.i" "$1/UNICODE-LICENSE"; do
+      echo "\$ ls -d $path"
+      if [[ -e $path ]]; then
+        echo "  there: a copy of the library  <-- FAILED"
+        status=1
+      else
+        echo "  not there, as it should be"
+      fi
+    done
+  }
+
+  library_locked() { # package directory
+    local want="$library $version $commit"
+    echo "\$ grep '^$want ' $1/i.lock"
+    if grep -q -- "^$want sha256-" "$1/i.lock" 2>/dev/null; then
+      echo "  i.lock pins the library at the commit of stdlib-v$version"
+    else
+      echo "  i.lock does not pin the library at $version $commit  <-- FAILED"
+      [[ -f $1/i.lock ]] && sed 's/^/    /' "$1/i.lock"
+      status=1
+    fi
+  }
+
   echo "== the source tree is not reachable =="
   local path
   for path in "$root/Cargo.toml" "$root/crates/ilang-cli/src/commands/package.rs" \
-    "$root/lib/i/io.i" "$root/target/debug/i"; do
+    "$root/stdlib/src/io.i" "$root/target/debug/i"; do
     echo "\$ ls -d $path"
     if ls -d -- "$path" 2>&1; then
       echo "  still there  <-- FAILED"
@@ -160,6 +211,14 @@ inner() {
   fi
 
   echo
+  echo "== the standard library comes from its repository =="
+  echo "ILANG_GIT_URLS=${ILANG_GIT_URLS:-<unset>}"
+  if [[ -z ${ILANG_GIT_URLS:-} ]]; then
+    echo "  ILANG_GIT_URLS is not set  <-- FAILED"
+    status=1
+  fi
+
+  echo
   echo "== i new =="
   step "$work/bin/i" new app
   if [[ -f app/i.toml ]]; then
@@ -169,15 +228,39 @@ inner() {
     echo "  app/i.toml is missing  <-- FAILED"
     status=1
   fi
+  library_named app
+  nothing_copied app
 
   echo
   echo "== the new package =="
   step "$work/bin/i" check --project app
   step "$work/bin/i" run --project app
   step "$work/bin/i" test --project app
+  library_locked app
 
   echo
-  echo "== a package named std =="
+  echo "== the name i is the library's =="
+  echo "\$ i new i"
+  if out=$("$work/bin/i" new i 2>&1); then
+    echo "$out"
+    echo "  exit 0, the name of the library was taken  <-- FAILED"
+    status=1
+  else
+    echo "$out"
+    if grep -qi 'reserved' <<<"$out"; then
+      echo "  refused, and the refusal says the name is reserved"
+    else
+      echo "  refused, but the refusal does not say why  <-- FAILED"
+      status=1
+    fi
+  fi
+  if [[ -e i ]]; then
+    echo "  the refusal left i/ behind  <-- FAILED"
+    status=1
+  fi
+
+  echo
+  echo "== a package named std is an ordinary package =="
   step "$work/bin/i" new std
   if [[ -f std/i.toml ]]; then
     echo "\$ cat std/i.toml"
@@ -186,21 +269,12 @@ inner() {
     echo "  std/i.toml is missing  <-- FAILED"
     status=1
   fi
+  library_named std
+  nothing_copied std
   step "$work/bin/i" check --offline --project std
   step "$work/bin/i" run --offline --project std
   step "$work/bin/i" test --offline --project std
-
-  echo
-  echo "== the copied std carries the Unicode licence, as the repository's =="
-  for path in app/std std/std; do
-    echo "\$ cmp $work/UNICODE-LICENSE $path/UNICODE-LICENSE"
-    if cmp -s -- "$work/UNICODE-LICENSE" "$path/UNICODE-LICENSE"; then
-      echo "  the same file as the repository's"
-    else
-      echo "  missing or different  <-- FAILED"
-      status=1
-    fi
-  done
+  library_locked std
 
   echo
   echo "== README's first example, the one it says prints 42 =="
@@ -364,6 +438,7 @@ root_side() {
   cd /
   local run=(env "HOME=$work/home" "XDG_CACHE_HOME=$work/cache"
     "I_CACHE_DIR=$work/cache/i" "TMPDIR=$work/tmp" "PATH=$path"
+    "ILANG_GIT_URLS=$(cat "$work/library-urls")"
     bash "$work/new-machine" --inside "$work" "$root")
   if [[ -n $uid ]]; then
     echo "dev-new-machine: running i as uid $uid, gid $gid"
@@ -528,6 +603,8 @@ finish() {
     cp -- "$work/proj/app/i.toml" "$evidence/app-i.toml" 2>/dev/null
     cp -- "$work/proj/nested/dir/i.toml" "$evidence/deep-i.toml" 2>/dev/null
     cp -- "$work/proj/readme_test/i.toml" "$evidence/readme-test-i.toml" 2>/dev/null
+    cp -- "$work/proj/app/i.lock" "$evidence/app-i.lock" 2>/dev/null
+    cp -- "$work/proj/std/i.toml" "$evidence/std-i.toml" 2>/dev/null
     find "$work/proj" -name i.lock -exec cp -- {} "$evidence/" \; 2>/dev/null
     {
       echo "binary: $binary"
@@ -557,7 +634,14 @@ cp -- "$binary" "$work/bin/i"
 cp -- "$script" "$work/new-machine"
 cp -- "$here/manifest-paths" "$work/manifest-paths"
 cp -- "$here/../README.md" "$work/README.md"
-cp -- "$here/../std/UNICODE-LICENSE" "$work/UNICODE-LICENSE"
+
+# The stand-in for the repository of the language, made while `stdlib/` can
+# still be read. It is in the work directory, which is not hidden.
+library_version=0.1.0
+"$here/dev-library-repo" "$here/../stdlib" "$work/git" "$library_version" > "$work/library-urls"
+echo "$library_version" > "$work/library-version"
+git -C "$work/git/i.git" rev-parse "stdlib-v$library_version^{commit}" > "$work/library-commit"
+echo "dev-new-machine: library $(cat "$work/library-urls") at $(cat "$work/library-commit")"
 
 # The trees to hide: this repository, the other clones of it, and the default
 # place of the sources. A path is masked only if it exists here.

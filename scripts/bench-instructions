@@ -76,11 +76,11 @@ bench() {
 }
 
 # --- the compiler ---------------------------------------------------------------------------
-bench check_std "$I" check --project std
+bench check_std "$I" check --project stdlib
 # `i test` has no build-only mode: a filter that matches no test builds the whole test program of
 # std (to Wasm, then to machine code) and runs nothing, so this is the build up to the first test.
-bench build_std_tests_o0 "$I" test --project std --opt 0 no_such_test_zz
-bench build_std_tests_o2 "$I" test --project std --opt 2 no_such_test_zz
+bench build_std_tests_o0 "$I" test --project stdlib --opt 0 no_such_test_zz
+bench build_std_tests_o2 "$I" test --project stdlib --opt 2 no_such_test_zz
 # Three wide-union cases of the review corpus (checking only).
 for case in review-k4/perf/wide_256 review-k4/perf/wide_1024 review-k4/perf/wide_generic_1024; do
   bench "corpus_$(basename "$case")" "$I" check --types --project "tests/review/cases/$case"

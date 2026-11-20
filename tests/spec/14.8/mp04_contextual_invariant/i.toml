@@ -2,3 +2,6 @@
 # expect: pass
 name = "probe"
 version = "0.1.0"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

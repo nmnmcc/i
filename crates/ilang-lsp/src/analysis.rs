@@ -305,7 +305,18 @@ mod expansion_source_tests {
     #[test]
     fn editor_text_excludes_the_expansion_suffix() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../stdlib")
+            .canonicalize()
+            .unwrap();
+        std::fs::write(
+            dir.path().join("i.toml"),
+            format!(
+                "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+                library.to_str().unwrap()
+            ),
+        )
+        .unwrap();
         std::fs::create_dir(dir.path().join("src")).unwrap();
         let source = "main = () { fake() }\n";
         std::fs::write(dir.path().join("src/main.i"), source).unwrap();

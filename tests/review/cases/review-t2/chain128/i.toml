@@ -1,1 +1,4 @@
 name = "review"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

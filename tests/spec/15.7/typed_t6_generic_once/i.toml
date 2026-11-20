@@ -1,3 +1,6 @@
 # spec: 15.7 T6; typed macro typed t6 generic once.
 # expect: pass
 name = "spec"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

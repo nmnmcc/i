@@ -1,1 +1,4 @@
 name = "capability"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

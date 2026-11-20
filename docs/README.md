@@ -157,7 +157,7 @@ are compiler inputs, not additional rendered code blocks.
 levels. It affects that example's compiler/program subprocesses only; the source
 still uses the ordinary process environment service.
 The runner sets the manifest name, absolute local `std` paths, and the
-`std/test.tests` collection. Tests use a `std` dev-dependency unless source
+`i/test.tests` collection. Tests use a `std` dev-dependency unless source
 modules need a regular dependency. Commands use `--offline`; output must be
 deterministic. Each example has a 60-second deadline across both levels.
 

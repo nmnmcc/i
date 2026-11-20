@@ -1419,7 +1419,19 @@ mod shared_place_tests {
         // Count every written occurrence after aliases,
         // across every constructor of the family, before inference.
         let root = tempfile::tempdir().unwrap();
-        std::fs::write(root.path().join("i.toml"), "name = \"app\"\n").unwrap();
+        std::fs::write(
+            root.path().join("i.toml"),
+            format!(
+                "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../stdlib")
+                    .canonicalize()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+            ),
+        )
+        .unwrap();
         std::fs::create_dir(root.path().join("src")).unwrap();
         std::fs::write(
             root.path().join("src/main.i"),

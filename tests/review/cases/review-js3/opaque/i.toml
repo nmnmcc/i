@@ -1,3 +1,6 @@
 name = "probe"
 [wasm]
 exports = ["probe/main.same"]
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

@@ -4,3 +4,6 @@ name = "spec"
 
 [entries]
 worker = "tools.jobs.work"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

@@ -1,1 +1,4 @@
 name = "probe"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

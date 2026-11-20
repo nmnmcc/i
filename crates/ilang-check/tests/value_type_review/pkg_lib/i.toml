@@ -1,1 +1,4 @@
 name="schema"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }

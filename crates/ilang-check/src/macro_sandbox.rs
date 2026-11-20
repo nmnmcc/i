@@ -1,7 +1,7 @@
 //! External dependencies of a compile-time macro program.
 use crate::hir::{DefId, DefKind, ModuleId, Program};
 use crate::order;
-use ilang_package::PackageId;
+use ilang_package::PackageGraph;
 use std::collections::{BTreeSet, VecDeque};
 
 /// External declarations from outside `i` reachable from the macro entries or
@@ -9,7 +9,7 @@ use std::collections::{BTreeSet, VecDeque};
 /// is the compiler-selected import closure for this macro program.
 pub fn foreign_externals(
     program: &Program,
-    library: PackageId,
+    graph: &PackageGraph,
     modules: &[ModuleId],
     entries: &[DefId],
 ) -> Vec<DefId> {
@@ -33,7 +33,7 @@ pub fn foreign_externals(
         }
         match &program.def(id).kind {
             DefKind::External { .. } => {
-                if program.module(id.module).package != library {
+                if !graph.is_language(program.module(id.module).package) {
                     foreign.insert(id);
                 }
             }

@@ -3,11 +3,11 @@
 	i/fs
 	i/fail
 	i/stdio
-	std/json
-	std/int
-	std/string
-	std/bit_array
-	(Some, None) = std/option
+	i/json
+	i/int
+	i/string
+	i/bit_array
+	(Some, None) = i/option
 )
 
 amount_value = (value) {

@@ -65,7 +65,15 @@ fn checked_with_exports(
     tempfile::TempDir,
 ) {
     let dir = tempfile::tempdir().unwrap();
-    let mut manifest = "name = \"app\"\n".to_owned();
+    let mut manifest = format!(
+        "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../stdlib")
+            .canonicalize()
+            .unwrap()
+            .to_str()
+            .unwrap()
+    );
     manifest.push_str(&format!("[wasm]\n{} = {exports:?}\n", "exports"));
     std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();

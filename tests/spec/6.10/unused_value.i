@@ -4,7 +4,7 @@
 // `assert 1 + 1 == 2` is the two statements `assert` and `1 + 1 == 2`: the
 // first does nothing, so the compiler warns about it.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 test("two_statements", () {

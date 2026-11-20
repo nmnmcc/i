@@ -8,12 +8,29 @@ use ilang_host::{Abi, Outcome, Program, Stop};
 use std::path::Path;
 use wasmtime::{Caller, Config, Engine, Extern, Linker, Module, Store};
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 /// The import of the standard service.
 const IO: &str = " ((Io) = i/io)\n";
 
 fn package(main: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join("i.toml"), "name = \"app\"\n").unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();
     std::fs::write(dir.path().join("src/main.i"), main).unwrap();
     dir
@@ -348,10 +365,7 @@ fn needs_an_entry() {
 fn the_standard_service_is_the_one_of_i_io() {
     let twice = "@host(\"i:io/v1\")\nMine = (print = (String) -> ())\n\nmain = () <- (io : Mine) { io.print(\"x\") }\n";
     let e = build_error(twice);
-    assert!(
-        e.contains("E0311") && e.contains("the host service `Io` of `i/io`"),
-        "{e}"
-    );
+    assert!(e.contains("E0311") && e.contains("i:io/v1"), "{e}");
     let other = "@host(\"i:io/v1\")\nInput = (read = () -> String)\n\nmain = () <- (input : Input) { input.read() }\n";
     let dir = package(other);
     let wasm = wasi(dir.path(), Level::O0);

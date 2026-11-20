@@ -112,7 +112,42 @@ impl World {
     }
 
     fn load(&self, project: &Path, tests: bool) -> (PackageGraph, Vec<Diagnostic>) {
-        load_with(project, &self.options(tests))
+        self.load_with(project, &self.options(tests))
+    }
+
+    /// Loads a project, which first gets the standard library if it has no
+    /// dependency `i` ([`World::with_library`]).
+    fn load_with(&self, project: &Path, options: &LoadOptions) -> (PackageGraph, Vec<Diagnostic>) {
+        self.with_library(project);
+        load_with(project, options)
+    }
+
+    /// Every compiled package depends on the standard library `i`: when the
+    /// `i.toml` of `project` has no dependency `i`, a path dependency on a
+    /// small package named `i` is put at its end, so that the lines that are
+    /// there keep their numbers.
+    fn with_library(&self, project: &Path) {
+        let toml = project.join("i.toml");
+        let Ok(mut text) = fs::read_to_string(&toml) else {
+            return;
+        };
+        if text.lines().any(|l| l.starts_with("i = ")) {
+            return;
+        }
+        let library = self.path().join("stdlib");
+        write(&library, &[("i.toml", "name = \"i\"\n")]);
+        let line = format!("i = {{ path = {:?} }}\n", library.display().to_string());
+        if !text.is_empty() && !text.ends_with('\n') {
+            text.push('\n');
+        }
+        if let Some(at) = text.find("[dependencies]\n") {
+            let at = at + "[dependencies]\n".len();
+            text.insert_str(at, &line);
+        } else {
+            text.push_str("[dependencies]\n");
+            text.push_str(&line);
+        }
+        fs::write(toml, text).unwrap();
     }
 }
 
@@ -639,7 +674,7 @@ fn dir_packages() {
     let (graph, diags) = w.load(&app, true);
     assert_eq!(errors(&diags), [code::NO_PACKAGE]);
     let line = graph.sources.render(&diags[0]);
-    assert!(line.starts_with("i.toml:3:1: error[E0621]: "), "{line}");
+    assert!(line.starts_with("i.toml:4:1: error[E0621]: "), "{line}");
 }
 
 #[test]
@@ -783,20 +818,24 @@ fn moved_tag_is_an_error() {
     // With a new cache, as on another computer.
     let mut options = w.options(true);
     options.cache = Some(w.path().join("cache2"));
-    let (graph, diags) = load_with(&app, &options);
+    let (graph, diags) = w.load_with(&app, &options);
     assert_eq!(errors(&diags), [code::LOCK_MISMATCH]);
     let line = graph.sources.render(&diags[0]);
     assert!(line.starts_with("i.lock:1:1: error[E0632]: "), "{line}");
     // Nothing is compiled, and `i.lock` is not changed.
     let root = graph.root.unwrap();
-    assert_eq!(graph.packages[root].dependencies[0].1, None);
+    let json_dep = graph.packages[root]
+        .dependencies
+        .iter()
+        .find(|(n, _)| n == "json");
+    assert_eq!(json_dep, Some(&("json".to_string(), None)));
     assert!(located(&graph).is_empty());
     assert_eq!(fs::read_to_string(app.join("i.lock")).unwrap(), locked);
 
     // The old cache still has the old tag, so it still loads, offline too.
     let mut options = w.options(true);
     options.offline = true;
-    let (graph, diags) = load_with(&app, &options);
+    let (graph, diags) = w.load_with(&app, &options);
     no_errors(&graph, &diags);
     // Not offline, the old cache is used as it matches `i.lock`.
     let (graph, diags) = w.load(&app, true);
@@ -869,7 +908,7 @@ fn lines_are_added_and_taken_out() {
     );
     let mut options = w.options(true);
     options.write_lock = false;
-    let (graph, diags) = load_with(&app, &options);
+    let (graph, diags) = w.load_with(&app, &options);
     no_errors(&graph, &diags);
     assert_eq!(fs::read_to_string(app.join("i.lock")).unwrap(), "");
 }
@@ -927,6 +966,11 @@ fn dev_dependencies_only_with_tests() {
     assert_eq!(located(&graph), ["example.com/alice/json@1.4.0"]);
     let root = &graph.packages[graph.root.unwrap()];
     assert_eq!(root.dev_dependencies, [("check".to_string(), None)]);
+    assert!(
+        root.dependencies
+            .iter()
+            .any(|(name, id)| name == "i" && id.is_some())
+    );
     assert!(root.modules.iter().all(|m| m.kind == ModuleKind::Src));
     // The lines are for the program with and without its tests.
     let all = [
@@ -1054,10 +1098,10 @@ fn offline() {
     let mut offline = w.options(true);
     offline.offline = true;
     // Nothing is in the cache.
-    let (graph, diags) = load_with(&app, &offline);
+    let (graph, diags) = w.load_with(&app, &offline);
     assert_eq!(errors(&diags), [code::OFFLINE]);
     let line = graph.sources.render(&diags[0]);
-    assert!(line.starts_with("i.toml:3:1: error[E0634]: "), "{line}");
+    assert!(line.starts_with("i.toml:4:1: error[E0634]: "), "{line}");
     assert!(!app.join("i.lock").exists());
 
     let (graph, diags) = w.load(&app, true);
@@ -1067,7 +1111,7 @@ fn offline() {
     fs::remove_dir_all(&json.bare).unwrap();
     let (graph, diags) = w.load(&app, true);
     no_errors(&graph, &diags);
-    let (graph, diags) = load_with(&app, &offline);
+    let (graph, diags) = w.load_with(&app, &offline);
     no_errors(&graph, &diags);
     assert_eq!(located(&graph), ["example.com/alice/json@1.4.0"]);
 
@@ -1079,7 +1123,7 @@ fn offline() {
             "name = \"app\"\n[dependencies]\njson = \"example.com/alice/json@1.5.0\"\n",
         )],
     );
-    let (graph, diags) = load_with(&app, &offline);
+    let (graph, diags) = w.load_with(&app, &offline);
     no_errors(&graph, &diags);
     assert_eq!(lock_lines(&app), ["example.com/alice/json 1.5.0"]);
     // A version that it does not have.
@@ -1090,12 +1134,55 @@ fn offline() {
             "name = \"app\"\n[dependencies]\njson = \"example.com/alice/json@1.6.0\"\n",
         )],
     );
-    let (_, diags) = load_with(&app, &offline);
+    let (_, diags) = w.load_with(&app, &offline);
     assert_eq!(errors(&diags), [code::OFFLINE]);
     // Online, the repository is gone.
     let (_, diags) = w.load(&app, true);
     assert_eq!(errors(&diags), [code::GIT]);
     assert_eq!(lock_lines(&app), ["example.com/alice/json 1.5.0"]);
+}
+
+#[test]
+fn offline_without_the_standard_library_in_the_cache() {
+    let w = World::new();
+    let stdlib = w.repo("nmnmcc/i");
+    stdlib.package("i", &[], "1.0.0");
+    let json = w.repo("alice/json");
+    json.package("json", &[], "1.0.0");
+    let app = w.project(
+        "app",
+        &[(
+            "i.toml",
+            "name = \"app\"\n[dependencies]\ni = \"example.com/nmnmcc/i@1.0.0\"\njson = \"example.com/alice/json@1.0.0\"\n",
+        )],
+    );
+    let mut offline = w.options(true);
+    offline.offline = true;
+    let (graph, diags) = w.load_with(&app, &offline);
+    assert_eq!(errors(&diags), [code::OFFLINE, code::OFFLINE]);
+    let rendered = graph.sources.render_all(&diags);
+    // The same code and shape; only the dependency `i` says that it is the
+    // standard library.
+    assert!(
+        rendered[0].starts_with("i.toml:3:1: error[E0634]: "),
+        "{rendered:#?}"
+    );
+    assert!(
+        rendered[0].ends_with(
+            "; the standard library `i` is not in the cache; run once online to fetch it"
+        ),
+        "{rendered:#?}"
+    );
+    assert!(
+        rendered[1].starts_with("i.toml:4:1: error[E0634]: "),
+        "{rendered:#?}"
+    );
+    assert!(!rendered[1].contains("standard library"), "{rendered:#?}");
+    // Once online, it is in the cache, and offline works.
+    let (graph, diags) = w.load(&app, true);
+    no_errors(&graph, &diags);
+    let (graph, diags) = w.load_with(&app, &offline);
+    no_errors(&graph, &diags);
 }
 
 #[test]
@@ -1214,7 +1301,7 @@ fn cached_package_files_are_checked_on_every_load() {
         }
         let mut options = w.options(false);
         options.offline = true;
-        let (g, ds) = load_with(&app, &options);
+        let (g, ds) = w.load_with(&app, &options);
         assert_eq!(
             errors(&ds),
             [code::LOCK_MISMATCH],
@@ -1269,7 +1356,7 @@ fn lock_pins_superseded_manifests_in_both_test_configurations() {
         for tests in [false, true] {
             let mut options = w.options(tests);
             options.cache = Some(w.path().join(format!("fresh-{tests}")));
-            let (g, ds) = load_with(&app, &options);
+            let (g, ds) = w.load_with(&app, &options);
             assert_eq!(errors(&ds), [code::LOCK_MISMATCH], "{ds:?}");
             assert!(
                 g.sources
@@ -1573,6 +1660,93 @@ fn two_fetches_of_one_repository_at_once() {
                 .is_file()
         );
         // No temporary bare repository was left behind.
+        let left: Vec<_> = fs::read_dir(cache.join("git"))
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|n| n.starts_with(".tmp-"))
+            .collect();
+        assert!(left.is_empty(), "{left:?}");
+    }
+}
+
+/// The child of [`two_processes_fetch_one_repository_at_once`]: fetches the
+/// location from `ILANG_GIT_RACE_CACHE` with the URL map in
+/// `ILANG_GIT_RACE_URLS`, after waiting for `ILANG_GIT_RACE_GO` to exist, and
+/// writes the commit it found to `ILANG_GIT_RACE_OUT`. Without the variables
+/// it does nothing.
+#[test]
+fn two_processes_fetch_child() {
+    let Some(cache) = std::env::var_os("ILANG_GIT_RACE_CACHE") else {
+        return;
+    };
+    let urls = parse_url_map(&std::env::var("ILANG_GIT_RACE_URLS").unwrap());
+    let go = PathBuf::from(std::env::var_os("ILANG_GIT_RACE_GO").unwrap());
+    let out = PathBuf::from(std::env::var_os("ILANG_GIT_RACE_OUT").unwrap());
+    let start = std::time::Instant::now();
+    while !go.exists() {
+        assert!(start.elapsed() < std::time::Duration::from_secs(60));
+        std::thread::yield_now();
+    }
+    let mut g = Git::new(PathBuf::from(cache), false, urls);
+    g.fetch("example.com/alice/json").unwrap();
+    let commit = g
+        .commit(
+            "example.com/alice/json",
+            parse_version("1.4.0").unwrap(),
+            None,
+        )
+        .unwrap();
+    fs::write(out, commit).unwrap();
+}
+
+/// Two processes (not two threads of one process) that fetch one location
+/// into one empty cache at the same moment both get the commit, and leave a
+/// cache that works offline, with no temporary repository behind.
+#[test]
+fn two_processes_fetch_one_repository_at_once() {
+    let w = World::new();
+    let json = w.repo("alice/json");
+    let c = json.package("json", &[], "1.4.0");
+    let urls = w
+        .urls()
+        .iter()
+        .map(|(from, to)| format!("{from}={to}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    for round in 0..3 {
+        let cache = w.path().join(format!("process-cache-{round}"));
+        let go = w.path().join(format!("go-{round}"));
+        let children: Vec<_> = (0..2)
+            .map(|n| {
+                let out = w.path().join(format!("out-{round}-{n}"));
+                let child = Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", "two_processes_fetch_child", "--nocapture"])
+                    .env("ILANG_GIT_RACE_CACHE", &cache)
+                    .env("ILANG_GIT_RACE_URLS", &urls)
+                    .env("ILANG_GIT_RACE_GO", &go)
+                    .env("ILANG_GIT_RACE_OUT", &out)
+                    .env("GIT_CONFIG_GLOBAL", "/dev/null")
+                    .env("GIT_CONFIG_NOSYSTEM", "1")
+                    .spawn()
+                    .unwrap();
+                (child, out)
+            })
+            .collect();
+        fs::write(&go, "").unwrap();
+        for (mut child, out) in children {
+            assert!(child.wait().unwrap().success(), "round {round}");
+            assert_eq!(fs::read_to_string(out).unwrap(), c, "round {round}");
+        }
+        let mut g = Git::new(cache.clone(), true, w.urls());
+        assert_eq!(
+            g.commit(
+                "example.com/alice/json",
+                parse_version("1.4.0").unwrap(),
+                Some(&c)
+            )
+            .unwrap(),
+            c
+        );
         let left: Vec<_> = fs::read_dir(cache.join("git"))
             .unwrap()
             .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())

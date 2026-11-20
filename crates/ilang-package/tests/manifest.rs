@@ -81,7 +81,8 @@ x = 1
 fn name_rules() {
     assert_eq!(codes(""), [code::MANIFEST_NAME]);
     assert_eq!(codes("name = 1"), [code::MANIFEST_NAME]);
-    assert_eq!(codes(r#"name = "i""#), [code::MANIFEST_NAME]);
+    // The standard library, and a fork of it, are named `i`.
+    assert!(codes(r#"name = "i""#).is_empty());
     assert_eq!(codes(r#"name = "App""#), [code::MANIFEST_NAME]);
     assert_eq!(codes(r#"name = "my-app""#), [code::MANIFEST_NAME]);
     assert_eq!(codes(r#"name = "__x""#), [code::MANIFEST_NAME]);
@@ -101,7 +102,8 @@ fn toml_syntax() {
 #[test]
 fn dependency_names() {
     let deps = |body: &str| codes(&format!("name = \"app\"\n[dependencies]\n{body}"));
-    assert_eq!(deps(r#"i = { path = "x" }"#), [code::DEPENDENCY_NAME]);
+    // The standard library is the dependency `i`.
+    assert!(deps(r#"i = { path = "x" }"#).is_empty());
     assert_eq!(deps(r#"app = { path = "x" }"#), [code::DEPENDENCY_NAME]);
     assert_eq!(deps(r#"Json = { path = "x" }"#), [code::DEPENDENCY_NAME]);
     assert_eq!(
@@ -153,7 +155,7 @@ fn wasm_exports() {
 /// not compiled are not used, so their shapes give no errors.
 #[test]
 fn dependency_manifest_ignores_dev_dependencies_and_wasm() {
-    let text = "name = \"u\"\n[dependencies]\na = { path = \"x\" }\n[wasm]\nexports = 5\n[dev-dependencies]\nzz = \"nonsense\"\ni = { path = \"x\" }\na = { path = \"y\" }\n";
+    let text = "name = \"u\"\n[dependencies]\na = { path = \"x\" }\n[wasm]\nexports = 5\n[dev-dependencies]\nzz = \"nonsense\"\nBad = { path = \"x\" }\na = { path = \"y\" }\n";
     let (m, diags) = parse_dependency_manifest(text);
     assert!(diags.is_empty(), "{diags:?}");
     let m = m.unwrap();
@@ -178,7 +180,7 @@ fn dependency_manifest_ignores_dev_dependencies_and_wasm() {
     );
     // The rest of a dependency's file is checked as before.
     assert_eq!(
-        parse_dependency_manifest("name = \"u\"\n[dependencies]\ni = { path = \"x\" }\n")
+        parse_dependency_manifest("name = \"u\"\n[dependencies]\nu = { path = \"x\" }\n")
             .1
             .iter()
             .map(|d| d.code)

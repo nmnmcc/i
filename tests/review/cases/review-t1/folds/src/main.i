@@ -1,5 +1,5 @@
 (
-	list = std/list
+	list = i/list
 )
 Box(A) = (value = A)
 rec = (n, acc) { n |> (0) { acc } & (_) { rec(n - 1, acc + 1) } }

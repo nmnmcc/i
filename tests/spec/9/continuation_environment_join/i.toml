@@ -1,3 +1,6 @@
 # spec: 9.2, 9.4, 11.4
 # expect: pass
 name = "reduced"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

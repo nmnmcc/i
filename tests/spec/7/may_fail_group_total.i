@@ -3,7 +3,7 @@
 
 // literal-types §5.3: deferred fitted failure in its own effect frame.
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 pair = (

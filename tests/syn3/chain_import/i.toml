@@ -1,3 +1,4 @@
 name = "syn3_chain_import"
 
 [dependencies]
+i = { path = "../../../stdlib" }

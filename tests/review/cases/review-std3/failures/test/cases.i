@@ -1,5 +1,5 @@
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
 	i/assertion
 )
@@ -12,7 +12,7 @@ adapter = (property : () <- (Assert) -> ()) <- (caller : Assert) -> () {
 		& (Error(failure)) {
 			caller.fail(
 				AssertionFailure(
-					message = "std/property v1: falsified\nseed: 0\nreason: " <>
+					message = "i/property v1: falsified\nseed: 0\nreason: " <>
 						failure.message,
 				),
 			)

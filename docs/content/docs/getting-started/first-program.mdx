@@ -14,25 +14,23 @@ made the package `hello` in `hello`
 run it with `i run --project hello`
 ```
 
-Put `i` on `PATH`. The command creates `i.toml`, `.gitignore`, `src/main.i`, `test/main_test.i`, and a copy of the standard library in `std/`; `i.toml` names that copy with `std = { path = "std" }` under `[dependencies]`, so the package needs no other source tree and stays portable when it moves.
+Put `i` on `PATH`. The command creates `i.toml`, `.gitignore`, `src/main.i`, and `test/main_test.i`, and nothing else:
 
-## The standard library copy
-
-The copy is 30 files, about 465 KiB: `std/i.toml`, `std/UNICODE-LICENSE`, and the sources under `std/src`. It is an ordinary path dependency, so you can read and change it like your own code.
-
-`.gitignore` lists only `/build/`, so `std/` is committed with the package and shipped by `i publish`. The copy keeps `std/UNICODE-LICENSE` and the copyright and licence notices in its source files; keep them when you redistribute the package.
-
-No command refreshes the copy: `i update` manages versioned dependencies, but `std/` is a plain directory. To move to a newer standard library, make a temporary package with the newer compiler and replace the directory:
-
-```sh
-i new refresh --path ../refresh
-rm -rf std
-cp -a ../refresh/std std
-rm -rf ../refresh
-i check
+```toml title="i.toml"
+name = "hello"
+[test]
+collection = "i/test.tests"
+[dependencies]
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 ```
 
-If the package itself is named `std`, its copy cannot use the dependency key `std`, because a package cannot depend on itself. `i new std` names the key `stdlib`, and code imports the copy as `stdlib/int`.
+## The standard library
+
+The standard library is the versioned package `i`, in the directory `stdlib` of the language's repository. `i new` names its newest version, `X.Y.Z` above, and copies none of its files into the package. The first command that loads the package gets that version and records it in `i.lock`; commit `i.lock` with the package. `collection = "i/test.tests"` registers the package's tests in the library's test collection, so `i test` finds them.
+
+`i update i` moves the package to the newest version of the library. `i publish` does not carry the library: a published package names its version, and each user gets it from the repository. To read a module, open its source under [stdlib/src](https://github.com/nmnmcc/i/tree/main/stdlib/src) in the repository, or the [library reference](/docs/library).
+
+The name `i` is reserved for the library: `i new i` is rejected. Any other name, `std` included, is an ordinary package name.
 
 ## Program
 
@@ -114,7 +112,7 @@ main = () <- (io : Io) { io.print(greeting("world")) }
 
 ```i test stdout=exact package=hello title="test/main_test.i"
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	hello/main
 )
 

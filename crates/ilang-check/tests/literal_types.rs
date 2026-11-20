@@ -1,4 +1,6 @@
 //! Interpretation checks: expectations come from literal-types, not snapshots.
+mod common;
+
 use ilang_check::types::Typed;
 
 fn check(source: &str) -> (Vec<(String, String)>, Vec<String>) {
@@ -7,14 +9,7 @@ fn check(source: &str) -> (Vec<(String, String)>, Vec<String>) {
 
 fn check_export(source: &str, export: bool) -> (Vec<(String, String)>, Vec<String>) {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(
-        dir.path().join("i.toml"),
-        format!(
-            "name = \"app\"\n[dependencies]\nstd = {{ path = {:?} }}\n",
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std")
-        ),
-    )
-    .unwrap();
+    std::fs::write(dir.path().join("i.toml"), common::manifest("app")).unwrap();
     if export {
         use std::io::Write;
         let mut f = std::fs::OpenOptions::new()
@@ -157,8 +152,8 @@ fn unknown_parts_and_all_hidden_input_directions_are_conservative() {
     // callback results, returned functions, environments and setters are hidden.
     let (ds, _) = check(
         r#"(
-	list = std/list
-	result = std/result
+	list = i/list
+	result = i/result
 )
 State(S) = (get = () -> S)
 cur = <S>(seed : S) <- (st : State(S)) { st.get() }
@@ -252,9 +247,8 @@ fn grouped_negatives_supply_the_same_written_group_facts() {
 #[test]
 fn shared_list_items_need_coverage_but_an_option_parameter_keeps_literals() {
     // Shared places get whole scalars; a once-occurring Some(A) keeps literals.
-    let (ds, lines) = check(
-        "(\n\t(Option, Some, None) = std/option\n)\nk = (Some(\"a\")) { 1 } & (None) { 2 }\n",
-    );
+    let (ds, lines) =
+        check("(\n\t(Option, Some, None) = i/option\n)\nk = (Some(\"a\")) { 1 } & (None) { 2 }\n");
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
         lines.iter().any(|l| l.contains("Option(\"a\")")),
@@ -642,7 +636,7 @@ fn everyday_disjoint_equalities_warn_without_widening() {
     for source in [
         "x = 1\nf = () { x == 2 }\n",
         "status = () { \"ok\" }\nf = () { status() == \"error\" }\n",
-        "(list = std/list)\nf = () { list.map([\"a\"], (x) { x == \"b\" }) }\n",
+        "(list = i/list)\nf = () { list.map([\"a\"], (x) { x == \"b\" }) }\n",
     ] {
         let (ds, lines) = check(source);
         assert_eq!(
@@ -667,7 +661,7 @@ fn everyday_disjoint_equalities_warn_without_widening() {
         }
     }
     let (ds, _) = check(
-        "(list = std/list)\nx = 1\nequal = (a, b) { a == b }\nstatus = () -> String { \"ok\" }\nf = () { (equal(x, 2), status() == \"error\", list.map([\"a\"], (x : String) { x == \"b\" })) }\n",
+        "(list = i/list)\nx = 1\nequal = (a, b) { a == b }\nstatus = () -> String { \"ok\" }\nf = () { (equal(x, 2), status() == \"error\", list.map([\"a\"], (x : String) { x == \"b\" })) }\n",
     );
     assert!(ds.is_empty(), "{ds:?}");
 }

@@ -1,4 +1,4 @@
 name = "http_server"
 
 [dependencies]
-std = { path = "../../std" }
+i = { path = "../../stdlib" }

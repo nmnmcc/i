@@ -9,10 +9,10 @@ Reads one path per line and prints {"rust": .., "docs": .., "editors": ..}
   rust     any file outside docs/ and editors/, and docs/spec.md (the Rust
            tests read it). Runs the Rust tests, the release build and every
            job that uses it (i, corpus, docs), and the JavaScript tests.
-  docs     a file under docs/, lib/ or std/ (the site and the generated
+  docs     a file under docs/, lib/ or stdlib/ (the site and the generated
            library pages). Runs the release build (the site's examples run
            with it) and the docs job.
-  editors  a file under editors/, lib/, std/ or examples/ (the tree-sitter
+  editors  a file under editors/, lib/, stdlib/ or examples/ (the tree-sitter
            queries parse those sources). Runs the editors job.
 
 A change to the workflow, the Devenv shell, ci/, scripts/ci/ or
@@ -40,8 +40,8 @@ def classify(paths):
         return any(path.startswith(d + '/') for d in dirs)
     return {
         'rust': any(p == 'docs/spec.md' or not under(p, 'docs', 'editors') for p in paths),
-        'docs': any(under(p, 'docs', 'lib', 'std') for p in paths),
-        'editors': any(under(p, 'editors', 'lib', 'std', 'examples') for p in paths),
+        'docs': any(under(p, 'docs', 'lib', 'stdlib') for p in paths),
+        'editors': any(under(p, 'editors', 'lib', 'stdlib', 'examples') for p in paths),
     }
 
 

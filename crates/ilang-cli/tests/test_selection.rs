@@ -13,8 +13,12 @@ fn package(files: &[(&str, &str)]) -> tempfile::TempDir {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
     }
-    if files.iter().any(|(_, source)| source.contains("std/test")) {
+    // Every package depends on the standard library `i`; one that uses
+    // `i/test` also collects its tests.
+    if files.iter().any(|(_, source)| source.contains("i/test")) {
         test_project::configure(dir.path());
+    } else {
+        test_project::depend_on_library(dir.path());
     }
     dir
 }
@@ -28,14 +32,14 @@ fn i(args: &[&str], project: &Path) -> std::process::Output {
         .unwrap()
 }
 
-/// A package with one passing test in `std/test.tests`.
+/// A package with one passing test in `i/test.tests`.
 fn tested() -> tempfile::TempDir {
     package(&[
         ("i.toml", "name = \"app\"\n"),
         ("src/lib.i", " (twice)\n\ntwice = (n : Int) { n * 2 }\n"),
         (
             "test/lib_test.i",
-            "(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { () } & (_) { panic(\"no\") } })\n",
+            "(\n\ttestlib = (test) = i/test\n\tapp/lib\n)\n\ntest(\"good\", () { lib.twice(2) |> (4) { () } & (_) { panic(\"no\") } })\n",
         ),
     ])
 }
@@ -52,13 +56,13 @@ fn set_collection(project: &Path, value: toml_edit::Item) {
 #[test]
 fn a_missing_collection_is_an_error_not_zero_tests() {
     let dir = tested();
-    set_collection(dir.path(), toml_edit::value("std/test.nothing"));
+    set_collection(dir.path(), toml_edit::value("i/test.nothing"));
     let out = i(&["test"], dir.path());
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{stdout}{stderr}");
     assert!(
-        stderr.contains("there is no test collection \"std/test.nothing\""),
+        stderr.contains("there is no test collection \"i/test.nothing\""),
         "{stderr}"
     );
     assert!(!stdout.contains("passed"), "{stdout}");
@@ -70,7 +74,7 @@ fn a_non_string_collection_is_rejected() {
     for (value, kind) in [
         (toml_edit::value(1), "integer"),
         (
-            toml_edit::value(toml_edit::Array::from_iter(["std/test.tests"])),
+            toml_edit::value(toml_edit::Array::from_iter(["i/test.tests"])),
             "array",
         ),
     ] {
@@ -106,7 +110,7 @@ fn the_configured_collection_still_runs_its_tests() {
 /// A package with five passing tests, `app/many_test.a` to `.e`, and a cost
 /// table that makes two shards of them.
 fn sharded() -> (tempfile::TempDir, std::path::PathBuf) {
-    let mut test = String::from("(\n\ttestlib = (test) = std/test\n\tapp/lib\n)\n");
+    let mut test = String::from("(\n\ttestlib = (test) = i/test\n\tapp/lib\n)\n");
     for name in ["a", "b", "c", "d", "e"] {
         test.push_str(&format!(
             "\ntest(\"{name}\", () {{ lib.twice(2) |> (4) {{ () }} & (_) {{ panic(\"no\") }} }})\n"

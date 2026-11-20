@@ -5,7 +5,7 @@ name = "probe"
 version = "0.1.0"
 
 [dependencies]
-std = { path = "../../../../std" }
+i = { path = "../../../../stdlib" }
 
 [entries]
 accept = "driver.main"

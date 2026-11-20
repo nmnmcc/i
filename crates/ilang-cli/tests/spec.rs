@@ -179,12 +179,18 @@ fn cases(root: &Path) -> Vec<(String, Result<Case, String>)> {
                             }
                         }
                         let dir = tempfile::tempdir().unwrap();
-                        let manifest = if text.contains("std/test") {
-                            let std_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../std");
-                            format!("name = \"spec\"\n[test]\ncollection = \"std/test.tests\"\n[dependencies]\nstd = {{ path = {:?} }}\n", std_path.to_str().unwrap())
+                        // Every root package depends on the standard library
+                        // `i`; a case that uses `i/test` also collects its tests.
+                        let library = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
+                        let collection = if text.contains("i/test") {
+                            "[test]\ncollection = \"i/test.tests\"\n"
                         } else {
-                            "name = \"spec\"\n".to_string()
+                            ""
                         };
+                        let manifest = format!(
+                            "name = \"spec\"\n{collection}[dependencies]\ni = {{ path = {:?} }}\n",
+                            library.to_str().unwrap()
+                        );
                         std::fs::write(dir.path().join("i.toml"), manifest).unwrap();
                         single_file::write(dir.path(), &stem, &text);
                         Case {

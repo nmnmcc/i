@@ -1,3 +1,6 @@
 # spec: 15.7 T5; typed macro typed t5 direct value type.
 # expect: compile-error E0531
 name = "spec"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

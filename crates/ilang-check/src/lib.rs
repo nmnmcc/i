@@ -189,14 +189,46 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
     for i in 0..graph.packages[root].modules.len() {
         queue.push_back((root, i));
     }
-    // The compiler's own library keeps all its modules parsed: its hints and
-    // its own tests see every module, and it is small. So does the `std`
-    // package of the current delivery model, whose modules supply repair
-    // advice; both become ordinary dependencies, filtered to the closure,
-    // once the library ships as the versioned package `i`.
-    for (package, p) in graph.packages.iter().enumerate() {
-        if package == graph.library || p.name == "std" {
-            for i in 0..p.modules.len() {
+    // The built-in package is only the prelude. The runtime and codegen
+    // modules live in the versioned package `i`, reached by module path.
+    for i in 0..graph.packages[graph.library].modules.len() {
+        queue.push_back((graph.library, i));
+    }
+    for path in ilang_package::library::RUNTIME
+        .iter()
+        .chain(CODEGEN_LIBRARY)
+    {
+        for package in 0..graph.packages.len() {
+            if let Some(&i) = index.get(&(package, *path)) {
+                queue.push_back((package, i));
+            }
+        }
+    }
+    // A test build needs the library's test collection module parsed so that
+    // its macros can install the collection entries.
+    let wants_tests = graph.packages[root]
+        .modules
+        .iter()
+        .any(|m| m.kind == ModuleKind::Test)
+        || graph.packages[root]
+            .manifest_source
+            .is_some_and(|source| graph.sources.get(source).text.contains("collection"));
+    if wants_tests {
+        for package in 0..graph.packages.len() {
+            if let Some(&i) = index.get(&(package, "i/test")) {
+                queue.push_back((package, i));
+            }
+        }
+    }
+    // A program that declares a host service in the standard Io namespace
+    // needs the library's `i/io` present to detect the conflict.
+    if graph.packages[root]
+        .modules
+        .iter()
+        .any(|m| graph.sources.get(m.source).text.contains("i:io/"))
+    {
+        for package in 0..graph.packages.len() {
+            if let Some(&i) = index.get(&(package, "i/io")) {
                 queue.push_back((package, i));
             }
         }
@@ -244,7 +276,11 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             }
         }
         if graph.sources.get(m.source).display.ends_with(".is") || has_macro(&parsed.ast) {
-            targets.push((graph.library, "i/syntax".to_string()));
+            for package in 0..graph.packages.len() {
+                if index.contains_key(&(package, "i/syntax")) {
+                    targets.push((package, "i/syntax".to_string()));
+                }
+            }
         }
         for (target, path) in targets {
             if let Some(&j) = index.get(&(target, path.as_str()))
@@ -293,9 +329,7 @@ fn import_package(
     first: &str,
 ) -> Option<PackageId> {
     let pkg = &graph.packages[from];
-    if first == "i" {
-        Some(graph.library)
-    } else if first == pkg.name {
+    if first == pkg.name {
         Some(from)
     } else if let Some((_, id)) = pkg.dependencies.iter().find(|(n, _)| n == first) {
         *id
@@ -317,7 +351,7 @@ fn has_macro(ast: &ast::Module) -> bool {
     })
 }
 
-fn parse_one(
+pub(crate) fn parse_one(
     graph: &PackageGraph,
     package: PackageId,
     m: &ilang_package::ModuleSource,
@@ -426,9 +460,7 @@ pub fn check_compiler_exports(
     let modules = (0..program.modules.len())
         .map(|i| hir::ModuleId(i as u32))
         .collect::<Vec<_>>();
-    for id in
-        macro_sandbox::foreign_externals(&program, graph.library, &modules, &program.host_exports)
-    {
+    for id in macro_sandbox::foreign_externals(&program, graph, &modules, &program.host_exports) {
         let def = program.def(id);
         diags.push(Diagnostic::error(
             code::COMPILER_CAPABILITY,

@@ -5,7 +5,7 @@ name = "numeric_loop"
 # to subtract.
 
 [dependencies]
-std = { path = "../../../std" }
+i = { path = "../../../stdlib" }
 numeric = { path = "../numeric" }
 
 [entries]

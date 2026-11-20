@@ -1,7 +1,7 @@
 // spec: 11.4
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 check = (ok : Bool, what : String) {

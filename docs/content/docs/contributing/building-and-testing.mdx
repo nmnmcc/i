@@ -7,8 +7,8 @@ Run a focused regression before choosing the wider checks for your change.
 
 ```i test stdout=exact package=checks title="test/bool_test.i"
 (
-	testlib = (test) = std/test
-	std/bool
+	testlib = (test) = i/test
+	i/bool
 )
 
 test("negation", () { assert(bool.not(True) == False) })
@@ -24,20 +24,20 @@ The docs runner supplies the manifest and compares this transcript at O0/O2. Rep
 ## Filtered tests
 
 ```sh
-"$I" test --project std --opt 0 std/bool_test.negate_true_test
+"$I" test --project stdlib --opt 0 i/bool_test.negate_true_test
 ```
 
 ```text
-pass std/bool_test.negate_true_test
+pass i/bool_test.negate_true_test
 1 passed, 0 failed
 ```
 
 ```sh
-"$I" test --project std --opt 2 std/bool_test.negate_true_test
+"$I" test --project stdlib --opt 2 i/bool_test.negate_true_test
 ```
 
 ```text
-pass std/bool_test.negate_true_test
+pass i/bool_test.negate_true_test
 1 passed, 0 failed
 ```
 
@@ -61,7 +61,7 @@ Product name: `The i Programming Language` when it stands alone (title, start of
 | --- | --- |
 | Checker | `cargo test -p ilang-check --locked` |
 | One spec case | `cargo test -p ilang-cli --test spec --locked -- a1_entry_exports` |
-| Source formatting | `"$I" fmt --check lib std bench examples` |
+| Source formatting | `"$I" fmt --check lib stdlib bench examples` |
 | Compiler formatting/lint | `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets --locked -- -D warnings` |
 | Snippets | `scripts/check-snippets`; `python3 -I scripts/check-snippets-test` |
 | Runtime smoke | `./scripts/wasi-smoke "$I"` |
@@ -70,7 +70,7 @@ Product name: `The i Programming Language` when it stands alone (title, start of
 | SDK/browser checks | `./scripts/checks js` |
 | Editor checks | `./scripts/checks editors` |
 
-`rust-lint` runs formatting, lint, and snippets; `rust-test` runs the tests; `rust` combines them. Other accepted parts are `snippets`, `i`, `js`, `editors`; no argument selects `rust i js editors`. The `i` part tests `std`, `examples/hello`, and `bench` at O0/O2, then smoke, corpus, and generated models. Smoke covers Wasmtime and Node; generated failures retain source/observations.
+`rust-lint` runs formatting, lint, and snippets; `rust-test` runs the tests; `rust` combines them. Other accepted parts are `snippets`, `i`, `js`, `editors`; no argument selects `rust i js editors`. The `i` part tests `stdlib`, `examples/hello`, and `bench` at O0/O2, then smoke, corpus, and generated models. Smoke covers Wasmtime and Node; generated failures retain source/observations.
 
 `CHECKS_TEST_GROUP=targets` with `CHECKS_TEST_TARGETS="ilang-check:lib ilang-cli:http"` makes `rust-test` run exactly those Cargo targets: `lib`, `bin`, `doc`, or a file of the crate's `tests/`, one `cargo test --no-fail-fast` per crate in the order given. This is how a planned test shard runs. The hand-written groups (`check-heavy`, `check`, `spec`, `spec-K/N`, `cli-heavy`, `cli`, `rest`) still work. `CHECKS_SHARD=K/N` makes the `i` part run shard K of N of the review corpus instead of all of it, and `CHECKS_SKIP_CORPUS=1` leaves the corpus out. `CHECKS_BUDGET` (seconds, default 270) is the shard budget handed to the shard tooling.
 

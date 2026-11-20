@@ -1,7 +1,7 @@
 // spec: 9.2, 14
 // expect: compile-error E0225
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 Db = (Int)
 read = () <- (db: Db) {

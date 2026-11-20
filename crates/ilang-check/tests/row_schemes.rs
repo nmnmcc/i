@@ -966,8 +966,8 @@ fn a_two_parameter_method_meet_depends_on_required_data() {
 fn shipped_stored_callback_types_keep_their_need_invariant() {
     // Stored callback needs remain invariant. Read the shipped
     // declarations, rather than a second copy that could miss a port bug.
-    let stream = include_str!("../../../std/src/stream.i");
-    let log = include_str!("../../../std/src/log.i");
+    let stream = include_str!("../../../stdlib/src/stream.i");
+    let log = include_str!("../../../stdlib/src/log.i");
     let declarations = stream
         .lines()
         .filter(|line| {

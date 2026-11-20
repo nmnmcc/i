@@ -1,6 +1,6 @@
 (
-	std/stream
-	std/log
+	i/stream
+	i/log
 )
 
 Read(A) = (read = () -> A)

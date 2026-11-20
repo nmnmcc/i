@@ -22,7 +22,7 @@ main = () <- (io : Io) {
 16
 ```
 
-Follow `bit_size` from [its declaration](https://github.com/nmnmcc/i/blob/main/lib/i/core.i), through `CORE` and `CORE_FUNCS` in [lower.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/lower.rs), to `$core_bit_size` in [runtime/core.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/runtime/core.rs); [runtime/tests.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/runtime/tests.rs) exercises it.
+Follow `bit_size` from [its declaration](https://github.com/nmnmcc/i/blob/main/stdlib/src/core.i), through `CORE` and `CORE_FUNCS` in [lower.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/lower.rs), to `$core_bit_size` in [runtime/core.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/runtime/core.rs); [runtime/tests.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-wasm/src/runtime/tests.rs) exercises it.
 
 ## Pipeline
 
@@ -48,7 +48,7 @@ Follow `bit_size` from [its declaration](https://github.com/nmnmcc/i/blob/main/l
 | --- | --- |
 | Package layout | [manifest.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-package/src/manifest.rs) and [modules.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-package/src/modules.rs). |
 | Diagnostic | `code` constants in `check/lib.rs`; `resolve.rs::module_of` emits `UNKNOWN_NAME` (E0201), span, and message. |
-| Library export | `std/src/bool.i::not` and `std/test/bool_test.i`. |
+| Library export | `stdlib/src/bool.i::not` and `stdlib/test/bool_test.i`. |
 | Formatting | [print.rs::data_item](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/print.rs) writes labelled fields; `data` selects layout. Follow `formatter_layout` in [syn3.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/tests/syn3.rs). |
 | Editor feature | [server.rs::hover](https://github.com/nmnmcc/i/blob/main/crates/ilang-lsp/src/server.rs) advertises/dispatches the request, uses [checker queries](https://github.com/nmnmcc/i/blob/main/crates/ilang-check/src/query.rs), and converts positions/ranges; [protocol.rs](https://github.com/nmnmcc/i/blob/main/crates/ilang-lsp/tests/protocol.rs) tests it. |
 | CLI or executable | [CLI main](https://github.com/nmnmcc/i/blob/main/crates/ilang-cli/src/main.rs) selects commands; [runner main](https://github.com/nmnmcc/i/blob/main/crates/ilang-runner/src/main.rs) starts native packages. `BuildOptions` and `Built` belong to the CLI library. |

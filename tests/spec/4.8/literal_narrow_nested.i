@@ -1,7 +1,7 @@
 // spec: 4.8, 7.4
 // expect: pass
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 )
 
 g = (s : String - "a") -> Int { 7 }

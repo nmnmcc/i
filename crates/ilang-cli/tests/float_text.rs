@@ -8,6 +8,19 @@ use ilang_host::{HostImports, HostOptions, Outcome, Program, Value};
 use ilang_wasm::{Numeric, Options};
 use num_bigint::BigInt;
 
+/// The `[dependencies]` table with the standard library `i` of this
+/// repository, which every root package needs (E0641).
+fn library_dependencies() -> String {
+    let library = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../stdlib")
+        .canonicalize()
+        .unwrap();
+    format!(
+        "[dependencies]\ni = {{ path = {:?} }}\n",
+        library.to_str().unwrap()
+    )
+}
+
 // Fixed presentations, with hexadecimal IEEE encodings for subnormal
 // endpoints and the neighbours of 1, and each side of every limit of the
 // long form of a Float.
@@ -181,7 +194,10 @@ fn programs() -> Vec<(u8, Program)> {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        "name = \"text\"\n[wasm]\nexports = [\"text/main.show\", \"text/main.nested\"]\n",
+        format!(
+            "name = \"text\"\n[wasm]\nexports = [\"text/main.show\", \"text/main.nested\"]\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::write(

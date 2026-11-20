@@ -9,6 +9,7 @@ Build a native executable, a WASI command, or a module for an embedding host.
 name = "guide_build"
 
 [dependencies]
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 ```
 
 ```i run package=guide_build title="src/main.i"
@@ -89,19 +90,19 @@ build/guide_host.wasm
 
 Keep the binding-plan sidecar for hosts authorizing its declarations. The host ABI and WASI command use different entry protocols; the Node SDK loads host modules in the [interop guide](/docs/guides/js-and-wasi-interop). `--out` preserves both artifacts; otherwise Wasm targets overwrite `build/<package-name>.wasm`.
 
-## Local dependencies
+## Dependencies
 
 ```toml file=i.toml title="i.toml"
 name = "guide_build"
 
 [dependencies]
-std = { path = "../std" }
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 ```
 
 ```i run package=guide_build title="src/main.i"
 (
 	i/stdio
-	std/int
+	i/int
 )
 
 main = () { stdio.print(int.to_string(42)) }
@@ -111,17 +112,17 @@ main = () { stdio.print(int.to_string(42)) }
 42
 ```
 
-Paths are relative to `i.toml`; `i.lock` leaves local contents unpinned. Located dependencies use git tags `vmajor.minor.patch`; minimal version selection chooses the highest reached requirement per package and major version, so publishing a tag alone changes no requirements.
+The standard library is a located dependency like any other: the package `stdlib` of the language's repository, tagged `stdlib-vX.Y.Z`. `i update i` moves to its newest version, and `i publish` does not carry it. Path dependencies are relative to `i.toml`, and `i.lock` leaves their contents unpinned. Located dependencies use git tags `vmajor.minor.patch` (`<dir>-vmajor.minor.patch` for a package in a directory of its repository); minimal version selection chooses the highest reached requirement per package and major version, so publishing a tag alone changes no requirements.
 
 ## Lock records
 
 ```sh
-i check --offline
-test ! -f i.lock && echo 'no lock records'
+i check
+cut -d' ' -f1,2 i.lock
 ```
 
 ```text
-no lock records
+github.com/nmnmcc/i//stdlib X.Y.Z
 ```
 
 For located dependencies, commit `i.toml` and `i.lock` together: records contain location, version, commit, and a `sha256-` hash over sorted paths, lengths, and committed bytes. Records include every manifest reached in normal or test configuration, even if a higher version compiles. The loader checks cached files and consumes that snapshot, rejecting changed tags or mismatches.
