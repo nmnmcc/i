@@ -23,9 +23,10 @@ TOKEN = re.compile(
     r'(?:(?<![\w/.-])|(?<=\./))(' + '|'.join(ROOTS) + r')/[A-Za-z0-9_./{},*<>-]+'
 )
 SKIP_LINE = re.compile(r'^\s*(?:import|export|use|mod)\b')
+# Reference-repository paths that start like ours.
+EXTERNAL = ('lib/elixir/', 'lib/module/', 'lib/Parse/', 'lib/src/')
 # Removed files still cited on purpose: a note other notes cite by line, the
-# pinned lane/b snapshot, and rows that record a deletion. Paths under lib/
-# that are not lib/i or lib/prelude.i belong to reference repositories.
+# pinned lane/b snapshot, and rows that record a deletion.
 REMOVED = {
     'docs/design/runtime.md',
     'lib/i/task.i',
@@ -79,7 +80,7 @@ def check_file(root, path):
             candidates = expand(token)
             if not candidates:
                 continue
-            if token.startswith('lib/') and not token.startswith(('lib/i', 'lib/prelude.i')):
+            if token.startswith(EXTERNAL):
                 continue
             found = False
             for candidate in candidates:
