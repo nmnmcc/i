@@ -317,16 +317,23 @@ test("timeout_bad_deadline_test", () {
 // is cancelled, its final runs, and the clock error comes back.
 test("timeout_clock_failure_test", () {
 	released = task.ref(False)
-	(r, elapsed) = time.measure(() {
-		fail.catch(() {
-			time.timeout(time.milliseconds(20), () {
-				resource.ensure(() { late() }, () { task.set(released, True) })
+	{
+		(r, elapsed) = time.measure(() {
+			fail.catch(() {
+				time.timeout(time.milliseconds(20), () {
+					resource.ensure(
+						() { late() },
+						() { task.set(released, True) },
+					)
+				})
 			})
 		})
-	})
-	assert(r == Error(clock.ClockError(operation = "sleep_ns", code = "boom")))
-	assert(task.get(released))
-	// Bounded, not exact: this path must not depend on the body ending.
-	assert(time.to_nanoseconds(elapsed) < 5000000000)
-	()
+		assert(
+			r == Error(clock.ClockError(operation = "sleep_ns", code = "boom")),
+		)
+		assert(task.get(released))
+		// Bounded, not exact: this path must not depend on the body ending.
+		assert(time.to_nanoseconds(elapsed) < 5000000000)
+		()
+	} <- (broken_clock)
 })

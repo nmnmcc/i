@@ -175,7 +175,7 @@ Timeout = (after = Duration)
 BadDeadline = (after = Duration)
 
 /// The largest deadline `timeout` accepts, in nanoseconds: 2^63 - 1.
-max_timeout = (9223372036854775807)
+max_timeout = 9223372036854775807
 
 /// What the race below gives: the body's value, the deadline, or a clock
 /// that could not install the timer.
