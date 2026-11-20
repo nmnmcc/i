@@ -44,6 +44,7 @@
 	sync
 	share
 	get
+	set
 	ref
 	update
 	both
@@ -3841,6 +3842,15 @@ share = <A, E>(s : Group(E), value : A) <- (own : Scheduler) -> Shared(A) {
 
 get = <A>(s : Shared(A)) <- (own : Scheduler) -> A {
 	read(s.values, ask(own, GetShare(s.run, s.owner, s.id)))
+}
+	& <A>(r : Ref(A)) <- (own : Scheduler) -> A {
+		read(r.values, ask(own, GetShare(r.run, r.id, r.id)))
+	}
+
+/// Replaces the value of a ref atomically.
+set = <A>(r : Ref(A), value : A) <- (own : Scheduler) -> () {
+	_ = update(r, (_ : A) { (value, ()) })
+	()
 }
 
 keep = <S, A, E, N>(
