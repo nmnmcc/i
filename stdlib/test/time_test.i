@@ -239,11 +239,14 @@ test("timeout_body_wins_test", () {
 // flag, and the flag must be set by the time `timeout` returns: that is R5's
 // "return only after their finals end", observed.
 test("timeout_timer_wins_test", () {
-	released = task.ref(False)
+	released = task.ref(False())
 	(r, elapsed) = time.measure(() {
 		fail.catch(() {
 			time.timeout(time.milliseconds(20), () {
-				resource.ensure(() { late() }, () { task.set(released, True) })
+				resource.ensure(
+					() { late() },
+					() { task.set(released, True()) },
+				)
 			})
 		})
 	})
@@ -255,24 +258,24 @@ test("timeout_timer_wins_test", () {
 })
 
 test("timeout_expired_test", () {
-	ran = task.ref(False)
+	ran = task.ref(False())
 	{
 		zero = fail.catch(() {
 			time.timeout(time.nanoseconds(0), () {
-				task.set(ran, True)
+				task.set(ran, True())
 				1
 			})
 		})
 		assert(zero == Error(time.Timeout(after = time.nanoseconds(0))))
 		negative = fail.catch(() {
 			time.timeout(time.nanoseconds(-5), () {
-				task.set(ran, True)
+				task.set(ran, True())
 				1
 			})
 		})
 		assert(negative == Error(time.Timeout(after = time.nanoseconds(-5))))
 		// A zero or negative duration never starts the body and never sleeps.
-		assert(task.get(ran) == False)
+		assert(task.get(ran) == False())
 		()
 	} <- (unused_clock)
 })
@@ -291,18 +294,18 @@ test("timeout_body_error_test", () {
 })
 
 test("timeout_bad_deadline_test", () {
-	ran = task.ref(False)
+	ran = task.ref(False())
 	too_big = time.nanoseconds(9223372036854775808)
 	{
 		r = fail.catch(() {
 			time.timeout(too_big, () {
-				task.set(ran, True)
+				task.set(ran, True())
 				1
 			})
 		})
 		assert(r == Error(time.BadDeadline(after = too_big)))
 		// The body never starts.
-		assert(task.get(ran) == False)
+		assert(task.get(ran) == False())
 		()
 	} <- (unused_clock)
 })

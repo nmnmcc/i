@@ -81,18 +81,18 @@ Pattern = Fixed | Exponential
 Delay = (pattern = Pattern, spread = time.Duration, seed = Int)
 
 _smaller = (a : Int, b : Int) -> Int {
-	{ a < b } |> (True) { a } & (False) { b }
+	{ a < b } |> (True()) { a } & (False()) { b }
 }
 
 _larger = (a : Int, b : Int) -> Int {
-	{ a > b } |> (True) { a } & (False) { b }
+	{ a > b } |> (True()) { a } & (False()) { b }
 }
 
 // `current * factor^steps`, stopping as soon as it reaches `cap`.
 _grow = (current : Int, factor : Int, steps : Int, cap : Int) -> Int {
 	{ steps <= 0 || current >= cap } |>
-		(True) { _smaller(current, cap) }
-		& (False) { _grow(current * factor, factor, steps - 1, cap) }
+		(True()) { _smaller(current, cap) }
+		& (False()) { _grow(current * factor, factor, steps - 1, cap) }
 }
 
 // The base delay before attempt `attempt`, in nanoseconds.
@@ -112,8 +112,8 @@ _base_ns = (pattern : Pattern, attempt : Int) -> Int {
 // The jitter offset for attempt `attempt`, in [-spread_ns, spread_ns].
 _offset_ns = (spread_ns : Int, seed : Int, attempt : Int) -> Int {
 	{ spread_ns <= 0 } |>
-		(True) { 0 }
-		& (False) {
+		(True()) { 0 }
+		& (False()) {
 			drawn = fail.catch(() {
 				(u, _) = rng.int(
 					rng.from_seed(seed + attempt),
@@ -160,8 +160,8 @@ _retry_from = <A, E, N>(
 		(Ok(value)) { value }
 		& (Error(error)) {
 			{ left <= 0 } |>
-				(True) { fail.raise(error) }
-				& (False) {
+				(True()) { fail.raise(error) }
+				& (False()) {
 					_sleep_before(delay, attempt)
 					_retry_from(left - 1, attempt + 1, delay, step)
 				}
@@ -202,8 +202,8 @@ retry = (times : Int, delay : Delay, step) {
 _repeat_from = (left : Int, attempt : Int, delay : Delay, step) {
 	_ = step()
 	{ left <= 1 } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			_sleep_before(delay, attempt)
 			_repeat_from(left - 1, attempt + 1, delay, step)
 		}
@@ -234,6 +234,6 @@ _repeat_from = (left : Int, attempt : Int, delay : Delay, step) {
 /// ```
 repeat = (times : Int, delay : Delay, step) {
 	{ times <= 0 } |>
-		(True) { () }
-		& (False) { _repeat_from(times, 0, delay, step) }
+		(True()) { () }
+		& (False()) { _repeat_from(times, 0, delay, step) }
 }
