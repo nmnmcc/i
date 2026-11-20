@@ -102,7 +102,7 @@ test("a fake clock", () {
 	{
 		assert(app.remaining(42) == 2)
 		expired = fail.catch(() { app.remaining(30) })
-		assert(expired == Error(app.Late))
+		assert(expired == Error(app.Late()))
 	} <- (Clock(now = () { 40 }))
 })
 ```

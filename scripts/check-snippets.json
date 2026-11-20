@@ -2011,20 +2011,7 @@
       "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
     ]
   },
-  "tests/review/cases/review-runtime/echo-types/src/task.i:16a58a0b7110f7a2": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters",
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
   "tests/review/cases/review-s6/probe/src/main.i:85c0687292ba6d00": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
-  "tests/review/cases/review-std1/factory/src/main.i:8c2864b9c5f6d54d": {
     "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
@@ -2207,13 +2194,6 @@
         "arg0"
       ]
     ]
-  },
-  "tests/review/cases/review-std1/tree/src/main.i:a94708754e53b03e": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ],
-    "substitutions": []
   },
   "tests/spec/4.6/written_poly_union_arity.i:003471a33db290d6": {
     "track": true,
@@ -3250,5 +3230,25 @@
   },
   "crates/ilang-syntax/examples/constructor-sites.rs:a97c99df48a9bbf6": {
     "not_source": "the tool's output protocol, not i source"
+  },
+  "tests/review/cases/review-runtime/echo-types/src/task.i:9c40e2df6883c033": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/factory/src/main.i:b5f83635540b9186": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/tree/src/main.i:a07f1eebf4dc561b": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ],
+    "substitutions": []
   }
 }

@@ -14,7 +14,7 @@ from corpus import ROOT, CORPUS, dump, git, invoke, sha
 VALUES = ['a', 'ab', 'b', 'c', '']
 # T1 review fuzz.py's finite domain and eight string predicates, represented as data.
 PATTERNS = ['"a"', '"ab"', '"b"', "_ : String - \"a\"", "_ : String - \"ab\" - \"b\"", '"a" <> _', '_', "_ : { \"a\" | \"b\" }"]
-BOOLS = ['True', 'False', '_']
+BOOLS = ['True()', 'False()', '_']
 RULES = {
     'coverage': 'docs/spec.md §7.4: A branch with a guard is not counted.',
     'runtime': 'docs/spec.md §6.12: the first branch whose parameter group matches the data and whose guard, if it has one, is True is taken',
@@ -54,7 +54,7 @@ def evaluate(rows):
 def literal_match(domain, rows):
     # §6.12: a match passes its subject in one position, including a pair.
     branches = '\n& '.join(f'(({PATTERNS[p]}, {BOOLS[q]})' +
-                           (' ? False' if guard else '') + f') {{ {i} }}'
+                           (' ? False()' if guard else '') + f') {{ {i} }}'
                            for i, (p, q, guard) in enumerate(rows))
     return f'f = (x : {domain}) {{ x |>\n{branches}\n}}'
 
@@ -67,12 +67,12 @@ def literal_case(seed, *, value_types, rng=None):
     domain = '("a" | "ab" | "b" | "c" | "", Bool)'
     declarations = []
     if value_types:
-        declarations += [f'domain : {domain} = ("a", True)', 'Input = domain']
+        declarations += [f'domain : {domain} = ("a", True())', 'Input = domain']
         domain = 'Input'
     declarations.append(f'pass = (x : {domain}) -> {domain} {{ x }}')
     declarations.append(literal_match(domain, rows))
     if covered:
-        assertions = '\n'.join(f'  assert(f(pass(({json.dumps(v)}, {str(b)}))) == {i})' for (v, b), i in expected.items())
+        assertions = '\n'.join(f'  assert(f(pass(({json.dumps(v)}, {"True()" if b else "False()"}))) == {i})' for (v, b), i in expected.items())
         declarations.append('main = () {\n' + assertions + '\n  ()\n}')
     return {'name': ('literal-value-guard-' if value_types else 't1-finite-') + str(seed),
             'declarations': declarations, 'accept': covered, 'rows': rows,
