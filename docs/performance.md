@@ -1331,3 +1331,26 @@ mixed union, depth over the cap); float boundaries (`-0.0 == 0.0`,
 `0.1 +. 0.2 != 0.3`); and a stop case showing that a NaN cannot become a
 Float value, so `NaN == NaN` is unreachable rather than defined. The full CI
 gate passes, and corpus output is unchanged at O0 and O2.
+## `list.sort`: one list cell per element per merge level (2026-11-20)
+
+The merge built each output element twice: a cons into the accumulator, then a
+cons again in `reverse_onto`. `sort` now alternates the merge direction by
+level. Ascending runs are merged into a descending run and descending runs into
+an ascending run; both write one cons per element and need no per-level
+reverse. Only a carried run and a final descending level pay for one reverse.
+The sorting order and stability are unchanged; `sort_stability_test` and the
+new `sort_stability_many_test` pin equal keys in their original order.
+
+Method: release `i` from this commit, `i test --project bench --opt {0,2}
+--time`, five alternating rounds (old/new rotated), median wall seconds, one
+process at a time pinned to four CPUs. Same machine, same run.
+
+| Benchmark | `--opt 0` before | `--opt 0` after | `--opt 2` before | `--opt 2` after |
+|---|---:|---:|---:|---:|
+| `list_sort` | 4.913 | 3.776 (-23%) | 1.609 | 1.100 (-32%) |
+| `list_merge` | 1.233 | 1.242 (+1%) | 0.707 | 0.728 (+3%) |
+| `dict_insert` | 1.086 | 1.090 (0%) | 0.840 | 0.899 (+7%) |
+
+`list_merge` and `dict_insert` do not use `sort`; their differences are run
+noise (individual `dict_insert` `--opt 2` runs ranged 0.78-0.97). The change is
+confined to `sort`'s merge.

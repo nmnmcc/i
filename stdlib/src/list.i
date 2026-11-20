@@ -597,7 +597,9 @@ unique = <A>(list : List(A)) -> List(A) {
 
 /// Sorts the elements with a compare function. The sort is stable: equal
 /// elements keep their order. It is a merge sort, which takes O(n log n)
-/// steps, and which starts from the runs that are already in order.
+/// steps, and which starts from the runs that are already in order. Each
+/// merge level writes each element once: the direction alternates, so a
+/// level needs no reverse of its output.
 ///
 /// ```i
 /// list.sort([3, 1, 2], int.compare)  // [1, 2, 3]
@@ -659,42 +661,102 @@ descending = <A, N>(
 		}
 }
 
-merge_all = <A, N>(runs : List(List(A)), by : (A, A) <- N -> Order) -> List(A) {
-	runs |>
-		([]) { [] }
-		& ([run]) { run }
-		& (_) { merge_all(merge_pairs(runs, by, []), by) }
+// The direction of a level's runs. Merging ascending runs gives descending
+// runs, and merging descending runs gives ascending runs. A merge builds one
+// cell per element and needs no reverse; only a carried run and a final
+// descending level pay for a reverse.
+Ascending = ()
+Descending = ()
+Direction = Ascending | Descending
+
+flip = (dir : Direction) -> Direction {
+	dir |> (Ascending) { Descending } & (Descending) { Ascending }
 }
 
-merge_pairs = <A, N>(
+merge_all = <A, N>(runs : List(List(A)), by : (A, A) <- N -> Order) -> List(A) {
+	runs |> ([]) { [] } & ([run]) { run } & (_) { rounds(runs, Ascending, by) }
+}
+
+rounds = <A, N>(
 	runs : List(List(A)),
+	dir : Direction,
+	by : (A, A) <- N -> Order
+) -> List(A) {
+	runs |>
+		([]) { [] }
+		& ([run]) { dir |> (Ascending) { run } & (Descending) { reverse(run) } }
+		& (_) { rounds(next_round(runs, dir, by, []), flip(dir), by) }
+}
+
+next_round = <A, N>(
+	runs : List(List(A)),
+	dir : Direction,
 	by : (A, A) <- N -> Order,
 	acc : List(List(A))
 ) -> List(List(A)) {
 	runs |>
 		([]) { reverse(acc) }
-		& ([run]) { reverse([run, ..acc]) }
+		& ([run]) { reverse([flip_run(run), ..acc]) }
 		& ([a, b, ..rest]) {
-			merge_pairs(rest, by, [merge(a, b, by, []), ..acc])
+			next_round(rest, dir, by, [merge_pair(a, b, dir, by), ..acc])
 		}
 }
 
-// Merges two sorted lists. On a tie, the element of `xs` comes first.
-merge = <A, N>(
+// A run that goes on to the next level is put in the opposite direction.
+flip_run = <A>(run : List(A)) -> List(A) { reverse(run) }
+
+merge_pair = <A, N>(
+	xs : List(A),
+	ys : List(A),
+	dir : Direction,
+	by : (A, A) <- N -> Order
+) -> List(A) {
+	dir |>
+		(Ascending) { merge_down(xs, ys, by, []) }
+		& (Descending) { merge_up(xs, ys, by, []) }
+}
+
+// Ascending runs to a descending run. The smaller item is taken first, so
+// the picked items go up and the consed cells go down; an equal pair takes
+// the item of `xs`, which keeps equal items in their original order after
+// the final reverse.
+merge_down = <A, N>(
 	xs : List(A),
 	ys : List(A),
 	by : (A, A) <- N -> Order,
 	acc : List(A)
 ) -> List(A) {
 	xs |>
-		([]) { reverse_onto(acc, ys) }
+		([]) { reverse_onto(ys, acc) }
 		& ([x, ..xs2]) {
 			ys |>
-				([]) { reverse_onto(acc, xs) }
+				([]) { reverse_onto(xs, acc) }
 				& ([y, ..ys2]) {
 					by(x, y) |>
-						(Greater) { merge(xs, ys2, by, [y, ..acc]) }
-						& (_) { merge(xs2, ys, by, [x, ..acc]) }
+						(Greater) { merge_down(xs, ys2, by, [y, ..acc]) }
+						& (_) { merge_down(xs2, ys, by, [x, ..acc]) }
+				}
+		}
+}
+
+// Descending runs to an ascending run. The larger item is taken first, so
+// the picked items go down and the consed cells go up; an equal pair takes
+// the item of `ys`, which keeps equal items in their original order.
+merge_up = <A, N>(
+	xs : List(A),
+	ys : List(A),
+	by : (A, A) <- N -> Order,
+	acc : List(A)
+) -> List(A) {
+	xs |>
+		([]) { reverse_onto(ys, acc) }
+		& ([x, ..xs2]) {
+			ys |>
+				([]) { reverse_onto(xs, acc) }
+				& ([y, ..ys2]) {
+					by(x, y) |>
+						(Greater) { merge_up(xs2, ys, by, [x, ..acc]) }
+						& (_) { merge_up(xs, ys2, by, [y, ..acc]) }
 				}
 		}
 }
