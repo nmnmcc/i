@@ -112,14 +112,17 @@ def main():
     for pattern in DOCS:
         files.extend(sorted(root.glob(pattern)))
     errors = []
+    checked = 0
     for path in files:
-        if path.is_file():
-            errors.extend(check_file(root, path))
+        if not path.is_file() or {'node_modules', 'dist', '.astro'} & set(path.parts):
+            continue
+        checked += 1
+        errors.extend(check_file(root, path))
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         print(f'{len(errors)} documented source paths do not exist.', file=sys.stderr)
         return 1
-    print(f'Documented source paths checked in {len(files)} files.')
+    print(f'Documented source paths checked in {checked} files.')
     return 0
 
 

@@ -45,6 +45,12 @@ def main():
         result = run(root)
         assert result.returncode == 0, result.stderr
 
+        # Installed modules are not ours to check.
+        (root / 'docs' / 'node_modules' / 'x').mkdir(parents=True)
+        (root / 'docs' / 'node_modules' / 'x' / 'README.md').write_text('`crates/elsewhere/lib.rs`\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
         # The mistake this exists for: a path that no longer exists fails,
         # and names the file and the path.
         write(root, 'Moved: `crates/gone/src/lib.rs`.\n')
