@@ -356,15 +356,6 @@ fn is_upper(name: &str) -> bool {
     name.chars().next().is_some_and(char::is_uppercase)
 }
 
-/// A name the formatter writes with its call (`True()`): one of the two
-/// prelude constructors. Their data is `()` by definition. A user
-/// constructor's arity is not knowable from the syntax tree, so a bare
-/// UpName elsewhere is left alone: it is either a value of a payload
-/// constructor (the constructor function) or already a call.
-pub(crate) fn is_constructor(name: &str) -> bool {
-    matches!(name, "True" | "False")
-}
-
 fn qualified(module: &Option<Ident>, name: &Ident) -> String {
     match module {
         Some(m) => format!("{}.{}", m.name, name.name),
@@ -959,9 +950,6 @@ impl Printer<'_> {
                 s.push('"');
                 t(s)
             }
-            ExprKind::Name { module, name } if is_constructor(&name.name) => {
-                cat(vec![t(qualified(module, name)), t("()")])
-            }
             ExprKind::Name { module, name } => t(qualified(module, name)),
             ExprKind::Data(items) => self.data(items, false),
             ExprKind::List { items, rest } => {
@@ -1186,7 +1174,6 @@ impl Printer<'_> {
                 let mut out = vec![t(qualified(module, name))];
                 match args {
                     Some(args) => out.push(self.data_pattern(args)),
-                    None if is_constructor(&name.name) => out.push(self.data_pattern(&[])),
                     None => {}
                 }
                 cat(out)

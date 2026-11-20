@@ -58,7 +58,7 @@ main = () {
 			Error(
 				process.ProcessError(
 					operation = "env",
-					reason = process.NotFound,
+					reason = process.NotFound(),
 					code = "not_found",
 				),
 			),

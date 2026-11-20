@@ -454,10 +454,10 @@ fn show_as_writes_every_row_in_its_position() {
         (
             Expression,
             "(|> opt (& (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\") (-> (, (Some v)) _ v) (-> (, None) _ \"none\")))",
-            "opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None()) { \"none\" }",
+            "opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" }",
         ),
         (Expression, "(. a b)", "a.b"),
-        (Expression, "(. m C)", "m.C()"),
+        (Expression, "(. m C)", "m.C"),
         (Expression, "(. pair 0)", "pair.0"),
         (Expression, "[a b .. rest]", "[a, b, ..rest]"),
         (
@@ -481,7 +481,7 @@ fn show_as_writes_every_row_in_its_position() {
         (Pattern, "(, p1 (= x p2))", "(p1, x = p2)"),
         (Pattern, "(, p ..)", "(p, ..)"),
         (Pattern, "(, p .. r)", "(p, ..r)"),
-        (Pattern, "C", "C()"),
+        (Pattern, "C", "C"),
         (Pattern, "(C p1 (= x p2))", "C(p1, x = p2)"),
         (Pattern, "(C p ..)", "C(p, ..)"),
         (Pattern, "((. m C) p)", "m.C(p)"),

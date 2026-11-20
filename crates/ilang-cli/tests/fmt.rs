@@ -242,6 +242,23 @@ fn the_new_constructor_form_round_trips_unchanged() {
 }
 
 #[test]
+fn a_bare_constructor_value_keeps_its_meaning() {
+    // `True` is the function value and `True()` is its value; formatting is
+    // layout, so neither changes. In particular the formatter never decides
+    // that a name should have been a call.
+    let source = "f = True\ng = True()\nmain = () { () }\n";
+    let dir = package(&[("src/main.i", source)]);
+    let out = fmt(&[], dir.path());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(read(dir.path(), "src/main.i"), source);
+    assert!(fmt(&["--check"], dir.path()).status.success());
+}
+
+#[test]
 fn conversion_to_lisp_writes_constructor_values_as_calls() {
     let source = "x = True()\ny = Some(1)\nf = (b : Bool) -> Int { b |> (True()) { 1 } & (False()) { 0 } }\n";
     let dir = package(&[("src/main.i", source)]);
@@ -265,11 +282,18 @@ fn conversion_to_lisp_writes_constructor_values_as_calls() {
 }
 
 #[test]
-fn lisp_constructor_values_are_written_as_calls() {
+fn lisp_constructor_values_are_printed_as_written() {
+    // A constructor is a function, so a bare name is a value: the formatter
+    // prints a name as the source has it and never adds a call. `(= x True)`
+    // stays the function, `(True x)` is the call it was, and a type is not a
+    // constructor.
     let source = "(= First (,))\n\n(= f (-> (, (= a Int) (: b Bool)) Bool {(= x True) (= y (True x)) (= z (. m Some)) (|> a (& (-> (, Int) _ False) (-> (, True) _ True)))}))\n";
     let pretty = ilang_syntax::lisp::format(source).unwrap();
     assert!(pretty.contains("(= First (,))"), "{pretty}");
-    assert!(pretty.contains("(= x (True))"), "{pretty}");
+    assert!(
+        pretty.contains("(= x True)") && !pretty.contains("(= x (True))"),
+        "a bare name is a value, not a call: {pretty}"
+    );
     assert!(
         pretty.contains("(True x)") && !pretty.contains("((True)"),
         "{pretty}"
@@ -287,7 +311,7 @@ fn lisp_constructor_values_are_written_as_calls() {
         "a type is not a constructor: {pretty}"
     );
     assert!(
-        pretty.contains("(-> (, Int) _ (False))") && pretty.contains("(-> (, (True)) _ (True))"),
+        pretty.contains("(-> (, Int) _ False)") && pretty.contains("(-> (, True) _ True)"),
         "{pretty}"
     );
     assert_eq!(ilang_syntax::lisp::format(&pretty).unwrap(), pretty);
@@ -296,3 +320,4 @@ fn lisp_constructor_values_are_written_as_calls() {
     assert_eq!(read(dir.path(), "src/main.is"), pretty);
     assert!(fmt(&["--check"], dir.path()).status.success());
 }
+

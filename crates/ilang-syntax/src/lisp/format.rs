@@ -15,52 +15,14 @@ use super::{Datum, DatumKind as K};
 use crate::Diagnostic;
 use crate::format::WIDTH;
 use crate::lexer::Comment;
-use crate::print::is_constructor;
 use crate::token::Token;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::rc::Rc;
 
-/// The spans of the constructors the reader read without their call: a
-/// constructor value (`True`, `(. m True)`) and a constructor pattern without
-/// arguments. A builtin type name is not a constructor. Only these are written
-/// with their call: an UpName elsewhere (a type, a type definition) is not a
-/// function.
-pub(super) fn constructors(module: &mut crate::ast::Module) -> HashSet<(u32, u32)> {
-    use crate::ast::{Expr, ExprKind, Pattern, PatternKind};
-    struct Collect(HashSet<(u32, u32)>);
-    impl crate::walk::Visitor for Collect {
-        fn expr(&mut self, e: &mut Expr, enter: bool) {
-            if enter
-                && let ExprKind::Name { name, .. } = &e.kind
-                && is_constructor(&name.name)
-            {
-                self.0.insert((e.span.0.start, e.span.0.end));
-            }
-        }
-        fn pattern(&mut self, p: &mut Pattern, enter: bool) {
-            if enter
-                && let PatternKind::Ctor {
-                    name, args: None, ..
-                } = &p.kind
-                && is_constructor(&name.name)
-            {
-                self.0.insert((p.span.0.start, p.span.0.end));
-            }
-        }
-    }
-    let mut out = Collect(HashSet::new());
-    crate::walk::module(module, &mut out);
-    out.0
-}
-
-pub(super) fn format(
-    source: &str,
-    constructors: &HashSet<(u32, u32)>,
-) -> Result<String, Vec<Diagnostic>> {
+pub(super) fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     let document = super::parse(source)?;
     let lexed = crate::lexer::lex_lisp(source);
     let mut builder = Builder {
-        constructors,
         source,
         comments: &lexed.comments,
         tokens: &lexed.tokens,
@@ -72,7 +34,7 @@ pub(super) fn format(
     let mut after_group = false;
     for datum in document.iter() {
         builder.top_gap(end, datum.span.start, after_group, &mut top);
-        let id = builder.datum(datum, false);
+        let id = builder.datum(datum);
         top.push(Item::Datum(id));
         end = datum.span.end;
         after_group = matches!(&datum.kind, K::Round(parts)
@@ -154,8 +116,6 @@ enum Node {
 }
 
 struct Builder<'a> {
-    /// The spans of the datums written with their call ([`constructors`]).
-    constructors: &'a HashSet<(u32, u32)>,
     source: &'a str,
     comments: &'a [Comment],
     tokens: &'a [Token],
@@ -258,36 +218,8 @@ impl Builder<'_> {
         self.nodes.len() - 1
     }
 
-    /// A constructor value or pattern without arguments ([`constructors`])
-    /// is a function, written with its call: where `wrap` holds, a bare
-    /// `True` is printed `(True)` and a qualified `(. m True)` is printed
-    /// `((. m True))`. `wrap` does not hold for the head of a round list, the
-    /// name bound by `=` (a binding or a type definition), the parts of a
-    /// `.` form, or a top-level form.
-    fn datum(&mut self, datum: &Datum, wrap: bool) -> usize {
-        let id = self.unwrapped(datum);
-        let named = match &datum.kind {
-            K::UpName(_) => true,
-            K::Round(xs) => {
-                matches!(xs.first().map(|d| &d.kind), Some(K::Symbol(s)) if s == ".")
-                    && matches!(xs.get(2).map(|d| &d.kind), Some(K::UpName(_)))
-                    && xs.len() == 3
-            }
-            _ => false,
-        };
-        if wrap
-            && named
-            && self
-                .constructors
-                .contains(&(datum.span.start, datum.span.end))
-        {
-            return self.push(Node::Seq {
-                open: "(",
-                close: ")",
-                items: vec![Item::Datum(id)],
-            });
-        }
-        id
+    fn datum(&mut self, datum: &Datum) -> usize {
+        self.unwrapped(datum)
     }
 
     fn unwrapped(&mut self, datum: &Datum) -> usize {
@@ -308,7 +240,7 @@ impl Builder<'_> {
                     end = dot.span.end;
                 }
                 self.prefix_gap(end, d.span.start, &mut parts);
-                let child = self.datum(d, true);
+                let child = self.datum(d);
                 return self.push(Node::Prefix(parts, child));
             }
             K::Round(xs) => ("(", ")", xs),
@@ -320,19 +252,11 @@ impl Builder<'_> {
                 return self.push(Node::Atom(text.to_owned()));
             }
         };
-        let head = match (&datum.kind, xs.first().map(|d| &d.kind)) {
-            (K::Round(_), Some(K::Symbol(s))) => Some(s.as_str()),
-            _ => None,
-        };
         let mut items = Vec::new();
         let mut end = datum.span.start + open.len() as u32;
-        for (i, child) in xs.iter().enumerate() {
+        for child in xs.iter() {
             self.gap(end, child.span.start, false, &mut items);
-            let wrap = match &datum.kind {
-                K::Round(_) => i > 0 && head != Some(".") && !(head == Some("=") && i == 1),
-                _ => true,
-            };
-            let id = self.datum(child, wrap);
+            let id = self.datum(child);
             items.push(Item::Datum(id));
             end = child.span.end;
         }
