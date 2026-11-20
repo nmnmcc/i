@@ -1113,6 +1113,17 @@ i/result.replace : (Result(A, B), C) -> Result(C, B)
 i/result.replace_error : (Result(A, B), C) -> Result(A, C)
 i/result.recover : (Result(A, B), (B) <- N -> Result(A, C)) <- N -> Result(A, C)
 i/result.reverse : (List(A)) -> List(A)
+i/schedule._smaller : (Int, Int) -> Int
+i/schedule._larger : (Int, Int) -> Int
+i/schedule._grow : (Int, Int, Int, Int) -> Int
+i/schedule._base_ns : (Pattern, Int) -> Int
+i/schedule._offset_ns : (Int, Int, Int) -> Int
+i/schedule.delay_at : (Delay, Int) -> time.Duration
+i/schedule._sleep_before : (Delay, Int) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner) -> ()
+i/schedule._retry_from : (Int, Int, Delay, () <- (Fail(B), ..N) -> A) <- (Fail(B | clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> A
+i/schedule.retry : (Int, Delay, () <- (Fail(B), ..N) -> A) <- (Fail(B | clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> A
+i/schedule._repeat_from : (Int, Int, Delay, () <- N -> A) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> ()
+i/schedule.repeat : (Int, Delay, () <- N -> A) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> ()
 i/schema._decode_result : (Schema(A, B), json.Json) -> Result(A, B)
 i/schema.encode : (Schema(A, B), A) -> json.Json
 i/schema._parse_result : (Schema(A, SchemaError), String) -> Result(A, ParseError)
@@ -1671,6 +1682,7 @@ i/time.now : () <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/requ
 i/time.sleep : (Duration) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner) -> ()
 i/time.measure : (() <- N -> A) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> (A, Duration)
 i/time.divide : (Duration, Int) <- (Fail(DivisionByZero)) -> Duration
+i/time.timeout : (Duration, () <- (Fail(B), i/request.Await, task.Runner, task.Scheduler, { Fail(Never) | i/request.Await | task.Runner | task.Scheduler | N } & { Fail(B) | N }) -> A) <- (Fail(Timeout | B | clock.ClockError), clock.Clock, i/request.Owner, task.Scheduler, ..N) -> A
 i/tls.options : () -> (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)
 i/tls.identity : (BitArray, BitArray) -> (cert = BitArray, key = BitArray)
 i/tls.join : (List(String)) -> String
