@@ -1175,7 +1175,7 @@ serialized through R2's one root continuation. Status 2 yields a macrotask;
 no microtask-only spin. Public waiting wrappers install an **individual request
 guard** immediately after start and before any wait. Non-resource-producing
 operations use runtime §5.4's ordinary `request.await_owned`, implemented with
-resource.ensure; creators use §8.1's await_resource. Borrowed request.await
+resource.ensure; creators use §8.1's resource.acquire. Borrowed request.await
 never cancels its producer merely because its waiter exits. Its final
 cancels that handle on normal exit, error or unwind; take the answer before
 normal cleanup, so cancelling Taken does nothing. Closing an Owner/root
@@ -1494,7 +1494,7 @@ must retain entry arity/ABI checks while allowing ordinary service needs.
 | 2. Wrapper and link | new provider elaboration/link modules beside `crates/ilang-wasm/src/lower.rs`; `lower.rs:776–807`, `:880–1005`; IR entry/target metadata; `emit/host.rs` generated adapter guards, coordinated with R2; compiler integration tests | After 1a/1c/1d; one whole graph/topological order, T10/T11, F2 including L3, async metadata and synchronous diagnostics. Do not edit P1's opaque lowering independently |
 | 3a. JS target | syntax AST/foreign declaration and checker `resolve.rs:500–551`; target IR/metadata and new JS artifact emitter; `bindings/javascript/ilang.mjs` converters/getters/loader; new `i/js`, `i/target`; SDK/browser/CLI tests | After 2 for full integration; synchronous bridge work can start earlier against a fixed plan interface. Reuse ABI/SDK representations and existing request factories |
 | 3b. Checked WASI | `crates/ilang-wasm/src/runtime/mod.rs:255–304`, `:369–374`; new `i/wasi`; printer replacement in `lower.rs:989–990`, `ir.rs:642–644`; `crates/ilang-cli/tests/wasi.rs` | After 0/plan interface; parallel to JS in these regions. Keep B.7/custom imports; checked slice/proc_exit tests before removing WasiStdout |
-| 3c. Standard IO/target factories | standard library service/provider declarations; `crates/ilang-host/src/services/`; SDK standard factories and IO tests | After 1b/1d and T2 service split; generated JS defaults additionally need 3a. Keep native N9 grants/private Ints, await_owned/await_resource and shared context teardown |
+| 3c. Standard IO/target factories | standard library service/provider declarations; `crates/ilang-host/src/services/`; SDK standard factories and IO tests | After 1b/1d and T2 service split; generated JS defaults additionally need 3a. Keep native N9 grants/private Ints, await_owned and resource.acquire and shared context teardown |
 | 4. Macro/packaging follow-through | M2/M4-owned macro origin/executable-needs checks; native packaging files assigned by native.md | M1 after macro prerequisites; native packaging after its accepted R2/IO gates. Callback re-entry and MC-D remain separate work |
 
 These are ownership boundaries for implementation assignment, not files changed
@@ -1523,7 +1523,7 @@ widening the §10.3 ABI value/error lists.
 | Spec B.7 | Replace only the special Io implementation bullet after adoption: “The target's Io provider writes UTF-8 text plus LF through the checked Wasi adapter; positive short writes are retried, zero progress/errors give up, and print gives Nil.” Keep it absent from external required-import metadata because internally provided. Keep custom imports, runtime-reserved import names, stops, `_start`, blocking calls and no tests. Add the no-result proc_exit adapter rule W2. | Installed: `docs/spec.md:1807`, `docs/spec.md:1870`; separate LF attempt preserves the existing failure behavior. |
 | Runtime D5 and §10 | Replace entry provisioning/classification and ABI async-flag text with §9.1 below. | Installed exact §9.1 replacements: `docs/design/runtime.md:126`, `docs/design/runtime.md:1768`, `docs/design/runtime.md:1843`. |
 | Runtime §§5.1/5.4 | Keep their existing ownership rules; use corrected A2 and the Ready-survives-Owner test in §10. | Bootstrap installed: `docs/design/runtime.md:378`; ownership unchanged; Ready test at `docs/design/runtime.md:2098`. |
-| Runtime §§7/7.4 | Keep the landed native N9/runtime resource text, group operations, await_owned/await_resource and program/control-root accounting. Split process fields by T2, preserving other signatures/errors. | Split installed: `docs/design/runtime.md:1225`; raw signatures, codecs, errors and resource rules preserved. |
+| Runtime §§7/7.4 | Keep the landed native N9/runtime resource text, group operations, await_owned and resource.acquire and program/control-root accounting. Split process fields by T2, preserving other signatures/errors. | Split installed: `docs/design/runtime.md:1225`; raw signatures, codecs, errors and resource rules preserved. |
 | Runtime §8.2 | Generated js/nodejs defaults follow T1–T3, with no automatic unsupported stubs. Explicit Host factories remain configurable. Generated builds share A4's factories. Keep WASI custom imports; list printer as this target project's separate adapter stage, and do not promise later adapters before they land. | Installed: `docs/design/runtime.md:1488`, `docs/design/runtime.md:1849`. |
 | Meta §4.3 | Add js to the built-in names and @js to the caller-origin list, exactly as M1. | Installed in the two named rows: `docs/design/meta.md:371`, `docs/design/meta.md:379`; the declaration companion is installed in §7.1 at `:496`. Meta remains a draft whose review is unfinished. |
 | Meta §8 | Add: “A macro program contains no executable JS binding or initializer. Reject required js declarations before instantiation; quoted syntax remains data.” Apply M1's full-needs rule. | Installed: `docs/design/meta.md:581`. Executable JS needs include macro entries and all ordinary initializers; quoted declarations remain data. The preceding external-needs rule is unchanged. |
@@ -1808,7 +1808,7 @@ needs with:
 
 Keep the rest of runtime §5.1/§5.4: shared portable Root/Owner capabilities,
 local Request/Ticket cells, count/settled/cancel_all/wait_none operations,
-Ready survival, borrowed await, await_owned and await_resource. Keep the
+Ready survival, borrowed await, await_owned and resource.acquire. Keep the
 landed program/control-root distinction: only program work and explicit
 borrowed producer interests determine quiescence, while all actual requests
 count for ABI status 1. No Ticket enumeration or native root bundle is added.

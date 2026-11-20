@@ -193,7 +193,7 @@ permanent tombstones. Preserve the blocking-file cancellation, stdin broker,
 partial-write and supervisor rules of runtime §8.1. Non-creating raw operations
 use the ordinary request.await_owned helper with an ensure/cancel final
 (runtime §5.4); a borrowed request.await does not cancel its producer. Creators
-retain the separate await_resource guard.
+retain the separate resource.acquire guard.
 
 **N9.4. Provisional resources have an owner before a reply exists.** The context owns
 them as soon as created. The host reply's drop guard removes and closes an undelivered
@@ -373,7 +373,7 @@ identity, cancellation and lifetime tests through either change.
 | R2 request layer | Local Request/Ticket and group-observer cells, portable group observations without Ticket enumeration, atomic subscriptions and separate program/control Root accounting; one root hand-off, consuming take, borrowed await and ordinary await_owned; no resource recognition for Int | Native packaging, worker transport |
 | R2 scheduler | Complete task records, detached routing services, retained environment frames, silent pinning, typed keys and single Scheduler boundary; FIFO/CML semantics, pure fresh-key events, stateful-leaf validation, owned-plus-borrowed waitable sets, combined go/run counters and R4a joins | Queue encoding/claim ownership, locked transport implementation and worker entry |
 | IO clock, before Fs | General §2.4 nominal field-privacy fix; host ResourceContext owner/controller, non-reusing Int allocator and trusted binding-plan/grant plumbing on Rust and JS; entry exit/stop/dispose hooks | Worker count, packaging layout, browser multicore |
-| IO fs/net/process | Private nominal resource values and raw Int signatures from first implementation; owning await_owned/await_resource wrappers, no raw-number injection exports, kind checks, leases, provisional/Ready transfer and host teardown; process supervisor | No intermediate externref services or fd-as-number adapter |
+| IO fs/net/process | Private nominal resource values and raw Int signatures from first implementation; owning await_owned and resource.acquire wrappers, no raw-number injection exports, kind checks, leases, provisional/Ready transfer and host teardown; process supervisor | No intermediate externref services or fd-as-number adapter |
 | IO stdio | Per-source broker with context subscribers, copied output buffers/leases, compatibility printer, complete target matrix/tests | Preview-1 adapter project |
 | Native packaging after R2/IO | Split compile/load host configuration; compiler-free runner, authenticated payload/plan, exact artifact manifest, N4 validation and default build | Cross-target distribution/signing choices must be fixed before release |
 | MC after MC-D/G5 | N7 queue, N8 typed locked transactions, identity/cycle-safe codec, host transport/wake, claim/cancel reclamation, N12 domains/controller, program/control quiescence and browser stop-safe entry | Started-task migration, lock-free optimization, shared GC |
@@ -718,7 +718,7 @@ Merely queuing a notification failed this attack, so runtime §5.1 now requires
 these synchronization points before the MC implementation gate.
 
 **N-R2 race then read.** File/Stream/Child non-creators, including close, use
-request.await_owned (runtime §5.4/§7). Resource creators use await_resource;
+request.await_owned (runtime §5.4/§7). Resource creators use resource.acquire;
 request.await remains borrowed. Test with a live Stream and a host fixture
 that keeps the first read pending until the second branch wins:
 
@@ -1175,9 +1175,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > open = (path, mode, raw ! Fs) {
 >   File(fail.map_error(
->     () { await_resource(raw.open(path, mode_string(mode)), (n) {
->       request.await(raw.close(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.open(path, mode_string(mode))) }, (n) { request.await_owned(raw.close(n)) }) }
 >     (code) { FsError("open", path, code) }
 >   ))
 > }
@@ -1242,14 +1240,12 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > Public listen returns Listener; accept/connect return Stream. Public resource
 > parameters use Listener or Stream as appropriate. Other result types stay the
 > same, with NetError, except the error-free close functions. Explicit wrappers
-> inside i/net include (await_resource is defined in §8.1):
+> inside i/net include (resource.acquire is defined in §8.1):
 >
 > ```i
 > accept = (Listener(number), raw ! Net) {
 >   Stream(fail.map_error(
->     () { await_resource(raw.accept(number), (n) {
->       request.await(raw.close_stream(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.accept(number)) }, (n) { request.await_owned(close_stream) }) }
 >     (code) { NetError("accept", "", code) }
 >   ))
 > }
@@ -1376,9 +1372,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > spawn = (program, args, raw ! Process) {
 >   bytes = encode_args(args)
 >   Child(fail.map_error(
->     () { await_resource(raw.spawn(program, bytes), (n) {
->       request.await(raw.close(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.spawn(program, bytes)) }, (n) { request.await_owned(raw.close(n)) }) }
 >     (code) { ProcessError("spawn", code) }
 >   ))
 > }
@@ -4189,7 +4183,7 @@ New sentence(s)/block:
 > runs on success, error and task cancellation; after take, cancel is a no-op.
 > request.await itself remains a borrowed wait and never takes producer ownership.
 > File/Stream/Child wrappers and other non-creating IO wrappers use await_owned,
-> including their close operations; resource creators use await_resource (§8.1).
+> including their close operations; resource creators use resource.acquire (§8.1).
 > Cancelling a pending Stream read revokes its read lease before the cancelled
 > wrapper finishes unwinding, so a following read cannot see busy from that
 > abandoned request. Already consumed bytes or committed effects are not rolled
@@ -4277,9 +4271,7 @@ Old sentence(s)/block:
 
 > open = (path, mode, raw ! Fs) {
 >   File(fail.map_error(
->     () { await_resource(raw.open(path, mode_string(mode)), (n) {
->       request.await(raw.close(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.open(path, mode_string(mode))) }, (n) { request.await_owned(raw.close(n)) }) }
 >     (code) { FsError("open", path, code) }
 >   ))
 > }
@@ -4298,9 +4290,7 @@ New sentence(s)/block:
 
 > open = (path, mode, raw ! Fs) {
 >   File(fail.map_error(
->     () { await_resource(raw.open(path, mode_string(mode)), (n) {
->       request.await_owned(raw.close(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.open(path, mode_string(mode))) }, (n) { request.await_owned(raw.close(n)) }) }
 >     (code) { FsError("open", path, code) }
 >   ))
 > }
@@ -4324,9 +4314,7 @@ Old sentence(s)/block:
 > ```i
 > accept = (Listener(number), raw ! Net) {
 >   Stream(fail.map_error(
->     () { await_resource(raw.accept(number), (n) {
->       request.await(raw.close_stream(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.accept(number)) }, (n) { request.await_owned(close_stream) }) }
 >     (code) { NetError("accept", "", code) }
 >   ))
 > }
@@ -4348,9 +4336,7 @@ New sentence(s)/block:
 > ```i
 > accept = (Listener(number), raw ! Net) {
 >   Stream(fail.map_error(
->     () { await_resource(raw.accept(number), (n) {
->       request.await_owned(raw.close_stream(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.accept(number)) }, (n) { request.await_owned(raw.close_stream(n)) }) }
 >     (code) { NetError("accept", "", code) }
 >   ))
 > }
@@ -4377,9 +4363,7 @@ Old sentence(s)/block:
 > spawn = (program, args, raw ! Process) {
 >   bytes = encode_args(args)
 >   Child(fail.map_error(
->     () { await_resource(raw.spawn(program, bytes), (n) {
->       request.await(raw.close(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.spawn(program, bytes)) }, (n) { request.await_owned(raw.close(n)) }) }
 >     (code) { ProcessError("spawn", code) }
 >   ))
 > }
@@ -4400,9 +4384,7 @@ New sentence(s)/block:
 > spawn = (program, args, raw ! Process) {
 >   bytes = encode_args(args)
 >   Child(fail.map_error(
->     () { await_resource(raw.spawn(program, bytes), (n) {
->       request.await_owned(raw.close(n))
->     }) }
+>     () { resource.acquire(() { request.await_owned(raw.spawn(program, bytes)) }, (n) { request.await_owned(raw.close(n)) }) }
 >     (code) { ProcessError("spawn", code) }
 >   ))
 > }
@@ -5208,7 +5190,7 @@ New sentence(s)/block:
 > partial-write and supervisor rules of runtime §8.1. Non-creating raw operations
 > use the ordinary request.await_owned helper with an ensure/cancel final
 > (runtime §5.4); a borrowed request.await does not cancel its producer. Creators
-> retain the separate await_resource guard.
+> retain the separate resource.acquire guard.
 
 Reason: N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards. N-R3: count program producers and pending program delivery for deadlock, separate control wakes through ordinary Root/Owner accounting, and preserve ABI H4. N-R4: preserve runtime’s pure fresh-key events, validate stateful leaves, and derive portability from payloads/captures. N-R5: retain the owned-plus-explicitly-borrowed waitable set, without counting unrelated roots. Record the review source, exact regression expectations, phase/spec handoff and checking limits; preserve revision-3 history.
 
@@ -5235,7 +5217,7 @@ New sentence(s)/block:
 > | R2 request layer | Local Request/Ticket and group-observer cells, portable group observations without Ticket enumeration, atomic subscriptions and separate program/control Root accounting; one root hand-off, consuming take, borrowed await and ordinary await_owned; no resource recognition for Int | Native packaging, worker transport |
 > | R2 scheduler | Complete task records, detached routing services, retained environment frames, silent pinning, typed keys and single Scheduler boundary; FIFO/CML semantics, pure fresh-key events, stateful-leaf validation, owned-plus-borrowed waitable sets, combined go/run counters and R4a joins | Queue encoding/claim ownership, locked transport implementation and worker entry |
 > | IO clock, before Fs | General §2.4 nominal field-privacy fix; host ResourceContext owner/controller, non-reusing Int allocator and trusted binding-plan/grant plumbing on Rust and JS; entry exit/stop/dispose hooks | Worker count, packaging layout, browser multicore |
-> | IO fs/net/process | Private nominal resource values and raw Int signatures from first implementation; owning await_owned/await_resource wrappers, no raw-number injection exports, kind checks, leases, provisional/Ready transfer and host teardown; process supervisor | No intermediate externref services or fd-as-number adapter |
+> | IO fs/net/process | Private nominal resource values and raw Int signatures from first implementation; owning await_owned and resource.acquire wrappers, no raw-number injection exports, kind checks, leases, provisional/Ready transfer and host teardown; process supervisor | No intermediate externref services or fd-as-number adapter |
 > | IO stdio | Per-source broker with context subscribers, copied output buffers/leases, compatibility printer, complete target matrix/tests | Preview-1 adapter project |
 > | Native packaging after R2/IO | Split compile/load host configuration; compiler-free runner, authenticated payload/plan, exact artifact manifest, N4 validation and default build | Cross-target distribution/signing choices must be fixed before release |
 > | MC after MC-D/G5 | N7 queue, N8 typed locked transactions, identity/cycle-safe codec, host transport/wake, claim/cancel reclamation, N12 domains/controller, program/control quiescence and browser stop-safe entry | Started-task migration, lock-free optimization, shared GC |
@@ -5324,7 +5306,7 @@ New sentence(s)/block:
 > these synchronization points before the MC implementation gate.
 >
 > **N-R2 race then read.** File/Stream/Child non-creators, including close, use
-> request.await_owned (runtime §5.4/§7). Resource creators use await_resource;
+> request.await_owned (runtime §5.4/§7). Resource creators use resource.acquire;
 > request.await remains borrowed. Test with a live Stream and a host fixture
 > that keeps the first read pending until the second branch wins:
 >
