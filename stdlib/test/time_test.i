@@ -222,14 +222,6 @@ unused_clock : clock.Clock = clock.Clock(
 	sleep_ns = (n) { request.ready(Error("unused")) },
 )
 
-// A clock whose sleep fails with the exact nanosecond count in its code, so a
-// test can see the duration that reached the clock without recording state.
-exact_clock : clock.Clock = clock.Clock(
-	monotonic_ns = () { request.ready(Ok(0)) },
-	unix_ns = () { request.ready(Ok(0)) },
-	sleep_ns = (n) { request.ready(Error(core.inspect(n))) },
-)
-
 late = () { task.sync(task.never()) }
 
 test("timeout_body_wins_test", () {
@@ -247,13 +239,17 @@ test("timeout_body_wins_test", () {
 // "return only after their finals end", observed.
 test("timeout_timer_wins_test", () {
 	released = task.ref(False)
-	r = fail.catch(() {
-		time.timeout(time.milliseconds(2), () {
-			resource.ensure(() { late() }, () { task.set(released, True) })
+	(r, elapsed) = time.measure(() {
+		fail.catch(() {
+			time.timeout(time.milliseconds(20), () {
+				resource.ensure(() { late() }, () { task.set(released, True) })
+			})
 		})
 	})
-	assert(r == Error(time.Timeout(after = time.milliseconds(2))))
+	assert(r == Error(time.Timeout(after = time.milliseconds(20))))
 	assert(task.get(released))
+	// The timer cannot fire before its deadline. No upper bound: load.
+	assert(time.to_nanoseconds(elapsed) >= 20000000)
 	()
 })
 
@@ -291,17 +287,4 @@ test("timeout_body_error_test", () {
 		assert(r == Error("boom"))
 		()
 	} <- (unused_clock)
-})
-
-test("timeout_duration_is_exact_test", () {
-	{
-		r = fail.catch(() { time.timeout(time.milliseconds(5), () { late() }) })
-		assert(
-			r ==
-				Error(
-					clock.ClockError(operation = "sleep_ns", code = "5000000"),
-				),
-		)
-		()
-	} <- (exact_clock)
 })

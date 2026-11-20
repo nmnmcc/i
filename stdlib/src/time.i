@@ -179,7 +179,10 @@ Timeout = (after = Duration)
 ///
 /// Needs `Scheduler`, `Runner` and `clock.Clock`.
 /// Errors: the body's own `E`, `Timeout(after = after)`, and
-/// `clock.ClockError` when the clock fails.
+/// `clock.ClockError` when the clock fails. A clock failure is a failure of
+/// the timer's child, so it is reported only after the body has unwound, as
+/// a race reports a failure (spec §9.9 R2); a body that does not respond to
+/// cancellation delays that report.
 ///
 /// ```i
 /// task.run(() {
