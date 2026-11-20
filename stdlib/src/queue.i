@@ -66,7 +66,7 @@
 //// `size` is for observation only: do not check it and then take, since
 //// another task can act in between. Use `poll` for a take that does not wait.
 ////
-//// Stability: experimental. Tracking: docs/design/std-v3.md §3.5.
+//// Stability: experimental. Tracking: docs/design/std-v3.md.
 (
 	failure = i/fail
 	i/core
