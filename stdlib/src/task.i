@@ -3109,7 +3109,7 @@ do_command = (
 		& (Drain) {
 			// RED EVIDENCE ONLY: reply without waiting for the raced scope's
 			// children, so a race may return before the loser's finals end.
-			reply(s, t.serial, k, Proceed(()), False)
+			reply(s, t.serial, k, Proceed(key.wrap(path_key, [])), False)
 		}
 }
 
