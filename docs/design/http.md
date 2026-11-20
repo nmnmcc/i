@@ -1,6 +1,6 @@
 # HTTP
 
-`std/http` provides HTTP/1.1 request and response values, case-insensitive
+`i/http` provides HTTP/1.1 request and response values, case-insensitive
 header lookup, incremental framing, and message serialization. Bodies and
 trailers are represented as bytes and headers. The parser reports incomplete
 input separately from invalid input and preserves unconsumed bytes for the
@@ -8,7 +8,7 @@ next message. Framing supports content lengths and chunked transfer encoding.
 
 `http.get(url)`, `http.post(url, bytes)` and `http.send(request)` use the
 target-selected `Client` service. Native and Node select the network provider;
-JS selects host fetch through ordinary provider-plan cells in std/i.toml.
+JS selects host fetch through ordinary provider-plan cells in stdlib/i.toml.
 The compiler has no HTTP-specific selection. Request targets supplied to the client are absolute URLs;
 the transport sends the path and query as the HTTP request target. HTTPS
 uses TLS with the host name for certificate checking and SNI, and requests

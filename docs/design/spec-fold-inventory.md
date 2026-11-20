@@ -58,10 +58,10 @@ All rows below are staged in `docs/spec.md` by this lane, except where noted.
 | O30 `catch` uses a light escape-only boundary; bench gate ≤1.25x | RELAYED L 23:29 | staged (semantics only; the gate is not spec material) | yes |
 | O31 platform provides a top-level `Fail` at entries | RELAYED L 23:29 | staged | yes |
 | O32 per-target defaults chosen explicitly in `main`; no package supplies services implicitly; provider plans and `i.toml` `providers` deleted | USER L 23:08, RELAYED L 23:29 | staged; old §2.6.1 deletion is another lane's | yes |
-| §1.3 author rules (Opaque position and invariance, `A(..)` whole-sum export, rest needs known shape, D3 `\|` joins only function literals, D5 `None` is a value / `None()` error, D7 display by declared name, D9 empty match `core.never`, D10 stored overload result union, D11 single-shape host exports/entries, solver checks selected domains, first branch wins at run time, `Nil = ()`, no default parameters) | coord ("accepted without explicit owner confirmation") | staged | yes |
+| §1.3 author rules (Opaque position and invariance, `A(..)` whole-sum export, rest needs known shape, D3 `\|` joins only function literals, D5 `None` is a value / `None()` error, D7 display by declared name, D9 empty match `core.never`, D10 stored overload result union, D11 single-shape host exports/entries, solver checks selected domains, first branch wins at run time, `() = ()`, no default parameters) | coord ("accepted without explicit owner confirmation") | staged | yes |
 | §1.3a fourth round Q1–Q19 (no positional after labelled, UTF-8 byte label order, no rest at top of a group, …) | coord (L 20:53, RELAYED "不用什么都问我") | staged | yes |
 | Q13 "no qualified names for built-in types" | superseded by L 21:02 (`Int = core.Int`) | — | — |
-| Fail in the prelude; `raise`/`catch` in `lib/i/fail.i`; light boundary detected from the literal passed to `control.boundary`; `task.Scope(E)` renamed `task.Group(E)`; one entry per target when targets need different services | coord (L 00:14, note §2.10) | staged (all but the boundary-detection mechanism, which is implementation) | yes |
+| Fail in the prelude; `raise`/`catch` in `stdlib/src/fail.i`; light boundary detected from the literal passed to `control.boundary`; `task.Scope(E)` renamed `task.Group(E)`; one entry per target when targets need different services | coord (L 00:14, note §2.10) | staged (all but the boundary-detection mechanism, which is implementation) | yes |
 | §8 open item 1: `Node(..)` does not export the members of its data's union | coord (recommended, open) | staged as recommended | yes |
 | Stage plan, migrator, sizes, measurements (§6, §7) | coord | n/a | — |
 
@@ -137,7 +137,7 @@ a staged syntax-three version of §14 beside it.
 | §4 synchronous bridge and conversion | coord | yes §10.3, App. B.6.1 | no |
 | §5 requests, cancellation, IO ownership on JS | coord | yes §9.11 | no |
 | §6 checked WASI adapter | coord (WASI exception accepted) | yes App. B.7.1 | no |
-| JS step 02: `std/http.Client` provider defaults in `std/i.toml` | coord; superseded by O32 | n/a (library) | — |
+| JS step 02: `i/http.Client` provider defaults in `stdlib/i.toml` | coord; superseded by O32 | n/a (library) | — |
 
 ## native.md (native packages and multicore workers)
 
@@ -193,12 +193,12 @@ a staged syntax-three version of §14 beside it.
 
 | Document | Decision | Status | Spec | New syntax |
 |---|---|---|---|---|
-| testing-macro.md | `std/test` item macros `test`, `suite`, `skip`, `only`, `fails`, `each`; `[test] collection`; fresh instance per test; `@test` removed | USER L 11-11 | yes §10.2 (summary) | no |
+| testing-macro.md | `i/test` item macros `test`, `suite`, `skip`, `only`, `fails`, `each`; `[test] collection`; fresh instance per test; `@test` removed | USER L 11-11 | yes §10.2 (summary) | no |
 | unused.md | unused top-level binding warning; direct references count | USER L 11-11 + coord | yes §2.4.1 | no |
 | macro-budget.md | per-call macro budgets | coord | no (with meta.md) | no |
 | tls.md | `i/tls` connect/accept/dial, options, `TlsError` | USER L 11-11 (TLS delivered) | partly §9.12 `i/tls` | no |
-| http.md | `std/http` client, `Client` service via provider-plan cells | USER L 11-11; provider selection superseded by O32 | n/a (std library) | — |
-| std-1/2/3.md | pure std modules, time/log, property tests, strings | coord | n/a (std library, not `lib/i`) | — |
+| http.md | `i/http` client, `Client` service via provider-plan cells | USER L 11-11; provider selection superseded by O32 | n/a (std library) | — |
+| std-1/2/3.md | pure std modules, time/log, property tests, strings | coord | n/a (std library, not `stdlib/src`) | — |
 | a1-front-end.md, historical step reports (removed), prior-art-*.md, macro-status.md | historical, studies and status | n/a | — | — |
 
 ## For the owner

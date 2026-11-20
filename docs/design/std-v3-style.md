@@ -17,7 +17,7 @@ files. The Effect checkout identifies itself as 4.1.3 in
 1. Keep Gleam's small modules, plain names, subject-first calls, and examples.
    Keep i's own absence convention. Do not import Gleam's Result-only control
    flow. See `gleam-stdlib/src/gleam/option.gleam`,
-   `gleam-stdlib/src/gleam/list.gleam`, and `std/src/list.i`.
+   `gleam-stdlib/src/gleam/list.gleam`, and `stdlib/src/list.i`.
 2. Use ordinary functions and services for workflows. A computation is
    `() <- (Fail(E), ..N) -> A`. Provision is `body() <- (service)`.
    There must be no parallel Effect, Layer, Context, or error-channel system.
@@ -25,8 +25,8 @@ files. The Effect checkout identifies itself as 4.1.3 in
    `docs/design/syntax-3.md` §2.10.
 3. Take Go's common I/O contracts seriously. i has many host operations, but
    lacks a shared reader/writer vocabulary and buffering layer. See
-   `go/src/io/io.go`, `go/src/bufio/bufio.go`, `lib/i/fs.i`,
-   `lib/i/stdio.i`, `lib/i/net.i`, and `lib/i/tls.i`.
+   `go/src/io/io.go`, `go/src/bufio/bufio.go`, `stdlib/src/fs.i`,
+   `stdlib/src/stdio.i`, `stdlib/src/net.i`, and `stdlib/src/tls.i`.
 4. Complete useful paths through the library before adding more synonyms.
    In particular: bounded I/O, incremental codecs, timeout/retry policies,
    Unicode operations, typed diagnostics, and deterministic test providers.
@@ -37,9 +37,9 @@ files. The Effect checkout identifies itself as 4.1.3 in
    cleanup guarantee.
 
 The spec is authoritative when this checkout differs from it. For example,
-`std/src/result.i` and `std/src/list.i` still describe `^ E` in comments.
-`lib/i/control.i` still carries an explicit error parameter on boundaries.
-`lib/i/resource.i` has callback-style `acquire`, while `docs/spec.md` §9.5
+`stdlib/src/result.i` and `stdlib/src/list.i` still describe `^ E` in comments.
+`stdlib/src/control.i` still carries an explicit error parameter on boundaries.
+`stdlib/src/resource.i` has callback-style `acquire`, while `docs/spec.md` §9.5
 defines scope-based acquisition too. These are migration facts. All proposals
 below use `Fail(E)` and the specified service model.
 
@@ -116,9 +116,9 @@ There are exceptions to subject-first order. `dict.group(key, list)` in
 first. Do not copy an exception as the general convention.
 
 `gleam-stdlib/src/gleam/option.gleam` explicitly reserves Option for optional
-arguments and stored data. It says fallible functions return Result, with Nil
+arguments and stored data. It says fallible functions return Result, with ()
 when no diagnostic exists. Thus `list.first`, `dict.get`, and string lookups
-return `Result(_, Nil)` in `gleam-stdlib/src/gleam/list.gleam`,
+return `Result(_, ())` in `gleam-stdlib/src/gleam/list.gleam`,
 `gleam-stdlib/src/gleam/dict.gleam`, and
 `gleam-stdlib/src/gleam/string.gleam`. This differs from i's existing Option
 lookups. `result.try` and `result.try_recover` compose Result values in
@@ -144,17 +144,17 @@ It is too small a coverage target for the owner's standalone i distribution.
 
 | Current i evidence | Assessment and proposed direction |
 |---|---|
-| `std/src/list.i`, `std/src/dict.i`, `std/src/set.i`, `std/src/pair.i`, `std/src/order.i` | The small type-focused modules, short verbs, subject-first order and comparator callbacks fit i. Keep them. |
-| `std/src/list.i`, `std/src/option.i`, `std/src/result.i` | Callbacks already have an open need `N`. Ordinary map and fold can propagate `Fail(E)` through that row. Make this the main composition path. |
-| `std/src/list.i`: `try_map`, `try_fold`, `try_each` | These traverse explicit Result data and stop at the first Error. They are not necessary to call functions that raise through Fail. Keep only where Result data traversal is useful; document that distinction and implement any retained helper through the canonical traversal. |
-| `std/src/list.i`, `std/src/dict.i`, `std/src/string.i`, `std/src/option.i` | Option-returning lookups and Option-based filter/find mapping are good adaptations. Do not restore Gleam's Result-with-Nil lookup convention. |
-| `std/src/int.i`, `std/src/float.i`, `std/src/bit_array.i` | Parsing and decoding often still return `Result(_, Nil)`. Diagnostics are lost. Introduce domain errors before stability and use Fail for the ordinary validating operation (§4.3). |
-| `std/src/crypto.i`: `random_bytes` | Invalid length is Result data, while `process.entropy` can raise a ProcessError. A Result return alone does not mean the call has no Fail need. Normalize the public boundary and document the complete inferred contract. |
-| `std/src/result.i`, `lib/i/fail.i`, `lib/i/failure.i` | `to_error`/`catch` wrappers and two failure modules create competing entry points. E3 should leave `i/fail` as the canonical error bridge; keep Result operations about stored data. |
-| `std/src/list.i`, `std/src/option.i`, `std/src/result.i` | Private reversal loops recur. Gleam's `gleam-stdlib/src/gleam/option.gleam` explains its own copy by import cycles. i should use an acyclic internal collection foundation, without new compiler privilege. |
-| `std/src/json.i`, `std/src/schema.i` | Labelled sums and explicit codecs fit i better than copying foreign Dynamic reflection. The current schema builder needs empty records, getters and setters; `std/test/schema_test.i` shows the repeated reconstruction. Explore ordinary constructor callbacks with decoded fields and named data. Do not invent reflection or a `use` form. |
-| `std/src/string.i` versus `gleam-stdlib/src/gleam/string.gleam` | i correctly documents scalar indexes rather than pretending to preserve Gleam's grapheme semantics. Add separately named grapheme operations if provided. |
-| `std/src/csv.i`: `parse`/`parse_with`; `std/src/http.i`: `send_with` and callback-first `send_timeout`; `std/src/schema.i`: schema-first decode | Review same-operation variants for shape groups and subject-first order. Shape groups are appropriate for differing argument shapes with one result family. They are not an excuse for hidden changes of meaning. |
+| `stdlib/src/list.i`, `stdlib/src/dict.i`, `stdlib/src/set.i`, `stdlib/src/pair.i`, `stdlib/src/order.i` | The small type-focused modules, short verbs, subject-first order and comparator callbacks fit i. Keep them. |
+| `stdlib/src/list.i`, `stdlib/src/option.i`, `stdlib/src/result.i` | Callbacks already have an open need `N`. Ordinary map and fold can propagate `Fail(E)` through that row. Make this the main composition path. |
+| `stdlib/src/list.i`: `try_map`, `try_fold`, `try_each` | These traverse explicit Result data and stop at the first Error. They are not necessary to call functions that raise through Fail. Keep only where Result data traversal is useful; document that distinction and implement any retained helper through the canonical traversal. |
+| `stdlib/src/list.i`, `stdlib/src/dict.i`, `stdlib/src/string.i`, `stdlib/src/option.i` | Option-returning lookups and Option-based filter/find mapping are good adaptations. Do not restore Gleam's Result-with-() lookup convention. |
+| `stdlib/src/int.i`, `stdlib/src/float.i`, `stdlib/src/bit_array.i` | Parsing and decoding often still return `Result(_, ())`. Diagnostics are lost. Introduce domain errors before stability and use Fail for the ordinary validating operation (§4.3). |
+| `stdlib/src/crypto.i`: `random_bytes` | Invalid length is Result data, while `process.entropy` can raise a ProcessError. A Result return alone does not mean the call has no Fail need. Normalize the public boundary and document the complete inferred contract. |
+| `stdlib/src/result.i`, `stdlib/src/fail.i` | `to_error`/`catch` wrappers and two failure modules create competing entry points. E3 should leave `i/fail` as the canonical error bridge; keep Result operations about stored data. |
+| `stdlib/src/list.i`, `stdlib/src/option.i`, `stdlib/src/result.i` | Private reversal loops recur. Gleam's `gleam-stdlib/src/gleam/option.gleam` explains its own copy by import cycles. i should use an acyclic internal collection foundation, without new compiler privilege. |
+| `stdlib/src/json.i`, `stdlib/src/schema.i` | Labelled sums and explicit codecs fit i better than copying foreign Dynamic reflection. The current schema builder needs empty records, getters and setters; `stdlib/test/schema_test.i` shows the repeated reconstruction. Explore ordinary constructor callbacks with decoded fields and named data. Do not invent reflection or a `use` form. |
+| `stdlib/src/string.i` versus `gleam-stdlib/src/gleam/string.gleam` | i correctly documents scalar indexes rather than pretending to preserve Gleam's grapheme semantics. Add separately named grapheme operations if provided. |
+| `stdlib/src/csv.i`: `parse`/`parse_with`; `stdlib/src/http.i`: `send_with` and callback-first `send_timeout`; `stdlib/src/schema.i`: schema-first decode | Review same-operation variants for shape groups and subject-first order. Shape groups are appropriate for differing argument shapes with one result family. They are not an excuse for hidden changes of meaning. |
 
 The Gleam decoder examples use `use name <- decode.field(...)` in
 `gleam-stdlib/src/gleam/dynamic/decode.gleam`. i has no such form.
@@ -194,8 +194,8 @@ The immutable translation must settle three things before code is written:
 | Ownership | A reader value does not own a resource lifetime by itself. Consumption remains inside a resource scope; early return, error and task cancellation run cleanup. Pure buffered cursors return the next cursor. A host handle's external progress must be documented. |
 
 These are proposals, motivated by `go/src/io/io.go`. Existing i wrappers often
-return Nil for writes and use empty bytes for EOF (`lib/i/fs.i`,
-`lib/i/net.i`, `lib/i/stdio.i`). They do not expose Go's partial-count contract.
+return () for writes and use empty bytes for EOF (`stdlib/src/fs.i`,
+`stdlib/src/net.i`, `stdlib/src/stdio.i`). They do not expose Go's partial-count contract.
 Do not promise an adapter can preserve information that its host API omits.
 
 ### 3.2 Package-by-package comparison
@@ -207,37 +207,37 @@ mechanism conflicts with i, but its user need still matters.
 
 | Go package and files read | What it supplies | i today: files and scope | Gap and direction |
 |---|---|---|---|
-| io: `go/src/io/io.go` | Shared Reader/Writer/Closer/Seeker contracts and I/O composition. | `lib/i/fs.i`, `lib/i/net.i`, `lib/i/tls.i`, `lib/i/stdio.i` have separate operations. TCP and TLS provide `byte_stream` data. | A: common byte readers/writers; copy, bounded read, exact read, limit and tee behavior. Define EOF, progress, errors and scope ownership once. |
-| bufio: `go/src/bufio/bufio.go`, `go/src/bufio/scan.go` | Buffering, lookahead, delimiter reads, configurable token scanning. | `lib/i/fs.i` reads whole files for `read_lines`; `std/src/csv.i` has its own incremental cursor. | A: reusable immutable cursors, bounded tokens, incremental UTF-8 and line scanning. Reuse the reader contract. |
-| bytes: `go/src/bytes/bytes.go`, `go/src/bytes/buffer.go`, `go/src/bytes/reader.go` | Byte search and manipulation; buffers and readers. | `std/src/bit_array.i` has concatenation, slicing, comparison and codecs; `std/src/sequence.i` is a persistent indexed collection. | A: byte search/split/replace and cheap chunk assembly. Distinguish bytes from arbitrary bits. Adapt buffers as immutable builders/cursors. |
-| strings: `go/src/strings/strings.go`, `go/src/strings/builder.go`, `go/src/strings/reader.go` | Text search, splitting, transformations, assembly and reading. | `std/src/string.i` already has a broad scalar-based API, including bounded replacement, words, map/filter/fold. | A: chunk assembly and reader adapters. Document scalar versus byte indexes at each boundary. Avoid needless copies. |
-| strconv: `go/src/strconv/doc.go` | Numeric and Boolean parsing/formatting, bases, precision, quoting. | `std/src/int.i`, `std/src/float.i`, `std/src/bool.i`, `lib/i/float_text.i` cover much of conversion; int and float parse errors are Nil. | A: diagnostic parse errors and explicit formatting options. B: quoting/unquoting APIs. Keep conversions with their type rather than add a second central conversion family. |
-| unicode: `go/src/unicode/letter.go`, `go/src/unicode/utf8/utf8.go`, `go/src/unicode/utf16/utf16.go` | Codepoint properties, casing and UTF-8/UTF-16 codecs. | `lib/i/core.i` supplies scalar conversion and simple casing. `std/src/string.i` has an internal whitespace test. `std/src/regex.i` has private Unicode 16 property and fold tables. | A: expose a shared Unicode foundation and table version; reuse existing data instead of adding a second set. Add incremental UTF-8. B: UTF-16 and separately specified grapheme support. Preserve scalar indexes. |
-| sort: `go/src/sort/sort.go` | Collection sorting through Len/Less/Swap, stable and unstable contracts. | `std/src/list.i` provides stable comparator merge sort; `std/src/order.i` supplies comparator tools. | Mostly covered. State comparator laws. Adapt to immutable outputs; no public Swap protocol. |
-| slices: `go/src/slices/slices.go`, `go/src/slices/sort.go` | Generic collection edits, equality, sort checks and binary search. | `std/src/list.i` is rich; `std/src/sequence.i` has persistent indexing, splitting and end edits. | B: sortedness and binary search for indexed sequences, and comparison helpers where useful. No need for mutable slices or clones of immutable values. |
-| maps: `go/src/maps/maps.go`, `go/src/maps/iter.go` | Equality, copying, filtered mutation, iterator collection. | `std/src/dict.i`, `std/src/set.i`, `std/src/stream.i` cover persistent updates and traversals. | B: explicit semantic equality/comparator helpers and stream adapters. Resolve the documented dict collision-order equality exception before promising map value equality. No mutable Copy requirement. |
-| time: `go/src/time/time.go`, `go/src/time/sleep.go`, `go/src/time/tick.go`, `go/src/time/zoneinfo.go` | Durations, clocks, timers, tickers and named zones. | `std/src/time.i` has exact durations and Unix instants; `std/src/calendar.i` has Gregorian dates and fixed offsets; `lib/i/clock.i` has monotonic/wall observations and sleep. | A: common deadline, timeout, repeat and backoff policy functions. B: named timezone data and scoped periodic streams. Keep wall instants distinct from monotonic measurement. |
-| context: `go/src/context/context.go` | Cancellation trees, deadlines and request values. The Context argument goes first. | `lib/i/task.i`, `lib/i/request.i`, `lib/i/resource.i` already handle scoped work, request ownership and unwinding; `std/src/http.i` has a timeout helper. | Adapt: general scoped deadlines and typed request metadata services. Do not add a Context parameter or an untyped value bag. Needs already express capabilities. |
-| errors: `go/src/errors/errors.go` | Error construction, wrapping, joining and tree inspection. | `lib/i/fail.i` provides raise/catch/conversion. Modules define labelled errors; several low-level codes are strings. | A: rich module errors and consistent operation/resource context. Typed unions and matching replace Is/As-style inspection; avoid a universal string error. |
-| fmt: `go/src/fmt/doc.go` | Formatting to strings, writers or stdout; scanning. | `lib/i/core.i` has inspect; interpolation is defined in `docs/spec.md` §1.6; `std/src/int.i` and `std/src/float.i` print numbers; `lib/i/stdio.i` prints lines. | A: pure configurable formatting and common writer sinks. B: scanning if real uses justify it. Prefer typed options to a second unchecked interpolation language. |
-| os: `go/src/os/file.go` | Portable file operations, metadata, structured path errors. | `lib/i/fs.i` covers open/read/write/list/metadata/temp_dir and simple whole-file helpers. `lib/i/process.i` covers arguments, env, cwd, entropy and child processes. | A: safe temporary-resource helpers, seek/random access, richer metadata, recursive traversal, permissions/links where supported, and documented host capability limits. Keep process concerns separate from filesystem contracts. |
-| path: `go/src/path/path.go` | Lexical slash-separated paths. | `std/src/path.i` has clean/join/split/base/dir/extension/relative and explicitly lexical POSIX rules. | Mostly covered. B: matching/globbing rules if needed. Do not treat lexical cleanup as filesystem containment or URI decoding. |
-| path/filepath: `go/src/path/filepath/path.go` | Native path conventions, distinct from URL paths. | `std/src/path.i` explicitly excludes drive conventions and filesystem access. | B: an explicit native path style/provider boundary. Do not make the meaning of existing `std/path` change with the target. |
-| net: `go/src/net/net.go` | TCP, UDP, Unix sockets, address interfaces and name resolution. | `lib/i/net.i` has TCP, UDP, name resolution and half close; `lib/i/tls.i` adds TLS and ALPN. | A: typed addresses and endpoints, shared I/O and deadlines. B: Unix sockets and richer resolver results. Feature availability must be explicit by target. |
-| net/http: `go/src/net/http/doc.go`, `go/src/net/http/client.go`, `go/src/net/http/transport.go`, `go/src/net/http/server.go` | Client/transport/handler boundaries, response-body ownership, pooling, proxies and policy. | `std/src/http.i` has HTTP/1.1 framing, messages, native/fetch providers, redirects, scoped servers and stream-shaped replies; `std/i.toml` declares client defaults. | A: split protocol data/framing from transport and policy; complete bounded streaming and cancellation contracts. `native_client` currently collects a response before exposing its stream reads. B: cookie jar, proxy/compression policies and more protocol coverage. |
-| encoding/json: `go/src/encoding/json/encode.go`, `go/src/encoding/json/stream.go` | JSON serialization, incremental encoder/decoder and tokens; documents compatibility-sensitive parser choices. | `std/src/json.i` preserves an explicit Json sum, arbitrary-size integer values and object entry lists; `std/src/schema.i` has typed two-way JSON codecs. | A: incremental tokens/decoding, resource bounds, and explicit duplicate-key/number/unknown-field policies. Keep explicit codecs; no foreign reflection dependency. |
-| encoding: `go/src/encoding/encoding.go` | Common binary/text serialization interfaces. | `std/src/schema.i` defines a JSON-specific codec value. | A: common explicit codec contracts where multiple consumers need them. Return new immutable values. Do not duplicate each format's parser in adapters. |
-| encoding/binary: `go/src/encoding/binary/binary.go` | Fixed-width endian conversion and varints. | `docs/spec.md` §8 and `lib/i/bits.i` cover bit segments and endian operations. | A: reusable bounded binary cursors and varints. Build on bit syntax rather than mirror fixed-width type hierarchies. |
-| encoding/base64 and encoding/hex: `go/src/encoding/base64/base64.go`, `go/src/encoding/hex/hex.go` | Whole and streaming codecs with diagnostic errors. | `std/src/bit_array.i` has hex, standard and URL base64. Its docs specify zero padding for incomplete bytes. | A: offset-bearing decode errors and incremental codecs. Make bit padding deliberate; do not silently change a stable codec. |
-| encoding/base32: `go/src/encoding/base32/base32.go` | Base32 alphabets, padding, whole and streaming codecs. | No base32 export in `std/src/bit_array.i`. | B: base32 when required by common wire formats. Reuse codec machinery. |
-| encoding/ascii85: `go/src/encoding/ascii85/ascii85.go` | ASCII85 for document formats, with whole and streaming encoding. | No ASCII85 export in `std/src/bit_array.i`. | B: add only for concrete document-format needs. The shared incremental codec contract should make it a small extension. |
-| encoding/csv: `go/src/encoding/csv/reader.go`, `go/src/encoding/csv/writer.go` | Record reading/writing, position errors and options. | `std/src/csv.i` already has strict rows, options, incremental row streams, records and schema decoding. | A: connect to common byte/text I/O and output sinks. Preserve its stated scalar line/column rules instead of assuming identical Go offsets. |
-| encoding/xml: `go/src/encoding/xml/xml.go` | XML tokens, namespaces and streaming decode. | No XML module in the `std/src` inventory. | B: XML token parsing and encoding for interoperability. Use immutable values and explicit resource limits. |
-| encoding/asn1 and encoding/pem: `go/src/encoding/asn1/asn1.go`, `go/src/encoding/pem/pem.go` | DER data and PEM blocks, used in certificate/key interchange. | `lib/i/tls.i` accepts certificate, key and root bytes; `std/src/crypto.i` has SHA-2/HMAC/KDFs, not these formats. | B: typed PEM/DER helpers if certificate tooling is in scope. TLS bytes alone are not format coverage. |
-| encoding/gob: `go/src/encoding/gob/doc.go` | Self-describing Go value streams. | `std/src/schema.i` is JSON-specific; no native binary object stream. | No requirement to copy gob. B: a versioned explicit binary schema only if i needs one. Do not expose private runtime representations as a wire format. |
-| sync: `go/src/sync/mutex.go`, `go/src/sync/once.go`, `go/src/sync/waitgroup.go`, `go/src/sync/map.go` | Locks, once-only work, task counting and concurrent maps. The package recommends communication for higher-level coordination. | `lib/i/task.i` has scoped groups, channels, events, refs, shares and concurrent combinators; `std/src/dict.i` is immutable. | Adapt: bounded concurrency, queues, semaphores and scoped single-flight/cache services as ordinary libraries. Do not add public mutable maps or detached WaitGroup-style work. |
-| log/slog: `go/src/log/slog/doc.go`, `go/src/log/slog/handler.go` | Structured records, handler filtering, grouped attributes, text and JSON handlers. | `std/src/log.i` has levels, entries, string fields, call-time Sink, filtering, lazy messages and stdio/file adapters. | A: typed attribute values, scoped annotations, structured JSON output and test capture. Preserve explicit timestamping and service replacement. Avoid a global mutable default logger. |
-| testing: `go/src/testing/testing.go`, `go/src/testing/example.go` | Unit tests, examples checked against output, benchmarks, fuzzing, cleanup and temporary directories. | `std/src/test.is` defines test/suite/each/fails macros; `std/src/property.i` has generation, shrinking and replay; `std/test/` has broad unit tests and some provider tests. | A: per-function example linkage, shared fake services, cleanup fixtures and scoped scheduler tests. B: benchmark and persistent fuzz-corpus tooling. Do not infer complete coverage from module test filenames. |
+| io: `go/src/io/io.go` | Shared Reader/Writer/Closer/Seeker contracts and I/O composition. | `stdlib/src/fs.i`, `stdlib/src/net.i`, `stdlib/src/tls.i`, `stdlib/src/stdio.i` have separate operations. TCP and TLS provide `byte_stream` data. | A: common byte readers/writers; copy, bounded read, exact read, limit and tee behavior. Define EOF, progress, errors and scope ownership once. |
+| bufio: `go/src/bufio/bufio.go`, `go/src/bufio/scan.go` | Buffering, lookahead, delimiter reads, configurable token scanning. | `stdlib/src/fs.i` reads whole files for `read_lines`; `stdlib/src/csv.i` has its own incremental cursor. | A: reusable immutable cursors, bounded tokens, incremental UTF-8 and line scanning. Reuse the reader contract. |
+| bytes: `go/src/bytes/bytes.go`, `go/src/bytes/buffer.go`, `go/src/bytes/reader.go` | Byte search and manipulation; buffers and readers. | `stdlib/src/bit_array.i` has concatenation, slicing, comparison and codecs; `stdlib/src/sequence.i` is a persistent indexed collection. | A: byte search/split/replace and cheap chunk assembly. Distinguish bytes from arbitrary bits. Adapt buffers as immutable builders/cursors. |
+| strings: `go/src/strings/strings.go`, `go/src/strings/builder.go`, `go/src/strings/reader.go` | Text search, splitting, transformations, assembly and reading. | `stdlib/src/string.i` already has a broad scalar-based API, including bounded replacement, words, map/filter/fold. | A: chunk assembly and reader adapters. Document scalar versus byte indexes at each boundary. Avoid needless copies. |
+| strconv: `go/src/strconv/doc.go` | Numeric and Boolean parsing/formatting, bases, precision, quoting. | `stdlib/src/int.i`, `stdlib/src/float.i`, `stdlib/src/bool.i`, `stdlib/src/float_text.i` cover much of conversion; int and float parse errors are (). | A: diagnostic parse errors and explicit formatting options. B: quoting/unquoting APIs. Keep conversions with their type rather than add a second central conversion family. |
+| unicode: `go/src/unicode/letter.go`, `go/src/unicode/utf8/utf8.go`, `go/src/unicode/utf16/utf16.go` | Codepoint properties, casing and UTF-8/UTF-16 codecs. | `stdlib/src/core.i` supplies scalar conversion and simple casing. `stdlib/src/string.i` has an internal whitespace test. `stdlib/src/regex.i` has private Unicode 16 property and fold tables. | A: expose a shared Unicode foundation and table version; reuse existing data instead of adding a second set. Add incremental UTF-8. B: UTF-16 and separately specified grapheme support. Preserve scalar indexes. |
+| sort: `go/src/sort/sort.go` | Collection sorting through Len/Less/Swap, stable and unstable contracts. | `stdlib/src/list.i` provides stable comparator merge sort; `stdlib/src/order.i` supplies comparator tools. | Mostly covered. State comparator laws. Adapt to immutable outputs; no public Swap protocol. |
+| slices: `go/src/slices/slices.go`, `go/src/slices/sort.go` | Generic collection edits, equality, sort checks and binary search. | `stdlib/src/list.i` is rich; `stdlib/src/sequence.i` has persistent indexing, splitting and end edits. | B: sortedness and binary search for indexed sequences, and comparison helpers where useful. No need for mutable slices or clones of immutable values. |
+| maps: `go/src/maps/maps.go`, `go/src/maps/iter.go` | Equality, copying, filtered mutation, iterator collection. | `stdlib/src/dict.i`, `stdlib/src/set.i`, `stdlib/src/stream.i` cover persistent updates and traversals. | B: explicit semantic equality/comparator helpers and stream adapters. Resolve the documented dict collision-order equality exception before promising map value equality. No mutable Copy requirement. |
+| time: `go/src/time/time.go`, `go/src/time/sleep.go`, `go/src/time/tick.go`, `go/src/time/zoneinfo.go` | Durations, clocks, timers, tickers and named zones. | `stdlib/src/time.i` has exact durations and Unix instants; `stdlib/src/calendar.i` has Gregorian dates and fixed offsets; `stdlib/src/clock.i` has monotonic/wall observations and sleep. | A: common deadline, timeout, repeat and backoff policy functions. B: named timezone data and scoped periodic streams. Keep wall instants distinct from monotonic measurement. |
+| context: `go/src/context/context.go` | Cancellation trees, deadlines and request values. The Context argument goes first. | `stdlib/src/task.i`, `stdlib/src/request.i`, `stdlib/src/resource.i` already handle scoped work, request ownership and unwinding; `stdlib/src/http.i` has a timeout helper. | Adapt: general scoped deadlines and typed request metadata services. Do not add a Context parameter or an untyped value bag. Needs already express capabilities. |
+| errors: `go/src/errors/errors.go` | Error construction, wrapping, joining and tree inspection. | `stdlib/src/fail.i` provides raise/catch/conversion. Modules define labelled errors; several low-level codes are strings. | A: rich module errors and consistent operation/resource context. Typed unions and matching replace Is/As-style inspection; avoid a universal string error. |
+| fmt: `go/src/fmt/doc.go` | Formatting to strings, writers or stdout; scanning. | `stdlib/src/core.i` has inspect; interpolation is defined in `docs/spec.md` §1.6; `stdlib/src/int.i` and `stdlib/src/float.i` print numbers; `stdlib/src/stdio.i` prints lines. | A: pure configurable formatting and common writer sinks. B: scanning if real uses justify it. Prefer typed options to a second unchecked interpolation language. |
+| os: `go/src/os/file.go` | Portable file operations, metadata, structured path errors. | `stdlib/src/fs.i` covers open/read/write/list/metadata/temp_dir and simple whole-file helpers. `stdlib/src/process.i` covers arguments, env, cwd, entropy and child processes. | A: safe temporary-resource helpers, seek/random access, richer metadata, recursive traversal, permissions/links where supported, and documented host capability limits. Keep process concerns separate from filesystem contracts. |
+| path: `go/src/path/path.go` | Lexical slash-separated paths. | `stdlib/src/path.i` has clean/join/split/base/dir/extension/relative and explicitly lexical POSIX rules. | Mostly covered. B: matching/globbing rules if needed. Do not treat lexical cleanup as filesystem containment or URI decoding. |
+| path/filepath: `go/src/path/filepath/path.go` | Native path conventions, distinct from URL paths. | `stdlib/src/path.i` explicitly excludes drive conventions and filesystem access. | B: an explicit native path style/provider boundary. Do not make the meaning of existing `i/path` change with the target. |
+| net: `go/src/net/net.go` | TCP, UDP, Unix sockets, address interfaces and name resolution. | `stdlib/src/net.i` has TCP, UDP, name resolution and half close; `stdlib/src/tls.i` adds TLS and ALPN. | A: typed addresses and endpoints, shared I/O and deadlines. B: Unix sockets and richer resolver results. Feature availability must be explicit by target. |
+| net/http: `go/src/net/http/doc.go`, `go/src/net/http/client.go`, `go/src/net/http/transport.go`, `go/src/net/http/server.go` | Client/transport/handler boundaries, response-body ownership, pooling, proxies and policy. | `stdlib/src/http.i` has HTTP/1.1 framing, messages, native/fetch providers, redirects, scoped servers and stream-shaped replies; `stdlib/i.toml` declares client defaults. | A: split protocol data/framing from transport and policy; complete bounded streaming and cancellation contracts. `native_client` currently collects a response before exposing its stream reads. B: cookie jar, proxy/compression policies and more protocol coverage. |
+| encoding/json: `go/src/encoding/json/encode.go`, `go/src/encoding/json/stream.go` | JSON serialization, incremental encoder/decoder and tokens; documents compatibility-sensitive parser choices. | `stdlib/src/json.i` preserves an explicit Json sum, arbitrary-size integer values and object entry lists; `stdlib/src/schema.i` has typed two-way JSON codecs. | A: incremental tokens/decoding, resource bounds, and explicit duplicate-key/number/unknown-field policies. Keep explicit codecs; no foreign reflection dependency. |
+| encoding: `go/src/encoding/encoding.go` | Common binary/text serialization interfaces. | `stdlib/src/schema.i` defines a JSON-specific codec value. | A: common explicit codec contracts where multiple consumers need them. Return new immutable values. Do not duplicate each format's parser in adapters. |
+| encoding/binary: `go/src/encoding/binary/binary.go` | Fixed-width endian conversion and varints. | `docs/spec.md` §8 and `stdlib/src/bits.i` cover bit segments and endian operations. | A: reusable bounded binary cursors and varints. Build on bit syntax rather than mirror fixed-width type hierarchies. |
+| encoding/base64 and encoding/hex: `go/src/encoding/base64/base64.go`, `go/src/encoding/hex/hex.go` | Whole and streaming codecs with diagnostic errors. | `stdlib/src/bit_array.i` has hex, standard and URL base64. Its docs specify zero padding for incomplete bytes. | A: offset-bearing decode errors and incremental codecs. Make bit padding deliberate; do not silently change a stable codec. |
+| encoding/base32: `go/src/encoding/base32/base32.go` | Base32 alphabets, padding, whole and streaming codecs. | No base32 export in `stdlib/src/bit_array.i`. | B: base32 when required by common wire formats. Reuse codec machinery. |
+| encoding/ascii85: `go/src/encoding/ascii85/ascii85.go` | ASCII85 for document formats, with whole and streaming encoding. | No ASCII85 export in `stdlib/src/bit_array.i`. | B: add only for concrete document-format needs. The shared incremental codec contract should make it a small extension. |
+| encoding/csv: `go/src/encoding/csv/reader.go`, `go/src/encoding/csv/writer.go` | Record reading/writing, position errors and options. | `stdlib/src/csv.i` already has strict rows, options, incremental row streams, records and schema decoding. | A: connect to common byte/text I/O and output sinks. Preserve its stated scalar line/column rules instead of assuming identical Go offsets. |
+| encoding/xml: `go/src/encoding/xml/xml.go` | XML tokens, namespaces and streaming decode. | No XML module in the `stdlib/src` inventory. | B: XML token parsing and encoding for interoperability. Use immutable values and explicit resource limits. |
+| encoding/asn1 and encoding/pem: `go/src/encoding/asn1/asn1.go`, `go/src/encoding/pem/pem.go` | DER data and PEM blocks, used in certificate/key interchange. | `stdlib/src/tls.i` accepts certificate, key and root bytes; `stdlib/src/crypto.i` has SHA-2/HMAC/KDFs, not these formats. | B: typed PEM/DER helpers if certificate tooling is in scope. TLS bytes alone are not format coverage. |
+| encoding/gob: `go/src/encoding/gob/doc.go` | Self-describing Go value streams. | `stdlib/src/schema.i` is JSON-specific; no native binary object stream. | No requirement to copy gob. B: a versioned explicit binary schema only if i needs one. Do not expose private runtime representations as a wire format. |
+| sync: `go/src/sync/mutex.go`, `go/src/sync/once.go`, `go/src/sync/waitgroup.go`, `go/src/sync/map.go` | Locks, once-only work, task counting and concurrent maps. The package recommends communication for higher-level coordination. | `stdlib/src/task.i` has scoped groups, channels, events, refs, shares and concurrent combinators; `stdlib/src/dict.i` is immutable. | Adapt: bounded concurrency, queues, semaphores and scoped single-flight/cache services as ordinary libraries. Do not add public mutable maps or detached WaitGroup-style work. |
+| log/slog: `go/src/log/slog/doc.go`, `go/src/log/slog/handler.go` | Structured records, handler filtering, grouped attributes, text and JSON handlers. | `stdlib/src/log.i` has levels, entries, string fields, call-time Sink, filtering, lazy messages and stdio/file adapters. | A: typed attribute values, scoped annotations, structured JSON output and test capture. Preserve explicit timestamping and service replacement. Avoid a global mutable default logger. |
+| testing: `go/src/testing/testing.go`, `go/src/testing/example.go` | Unit tests, examples checked against output, benchmarks, fuzzing, cleanup and temporary directories. | `stdlib/src/test.is` defines test/suite/each/fails macros; `stdlib/src/property.i` has generation, shrinking and replay; `stdlib/test/` has broad unit tests and some provider tests. | A: per-function example linkage, shared fake services, cleanup fixtures and scoped scheduler tests. B: benchmark and persistent fuzz-corpus tooling. Do not infer complete coverage from module test filenames. |
 
 The supplied Go tree also contains experimental JSON packages.
 `go/src/encoding/json/v2/doc.go` separates semantic value conversion from
@@ -245,8 +245,8 @@ The supplied Go tree also contains experimental JSON packages.
 `goexperiment.jsonv2`. They support the proposed split between i codecs and
 incremental syntax processing. Their presence is not evidence of a stable
 Go 1 API promise for those packages. i has neither public token processing nor
-an equivalent format-neutral codec layer in `std/src/json.i` and
-`std/src/schema.i`; those remain proposed additions.
+an equivalent format-neutral codec layer in `stdlib/src/json.i` and
+`stdlib/src/schema.i`; those remain proposed additions.
 
 ### 3.3 What “powerful from the start” should mean
 
@@ -265,9 +265,9 @@ large package. Proposed acceptance examples are:
 
 These are proposed release goals, not claims that they work now. Existing
 starting points are `examples/io-fs/src/main.i`,
-`examples/io-clock/src/main.i`, `std/test/http_network_test.i`,
-`std/test/clock_test.i`, `std/src/cli.i`, `std/src/csv.i`, and
-`std/src/stream.i`. The stream docs explicitly require the resource scope to
+`examples/io-clock/src/main.i`, `stdlib/test/http_network_test.i`,
+`stdlib/test/clock_test.i`, `stdlib/src/cli.i`, `stdlib/src/csv.i`, and
+`stdlib/src/stream.i`. The stream docs explicitly require the resource scope to
 surround consumption. That requirement should remain visible in examples.
 
 Effect remains the capability reference. `effect/packages/effect/src/Effect.ts`
@@ -294,7 +294,7 @@ are inferred, as specified in `docs/spec.md` §6.8.
 
 | Rule | Reason | Example |
 |---|---|---|
-| Use snake_case values/modules and UpperCamelCase types. | Matches `docs/spec.md` §1.3 and existing code. | `read_exact`, `ParseError`, `std/bit_array`. |
+| Use snake_case values/modules and UpperCamelCase types. | Matches `docs/spec.md` §1.3 and existing code. | `read_exact`, `ParseError`, `i/bit_array`. |
 | Prefer one short operation name within its module. Use `is_`/`has_` for Boolean questions. | Qualification carries context; names reveal the kind of answer. | `dict.insert(values, key, value)`, `string.is_empty(text)`. |
 | Use `parse`/`decode` for validation; `print`/`format`/`encode` for representations. Use `from_`/`to_` for named representation boundaries. | A caller can find the inverse without guessing. Document every lossy conversion. | `time.from_unix_nanoseconds(n)`, `bit_array.to_string(bytes)`. |
 | Put the subject first, configuration next, callback last. A fold callback takes accumulator first, element second. | Pipes insert position zero; callback order stays predictable. | `items |> list.fold(0, (total, x) { total + x })`. |
@@ -303,9 +303,10 @@ are inferred, as specified in `docs/spec.md` §6.8.
 | Do not add `try_` merely because a callback may raise. | Fail is already a need. Ordinary map propagates it. | `list.map(texts, parse_port)`; use `fail.catch` if the whole traversal should return Result. |
 | Use shape groups for a default and an explicit configuration of one operation. | Avoid `_with` families when shape alone expresses the difference. | The `split` definition below. |
 
+<!-- old-syntax-check: E0101 -->
 ```i
 (
-	std/string
+	i/string
 )
 
 split =
@@ -340,12 +341,12 @@ The public contract of map is conceptually:
 
 This is one traversal. `N` may include a clock, logger or `Fail(ParseError)`.
 Do not add map_effect, a wrapped Effect value or a second task runtime.
-`std/src/list.i` already accepts need-bearing callbacks; normalize its docs
+`stdlib/src/list.i` already accepts need-bearing callbacks; normalize its docs
 and expose their inferred needs accurately.
 
 Deferred values must say when callbacks run and which services are captured.
-For example, `std/src/stream.i` uses services at pull time, while
-`std/src/http.i` provider factories capture transport services. Both are valid.
+For example, `stdlib/src/stream.i` uses services at pull time, while
+`stdlib/src/http.i` provider factories capture transport services. Both are valid.
 The difference must be documented. Giving a new service with `<-` does not
 replace a value already captured by a closure (`docs/spec.md` §9.2).
 
@@ -360,17 +361,18 @@ replace a value already captured by a closure (`docs/spec.md` §9.2).
 | Invalid internal assumption | Assert/stop with a documented invariant | Do not turn user input errors into assertions. Assert is separate from Fail. |
 
 Sources for the language distinction are `docs/spec.md` §§9.3, 9.6. Existing
-`std/src/json.i` uses Fail internally and catches at `parse`; `std/src/uri.i`
-and `std/src/calendar.i` also expose Result validation. Under this proposal,
+`stdlib/src/json.i` uses Fail internally and catches at `parse`; `stdlib/src/uri.i`
+and `stdlib/src/calendar.i` also expose Result validation. Under this proposal,
 ordinary public validation would raise, with Result created at the caller's
 chosen boundary. This is a deliberate pre-stability API change, not a claim
 that E3 alone changes those functions.
 
+<!-- old-syntax-check: E0101 -->
 ```i
 (
 	i/fail
-	std/int
-	std/list
+	i/int
+	i/list
 )
 
 InvalidPort = (text = String)
@@ -408,8 +410,8 @@ global Error. Do not allocate one error type for every function.
 For example, a proposed file error can carry `operation`, `path` and a typed
 reason. `NotFound`, `Denied` and `Unsupported` are useful conditions.
 Keep an optional host detail for diagnosis; do not make applications parse
-English messages. `lib/i/fs.i` already has operation/path context, but its code
-is a String. `std/src/uri.i` demonstrates structured parts and offsets.
+English messages. `stdlib/src/fs.i` already has operation/path context, but its code
+is a String. `stdlib/src/uri.i` demonstrates structured parts and offsets.
 
 ```i
 NotFound = ()
@@ -434,9 +436,10 @@ Effect/Layer to the type. Keep the smallest useful capability together.
 Two independently replaceable services need distinct nominal type constructors
 because needs are keyed by constructor (`docs/spec.md` §9.2).
 
+<!-- old-syntax-check: E0101 -->
 ```i
 (
-	option = (Option, Some, None) = std/option
+	option = (Option, Some, None) = i/option
 )
 
 Unavailable = (detail = String)
@@ -465,35 +468,35 @@ every use and its cleanup.
 
 Default selection belongs at the application boundary. Explicit provision
 remains the simplest example. Package/target defaults may use the existing
-provider plan data from `docs/spec.md` §2.6.1; `std/i.toml` already selects
+provider plan data from `docs/spec.md` §2.6.1; `stdlib/i.toml` already selects
 native and fetch HTTP clients. This is the same mechanism available to other
 packages. Document the chosen target defaults, their needs and unsupported
 targets. Missing providers are compile errors, not optional runtime discovery.
 Startup that may fail remains an ordinary Fail-bearing acquisition; provider
 plan factories themselves obey the spec's no-uncaught-error restriction.
 
-### 4.6 i/ versus std/
+### 4.6 i/ versus i/
 
 | Place | Rule and example | Reason |
 |---|---|---|
 | `i/…` | Runtime primitives, host capability contracts and their minimal adapters: `i/control`, `i/request`, `i/fs`, `i/net`, `i/clock`, `i/core`. | These operations need runtime or host cooperation. Keep the boundary small. |
-| `std/…` | Collections, text, dates, codecs, policies, protocols and reusable algorithms: `std/list`, `std/uri`, `std/schema`. | Ordinary i should implement everything that can be expressed there. |
-| `std/…` using i needs | High-level HTTP, logging, CLI, time convenience and buffered I/O may require host services through `i/…`. | Depending on a host need does not make an algorithm a host primitive. |
+| `i/…` | Collections, text, dates, codecs, policies, protocols and reusable algorithms: `i/list`, `i/uri`, `i/schema`. | Ordinary i should implement everything that can be expressed there. |
+| `i/…` using i needs | High-level HTTP, logging, CLI, time convenience and buffered I/O may require host services through `i/…`. | Depending on a host need does not make an algorithm a host primitive. |
 | Separate adapter module where useful | Keep native HTTP/fetch construction and sink output apart from pure HTTP messages or log formatting. | Pure use should not accidentally import transport authority or an incompatible target implementation. |
 
 `docs/spec.md` §2.1 reserves supplied `i/` library paths, and the introduction
 lists compiler-required modules. That distribution rule is not permission for
 name-based implementation shortcuts. A later module move must respect those
-specified contracts. `lib/i/random.i` is pure today but is specified runtime
+specified contracts. `stdlib/src/random.i` is pure today but is specified runtime
 support. Do not move it casually merely because the placement rule favors
 ordinary algorithms in std. Also review whole-file convenience algorithms in
-`lib/i/fs.i` for a future std home without duplicating their implementation.
+`stdlib/src/fs.i` for a future std home without duplicating their implementation.
 
 ### 4.7 Documentation, tests and examples
 
 Use `////` for a module introduction and `///` for each exported item, as
 defined in `docs/spec.md` §1.2. Avoid copying a second signature catalogue into
-module comments. `std/src/log.i` shows how that catalogue can retain obsolete
+module comments. `stdlib/src/log.i` shows how that catalogue can retain obsolete
 effect syntax after executable signatures change.
 
 Each public function should have:
@@ -518,23 +521,23 @@ first = <A>(items : List(A)) -> Option(A) {
 The example assumes the normal Option import. Stability text here is a proposed
 documentation convention, not a new built-in attribute.
 
-Use `std/test/<module>_test.i` and the ordinary `std/test` macros. Group several
+Use `stdlib/test/<module>_test.i` and the ordinary `i/test` macros. Group several
 small functions in one table-driven test when appropriate; do not require a
 test file per function. Cover laws and observable behavior rather than private
-tree shapes or closure identity. `std/test/sequence_test.i` and
-`std/test/property_test.i` already demonstrate this distinction.
+tree shapes or closure identity. `stdlib/test/sequence_test.i` and
+`stdlib/test/property_test.i` already demonstrate this distinction.
 
 Every published function should map to a test or a documented reason why a
 shared test covers it. Not every function needs a property generator. Prioritize
 round trips, traversal order, stable sorting, early stop, errors, limits and
 cleanup. For callback APIs include a service-bearing callback and a failure.
 For resource APIs include cancellation and early exit. Use fake clock,
-filesystem, client and log services where possible. `std/test/clock_test.i`
-already substitutes a Clock with `<-`; `std/test/http_network_test.i` has a
+filesystem, client and log services where possible. `stdlib/test/clock_test.i`
+already substitutes a Clock with `<-`; `stdlib/test/http_network_test.i` has a
 non-terminating provider timeout case and a local network example.
 
 For example, a test for the proposed port parser uses the same ordinary catch
-as application code. A complete test module imports `std/test`, `i/fail`,
+as application code. A complete test module imports `i/test`, `i/fail`,
 and the module that defines `parse_port` and `InvalidPort`:
 
 ```i

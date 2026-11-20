@@ -116,7 +116,7 @@ Fixation never generalizes a weak variable. Variables not demanded remain shared
 
 **R6. Examples and cost.** With `id = (x) { x }`, `twice = (f : id, n : Int) { f(f(n)) }` instantiates `id`; `Same = id` is E0533. `g = id(id)` is weak and unfilled, so `G = g` is E0534. With `port = 8080`, `Port = port` is `8080`, never `Int`; write `port : Int = 8080` to obtain `Int`.
 
-With an invariant `Cell(A) { Cell(get : () -> A, set : (A) -> Nil) }`, `r = cell(1)` and `C = r` in one module fix the demanded parameter to `1` if the batch checks. A later `r.set(2)` fails. Without the read, later constraints may widen that parameter. This is a deliberate, visible cost of D; it is not ordinary display simplification.
+With an invariant `Cell(A) { Cell(get : () -> A, set : (A) -> ()) }`, `r = cell(1)` and `C = r` in one module fix the demanded parameter to `1` if the batch checks. A later `r.set(2)` fails. Without the read, later constraints may widen that parameter. This is a deliberate, visible cost of D; it is not ordinary display simplification.
 
 **R7. Closed-only reuse after completion (coordinator choice a).** A new definition read or extraction in another module, or performed by a later group, must start from a **wholly closed completed source type**. Replace recorded fixed variables by their closed forms; all remaining structure must contain no generalized variable, unresolved weak variable, label parameter, Top or hole. A successful source-completion batch may publish a wholly closed source form as well as its closed aliases. Do not reconstruct a shape from a weak variable's live bounds, use its displayed type, or add equations to obtain a closed form after the source has completed. The rule is the same for a direct constructor-shaped scheme and for a weak root with that constructor below it.
 
@@ -449,7 +449,7 @@ No-value-type programs bypass demand collection/closure/trial work. Do not promi
 8. Add deferred exports, Typed.alias_types, queries and canonical package comparison, including parameterized aliases containing a closed Of.
 9. Run the T2 tests in §10. With T1 integrated, run spec tests and `scripts/checks rust`; compare existing checker/interface goldens. Use the coordinator's heavy wrapper for **every** cargo invocation. No Rust implementation or compiler run is part of this design-note commit.
 10. T3 adds record/Without closure and shape arms, label checks, shown-place checks and the §5.9 builder test. M1/M2 add or reconcile the Lisp/Definitions rows; M4 applies the expansion restrictions. Each track owns and runs its deferred tests.
-11. Run std/spec with reversed independent-group tie breaking and with recovery enabled. Measure std time with the accepted T1 measurement procedure; investigate any regression. Audit WAT for existing programs and for type-only changes, allowing only differences justified by changed inferred runtime tests.
+11. Run i/spec with reversed independent-group tie breaking and with recovery enabled. Measure std time with the accepted T1 measurement procedure; investigate any regression. Audit WAT for existing programs and for type-only changes, allowing only differences justified by changed inferred runtime tests.
 
 ## 10. Tests and expected results
 
@@ -477,7 +477,7 @@ These are implementation requirements, not tests reported as passing. Each expec
 | Consumer isolation | Module lib exports r/reset with `r = cell(1)`, reset sets `"s"`, and no lib type read. App or a test module adds `C = lib.r`. | E0534 only at the consumer; library check/interface unchanged; R3/X3. With a source annotation Cell(Int), a consumer read is allowed. |
 | Scope | Own pattern/header/value examples V3; local m covers imported m in `m.x`; module-only `m`; private member. | E0536, E0207, E0205, E0204 respectively; V2/V3. Pending qualifier stays E0207 after adding an import. |
 | Import-stable item | Add/remove an import of User around `Schema(User, _) = user`; add it around `Pair(A) = (A,A)`. | First remains a pattern and gains E0537 on collision; second remains generic; P1/P3. |
-| Pattern shapes | Tuple through Pair alias; wrong head; union with Nil; exact head-alias part; duplicate binder; invalid macro part. | Correct projection; E0535; E0535; equality or mismatch without filling an unknown; E0208; E0532; P2–P4. |
+| Pattern shapes | Tuple through Pair alias; wrong head; union with (); exact head-alias part; duplicate binder; invalid macro part. | Correct projection; E0535; E0535; equality or mismatch without filling an unknown; E0208; E0532; P2–P4. |
 | Eager order | Unused mismatching pattern; `A = List(B)` before a pattern defining B; module containing only an imported closed-source pattern. | Unused error is reported; A completes after B; no-group module still completes; P5/R7. |
 | Cycles | O3 example; self Of through alias; two type edges between groups; pure alias circle; import circle. | E0530 with chain for the first three, E0223 and E0214 for the last two; O2/O3. SCCs/needs/init unaffected on valid fixtures. |
 | Recovery | Query all preceding bad-cycle fixtures and an unrelated valid binding. | No panic/fresh inferred alias; Failed propagates, unrelated hover/navigation survives; O4/X4. |
@@ -489,13 +489,13 @@ These are implementation requirements, not tests reported as passing. Each expec
 | Queries | Head/source/binder navigation, multi-binder outline, inferred/failed hover. | Existing head target, source binding target, individual alias targets; stable outline without inference; X4. |
 | Macros (M2/M4) | Body macro yielding a value name in a generic alias; generated direct Of; generated alias from ancestor/non-ancestor/imported source. | No reclassification; E0531; accepted/E0531/accepted only after imported completion; P1/M3. Definitions returns the written item, not an inferred body. |
 | Records (T3) | records.md §5.9 codec plus later encode calls; read encode side without lower bounds; read record key/label-parameter binding. | User = { age: Int, name: String }; encode calls work; E0534; E0543/E0542; M1/V4. |
-| No feature | Existing std/spec without Of or patterns; reverse independent order. | Same accepted programs, canonical types, needs and init; no demand batches; O2. Measure rather than assume timing. |
+| No feature | Existing i/spec without Of or patterns; reverse independent order. | Same accepted programs, canonical types, needs and init; no demand batches; O2. Measure rather than assume timing. |
 
 A complete, ordinary i fixture for the invariant Cell tests (no host or mutable primitive is required to exercise invariant type constraints):
 
 ```i
-Cell(A) = (get = () -> A, set = (A) -> Nil)
-cell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }
+Cell(A) = (get = () -> A, set = (A) -> ())
+cell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }
 r = cell(1)
 C = r
 later = () { r.set(2) }
@@ -567,7 +567,7 @@ All programs here use the proposed syntax. “Checked by reading” means the in
 
 ### Attack pass 1 after those corrections
 
-- **Soundness:** `Box(A) { Box(get : () -> A, put : (A) -> Nil) }`; extract from a weak Box then pass it to incompatible invariant contexts. R4 checks both equality directions with the original graph; later incompatible constraints still fail. A skipped occurrence of that same A cannot escape fixation. The expected-known callback counterexample is also rechecked with an unannotated holder: its shape stays unknown while its monotype is shared. The inner-f shadowing example follows lexical reserved frames. No further serious issue found by tracing `constrain_in`, `compare` and the proposed scope rules.
+- **Soundness:** `Box(A) { Box(get : () -> A, put : (A) -> ()) }`; extract from a weak Box then pass it to incompatible invariant contexts. R4 checks both equality directions with the original graph; later incompatible constraints still fail. A skipped occurrence of that same A cannot escape fixation. The expected-known callback counterexample is also rechecked with an unannotated holder: its shape stays unknown while its monotype is shared. The inner-f shadowing example follows lexical reserved frames. No further serious issue found by tracing `constrain_in`, `compare` and the proposed scope rules.
 - **Buildability:** `A = List(B)`, then `Pair(B, _) = pair`, with pair's result behind a weak root and an unused encode-like part. Module/group events and dependency order complete B before A without forcing the skipped part. No Pending fallback is needed.
 - **Sources:** `Schema(User, _) = m()` with a syntax macro returning `user`, and a later import of User. The stored generic classification gives a parameter-form error throughout; no import/expansion changes meaning. A newly generated whole pattern item is classified as such. This keeps the macro draft's syntactic definition service and accepted macro reservation. No further serious issue found.
 

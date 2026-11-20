@@ -5,7 +5,7 @@ import json
 import re
 
 OUT = ROOT / 'docs/content/docs/standard/generated'
-text = SPEC_PATH.read_text().replace('(design/runtime.md)', '(https://github.com/nmnmcc/i/blob/main/docs/design/runtime.md)')
+text = SPEC_PATH.read_text()
 parts = re.split(r'(?m)^(## (?:\d+\.|Appendix [A-Z]\.).*)$', text)
 OUT.mkdir(parents=True, exist_ok=True)
 for old in OUT.glob('*.mdx'):

@@ -1,13 +1,13 @@
 # Test macros
 
-`std/test` supplies item macros. Import the names using an alias that does not
-shadow `test`, for example `(testlib = (test, suite, skip, only, fails, each) = std/test)`.
+`i/test` supplies item macros. Import the names using an alias that does not
+shadow `test`, for example `(testlib = (test, suite, skip, only, fails, each) = i/test)`.
 The variant names are separate imports: §2.2 reserves `a.m(...)` for module
 qualification, so `test.skip(...)` would mean a module named `test`.
 
 `test("name", () { ... })` expands to a fresh private, zero-argument function
 that calls the supplied body. The item expansion contributes that function to
-`std/test.tests` through `Items.add`, with `name` and `mode` string metadata.
+`i/test.tests` through `Items.add`, with `name` and `mode` string metadata.
 `skip`, `only` and `fails` generate the same kind of entry, with their respective
 modes. Each function is a distinct selected root and runs in a fresh instance.
 A failure or uncaught typed error belongs to that entry. An expected failure
@@ -21,7 +21,7 @@ value), ...], (value) { ... })` expands to one `test` per case, named
 `name / case`. Names and case lists are written literals so discovery does not
 execute application code. Suites and cases compose.
 
-A package opts in with `[test] collection = "std/test.tests"` in `i.toml` and
+A package opts in with `[test] collection = "i/test.tests"` in `i.toml` and
 a dependency on `std`. The runner reads the general collection manifest, selects
 entries with that qualified collection identity, and compiles all selected roots into one artifact, then runs each in a fresh instance. Metadata supplies display names and modes, not type information.
 `only` selects focused entries; `skip` is reported without execution.

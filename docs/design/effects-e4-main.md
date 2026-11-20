@@ -105,7 +105,7 @@ final record. Both O0 and O2 copies retain the exact `Error(7)` output, empty
 stderr and zero-exit assertions; no expected output changes.
 
 Spec §9.4: `control.cancel` has type
-`<A, R, N>(Continuation(A, R, N)) <- N -> Nil`.
+`<A, R, N>(Continuation(A, R, N)) <- N -> ()`.
 Spec §9.2: “A service value can be captured. Providing the service later
 changes calls that take it from their caller, not the captured value.”
 Spec §9.3: “An error goes out through the calls to the `catch` that provided
@@ -178,7 +178,7 @@ both i optimization levels. The checker skip is exactly
 - Workspace all-targets check: pass after the merge and again on the final source.
 - Requested six-crate tests: all pass after complete LSP protocol (98) and
   control_lazy (17) reruns; the other targets of the original run pass.
-- Every CLI integration binary, lib/bin tests, and doc tests: pass after
+- Every CLI integration binary, lib and bin tests, and doc tests: pass after
   complete corrected target reruns (determinism 3, macro_budget 9, native 14,
   r2_runtime 8, WASI 17). `typed_macros` has its separate complete 36-test run.
 - Std typecheck: pass.

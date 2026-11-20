@@ -27,7 +27,7 @@ take, and the error is given to the host (Appendix B)."
 ## Streaming fetch after a suspension
 
 WAT builds of the current std and a pre-E4 std snapshot (`d5d8e9042`) both
-reproduce the same failure. `std/http.client` (`f157`) has the same `$fn0`
+reproduce the same failure. `i/http.client` (`f157`) has the same `$fn0`
 signature, reads service slot 10, and calls `$field` to obtain `Client.make`.
 The request has already suspended on its first streamed read. When the caller
 makes its second HTTP request, slot 10 is empty in the resumed environment.

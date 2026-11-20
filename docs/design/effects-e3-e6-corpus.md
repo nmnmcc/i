@@ -67,16 +67,16 @@ control; one-sided bounds stay open (§4.5: “Two types are equal when each is
 a subtype of the other”). Ordinary value-difference display is unchanged.
 
 The stored-callback repair restores the published Stream error covariance
-and residual-need invariance, including Sink's ordinary `(N)->Nil` marker.
+and residual-need invariance, including Sink's ordinary `(N)->()` marker.
 Std-1 §3.1: “A/E are covariant; N is invariant.” Std-2 §6.3 L5: “E is covariant;
-N is invariant through the unused `(N)->Nil` marker”. The shipped-declaration
+N is invariant through the unused `(N)->()` marker”. The shipped-declaration
 regression checks these actual types. The vendored snapshot receives the
 same marker/annotation and grouped-suite-collector repairs, retaining every
 test body, algorithm, error assertion and literal. It checks successfully;
 its 1,446 collected test bindings and original bounded runtime censors remain.
 
 Decision 2 also restores §9.5's exact `resource.ensure` type
-`<A,N>(() <- N -> A, () <- N -> Nil) <- N -> A`. Internal pure kept scheduler
+`<A,N>(() <- N -> A, () <- N -> ()) <- N -> A`. Internal pure kept scheduler
 callbacks supply an actual `Fail(Never)` value; no key is erased or caller
 handler captured in its place. The former final-error rejection fixture now
 asserts the same `Error("final")` through `fail.catch` under Decision 9.
@@ -189,7 +189,7 @@ rule that a test pinning a removed feature keeps its original intent.
 | Case | Old | New / retained intent | Category and paragraph |
 |---|---|---|---|
 | `review-k4-lane/alias_kind_env` | E0515 | E0515 + E0225: returning the row as ordinary data | a, R3 |
-| `review-k4-lane/alias_kind_error` | E0515 on the old error-row alias | `Fail(N)` correctly has an ordinary argument after E3. Migrate `Row(N)` to `() <- N -> Nil`, keeping the original negative row-kind test and its E0515 requirement; it also reports the R3 row-value error. The ordinary `Fail(N)` form is a positive compiler regression. | a, R1/R3; source migration |
+| `review-k4-lane/alias_kind_error` | E0515 on the old error-row alias | `Fail(N)` correctly has an ordinary argument after E3. Migrate `Row(N)` to `() <- N -> ()`, keeping the original negative row-kind test and its E0515 requirement; it also reports the R3 row-value error. The ordinary `Fail(N)` form is a positive compiler regression. | a, R1/R3; source migration |
 | `review-k4d/_loose/fuzz/e0505/21_135` | checker E0515 | checker accepts the unused local `T` provide; entry still rejects missing `Dep`, `S`, `T` | a, R1/R5/R6 |
 | `review-k4d/_loose/fuzz/e0505/21_145` | E0501 | E0225 + the same E0501; two explicit `S` values | a, R2 |
 | `review-k4d/_loose/fuzz/e0505/21_160` | one aggregate E0523 | two E0523, for `S` and `T`; all entry phases still reject | a, R6 |
@@ -239,7 +239,7 @@ the compiler's general tail-provide gap. No release is run on a stop.
 
 | Original leak case | Fresh full-corpus result |
 |---|---|
-| `review-native3/_loose/design-cases/events` | Every phase passes. Exact printed main is `() <- (Assert, Fail(Never), task.Runner) -> Nil`; Scheduler is gone and the genuine Fail key remains (Decision 2). |
+| `review-native3/_loose/design-cases/events` | Every phase passes. Exact printed main is `() <- (Assert, Fail(Never), task.Runner) -> ()`; Scheduler is gone and the genuine Fail key remains (Decision 2). |
 | `review-r2/determinism` | Every phase passes; main needs `Fail(task.NotRunnable), Io, task.Runner`, with no Scheduler; outcomes match main. |
 | `review-r2/never_yields` | Check and both test phases pass; both runs intentionally diverge with empty stdout at the original bound; no Scheduler; outcomes match main. |
 
@@ -278,8 +278,8 @@ the unmodified old e4 executable:
 
 | Case | Old copied `app/main.run` type | Fresh type | Controlling paragraph |
 |---|---|---|---|
-| `review-k4/perf/wide_generic_2048` | `(() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil` | `(() <- N -> Nil) <- N -> Nil` | R1, syntax-three §6.1: “One need row. `err` is removed (stage E3): errors are the `Fail(E)` entry of `env`.” N is the complete need row; no new meaning or diagnostic changes. |
-| `review-k4c/cases/stress_wide_open_1024` | `(() <- (Fail(E), ..N) -> Nil) <- (Fail(E), ..N) -> Nil` | `(() <- N -> Nil) <- N -> Nil` | R1, syntax-three §6.1: “One need row. `err` is removed (stage E3): errors are the `Fail(E)` entry of `env`.” N is the complete need row; no new meaning or diagnostic changes. |
+| `review-k4/perf/wide_generic_2048` | `(() <- (Fail(E), ..N) -> ()) <- (Fail(E), ..N) -> ()` | `(() <- N -> ()) <- N -> ()` | R1, syntax-three §6.1: “One need row. `err` is removed (stage E3): errors are the `Fail(E)` entry of `env`.” N is the complete need row; no new meaning or diagnostic changes. |
+| `review-k4c/cases/stress_wide_open_1024` | `(() <- (Fail(E), ..N) -> ()) <- (Fail(E), ..N) -> ()` | `(() <- N -> ()) <- N -> ()` | R1, syntax-three §6.1: “One need row. `err` is removed (stage E3): errors are the `Fail(E)` entry of `env`.” N is the complete need row; no new meaning or diagnostic changes. |
 
 The fresh full run is followed by an exact all-1973 outcome comparison with
 e975 and a byte-exact metadata restoration. The 395 requirements and all 34

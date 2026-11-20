@@ -81,7 +81,7 @@ A narrower factual treatment of those written results is evaluated separately.
 This preserves the useful field inference example:
 
 ```i
-(list = std/list)
+(list = i/list)
 f = () { list.fold([1], (n = 0), (acc, x) { (n = acc.n + x) }).n }
 ```
 

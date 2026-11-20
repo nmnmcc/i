@@ -9,7 +9,7 @@ review is `/home/agent/Programming/i/.rd/cache/gpt/report-review-std1.md`;
 its two findings were checked again for this revision. Examples use the accepted
 syntax. Signature inventories describe bindings with bodies, not external
 declarations or new syntax. `Option`, `Some`, and `None` are explicitly imported
-from `std/option`; `ContinueOrStop` is qualified through `std/list`.
+from `i/option`; `ContinueOrStop` is qualified through `i/list`.
 
 ## 1. Problem and controlling sources
 
@@ -37,19 +37,19 @@ Facts checked by reading code:
 
 | Code region | Evidence and consequence |
 |---|---|
-| `std/src/list.i:9–18`, `:188–199`, `:271–278`, `:366–407`, `:447–455`, `:512–524` | Missing elements use `Option`; negative indexes miss; take/drop clamp negative counts; callbacks carry `^ E ! N`; folds run left to right. Keep these conventions. |
-| `std/src/dict.i:24–60`, `:136–143`, `:237–244` | A public type hides private recursive nodes; updates return new values. Follow this encapsulation. |
-| `std/src/string.i:4–6`, `:70–94`, `:110–139`, `:254–308`, `:428–455` | String indexes are codepoints; byte size is separate; concat takes fragments; slice/pop_codepoint convert codepoint lists. Do not repeatedly pop a string in a linear parser. |
-| `std/src/option.i:1–6`, `:27–31`, `:54–59`; `std/src/result.i:1–5`, `:244–252` | Absence and failure are distinct; `Result` and error effects have explicit bridges. |
-| `lib/i/fail.i:10–31` | Raise/catch already exist. Stream error adapters need no new primitive. |
-| `std/test/list_test.i:1847–1853`, `:1973–1985`, `:2073–2139` | Existing tests cover bounds, error callbacks, labels, known nominal fields, services and control callbacks. Preserve all of these cases for new containers. |
-| `std/test/dict_test.i:420–428`, `:857–1014` | Tests keep old versions and use a deterministic list model. Use that method for sequences. |
-| `std/test/string_test.i:2060–2095`, `:2240–2247`; `std/test/option_test.i:255–280`; `std/test/result_test.i:319–342`, `:372–382` | Empty pieces, Unicode, known fields, deferred callbacks, long walks, and union errors have concrete precedents. |
+| `stdlib/src/list.i:9–18`, `:188–199`, `:271–278`, `:366–407`, `:447–455`, `:512–524` | Missing elements use `Option`; negative indexes miss; take/drop clamp negative counts; callbacks carry `^ E ! N`; folds run left to right. Keep these conventions. |
+| `stdlib/src/dict.i:24–60`, `:136–143`, `:237–244` | A public type hides private recursive nodes; updates return new values. Follow this encapsulation. |
+| `stdlib/src/string.i:4–6`, `:70–94`, `:110–139`, `:254–308`, `:428–455` | String indexes are codepoints; byte size is separate; concat takes fragments; slice/pop_codepoint convert codepoint lists. Do not repeatedly pop a string in a linear parser. |
+| `stdlib/src/option.i:1–6`, `:27–31`, `:54–59`; `stdlib/src/result.i:1–5`, `:244–252` | Absence and failure are distinct; `Result` and error effects have explicit bridges. |
+| `stdlib/src/fail.i:10–31` | Raise/catch already exist. Stream error adapters need no new primitive. |
+| `stdlib/test/list_test.i:1847–1853`, `:1973–1985`, `:2073–2139` | Existing tests cover bounds, error callbacks, labels, known nominal fields, services and control callbacks. Preserve all of these cases for new containers. |
+| `stdlib/test/dict_test.i:420–428`, `:857–1014` | Tests keep old versions and use a deterministic list model. Use that method for sequences. |
+| `stdlib/test/string_test.i:2060–2095`, `:2240–2247`; `stdlib/test/option_test.i:255–280`; `stdlib/test/result_test.i:319–342`, `:372–382` | Empty pieces, Unicode, known fields, deferred callbacks, long walks, and union errors have concrete precedents. |
 | `crates/ilang-check/src/types/infer.rs:232–247`, `:292–325` | Recursive group names get monomorphic holders before generalization. A Haskell helper recursively called at `Node(A)` cannot simply be ported. |
 | `crates/ilang-check/src/types/infer.rs:2237–2266`, `:2321–2329` | Custom variance is found by a fixed point; function result, errors and environment are traversed. A plain thunk wrapper would infer positive N variance. That is insufficient to preserve the stricter environment relation; §3 adds an ordinary negative occurrence to make N invariant. |
 | `crates/ilang-check/src/types/display.rs:670–679`, `:1028–1052`; `crates/ilang-check/src/types/infer.rs:2104–2120` | Normalization can collapse equal Both sides; the ordinary constructor occurrence walk does not visit invariant arguments in both directions. Generalization consumes the simplification, so the factory failure in §3.4 affects accepted clients, not only display. This requires a general compiler conformance fix. |
 | `crates/ilang-check/src/order.rs:135–168`, `:188–207` | Direct recursive functions are possible; eager self-dependent values are rejected. Build infinite streams through functions, not an eager cyclic list. |
-| `std/src/bit_array.i:33–45`, `:70–77`; `crates/ilang-wasm/src/runtime/core.rs:110–125` | UTF-8 conversion can fail; whole byte fragments can be joined; conversion validates UTF-8. URI bytes need not be UTF-8. |
+| `stdlib/src/bit_array.i:33–45`, `:70–77`; `crates/ilang-wasm/src/runtime/core.rs:110–125` | UTF-8 conversion can fail; whole byte fragments can be joined; conversion validates UTF-8. URI bytes need not be UTF-8. |
 
 These are reading results, not evidence that the new modules compile. Cost
 notes count element/byte/node operations; arbitrary-size integer arithmetic,
@@ -80,13 +80,13 @@ Decisions, reasons, and sources:
    (spec §2.1/§2.4, source table above).
 2. **Factories are functions with written interfaces.** In particular `new()`
    avoids sharing one weakly typed empty value across unrelated uses. This follows
-   the value restriction (spec §4.7) and `list.new` at `std/src/list.i:394–398`.
+   the value restriction (spec §4.7) and `list.new` at `stdlib/src/list.i:394–398`.
 3. **Streams store calls, not running continuations.** Making/composing a stream
    is pure; pulling supplies services at that call. This is spec §9.1/§9.2, not a
    stream-specific effect rule. The pure case uses `Never` for both effect parts.
 4. **Errors stop a traversal; they are not end-of-stream.** Value errors can be
    ordinary elements, or explicitly promoted/demoted with adapters. Keep the
-   distinction of `std/src/result.i:1–5`, `:244–252`.
+   distinction of `stdlib/src/result.i:1–5`, `:244–252`.
 5. **Sequence is an eager, uniform-node finger tree.** Keep measured splitting and
    concatenation, avoiding polymorphic recursive helpers. End edits have O(log n)
    worst-case bounds in every persistent history. Do not promise Haskell's
@@ -130,7 +130,7 @@ the checker must infer. These building blocks have unrelated uses:
 | json | Structured interchange; configuration; HTTP payloads. |
 | http | Message framing, HTTP client and server, request construction, and response inspection. |
 
-## 3. `std/stream`
+## 3. `i/stream`
 
 ### 3.1 Types and complete exports
 
@@ -138,7 +138,7 @@ Export `Stream` without its constructor; export `Step(..)`. Export exactly the
 functions below. `Step` is data; its `Next` tail describes later calls.
 
 ```i
-Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> Nil)
+Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> ())
 Done = ()
 Next(A, E, N) = (A, Stream(A, E, N))
 Step(A, E, N) = Done | Next(A, E, N)
@@ -163,7 +163,7 @@ drop(A, E, N): (from: Stream(A, E, N), up_to: Int) -> Stream(A, E, N)
 take_while(A, E, F, N): (from: Stream(A, E, N), keeping: (A) -> Bool ^ F ! N) -> Stream(A, E | F, N)
 fold(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> Acc ^ F ! N) -> Acc ^ E | F ! N
 fold_until(A, Acc, E, F, N): (over: Stream(A, E, N), from: Acc, with: (Acc, A) -> list.ContinueOrStop(Acc) ^ F ! N) -> Acc ^ E | F ! N
-each(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ^ F ! N) -> Nil ^ E | F ! N
+each(A, B, E, F, N): (over: Stream(A, E, N), with: (A) -> B ^ F ! N) -> () ^ E | F ! N
 to_list(A, E, N): (stream: Stream(A, E, N)) -> List(A) ^ E ! N
 from_results(A, E, N): (items: List(Result(A, E))) -> Stream(A, E, N)
 attempt(A, E, N): (stream: Stream(A, E, N)) -> Stream(Result(A, E), Never, N)
@@ -171,7 +171,7 @@ map_environment(A, E, N, M): (stream: Stream(A, E, N), run: { (body: () -> Step(
 ```
 
 A/E are covariant; N is invariant. The second private Stream field is an unused
-function accepting N and returning Nil. It is made as `(_ : N) { Nil }` and never
+function accepting N and returning (). It is made as `(_ : N) { () }` and never
 called. This is an ordinary negative occurrence, so the existing variance rule
 makes N invariant, including through Step's tail. It prevents a Stream needing
 `Sink(Int)` from being coerced to one needing `Sink(Never)` through the ordinary
@@ -250,12 +250,14 @@ common environment in their constructors; this is a deliberate ergonomic cost.
 
 Implementation witnesses, using ordinary constructors and calls:
 
+<!-- old-syntax-check: E0101 -->
+
 ```i
 make = <A, E, N>(step : () <- (Fail(E), ..N) -> Step(A, E, N)) -> Stream(
 	A,
 	E,
 	N,
-) { Stream(step, (_ : N) { Nil }) }
+) { Stream(step, (_ : N) { () }) }
 pull = <A, E, N>(stream : Stream(A, E, N)) -> Step(A, E, N) {
 	Stream(step, _) = stream
 	step()
@@ -305,7 +307,7 @@ also need separate demand tests, not just these extensional laws.
 | Zip empty left with failing right | Empty; no error | S5 |
 | Zip failing left with empty right | Error from left | S5 |
 | Fold-until Stop at element 2 over `[1, 2]` plus a failing tail | Returned acc, no tail error | S6 |
-| Fold `[1, 2, 3]` from 0 by addition | `6`; each returns `Nil` | S6 |
+| Fold `[1, 2, 3]` from 0 by addition | `6`; each returns `()` | S6 |
 | Collect `from_results([Ok(1), Error("bad"), Ok(3)])` inside fail.catch | `Error("bad")` | S7 |
 | Collect attempt of that stream | `[Ok(1), Error("bad")]` | S7 |
 
@@ -345,7 +347,7 @@ written here in the accepted syntax with Stream/Step as defined in §3.1:
 
 ```i
 new = <A, N>() -> Stream(A, Never, N) {
-	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { Nil })
+	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { () })
 }
 Bias = (value = Int)
 needs_bias = () -> Stream(Int, Never, Bias) { new() }
@@ -374,7 +376,7 @@ generalization. The separate compiler track must correct this general behavior
 and pass both gates before the stream writer starts; it must not teach the
 compiler about Stream, Bias or any std path.
 
-## 4. `std/sequence`
+## 4. `i/sequence`
 
 ### 4.1 Types and complete exports
 
@@ -404,7 +406,7 @@ drop(A): (from: Sequence(A), up_to: Int) -> Sequence(A)
 reverse(A): (sequence: Sequence(A)) -> Sequence(A)
 map(A, B, E, N): (over: Sequence(A), with: (A) -> B ^ E ! N) -> Sequence(B) ^ E ! N
 fold(A, Acc, E, N): (over: Sequence(A), from: Acc, with: (Acc, A) -> Acc ^ E ! N) -> Acc ^ E ! N
-each(A, B, E, N): (over: Sequence(A), with: (A) -> B ^ E ! N) -> Nil ^ E ! N
+each(A, B, E, N): (over: Sequence(A), with: (A) -> B ^ E ! N) -> () ^ E ! N
 equal(A): (first: Sequence(A), second: Sequence(A)) -> Bool
 ```
 
@@ -520,7 +522,7 @@ source remains observationally equal to its old list after any descendant edit.
 | Set at 1 to 7; separately observe saved original | Some sequence `[10, 7]`; original `[10, 20]` | Q1/Q2 |
 | Split `[1, 2, 3]` at -1, 1, 99 | `([], [1,2,3])`, `([1],[2,3])`, `([1,2,3],[])` after conversion | Q2 |
 | Append `[1, 2]` and `[3]`, then reverse | `[3, 2, 1]` | Q1 |
-| Map doubling; fold addition from 0; each | `[2,4,6]`; 6; Nil | Q3 |
+| Map doubling; fold addition from 0; each | `[2,4,6]`; 6; () | Q3 |
 | Callback raises at 2; callback at 3 would panic | First error, no panic | Q3 |
 | Same elements built by append and repeated end insertion | equal gives True; no assertion about `==` | Q4 |
 
@@ -533,7 +535,7 @@ Instrumentation in a temporary development variant counts touched nodes for
 at/set/split/append on growing sizes; it must show height work, including when
 the two arguments alias. Deliver count scripts to the coordinator, not timings.
 
-## 5. `std/path`
+## 5. `i/path`
 
 ### 5.1 Complete exports
 
@@ -620,7 +622,7 @@ as O(1). Compare path segments over at most the total input size. For long tests
 use 100,000 segments, multibyte names, and long dot/parent runs. Check the laws
 over all short strings from a small alphabet including `/`, `.`, `a`, `é`, `\\`.
 
-## 6. `std/uri`
+## 6. `i/uri`
 
 ### 6.1 Types and complete exports
 
@@ -915,7 +917,7 @@ sequence may be implemented first and need not wait for the stream prerequisite.
 URI may also proceed independently with the corrected U5/U8 contract. Stream
 implementation starts only after the separate compiler track passes §3.4's
 positive factory and negative service-compatibility gates. Each writer owns
-one new `std/src/<name>.i` and one new `std/test/<name>_test.i`, from line 1 through
+one new `stdlib/src/<name>.i` and one new `stdlib/test/<name>_test.i`, from line 1 through
 EOF. Module source regions, in order: imports; exact exports; public types;
 factories/parsers; operations/builders; private helpers. Tests use imported `test` macros,
 assertions and pure local fake services like the existing tests. No module may
@@ -925,7 +927,7 @@ sequence does not depend on stream. Stream alone may import list for fold contro
 
 No spec edit is assigned to Std-1. The coordinator assigns the compiler
 conformance prerequisite to a separate compiler track; std writers do not patch
-it or weaken the stream interface. No `std/i.toml` change is needed: source
+it or weaken the stream interface. No `stdlib/i.toml` change is needed: source
 discovery already walks source/test directories and accepts .i files
 (`crates/ilang-package/src/modules.rs:22–31`, `:84–94`; spec §2.1). Any discovered compiler
 defect is reported with a minimal ordinary-language witness, not patched in std.
@@ -1024,7 +1026,7 @@ type and logarithmic middle search do not require polymorphic recursion.
 
 ```i
 (
-	std/stream
+	i/stream
 	i/fail
 )
 bad = () -> List(Int) {
@@ -1042,8 +1044,8 @@ cannot be erased by an intermediate combinator.
 **Soundness/source conflict: service variance hidden in a nominal wrapper.**
 
 ```i
-Sink(A) = (put = (A) -> Nil)
-PlainStream(E, N) = (() <- (Fail(E), ..N) -> Nil)
+Sink(A) = (put = (A) -> ())
+PlainStream(E, N) = (() <- (Fail(E), ..N) -> ())
 need_int = () <- (s : Sink(Int)) { s.put(1) }
 coerce = (source : PlainStream(Never, Sink(Int))) -> PlainStream(
 	Never,
@@ -1053,7 +1055,7 @@ unsafe = () {
 	{
 		PlainStream(run) = coerce(PlainStream(need_int))
 		run()
-	} <- (Sink(put = (x : Never) -> Nil { core.never(x) }))
+	} <- (Sink(put = (x : Never) -> () { core.never(x) }))
 }
 ```
 
@@ -1087,7 +1089,7 @@ reading pass did not establish factory buildability.
 
 ```i
 (
-	std/stream
+	i/stream
 	i/fail
 )
 example = () {
@@ -1109,7 +1111,7 @@ another input pull (S4). Expected `[1]`. `take(0)` also cannot call a thunk.
 
 ```i
 (
-	std/stream
+	i/stream
 	i/control
 	i/resource
 )
@@ -1125,7 +1127,7 @@ abandon = () {
 			() { panic("finalizer") },
 		)
 	})
-	Nil
+	()
 }
 ```
 
@@ -1140,8 +1142,8 @@ safety merely from the absence of control calls inside the stream implementation
 
 ```i
 (
-	std/list
-	std/sequence
+	i/list
+	i/sequence
 )
 branches = (q : sequence.Sequence(Int)) {
 	list.map(list.range(1, 1000), (x) { sequence.push_back(q, x) })
@@ -1262,7 +1264,7 @@ control `"x://host/a"` with `"/.//h"`, and missing-base-scheme error precedence.
 It also checked that path/sequence have no dependency on the factory gate and
 that no spec addition or weaker service rule remains. No further serious issue
 was found in these two passes. The compiler prerequisite is still open; these
-checks do not claim its fix or an execution of std/uri.
+checks do not claim its fix or an execution of i/uri.
 
 ## 10. Risks, coordinator decisions, and checking limits
 
@@ -1290,7 +1292,7 @@ No API question from the original recommendation list remains open. Stream's
 implementation prerequisite is a tracked compiler dependency, not a language
 change or a reason to relax service compatibility.
 
-Checked here: source baseline and branch, cited std/compiler regions, accepted
+Checked here: source baseline and branch, cited i/compiler regions, accepted
 syntax and scoped type notes, plan/ledger decisions, reference API documents,
 the initial manual counterexample passes, and the independent-review corrections
 with two further clean reading passes. No new modules exist yet, so their compile/run behavior, exported inferred signatures, Wasm stack use,

@@ -23,8 +23,8 @@ text onto new code. Conflict decisions are recorded in
 | Rust comment section marks | 1,381 | 0 |
 | Rust comment `spec.md` paths | 5 | 0 |
 | Rust comment lines with either reference | 1,238 | 0 |
-| `std/` and `lib/` comment section marks | 78 | 0 |
-| `std/` and `lib/` comment reference lines | 72 | 0 |
+| `i/` and `lib/` comment section marks | 78 | 0 |
+| `i/` and `lib/` comment reference lines | 72 | 0 |
 | Additional checker-fixture section marks / lines | 6 / 5 | 0 / 0 |
 | Stale-comment detector lines | 584 | 0 |
 | Dormant Python recipe code lines / files | 231 / 5 | 0 / 0 |
@@ -75,7 +75,7 @@ scripts/doc-comments check --proof "$base" --i-bin target/release/i
 ```
 
 The proof lexes every existing tracked Rust file, plus `.i` and `.is` files under
-`std/` and `lib/`, plus the three checker fixtures listed in `EXTRA_I`. Tokens
+`i/` and `lib/`, plus the three checker fixtures listed in `EXTRA_I`. Tokens
 include exact string and character literals; Rust whitespace is ignored, while
 i line breaks are retained. A separate comparison
 keeps all seven fenced or indented Rustdoc example blocks byte-identical, including

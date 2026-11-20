@@ -5,7 +5,7 @@ This note applies J1–J8, K1–K5 and L1–L4. Track JA has installed the owned
 arbitrary foreign values and callbacks remain outside this revision.
 
 Sources, in order: the user's rulings; `docs/spec.md`; accepted `syntax.md`,
-`runtime.md`, `meta.md`, and the now-landed `native.md`/`multicore.md`; the
+`runtime.md` (removed; its installed task and IO rules are in the standard and in this note), `meta.md`, and the now-landed `native.md`/`multicore.md`; the
 reviews `.rd/cache/gpt/report-review-js.md`, `report-review-js3.md` and
 `report-review-js4.md` (full last report `/tmp/review-js4/review.md`); the old
 note. The plan's “已定的设计”, IO/native tracks and the coordinator ledger were
@@ -16,7 +16,7 @@ probe results are labelled separately. All i examples use accepted syntax.
 
 ## Implemented JS step 02
 
-`std/http.Client` now has package-owned provider defaults: native and Node
+`i/http.Client` now has package-owned provider defaults: native and Node
 capture Net/Tls, JS captures `i/fetch.Fetch`. Selection uses the general plan
 resolver. Dependency packages may default only their own nominal services;
 the root can override those cells. `i deps --target js` shows the chosen entry
@@ -131,7 +131,7 @@ accepted this cost verbatim: **“接受这个代价” (J1)**. For example:
 
 main = () {
 	fail.catch(() { fs.read_file("settings.txt") })
-	Nil
+	()
 }
 ```
 
@@ -237,6 +237,8 @@ embedder's services cannot be enumerated by the compiler.
 
 This complete example covers all five constructors and needs only Target:
 
+<!-- old-syntax-check: E0101 -->
+
 ```i
 (
 	target = i/target
@@ -244,11 +246,11 @@ This complete example covers all five constructors and needs only Target:
 
 main = () <- (t : target.Target) {
 	t |>
-		(target.Js(_)) { Nil }
-		| (target.NodeJS(_)) { Nil }
-		| (target.Wasi(_)) { Nil }
-		| (target.Native) { Nil }
-		| (target.Host) { Nil }
+		(target.Js(_)) { () }
+		| (target.NodeJS(_)) { () }
+		| (target.Wasi(_)) { () }
+		| (target.Native) { () }
+		| (target.Host) { () }
 }
 ```
 
@@ -605,7 +607,7 @@ exact types and meanings:
 | Argument | Type | Value and dependency |
 |---|---|---|
 | seed | `List(S)` | [] outside the adapter; inside it, [s] when supplies contains S, otherwise []; a nonempty list depends on the adapter entering |
-| entry-root-key | `Key(Nil)` | The initial registered root key of this entry's primitive context, available before factories; no service dependency |
+| entry-root-key | `Key(())` | The initial registered root key of this entry's primitive context, available before factories; no service dependency |
 
 `seed_required=true` requires exactly [s] at this construction site, or the
 plan is rejected; it is not a runtime missing-service fallback. A seed is an
@@ -767,7 +769,7 @@ make_await = () <- (cfg : Config) -> request.Await {
 		},
 	)
 }
-make_root = (k : Key(Nil)) -> request.Root { request.Root(key = k) }
+make_root = (k : Key(())) -> request.Root { request.Root(key = k) }
 make_bundle = () <- (remote : Remote) -> Bundle {
 	Bundle(fetch = () { request.await_owned(remote.fetch()) })
 }
@@ -802,7 +804,7 @@ with every factory requirement explicitly bound; the two parameters are the
 already-typed primitive leaves. It has **no** inferred environment or error:
 
 ```i
-entry_body = (remote : Remote, entry_key : Key(Nil)) -> Int {
+entry_body = (remote : Remote, entry_key : Key(())) -> Int {
 	b = { make_bundle() <- (remote) }
 	cfg = make_config()
 	aw = { make_await() <- (cfg) }
@@ -1074,7 +1076,7 @@ same rule. `call` uses `panic("js: call threw")` with source positions;
 `try_call` preserves the exact thrown value, including null and undefined.
 
 A private argument builder uses `Args {}` with `new_args : () -> Args`,
-`push_arg : (Args, Value) -> Nil`, `invoke : (Value, Args) -> Outcome`.
+`push_arg : (Args, Value) -> ()`, `invoke : (Value, Args) -> Outcome`.
 Build a fresh array per call, copy the completed argument sequence at invoke,
 and never expose the mutable builder through public i/js functions. List
 traversal, result decoding and error construction are ordinary i. An Args
@@ -1097,9 +1099,9 @@ Outcome itself is a private branded object without a then property.
 Public `nil`, `bool`, `int`, `float`, `string`, `bits` convert into Value.
 `to_nil`, `to_bool`, `to_int`, `to_float`, `to_string`, `to_bits` give the
 corresponding i type with error `Mismatch { Mismatch }`. Implement each raw
-extractor with a primitive error, e.g. `(Value) -> Float ^ Nil`; validate in
+extractor with a primitive error, e.g. `(Value) -> Float ^ ()`; validate in
 the JS bridge *before* returning the Float. The ordinary wrapper maps that
-Nil error to Mismatch. This is implementable by §10.3 and avoids using the
+() error to Mismatch. This is implementable by §10.3 and avoids using the
 SDK's permissive `ofType` predicate as a conversion test.
 
 Exactly one outcome applies to each case below. “Mismatch” means the public
@@ -1109,8 +1111,8 @@ may replace outgoing conversions for application calls.
 
 | Case | Outcome | Representation or reason |
 |---|---|---|
-| i Nil to JS | convert | undefined |
-| JS undefined or null through to_nil | convert | Nil |
+| i () to JS | convert | undefined |
+| JS undefined or null through to_nil | convert | () |
 | i Bool / JS boolean in the matching conversion | convert | boolean / Bool |
 | i Int / JS bigint in the matching conversion | convert | Exact arbitrary-precision bigint / Int; never Number |
 | i Float / finite JS number in the matching conversion | convert | binary64; negative zero follows existing SDK/spec equality |
@@ -1175,7 +1177,7 @@ serialized through R2's one root continuation. Status 2 yields a macrotask;
 no microtask-only spin. Public waiting wrappers install an **individual request
 guard** immediately after start and before any wait. Non-resource-producing
 operations use runtime §5.4's ordinary `request.await_owned`, implemented with
-resource.ensure; creators use §8.1's await_resource. Borrowed request.await
+resource.ensure; creators use §8.1's resource.acquire. Borrowed request.await
 never cancels its producer merely because its waiter exits. Its final
 cancels that handle on normal exit, error or unwind; take the answer before
 normal cleanup, so cancelling Taken does nothing. Closing an Owner/root
@@ -1212,7 +1214,7 @@ Roots and nested task runs. A host-wide positive arbitrary Int allocator
 never reissues numbers, including failed/provisional numbers; JS uses BigInt.
 Fresh tests/export invocations get fresh contexts. Check context, kind and
 liveness on every operation; unknown/closed/foreign/wrong-kind gives `closed`,
-close gives Nil. OS descriptors may be reused privately, language numbers may
+close gives (). OS descriptors may be reused privately, language numbers may
 not. Allocation failure stops before exposure and disposes of the OS result.
 
 Lookup, operation leases, completion and close have one commit order. Same
@@ -1258,11 +1260,11 @@ wraps it. Root APIs expose operations, not the table.
 | Field | Type |
 |---|---|
 | alloc | `(size : Int) -> Int ^ String` |
-| free | `(token : Int) -> Nil ^ String` |
-| store | `(token : Int, offset : Int, bytes : BitArray) -> Nil ^ String` |
+| free | `(token : Int) -> () ^ String` |
+| store | `(token : Int, offset : Int, bytes : BitArray) -> () ^ String` |
 | load | `(token : Int, offset : Int, size : Int) -> BitArray ^ String` |
 | fd_write | `(fd : Int, token : Int, offset : Int, size : Int) -> Int ^ String` |
-| proc_exit | `(code : Int) -> Nil ^ String` |
+| proc_exit | `(code : Int) -> () ^ String` |
 
 This deliberately replaces the old four raw-address fields and the promise
 of an unchecked field for every preview-1 function. `Wasi` is an ordinary
@@ -1305,15 +1307,15 @@ result shape, with checked layout adapters where necessary. No promise that
 every function needs identical code remains.
 
 proc_exit validates its unsigned code, runs context teardown, then calls the
-existing raw `(i32) -> ()` import. Its i signature is Nil because §10.3 has no
-Never result; successful execution never returns an i Nil. If the host returns
+existing raw `(i32) -> ()` import. Its i signature is () because §10.3 has no
+Never result; successful execution never returns an i (). If the host returns
 unexpectedly, trap and retire the instance. Invalid code raises `invalid`
 before teardown or exit. There is no fabricated errno/result from a void
 Wasm call. Teardown does not run i finals; explicit process exit is termination,
 not a way to detach work. WASI resource cleanup must finish before this call.
 
 **W3 — Ordinary printing, with existing behavior preserved.** The proposed
-Io factory captures Wasi and makes a closure that writes the UTF-8 text, then separately attempts LF even if the text write gave up. For each write it allocates/stores a buffer and repeats fd_write on the remaining slice. Positive short writes advance the offset; zero progress or a reported write error gives up that write; release the buffer on every returning path. Give Nil, never
+Io factory captures Wasi and makes a closure that writes the UTF-8 text, then separately attempts LF even if the text write gave up. For each write it allocates/stores a buffer and repeats fd_write on the remaining slice. Positive short writes advance the offset; zero progress or a reported write error gives up that write; release the buffer on every returning path. Give (), never
 an IO error, as legacy Io requires. Stdio's error-reporting API stays distinct.
 This moves encoding, looping and output policy into i, while W2 keeps unsafe
 layout construction inside the kernel. The review's raw-iovec prototype is
@@ -1449,7 +1451,7 @@ are read evidence unless explicitly listed in revision 8 checking below.
 | WASI fd_write returns i32, proc_exit has no result; stops use a private short-write loop | `crates/ilang-wasm/src/runtime/mod.rs:255–256`, `:273–304` |
 | Custom WASI services, blocking async and host references have regression tests | `crates/ilang-cli/tests/wasi.rs:313–355` |
 | CLI checks before compiling/optimizing; options used by run/test select Ilang | `crates/ilang-cli/src/lib.rs:89–119`; `crates/ilang-cli/src/main.rs:160–167`, `:229–270` |
-| Legacy Io writes a line and ignores output errors in the Rust host | `crates/ilang-host/src/services/mod.rs:53–77`; declaration `lib/i/io.i:11–14` |
+| Legacy Io writes a line and ignores output errors in the Rust host | `crates/ilang-host/src/services/mod.rs:53–77`; declaration `stdlib/src/io.i:11–14` |
 
 Implementation handoff, with changed regions (new files are explicitly new):
 
@@ -1489,12 +1491,12 @@ must retain entry arity/ABI checks while allowing ordinary service needs.
 | 0. Source integration | `docs/spec.md` §§2.6/9.7/10/B; `docs/design/runtime.md` D5/§5.1/§10; `docs/design/meta.md` §§4.3/8 | Apply §9 before claiming spec conformance; preserve landed native/multicore contracts |
 | 1a. P1 opaque provenance (existing compiler owner) | `crates/ilang-wasm/src/ir.rs` HostSignature; `lower.rs:2587–2595`; `emit/mod.rs:980–1005`; `emit/host.rs:231–242`; `runtime/abi.rs:138–141`, `runtime/mod.rs:240`, `runtime/values.rs:28–34`, `:146–148`; boundary/runtime tests listed under P1 | Can proceed independently; same-object A/B and null tests must pass before JS/IO boundary integration |
 | 1b. General field privacy (existing FP owner) | `crates/ilang-check/src/types/infer.rs:1538–1614` and nominal visibility tests | Parallel to P1; required before public Fs/File wrappers can claim private raw Int fields |
-| 1c. Plan/check/CLI | `crates/ilang-package/src/manifest.rs:110–129`, `:274–317`, `src/lib.rs:219`, `:497`; checker `types/infer.rs:379–429` and checked-program metadata; new `crates/ilang-check/src/providers.rs`; CLI `main.rs:160–167`, `:229–270`, `:323–348`, `lib.rs:89–123`; new plan/command tests | After 0; implement T3/T6/T9 validation, origin authority, instantiated identities, one-adapter diagnostic and P2; parallel to 1a/1b with disjoint checker regions |
-| 1d. R2 runtime integration | R2-owned `lib/i/request.i`, `lib/i/task.i` and request/control/key primitives; `crates/ilang-wasm/src/emit/host.rs` continuation/lifecycle regions; host request contexts | After accepted runtime dependencies; serialize host decoder edits with 1a. Expose only primitive admission/registered key plumbing to planner; implement owned waits, guards and shared group operations |
+| 1c. Plan/check/CLI | `crates/ilang-package/src/manifest.rs:110–129`, `:274–317`, `src/lib.rs:219`, `:497`; checker `types/infer.rs:379–429` and checked-program metadata; new `crates/ilang-check/src/types/solve.rs`; CLI `main.rs:160–167`, `:229–270`, `:323–348`, `lib.rs:89–123`; new plan/command tests | After 0; implement T3/T6/T9 validation, origin authority, instantiated identities, one-adapter diagnostic and P2; parallel to 1a/1b with disjoint checker regions |
+| 1d. R2 runtime integration | R2-owned `stdlib/src/request.i`, `stdlib/src/task.i` and request/control/key primitives; `crates/ilang-wasm/src/emit/host.rs` continuation/lifecycle regions; host request contexts | After accepted runtime dependencies; serialize host decoder edits with 1a. Expose only primitive admission/registered key plumbing to planner; implement owned waits, guards and shared group operations |
 | 2. Wrapper and link | new provider elaboration/link modules beside `crates/ilang-wasm/src/lower.rs`; `lower.rs:776–807`, `:880–1005`; IR entry/target metadata; `emit/host.rs` generated adapter guards, coordinated with R2; compiler integration tests | After 1a/1c/1d; one whole graph/topological order, T10/T11, F2 including L3, async metadata and synchronous diagnostics. Do not edit P1's opaque lowering independently |
-| 3a. JS target | syntax AST/foreign declaration and checker `resolve.rs:500–551`; target IR/metadata and new JS artifact emitter; `bindings/javascript/ilang.mjs` converters/getters/loader; new `lib/i/js.i`, `lib/i/target.i`; SDK/browser/CLI tests | After 2 for full integration; synchronous bridge work can start earlier against a fixed plan interface. Reuse ABI/SDK representations and existing request factories |
-| 3b. Checked WASI | `crates/ilang-wasm/src/runtime/mod.rs:255–304`, `:369–374`; new `lib/i/wasi.i`; printer replacement in `lower.rs:989–990`, `ir.rs:642–644`; `crates/ilang-cli/tests/wasi.rs` | After 0/plan interface; parallel to JS in these regions. Keep B.7/custom imports; checked slice/proc_exit tests before removing WasiStdout |
-| 3c. Standard IO/target factories | standard library service/provider declarations; `crates/ilang-host/src/services/`; SDK standard factories and IO tests | After 1b/1d and T2 service split; generated JS defaults additionally need 3a. Keep native N9 grants/private Ints, await_owned/await_resource and shared context teardown |
+| 3a. JS target | syntax AST/foreign declaration and checker `resolve.rs:500–551`; target IR/metadata and new JS artifact emitter; `bindings/javascript/ilang.mjs` converters/getters/loader; new `i/js`, `i/target`; SDK/browser/CLI tests | After 2 for full integration; synchronous bridge work can start earlier against a fixed plan interface. Reuse ABI/SDK representations and existing request factories |
+| 3b. Checked WASI | `crates/ilang-wasm/src/runtime/mod.rs:255–304`, `:369–374`; new `i/wasi`; printer replacement in `lower.rs:989–990`, `ir.rs:642–644`; `crates/ilang-cli/tests/wasi.rs` | After 0/plan interface; parallel to JS in these regions. Keep B.7/custom imports; checked slice/proc_exit tests before removing WasiStdout |
+| 3c. Standard IO/target factories | standard library service/provider declarations; `crates/ilang-host/src/services/`; SDK standard factories and IO tests | After 1b/1d and T2 service split; generated JS defaults additionally need 3a. Keep native N9 grants/private Ints, await_owned and resource.acquire and shared context teardown |
 | 4. Macro/packaging follow-through | M2/M4-owned macro origin/executable-needs checks; native packaging files assigned by native.md | M1 after macro prerequisites; native packaging after its accepted R2/IO gates. Callback re-entry and MC-D remain separate work |
 
 These are ownership boundaries for implementation assignment, not files changed
@@ -1520,10 +1522,10 @@ widening the §10.3 ABI value/error lists.
 | Spec §11.7 | Keep host-value, memory and stack stops. A bridge call that does not expose exceptions uses F4's panic; malformed raw outcome/host reply uses the existing host-value stop. Do not convert these into Mismatch. | Installed: `docs/spec.md:1582`. |
 | Spec B.1/B.3 | Keep ABI allocation ownership. “Checked Wasi buffers are separate table-owned allocations and are not addresses supplied to ilang_free by i code.” Use W1/W2 as the checked root contract; ABI exports remain host machinery. | Installed: `docs/spec.md:1678`, `docs/spec.md:1711`, `docs/spec.md:1816`. |
 | Spec B.4–B.6 | Keep v3 ids, cancel, statuses and import-time re-entry restrictions. Add F3's JS target marker/ilang.js v1 metadata and retained getter imports, without changing the host artifact contract. Mandatory changes to runtime imports/statuses/host-called exports still require a version bump. | Installed: `docs/spec.md:1717`, `docs/spec.md:1775`; B.5 unchanged. |
-| Spec B.7 | Replace only the special Io implementation bullet after adoption: “The target's Io provider writes UTF-8 text plus LF through the checked Wasi adapter; positive short writes are retried, zero progress/errors give up, and print gives Nil.” Keep it absent from external required-import metadata because internally provided. Keep custom imports, runtime-reserved import names, stops, `_start`, blocking calls and no tests. Add the no-result proc_exit adapter rule W2. | Installed: `docs/spec.md:1807`, `docs/spec.md:1870`; separate LF attempt preserves the existing failure behavior. |
+| Spec B.7 | Replace only the special Io implementation bullet after adoption: “The target's Io provider writes UTF-8 text plus LF through the checked Wasi adapter; positive short writes are retried, zero progress/errors give up, and print gives ().” Keep it absent from external required-import metadata because internally provided. Keep custom imports, runtime-reserved import names, stops, `_start`, blocking calls and no tests. Add the no-result proc_exit adapter rule W2. | Installed: `docs/spec.md:1807`, `docs/spec.md:1870`; separate LF attempt preserves the existing failure behavior. |
 | Runtime D5 and §10 | Replace entry provisioning/classification and ABI async-flag text with §9.1 below. | Installed exact §9.1 replacements: `docs/design/runtime.md:126`, `docs/design/runtime.md:1768`, `docs/design/runtime.md:1843`. |
 | Runtime §§5.1/5.4 | Keep their existing ownership rules; use corrected A2 and the Ready-survives-Owner test in §10. | Bootstrap installed: `docs/design/runtime.md:378`; ownership unchanged; Ready test at `docs/design/runtime.md:2098`. |
-| Runtime §§7/7.4 | Keep the landed native N9/runtime resource text, group operations, await_owned/await_resource and program/control-root accounting. Split process fields by T2, preserving other signatures/errors. | Split installed: `docs/design/runtime.md:1225`; raw signatures, codecs, errors and resource rules preserved. |
+| Runtime §§7/7.4 | Keep the landed native N9/runtime resource text, group operations, await_owned and resource.acquire and program/control-root accounting. Split process fields by T2, preserving other signatures/errors. | Split installed: `docs/design/runtime.md:1225`; raw signatures, codecs, errors and resource rules preserved. |
 | Runtime §8.2 | Generated js/nodejs defaults follow T1–T3, with no automatic unsupported stubs. Explicit Host factories remain configurable. Generated builds share A4's factories. Keep WASI custom imports; list printer as this target project's separate adapter stage, and do not promise later adapters before they land. | Installed: `docs/design/runtime.md:1488`, `docs/design/runtime.md:1849`. |
 | Meta §4.3 | Add js to the built-in names and @js to the caller-origin list, exactly as M1. | Installed in the two named rows: `docs/design/meta.md:371`, `docs/design/meta.md:379`; the declaration companion is installed in §7.1 at `:496`. Meta remains a draft whose review is unfinished. |
 | Meta §8 | Add: “A macro program contains no executable JS binding or initializer. Reject required js declarations before instantiation; quoted syntax remains data.” Apply M1's full-needs rule. | Installed: `docs/design/meta.md:581`. Executable JS needs include macro entries and all ordinary initializers; quoted declarations remain data. The preceding external-needs rule is unchanged. |
@@ -1535,7 +1537,7 @@ The older spec restrictions on declarations, entry services, the special WASI pr
 
 F2 originally said “allowing parentheses or a one-expression group around the subject”. Spec §6.4 says “`(x)` is a tuple of one part” and uses `{ }` for grouping. The parenthesis allowance was left out, and that sentence in F2 was corrected. This changes no type or tuple rule.
 
-**Adjoining sentences corrected with installation.** Spec opening/§2.1 now name target modules and distinguish checking test source from compiling test entries; §1.4 no longer reserves `@js` for macros; §2.2/§2.5 allow its declaration and initialization; §2.6's key introduction includes plans; §4.3/§4.7 require its annotation and preserve inference; §9.7 distinguishes chosen factories from imported services and keeps Io's Nil result; §10.2 replaces the host/Assert-only and direct-async rules; B.1/B.3 separate checked buffers, B.6 lists required host registrations and JS markers, and B.7 applies its reserved-import rule to required graph imports. Runtime §10's old host-supply/browser/WASI sentences, entry-dependency instructions and related test expectations now follow D5 and J1. Syntax's summary, §1.4, §2.2 and §2.5 no longer reserve `@js` declarations for macros; its attribute-list instruction now adds `js`. Meta §7.1 no longer says externals are the sole non-macro declarations. Meta §8 gains the executable-JS restriction without removing the external restriction. These are consequences of the named amendments, not additional feature choices.
+**Adjoining sentences corrected with installation.** Spec opening/§2.1 now name target modules and distinguish checking test source from compiling test entries; §1.4 no longer reserves `@js` for macros; §2.2/§2.5 allow its declaration and initialization; §2.6's key introduction includes plans; §4.3/§4.7 require its annotation and preserve inference; §9.7 distinguishes chosen factories from imported services and keeps Io's () result; §10.2 replaces the host/Assert-only and direct-async rules; B.1/B.3 separate checked buffers, B.6 lists required host registrations and JS markers, and B.7 applies its reserved-import rule to required graph imports. Runtime §10's old host-supply/browser/WASI sentences, entry-dependency instructions and related test expectations now follow D5 and J1. Syntax's summary, §1.4, §2.2 and §2.5 no longer reserve `@js` declarations for macros; its attribute-list instruction now adds `js`. Meta §7.1 no longer says externals are the sole non-macro declarations. Meta §8 gains the executable-JS restriction without removing the external restriction. These are consequences of the named amendments, not additional feature choices.
 
 **Older-sentence inventory (JA, including the companion follow-up).** The list below quotes the older sentences removed or reworded in the amended source passages. Locations name the paragraph or table row in baseline `7b3cea3`, not the shifted line numbers of this lane. Replacements are located in the amendment map above. To make the inventory complete, it also includes sentences restated with unchanged meaning inside a replaced paragraph and changed table rows. It does not claim those preserved rules were false. Pure additions, such as Meta §8's JS ban, have no older sentence to quote; Meta's external-needs sentence remains unchanged.
 
@@ -1599,9 +1601,9 @@ F2 originally said “allowing parentheses or a one-expression group around the 
 - Baseline paragraph/row 1451: | random | Pure i | Same pure i | Same pure i | Same pure i |
 - Baseline paragraph/row 1452: | task | i FIFO loop over v3 | Same loop; promises, AbortSignal, macrotask polling | Same loop on calling thread; never block it | Same i loop; raw host calls complete synchronously; no status hand-off |
 - Baseline paragraph/row 1453: | clock | Reactor timers and OS clocks | Monotonic/system clocks and abortable timers | Performance/system clocks and abortable timers | Ordinary blocking service imports; preview-1 command supplies no i:clock adapter |
-- Baseline paragraph/row 1454: | fs | OS files, with the cancellation rule above | Node context-owned Int table, closed/busy leases, explicit close | Every raw operation gives unsupported, except close gives Nil | Blocking Int imports; buffer-aware embedder/linked adapter needed, no default fs adapter |
-- Baseline paragraph/row 1455: | net | Reactor TCP | Node context-owned Int table; provisional cleanup and close wakeups | All operations give unsupported, close gives Nil; browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
-- Baseline paragraph/row 1456: | process | OS args/env/cwd/entropy/child processes | Node process data, entropy, spawn/wait/terminate/close | args gives an encoded empty list; env gives denied; cwd/spawn/wait/terminate give unsupported; entropy uses platform secure entropy; close gives Nil | Ordinary blocking imports; no default process/entropy adapter or spawn implementation |
+- Baseline paragraph/row 1454: | fs | OS files, with the cancellation rule above | Node context-owned Int table, closed/busy leases, explicit close | Every raw operation gives unsupported, except close gives () | Blocking Int imports; buffer-aware embedder/linked adapter needed, no default fs adapter |
+- Baseline paragraph/row 1455: | net | Reactor TCP | Node context-owned Int table; provisional cleanup and close wakeups | All operations give unsupported, close gives (); browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
+- Baseline paragraph/row 1456: | process | OS args/env/cwd/entropy/child processes | Node process data, entropy, spawn/wait/terminate/close | args gives an encoded empty list; env gives denied; cwd/spawn/wait/terminate give unsupported; entropy uses platform secure entropy; close gives () | Ordinary blocking imports; no default process/entropy adapter or spawn implementation |
 - Baseline paragraph/row 1457: | stdio | Per-source input broker/subscribers and byte output | Node standard byte streams with cancelable subscribers | Default byte read/write/flush operations give unsupported; an embedder can give explicit byte sources/sinks | Ordinary blocking imports; no new i:stdio adapter; legacy i/io continues to use fd_write |
 - Baseline paragraph/row 1459: The JS factory is an explicit SDK option, not a language name-resolution rule.
 - Baseline paragraph/row 1459: It installs all fields including unsupported stubs, so a module can instantiate and catch a typed unsupported error.
@@ -1808,7 +1810,7 @@ needs with:
 
 Keep the rest of runtime §5.1/§5.4: shared portable Root/Owner capabilities,
 local Request/Ticket cells, count/settled/cancel_all/wait_none operations,
-Ready survival, borrowed await, await_owned and await_resource. Keep the
+Ready survival, borrowed await, await_owned and resource.acquire. Keep the
 landed program/control-root distinction: only program work and explicit
 borrowed producer interests determine quiescence, while all actual requests
 count for ABI status 1. No Ticket enumeration or native root bundle is added.
@@ -1982,7 +1984,7 @@ Outcome, with separate synchronous accessors and i decoding. JsRequests is
 separate from synchronous JsSync, with both inside the ordinary Js bundle.
 Otherwise a mixed raw host declaration would impose request semantics on
 converters, or a second public environment requirement would escape a guarded
-Target branch. Constructing the bundle performs no request. W2 likewise uses a Nil
+Target branch. Constructing the bundle performs no request. W2 likewise uses a ()
 i signature for the raw void proc_exit instead of an inadmissible Never ABI
 result. Raw ABI fields returning File(Int) also remain rejected under A3.
 
@@ -2090,7 +2092,7 @@ main = () { inspect() <- (target.Native) }
 
 On WASI this must reject, because inspect really reads foreign. Its environment
 binder is not a certified entry binder; F2 retains it. Capturing inspect with
-`control.keep_env((_ : Nil) { inspect() })` inside that substitution and invoking
+`control.keep_env((_ : ()) { inspect() })` inside that substitution and invoking
 it later has the same answer. Conversely, a closure directly capturing an
 entry's certified t still sees that old value after a substitution: its only
 pruning is justified by lexical capture, not by keep_env. If an entry is also
@@ -2197,7 +2199,7 @@ make_cell = <A>() <- (next : Cell(List(A))) -> Cell(A) {
 	Cell
 }
 
-main = () <- (c : Cell(Int)) { Nil }
+main = () <- (c : Cell(Int)) { () }
 ```
 
 Selecting make_cell for Cell produces infinitely many distinct instantiated

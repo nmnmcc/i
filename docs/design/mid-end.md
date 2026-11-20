@@ -81,9 +81,9 @@ pass 3 on current evidence.
   must see the same representation.
 
 
-**Pass 3 probe (2026-11-20, no code).** A copy of `std/dict`'s insert path
+**Pass 3 probe (2026-11-20, no code).** A copy of `i/dict`'s insert path
 with the per-level result tuples removed (`put` returns only the new node and
-`put_entry` only the new list) was compared with `std/dict` on 200k random
+`put_entry` only the new list) was compared with `i/dict` on 200k random
 keys in one CI job, five alternating rounds (Xeon 6975P-C, load 0.5):
 `dict.insert` cost 0.385 s with the tuples and 0.328 s without, a **14.8%**
 difference (1.9 µs to 1.65 µs per insert, about 250 ns each). The trie shape

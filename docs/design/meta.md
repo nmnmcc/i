@@ -7,7 +7,7 @@ the implementation choices; their behavior is checked by implementation tests.
 
 Sources, in order: spec.md; syntax.md as amended by the user's confirmed SYN2
 decisions; literal-types.md, value-types.md, types-joint.md, records.md at the
-ledger-accepted 0d0ce19 (the copy in this merge is older), js.md and runtime.md;
+ledger-accepted 0d0ce19 (the copy in this merge is older), js.md;
 the plan's decided design and M tracks; the ledger through its meta restart.
 The user's later removal of the test attribute also controls. The SYN2 scope
 rulings retain brace type groups and the general pipe into a clause function.
@@ -432,7 +432,7 @@ A **syntax macro** is a top-level binding in a `.is` file with the attribute `@m
 
 (@ macro
   (= unless (-> (cond body) _
-    `(| ~cond { (-> True Nil) (-> False ~body) }))))
+    `(| ~cond { (-> True ()) (-> False ~body) }))))
 ```
 
 - The pattern of the binding is one name, with no type variables. The value is a function expression `(-> …)`. Each parameter is a name or an environment parameter.
@@ -461,7 +461,7 @@ A **syntax macro** is a top-level binding in a `.is` file with the attribute `@m
           `{ (= l ~left)
              (= r ~right)
              (| (== l r) {
-               (-> True Nil)
+               (-> True ())
                (-> False (failed ~(make (Text (show_as claim Expression)) (: like claim))
                                  (inspect l) (inspect r))) }) })
       (-> _ `(assert ~claim)) }))))
@@ -490,7 +490,7 @@ A **macro call** is written in one of these ways, in both surfaces. `m` is a nam
 | Before an item | `@m Item`, `@m(args) Item` | Expressions, with or without labels, and then the item as the last argument | See below |
 | Type | `m(args)` | Types, integer literals, and strings, with no labels | A type |
 
-- The parser does not know which names are macros. The arguments are always read by the grammar of the position, as in the table, so a file can be read and formatted with no other file. From this, an argument in the position of an expression cannot be a type such as `Int | Nil` or `(Int) -> String`, a discard, or a list pattern with `..`.
+- The parser does not know which names are macros. The arguments are always read by the grammar of the position, as in the table, so a file can be read and formatted with no other file. From this, an argument in the position of an expression cannot be a type such as `Int | ()` or `(Int) -> String`, a discard, or a list pattern with `..`.
 - In the normal surface, syntax.md already reads a macro call as an item, a macro before an item with any arguments or named with its module (`@a.m`), a macro call in a type, a call whose first argument is an `UpName` at the start of a statement or an item, as `decode(User, text)`, and a declaration `name [TypeParams] : Type` with no `=`, whatever its attributes, also one with no `@external` and one with a macro before it, as `@rpc fetch : (Id) -> User ! Http` (§1). It keeps each of them for macros, and the macro streams give them their meaning.
 - `e | m` is the macro call `m(e)`, and `e | m(args)` is the macro call `m(e, args)`, as `|` works for every call (spec §6.9). This is only in the position of an expression.
 - The number of arguments must be the number of parameters of the macro. An argument with a label goes to the parameter with that label, by the rule of calls (spec §6.6), and the macro gets it with no label.
@@ -563,8 +563,8 @@ i wrappers with these signatures (these are API types, not external declarations
 Items = (
 	add = (Syntax, Syntax, List((String, String)), Syntax) <- (
 		Fail(SyntaxError),
-	) -> Nil,
-	expose = (Syntax) <- (Fail(SyntaxError)) -> Nil,
+	) -> (),
+	expose = (Syntax) <- (Fail(SyntaxError)) -> (),
 )
 ```
 
@@ -635,7 +635,7 @@ query dependencies (including negative/fallback answers in §6). Reusing a
 partially expanded subtree is not a cache hit. `note(String)` is a buffered
 compiler diagnostic, replayed once with the successful invocation; it never
 becomes program output. It is the `note` field of `i/syntax.Diagnostics`,
-whose definition is `Diagnostics { Diagnostics(note : (String) -> Nil) }`.
+whose definition is `Diagnostics { Diagnostics(note : (String) -> ()) }`.
 This ordinary service is available in syntax and typed macro runs.
 
 C8. No macro may generate another macro definition. Items may generate normal
@@ -708,7 +708,7 @@ definition = (of : Syntax) <- (d : Definitions) { d.definition(of) }
   This needs no type inference and agrees with T2 M2. A caller wanting the
   completed set uses `Types` after the completion barrier, not `definition`.
 - What may be seen is what the module of the scope of `of` may see. A type of another module that is not exported is not defined. A name that rule 3 finds among the names that an expansion defined in the module of the call may always be seen: it is the name that the same template, in the same run, means. A type of another module whose constructors are not exported is a `SyntaxError`.
-- Built-in types have no written definition, and asking for one is a `SyntaxError`. But `Bool`, `Nil`, `Result`, `Assert`, and `AssertionFailure` give the definitions that the spec gives for them. In such an answer, each atom that names a built-in type or constructor has the scope of its own kind that §5 gives, so it means the built-in name also in a module that defines its own `Error` or `Ok`.
+- Built-in types have no written definition, and asking for one is a `SyntaxError`. But `Bool`, `Result`, `Assert`, and `AssertionFailure` give the definitions that the spec gives for them; the unit type `()` has no written one. In such an answer, each atom that names a built-in type or constructor has the scope of its own kind that §5 gives, so it means the built-in name also in a module that defines its own `Error` or `Ok`.
 - A name that step 2 does not find is a compile error at the span of `of`. The macro cannot catch it. A name bound by a type variable never gets to step 2, so it is always a `SyntaxError`.
 - Only type definitions can be asked for. The definition of a binding cannot, because then the result of a macro would depend on the bodies of functions of other modules.
 
@@ -891,7 +891,7 @@ A type is given to a macro as scoped Syntax, using the written-type rows when po
 | `type_of(s)` | The type that the checker gave to `s` at its position in the call. `s` must be a `Syntax` that the compiler gave to this run: an argument, an expression inside an argument, or a name that a pattern inside an argument binds. For any other `Syntax`, also one made by `make` or by a quote, and for a datum that is not an expression or such a name, it is a `SyntaxError`. |
 | `signature()` | The needed type of the call (§7.3), as a function type. Closed variables are filled in, and fixed variables are given as in the list above. |
 | `subtype(a, b)` | `Yes` when `a` is a subtype of `b` (spec §4.5) by §7.3 T4, with no snapshot variable given a bound. The types are taken in the form that `type_of` gives. `No` when it is not, and neither type has a type variable in it. `NotKnown` in every other case. A `Syntax` that is not a correct type, or has `_` in it, is a `SyntaxError`. |
-| `members(t)` | The members of the type (spec §4.4), in the order of their `show` text. `Never` has no members. `A & Int` and `A - U`, with a fixed variable `A`, are one member each. `Bool` is one member. With literal types, a member of `Int` or `String` with a finite set of values gives one item for each value, a literal type, and a member with all values but a finite set is one item, as `String - "a"`; here only, an item is not a member of spec §4.4. So `members` of `"GET" \| "POST"` is `"GET"` and `"POST"`, and of `2 \| 10 \| Nil` it is `10`, `2`, `Nil`. The same `SyntaxError` as for `subtype`. |
+| `members(t)` | The members of the type (spec §4.4), in the order of their `show` text. `Never` has no members. `A & Int` and `A - U`, with a fixed variable `A`, are one member each. `Bool` is one member. With literal types, a member of `Int` or `String` with a finite set of values gives one item for each value, a literal type, and a member with all values but a finite set is one item, as `String - "a"`; here only, an item is not a member of spec §4.4. So `members` of `"GET" \| "POST"` is `"GET"` and `"POST"`, and of `2 \| 10 \| ()` it is `10`, `2`, `()`. The same `SyntaxError` as for `subtype`. |
 
 - `type_of` gives the type at the position of the argument in the call. When the macro puts the argument in another position of its result, for example inside a clause, the argument keeps that type and its type variables (§7.3), and only the constraints of the new position are checked. With literal types, the type may be a literal type, as `1` for `to_text(1)`, a `Syntax` whose node is `Int(1)`, and `subtype` and `members` take it.
 - A type is a set of values, and one type may be written in more than one way: `Int | String` and `String | Int` are the same type. So a macro asks `subtype` and `members`, and does not match the `Syntax` of a type by its form.
