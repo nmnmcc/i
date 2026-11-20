@@ -1928,8 +1928,8 @@ No new host operation or unsupported-only platform provider is added.
 |---|---|
 | `i/io` | Keep the specified public `Io = (print = (String) -> Nil)` service and no free functions. Best-effort newline printing intentionally reports no error. |
 | `i/stdio` | Keep public Stdio constructor and all seven functions. Stdio's existing read/write/write_error/flush/flush_error Request fields stay. StdioError gains a typed reason; raw code remains diagnostic. |
-| `i/fs` | Keep private raw Fs/File constructors, OpenMode and Metadata. Keep minimal operations below. Move read_file/write_file/read_lines algorithms to std/fs; update spec §9.12's convenience-operation location in the migration, rather than leaving two implementations. |
-| `i/process` | Keep Arguments/Environment/WorkingDirectory/Entropy public constructors, raw Process and Child private. Keep all fourteen operations. Directory's value constructor becomes AtDirectory, fixing the duplicate name; the union stays Directory. |
+| `i/fs` | Keep private raw Fs/File constructors, OpenMode and Metadata. Keep minimal operations below. open is scope-owned through resource.Scope. FsError carries an FsProblem reason with the host code kept. copy (chunked, gives bytes) and walk (depth first, name order, capped at depth 32) are the new operations. Move read_file/write_file/read_lines algorithms to std/fs; update spec §9.12's convenience-operation location in the migration, rather than leaving two implementations.  `Fs` is provided on `native`, `nodejs` and `wasi`; any other target rejects an entry that needs it with E0523. |
+| `i/process` | Keep Arguments/Environment/WorkingDirectory/Entropy public constructors, raw Process and Child private. Keep all fourteen operations. Directory's value constructor becomes AtDirectory, fixing the duplicate name; the union is DirectoryMode. spawn, spawn_piped and spawn_config are scope-owned through resource.Scope. ProcessError carries a ProcessProblem reason with the host code kept. collect (both piped streams drained concurrently with task.both, unbounded, no wait) is the new operation.  `Process` and `WorkingDirectory` are provided on `native` and `nodejs`; any other target rejects an entry that needs them with E0523. |
 | `i/net` | Keep private Net/Listener/Stream/Datagram, NetError and all seventeen operations. Keep specified close_stream/close_listener/close_datagram rather than prematurely merging their different contracts. byte_stream retains a low-level lib-only byte record; std/io adaptation lives above it. |
 | `i/tls` | Keep Tls/Stream, TlsError and all eleven functions. Keep options/identity as closed data. accept's identity carries cert/key; split server options to alpn only, deleting ignored roots/cert/key fields from that argument. |
 | `i/fetch` | Keep Fetch/Response and five functions. Replace Fail(String) with one FetchError. Scope-owning HTTP construction is above this raw adapter. |
@@ -1963,11 +1963,14 @@ write, write_error : (BitArray) <- IO[Stdio,StdioError] -> Nil
 flush, flush_error : () <- IO[Stdio,StdioError] -> Nil
 print, print_error : (String) <- IO[Stdio,StdioError] -> Nil
 // i/fs
-Fs, File = private
+File, Fs = private
+File = (number = Int, path = String)
 ReadOnly = (); WriteTruncate = (); Append = (); ReadWrite = ()
 OpenMode = ReadOnly | WriteTruncate | Append | ReadWrite
 Metadata = (size = Int, kind = String)
-open : (String,OpenMode) <- IO[Fs,FsError] -> File
+FsProblem = NotFound | Denied | Exists | Closed | Busy | Invalid | Unsupported | Other
+FsError = (operation = String, path = String, reason = FsProblem, code = String)
+open : (String,OpenMode) <- (resource.Scope,Fs,Fail(FsError)) -> File
 read : (File,Int) <- IO[Fs,FsError] -> BitArray
 write : (File,BitArray) <- IO[Fs,FsError] -> Nil
 flush : (File) <- IO[Fs,FsError] -> Nil
@@ -1977,6 +1980,9 @@ rename : (String,String) <- IO[Fs,FsError] -> Nil
 list : (String) <- IO[Fs,FsError] -> List(String)
 metadata : (String) <- IO[Fs,FsError] -> Metadata
 temp_dir : () <- IO[Fs,FsError] -> String
+copy : (String,String) <- (Fs,Fail(FsError)) -> Int
+walk : (String) <- (Fs,Fail(FsError)) -> List(String)
+// open attaches the File's close to the current resource.Scope before it returns; it runs on normal return, error, cancel and early return.
 // i/process
 Arguments = (args = () -> Request(Result(BitArray,String)))
 Environment = (env = (String) -> Request(Result(String,String)))
@@ -1987,21 +1993,26 @@ Inherit = (); Null = (); Piped = (); Stdio = Inherit | Null | Piped
 InheritEnvironment = (List(String)); ReplaceEnvironment = (List(String))
 EnvironmentMode = InheritEnvironment | ReplaceEnvironment
 InheritDirectory = (); AtDirectory = (String)
-Directory = InheritDirectory | AtDirectory
+DirectoryMode = InheritDirectory | AtDirectory
+ProcessProblem = NotFound | Denied | Closed | Busy | Invalid | Other
+ProcessError = (operation = String, reason = ProcessProblem, code = String)
 args : () <- IO[Arguments,ProcessError] -> List(String)
 env : (String) <- IO[Environment,ProcessError] -> String
 cwd : () <- IO[WorkingDirectory,ProcessError] -> String
 entropy : (Int) <- IO[Entropy,ProcessError] -> BitArray
-spawn : (String,List(String)) <- IO[Process,ProcessError] -> Child
-spawn_piped : (String,List(String),Stdio,Stdio,Stdio) <- IO[Process,ProcessError] -> Child
-spawn_config : (String,List(String),Stdio,Stdio,Stdio,EnvironmentMode,Directory)
-  <- IO[Process,ProcessError] -> Child
+spawn : (String,List(String)) <- (resource.Scope,Process,Fail(ProcessError)) -> Child
+spawn_piped : (String,List(String),Stdio,Stdio,Stdio) <- (resource.Scope,Process,Fail(ProcessError)) -> Child
+spawn_config : (String,List(String),Stdio,Stdio,Stdio,EnvironmentMode,DirectoryMode)
+  <- (resource.Scope,Process,Fail(ProcessError)) -> Child
 read_stdout, read_stderr : (Child,Int) <- IO[Process,ProcessError] -> BitArray
 write_stdin : (Child,BitArray) <- IO[Process,ProcessError] -> Nil
 close_stdin : (Child) <- IO[Process,ProcessError] -> Nil
 wait : (Child) <- IO[Process,ProcessError] -> Int
 terminate : (Child) <- IO[Process,ProcessError] -> Nil
 close : (Child) <- IO[Process] -> Nil
+collect : (Child) <- (resource.Scope,Process,task.Scheduler,task.Runner,Fail(ProcessError))
+  -> (stdout = BitArray, stderr = BitArray)
+// spawn* attach the Child's release to the current resource.Scope before returning: terminate, wait (reaps), close; terminate/wait errors are dropped so the release cannot fail.
 // i/net
 Net, Listener, Stream, Datagram = private
 bind : (String,Int) <- IO[Net,NetError] -> Datagram
@@ -2140,7 +2151,7 @@ high-level service for tests; it captures the raw Process choice deliberately.
 No shell interpolation or detached child is added.
 
 ```text
-Command = (program = String, args = List(String), directory = iprocess.Directory,
+Command = (program = String, args = List(String), directory = iprocess.DirectoryMode,
            environment = iprocess.EnvironmentMode, stdin = iprocess.Stdio,
            stdout = iprocess.Stdio, stderr = iprocess.Stdio)
 Child(N) = (stdin = io.Writer(iprocess.ProcessError,N),

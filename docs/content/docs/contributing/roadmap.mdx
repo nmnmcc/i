@@ -91,6 +91,8 @@ Data-rest patterns are not available yet; list rest patterns work (P13).
 - [ ] **Platform entry `Scope`.** The platform gives every entry a `Scope` (§10.2), so a program need not start with `resource.scoped`. Prerequisite: the checker's platform-service table and the host must provide `Scope` at entries; the library `Scope` already has the open, closing and closed states.
 - [ ] **Rename `dict.has` and `set.has` to `contains`.** Prerequisite: migrate `stdlib/src/list.i`, `stdlib/src/regex.i`, `stdlib/src/dict.i`, `stdlib/src/set.i`, `stdlib/test/dict_test.i` and the review-corpus snapshots in the same change, since the snapshots vendor their own copies.
 - [ ] **Merge `lazy_unwrap` and `lazy_or` into labelled `unwrap`/`or` shapes.** Prerequisite: labelled function parameters (parameter groups) implemented and tested in the language; the baseline has labelled data fields only.
+- [ ] **`i/task` revision events (`snapshot` and `changed`).** Coordination waiting in `i/deferred`, `i/semaphore` and `i/queue` looks at the state once per scheduler turn and yields; a waiter that nothing will satisfy keeps taking turns until it is cancelled. Prerequisite: revision events in `i/task`; blocking waits and the "deadlock" report for a blocked channel receive depend on them. FIFO waiter tickets already fit the same state and do not depend on them.
+- [ ] **`i/queue.fail`'s exported name.** The queue's `fail` is exported by design, and it now shows up in the import suggestion for the common name `fail` (`(fail) = i/queue`), which is noise. Prerequisite: none for this one; if another module exports a name that common in a later batch, converge on one rule (rename, or restrict suggestions) rather than adding more such names.
 
 ### Loader generation
 

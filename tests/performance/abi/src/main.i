@@ -54,7 +54,7 @@ echo = (value : Int) -> Int { tick(value) }
 fs_reads = (n : Int, path : String) {
 	fail.catch(() {
 		resource.scoped(() {
-			file = resource.acquire(() { fs.open(path, fs.ReadOnly) }, fs.close)
+			file = fs.open(path, fs.ReadOnly)
 			fs_loop(n, file)
 		})
 	}) |>
