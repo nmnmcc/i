@@ -513,20 +513,20 @@ paused = () {
 	k = {
 		control.boundary((b) {
 			control.boundary((b2) { g(b, b2) })
-			Done
+			Done()
 		})
 	} |>
 		(Paused(k)) { k }
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 	handed = control.boundary((b0) {
 		{
 			control.cancel(k)
-			Lost
+			Lost()
 		} <- (Out(put = (k2) { control.suspend(b0, (rest) { Handed(k2) }) }))
 	})
 	handed |>
 		(Handed(Inner(k2))) { k2 }
-		& (Lost) { panic("k2 was not handed out") }
+		& (Lost()) { panic("k2 was not handed out") }
 }
 "#;
 
@@ -582,7 +582,7 @@ main = () {
 		k2 = paused()
 		k3 = { control.boundary((b3) { o1(b3, k2) }) } |>
 			(Third(k3)) { k3 }
-			& (Over) { panic("not paused") }
+			& (Over()) { panic("not paused") }
 		control.resume(k3, ())
 		()
 	} <- (Out(put = (k2) { () }))

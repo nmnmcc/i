@@ -25,12 +25,12 @@ read_manifest = (file : String) -> Result(List(Job), InputError) {
 		bytes = fs.read_file(file)
 		text = bit_array.to_string(bytes) |>
 			(Ok(value)) { value }
-			& (Error(_)) { fail.raise(InputError) }
+			& (Error(_)) { fail.raise(InputError()) }
 		json.parse(text) |>
 			(Ok(value)) { value }
-			& (Error(_)) { fail.raise(InputError) }
+			& (Error(_)) { fail.raise(InputError()) }
 		value |> (json.Array(jobs)) { decode_jobs(jobs) }
-		& (_) { fail.raise(InputError) }
+		& (_) { fail.raise(InputError()) }
 	})
 }
 
@@ -42,21 +42,21 @@ decode_jobs_loop = (values : List(json.Json), seen : List(String), out : List(Jo
 	values |> ([]) { list.reverse(out) }
 		& ([value, ..rest]) {
 			value |> (json.Object(_)) {
-				name_json = json.field(value, "name") |> (Some(v)) { v } & (None) { fail.raise(InputError) }
-				url_json = json.field(value, "url") |> (Some(v)) { v } & (None) { fail.raise(InputError) }
+				name_json = json.field(value, "name") |> (Some(v)) { v } & (None()) { fail.raise(InputError()) }
+				url_json = json.field(value, "url") |> (Some(v)) { v } & (None()) { fail.raise(InputError()) }
 				name_json |> (json.Text(name)) {
 					url_json |> (json.Text(url)) {
 						{ valid_job_name(name) && core.not(list.contains(seen, name)) } |>
-							(True) {
+							(True()) {
 								decode_jobs_loop(rest, [name, ..seen], [Job(name = name, url = url), ..out])
 							}
-							& (False) { fail.raise(InputError) }
+							& (False()) { fail.raise(InputError()) }
 					}
-					& (_) { fail.raise(InputError) }
+					& (_) { fail.raise(InputError()) }
 				}
-				& (_) { fail.raise(InputError) }
+				& (_) { fail.raise(InputError()) }
 			}
-			& (_) { fail.raise(InputError) }
+			& (_) { fail.raise(InputError()) }
 		}
 }
 
@@ -76,15 +76,15 @@ first_lower = (chars : List(UtfCodepoint)) -> Bool {
 		n = core.codepoint_to_int(first)
 		n >= 97 && n <= 122
 	}
-	& ([]) { False }
+	& ([]) { False() }
 }
 
 parse_integer_token = (text : String) -> Result(Int, ()) {
 	int.parse(text) |> (Ok(value)) {
 		canonical = int.to_string(value)
 		{ canonical == text || text == "+" <> canonical } |>
-			(True) { Ok(value) }
-			& (False) { Error(()) }
+			(True()) { Ok(value) }
+			& (False()) { Error(()) }
 	}
 	& (Error(_)) { Error(()) }
 }
@@ -96,8 +96,8 @@ decode_response = (text : String) -> Result(Int, ()) {
 				(Some(json.Text(token))) {
 					parse_integer_token(token) |> (Ok(number)) {
 						{ number >= -1000 && number <= 1000 } |>
-							(True) { Ok(number) }
-							& (False) { Error(()) }
+							(True()) { Ok(number) }
+							& (False()) { Error(()) }
 					}
 					& (Error(_)) { Error(()) }
 				}
@@ -118,11 +118,11 @@ process_job = (job : Job, output : String) -> Outcome {
 	part = path.join([output, job.name <> ".part"])
 	target = path.join([output, job.name <> ".txt"])
 	fail.catch(() {
-		job.url |> ("bad-url") { fail.raise(InputError) } & (_) { () }
-		fail.raise(InputError)
+		job.url |> ("bad-url") { fail.raise(InputError()) } & (_) { () }
+		fail.raise(InputError())
 	}) |>
-		(Ok(_)) { remove_part(output, job.name)  Failure }
-		& (Error(_)) { remove_part(output, job.name)  Failure }
+		(Ok(_)) { remove_part(output, job.name)  Failure() }
+		& (Error(_)) { remove_part(output, job.name)  Failure() }
 }
 
 run_jobs = (jobs : List(Job), output : String) -> List(String) {
@@ -130,7 +130,7 @@ run_jobs = (jobs : List(Job), output : String) -> List(String) {
 		result = process_job(job, output)
 		result |>
 			(Success(value)) { "OK " <> job.name <> " " <> int.to_string(value) }
-			& (Failure) { "ERROR " <> job.name }
+			& (Failure()) { "ERROR " <> job.name }
 	})
 }
 

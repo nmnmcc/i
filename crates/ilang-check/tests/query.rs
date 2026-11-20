@@ -203,8 +203,8 @@ fn type_of_local_names() {
 fn type_of_other_things() {
     let f = fixture();
     assert_eq!(f.hover("app/main", "Some(v)", 0), "Some : (A) -> Some(A)");
-    // A constructor's type is its own.
-    assert_eq!(f.hover("app/main", "None)", 0), "None : None");
+    // A constructor's type is the function that makes its value.
+    assert_eq!(f.hover("app/main", "None()", 0), "None : () -> None");
     assert_eq!(f.hover("app/main", "name", 0), "name : String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
@@ -775,7 +775,7 @@ fn query_completion_context() {
         q.completion_context(shapes, f.at("app/shapes", "Shape) ->", 0, 1)),
         CompletionContext::Type
     );
-    match q.completion_context(shapes, f.at("app/shapes", "Dot) { 0 }", 0, 0)) {
+    match q.completion_context(shapes, f.at("app/shapes", "Dot()) { 0 }", 0, 0)) {
         // The members of `Shape = Circle | Dot`.
         CompletionContext::Pattern { types } => assert_eq!(types.len(), 2),
         other => panic!("{other:?}"),
@@ -793,7 +793,7 @@ fn query_completion_context() {
 
 #[test]
 fn query_unused_imports_and_fixes() {
-    let text = "(\n  app/shapes\n)\n\nmain = () { area(Dot) }\n";
+    let text = "(\n  app/shapes\n)\n\nmain = () { area(Dot()) }\n";
     let f = Fixture::new(&[("src/shapes.i", SHAPES_Q), ("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");

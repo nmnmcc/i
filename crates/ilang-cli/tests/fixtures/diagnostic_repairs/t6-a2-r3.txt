@@ -32,7 +32,7 @@ main = () {
 							lock = root <> "/.lock"
 							owned = fail.catch(() { fs.mkdir(lock) }) == Ok(())
 							{ owned } |>
-								(True) {
+								(True()) {
 									journal = root <> "/journal"
 									snapshot = fail.catch(() { fs.read_file(journal) })
 									snapshot |>
@@ -53,7 +53,7 @@ main = () {
 											stdio.print("ERROR INPUT")
 										}
 								}
-								& (False) { stdio.print("ERROR LOCK") }
+								& (False()) { stdio.print("ERROR LOCK") }
 						}
 						& (_) { stdio.print("ERROR INPUT") }
 				}
@@ -71,7 +71,7 @@ process_steps = (steps, journal, index) {
 		& ([step, ..rest]) {
 			result = fail.catch(() { apply_step(step, journal) })
 			result |>
-				(Ok(True)) { process_steps(rest, journal, index + 1) }
+				(Ok(True())) { process_steps(rest, journal, index + 1) }
 				& (_) { RolledBack(index) }
 		}
 }
@@ -85,15 +85,15 @@ apply_step = (step, journal) {
 					(Some(json.Text(text))) {
 						valid_ascii = core.codepoints(text) |> list.all((c) { core.codepoint_to_int(c) < 128 })
 						{ valid_ascii } |>
-							(True) {
-								Ok(file) = fs.open(journal, fs.Append)
+							(True()) {
+								Ok(file) = fs.open(journal, fs.Append())
 								Ok(_) = fs.write(file, <<text:utf8>>)
 								fs.close(file)
-								True
+								True()
 							}
-							& (False) { False }
+							& (False()) { False() }
 					}
-					& (_) { False }
+					& (_) { False() }
 			}
 			& (Some(json.Text("expect"))) {
 				json.field(object, "length") |>
@@ -101,18 +101,18 @@ apply_step = (step, journal) {
 						int.parse(token) |>
 							(Ok(length)) {
 								{ length >= 0 && length <= 65536 } |>
-									(True) {
+									(True()) {
 										bytes = fs.read_file(journal)
 										core.bit_size(bytes) / 8 == length
 									}
-									& (False) { False }
+									& (False()) { False() }
 							}
-							& (_) { False }
+							& (_) { False() }
 					}
-					& (_) { False }
+					& (_) { False() }
 			}
-			& (Some(json.Text("abort"))) { False }
-			& (_) { False }
+			& (Some(json.Text("abort"))) { False() }
+			& (_) { False() }
 	}
-	& (_) { False }
+	& (_) { False() }
 }

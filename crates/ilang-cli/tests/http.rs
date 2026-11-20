@@ -133,7 +133,7 @@ fn http_timeout() {
 main = () {{
  task.run(() {{
   result = fail.catch(() {{ http.send_timeout(http.client().send, http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
-  result |> (Error(http.Timeout)) {{ () }} & (_) {{ panic("expected timeout") }}
+  result |> (Error(http.Timeout())) {{ () }} & (_) {{ panic("expected timeout") }}
  }})
 }}
 "#

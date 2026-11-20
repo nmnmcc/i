@@ -974,7 +974,7 @@ fn lisp_rows() {
 
 #[test]
 fn lisp_examples_of_the_note() {
-    let normal = "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\npick = (0, y) { y } & (x, _) { x }\nlabel = (opt) { opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" } }\n";
+    let normal = "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\npick = (0, y) { y } & (x, _) { x }\nlabel = (opt) { opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None()) { \"none\" } }\n";
     let lisp_text = "(= connect (-> (, (: host String) (= port (: p Int))) Conn (open host p)))\n(= pick (& (-> (, 0 y) _ y) (-> (, x _) _ x)))\n(= label (-> (, opt) _\n  (|> opt (& (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\")\n             (-> (, (Some v)) _ v)\n             (-> (, None) _ \"none\")))))\n";
     let (read, diags) = lisp::from_lisp(lisp_text);
     assert!(diags.is_empty(), "{diags:#?}");

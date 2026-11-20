@@ -82,7 +82,7 @@ fn template_stop_keeps_call_and_template_locations() {
             marks: BTreeSet::new(),
         },
     );
-    let mut datum = ilang_syntax::lisp::parse("(assert False)")
+    let mut datum = ilang_syntax::lisp::parse("(assert (False))")
         .unwrap()
         .datums
         .remove(0);
