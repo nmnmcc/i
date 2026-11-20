@@ -6,9 +6,9 @@
 //// provided by the target `t`" (E0523). The checker's target table gives
 //// `Process` and `WorkingDirectory` on `native` and `nodejs`, `Arguments`
 //// and `Environment` on `native`, `nodejs` and `wasi`, and `Entropy` on
-//// every target. Only the native host implements `Process`: spawning a
-//// child is native-only in practice, so on `js` and `wasi` an entry that
-//// needs `Process` does not compile.
+//// every target. The native host and the Node binding implement `Process`;
+//// on a target that does not give it, an entry that needs `Process` does
+//// not compile.
 ////
 //// A child belongs to the current `resource.Scope`. `spawn`, `spawn_piped`
 //// and `spawn_config` attach a release to it before they give the `Child`;

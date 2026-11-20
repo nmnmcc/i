@@ -1,8 +1,9 @@
 //// File system operations over the host's `i:fs/v1` service.
 ////
-//// `i/fs` is available on the `native` and `wasi` targets only. On `js` and
-//// `nodejs` an entry that needs `Fs` does not compile: it is the error
-//// "`Fs` is not provided by the target" (E0523).
+//// The platform gives `Fs` on `native`, `nodejs` and `wasi` (the Node
+//// binding and the WASI adapter both implement the service). On any other
+//// target an entry that needs `Fs` is the compile error "`Fs` is not
+//// provided by the target" (E0523).
 ////
 //// Every operation that can fail raises an `FsError` through `Fail(FsError)`.
 //// Its `reason` is an `FsProblem` made from the host's error code once, in
