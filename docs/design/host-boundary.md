@@ -170,8 +170,9 @@ Logger = (log = (String) <- (Fail(String)) -> Nil)
 ```
 
 The type is ordinary otherwise: one constructor, labelled function fields
-(§9.7). Its module must export the type `Logger`; `Logger(..)` is optional and
-only needed for a fake made in another module. Missing `Logger` is `E0329`.
+(§9.7). Its module must export it as `Logger(..)`; `@import` requires the
+constructor and the field access because the accessor and callers read the
+fields and a test constructs a fake. Missing it is `E0329`.
 
 Modes:
 
@@ -253,11 +254,10 @@ main = () {
 - **Name collisions**: the accessor and its field values are named
   `make_<Type>` and `<type>_<label>` (first character lowercased); a user
   definition with one of those names is E0208, and the user renames.
-- **Fakes**: a test in another module can pass `Logger(log = …)` only if the
-  service type is exported with `(..)`; in the same module the constructor is
-  always visible. The fake reaches a function only if that function takes
-  `Logger` in its own pattern; an accessor-style function builds/returns the
-  platform value and cannot be injected from outside.
+- **Fakes**: a test in another module passes `Logger(log = …)` using the
+  exported constructor. The fake reaches a function only if that function
+  takes `Logger` in its own pattern; an accessor-style function builds/returns
+  the platform value and cannot be injected from outside.
 
 The accessor is the only way to get a user service value outside the type's
 own module unless the function takes it as an explicit parameter. Standard
@@ -824,7 +824,7 @@ parallel with the implementation.
    same-namespace+label services E0311; import in a macro need E0336; missing
    type export E0329; wrong argument count E0326.
 5. **Accessor**: `make_Logger` is synthesized once and exported; a user
-   `make_Logger` is E0208; a fake in another module needs `Logger(..)` and
+   `make_Logger` is E0208; a fake in another module uses `Logger(..)` and
    works when the function takes the service; a fake field through `call`
    gives a ready Call; `library.out` shows the accessor once; no files appear
    under `src/`.
@@ -970,7 +970,7 @@ add_logged : (Int, Int) <- (Fail(String)) -> Int = (a, b) {
 version : () -> Int = () { 1 }
 ```
 
-The library module export group is `(Logger add add_logged version)`;
+The library module export group is `(Logger(..) add add_logged version)`;
 `make_Logger` is added to it synthetically. The root:
 
 ```i
@@ -1004,7 +1004,7 @@ registration helper.
 | E0326 | wrong `@import` argument count or form |
 | E0327 | wrong `@import` place, or `@import` on a non-service type |
 | E0328 | `js`/`ilang:` used where not allowed |
-| E0329 | `@import` service type not exported by its module |
+| E0329 | `@import` service type not exported with `(..)` |
 | E0330 | `@export` in a program |
 | E0331 | `i run`/`i build NAME` on a library with no target entry |
 | E0332 | native build of a library |
