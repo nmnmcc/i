@@ -167,7 +167,7 @@ f = () {
 			list.fold(
 				[1, 2, 3, 4],
 				0,
-				{ (n, _) { { n == 3 } |> (True) { n } & (False) { n + 1 } } },
+				{ (n, _) { { n == 3 } |> (True()) { n } & (False()) { n + 1 } } },
 			) ==
 				3,
 		)
@@ -320,7 +320,7 @@ fn typed_complements_keep_the_head_and_cover_cross_columns() {
             None,
         ),
         (
-            "f = (p : (String, Bool)) {\n\tp |> ((x : String - \"a\", _)) { 1 } & ((\"a\", True)) { 2 }\n}",
+            "f = (p : (String, Bool)) {\n\tp |> ((x : String - \"a\", _)) { 1 } & ((\"a\", True())) { 2 }\n}",
             Some("(\"a\", False)"),
         ),
         (

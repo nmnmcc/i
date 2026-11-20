@@ -21,8 +21,8 @@ wrap = (make : (Int) -> Ok(Int), x : Int) -> Ok(Int) { make(x) }
 main = () {
 	yes : Bool = True()
 	assert(yes)
-	assert(pick(True(), [1, 2]) == [1, 2])
-	assert(pick(False(), [1, 2]) == [])
+	assert(pick(True, [1, 2]) == [1, 2])
+	assert(pick(False, [1, 2]) == [])
 	assert(wrap(Ok, 1) == Ok(1))
 	()
 }

@@ -261,7 +261,7 @@ fn calls_that_may_suspend_are_split() {
     assert_eq!(uses.matches("(catch_ref $capture").count(), 1, "{uses}");
     // `assertion.catch` is i code now.
     assert!(
-        wasm(" (i/assertion)\n\nmain = () {\n  assertion.catch(() { assert(False) })\n  ()\n}\n")
+        wasm(" (i/assertion)\n\nmain = () {\n  assertion.catch(() { assert(False()) })\n  ()\n}\n")
             .is_ok()
     );
 }

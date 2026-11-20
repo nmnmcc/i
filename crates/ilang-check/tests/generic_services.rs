@@ -103,7 +103,7 @@ fn several_parameters_and_nested_services() {
     // independent value/error/environment parameters. Instantiation permits
     // independent closed instances of the resulting scheme.
     for annotation in ["{", "-> A {"] {
-        let source = "Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> ())\nOuter(A, E, N) = (Inner(A, E, N))\nuse = <A, E, N>(x : A) <- (s : Outer(A, E, N)) -> A {\n\tOuter(Inner(f, _)) = s\n\tf(x)\n}\nrun = <A, N>(body : () <- N -> A) { body() }\ninteger = () {\n\trun(() { use(1) }) <- (Outer(Inner((x : Int) { x }, (_ : Never) { () })))\n}\nboolean = () {\n\trun(() { use(True) }) <- (Outer(Inner((x : Bool) { x }, (_ : Never) { () })))\n}"
+        let source = "Inner(A, E, N) = ((A) <- (Fail(E), ..N) -> A, (N) -> ())\nOuter(A, E, N) = (Inner(A, E, N))\nuse = <A, E, N>(x : A) <- (s : Outer(A, E, N)) -> A {\n\tOuter(Inner(f, _)) = s\n\tf(x)\n}\nrun = <A, N>(body : () <- N -> A) { body() }\ninteger = () {\n\trun(() { use(1) }) <- (Outer(Inner((x : Int) { x }, (_ : Never) { () })))\n}\nboolean = () {\n\trun(() { use(True()) }) <- (Outer(Inner((x : Bool) { x }, (_ : Never) { () })))\n}"
         .replace("-> A {", annotation);
         accepts(
             &source,

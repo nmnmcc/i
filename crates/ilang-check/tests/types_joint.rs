@@ -40,7 +40,7 @@ fn alias(c: &Checked, name: &str) -> String {
 fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
     // No reconstruction defaults an existing Con's set to All.
     let (_, c) = good(
-        "v = \"GET\"\nx : v = \"GET\"\nMethod = v\nBox(A) = (value = A)\nboxed = Box(value = 8080)\nBox(Port) = boxed\nPair(A, B) = { (A, B) }\nparts = (\"GET\", 8080)\nPair(Verb, Number) = parts\nchoice = True |> (True) { Box(value = 1) } & (False) { Box(value = 2) }\nBox(Choice) = choice\nConfig(A, B) = (method = A, port = B)\nconfig = Config(method = \"GET\", port = 8080)\nConfigType = config\nagain : ConfigType = Config(method = \"GET\", port = 8080)",
+        "v = \"GET\"\nx : v = \"GET\"\nMethod = v\nBox(A) = (value = A)\nboxed = Box(value = 8080)\nBox(Port) = boxed\nPair(A, B) = { (A, B) }\nparts = (\"GET\", 8080)\nPair(Verb, Number) = parts\nchoice = True() |> (True()) { Box(value = 1) } & (False()) { Box(value = 2) }\nBox(Choice) = choice\nConfig(A, B) = (method = A, port = B)\nconfig = Config(method = \"GET\", port = 8080)\nConfigType = config\nagain : ConfigType = Config(method = \"GET\", port = 8080)",
     );
     for (name, want) in [
         ("Method", "\"GET\""),
@@ -64,7 +64,7 @@ fn j1_value_reads_and_patterns_preserve_exact_literal_sets() {
         code::TYPE_MISMATCH,
     );
     bad(
-        "Box(A) = (A)\nv = True |> (True) { Box(1) } & (False) { Box(2) }\nBox(Item) = v\nx : Item = 3",
+        "Box(A) = (A)\nv = True() |> (True()) { Box(1) } & (False()) { Box(2) }\nBox(Item) = v\nx : Item = 3",
         code::TYPE_MISMATCH,
     );
     let (_, c) = good("v : Int - 0=1\nNonzero=v\nx : Nonzero=2");
@@ -161,7 +161,7 @@ fn j5_completed_literal_aliases_produce_exact_runtime_tests() {
         ])
     );
     bad(
-        "source : { \"GET\"|\"POST\" }=\"GET\"\nMethods=source\nf=(x : Methods){ x |> (\"GET\" ? True) { 1 } }",
+        "source : { \"GET\"|\"POST\" }=\"GET\"\nMethods=source\nf=(x : Methods){ x |> (\"GET\" ? True()) { 1 } }",
         code::CASE_NOT_COVERED,
     );
 }

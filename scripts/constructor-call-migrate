@@ -90,7 +90,13 @@ import tomllib
 
 PROG = "constructor-call-migrate"
 # Nothing is skipped by default: the constructor rule covers every source.
-DEFAULT_SKIP = ()
+# The spec fixtures that use the constructor as a function, or assert that the
+# old form is an error, keep their form.
+DEFAULT_SKIP = (
+    "tests/spec/4.3/constructor_as_function_value.i",
+    "tests/spec/4.3/constructor_bare_value.i",
+    "tests/spec/4.3/constructor_pattern_bare.i",
+)
 BUILTIN_ZERO = ("True", "False")
 
 

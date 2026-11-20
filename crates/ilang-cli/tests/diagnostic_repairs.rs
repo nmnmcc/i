@@ -212,7 +212,7 @@ fn an_unmatched_combination_still_reports_branch_selection() {
 fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
     let diagnostics = check(&[(
         "src/main.i",
-        "word = (0) { \"zero\" } & (1) { \"one\" }\nbad = word(True)\n_ = bad\n",
+        "word = (0) { \"zero\" } & (1) { \"one\" }\nbad = word(True())\n_ = bad\n",
     )]);
     assert_eq!(
         diagnostics,

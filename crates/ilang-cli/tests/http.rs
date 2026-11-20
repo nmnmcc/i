@@ -465,28 +465,28 @@ read_pieces = (
 ) {
 	piece = body.read(4096)
 	{ bit_array.byte_size(piece) == 0 } |>
-		(True) { (bit_array.concat(list.reverse(acc)), count) }
-		& (False) {
-			{ count == 0 } |> (True) { stdio.print("piece") } & (False) { () }
+		(True()) { (bit_array.concat(list.reverse(acc)), count) }
+		& (False()) {
+			{ count == 0 } |> (True()) { stdio.print("piece") } & (False()) { () }
 			read_pieces(body, [piece, ..acc], count + 1)
 		}
 }
 handle = (req : http.Request, body : (read = _, trailers = _)) {
 	{ req.target == "/ignore" || req.target == "/next" } |>
-		(True) { http.response(http.Status(204)) }
-		& (False) { echo_upload(req, body) }
+		(True()) { http.response(http.Status(204)) }
+		& (False()) { echo_upload(req, body) }
 }
 echo_upload = (req : http.Request, body : (read = _, trailers = _)) {
 	(bytes, count) = read_pieces(body, [], 0)
 	assert(bit_array.byte_size(bytes) == 1048576)
 	assert(count >= 256)
 	{ req.target == "/chunked" } |>
-		(True) {
+		(True()) {
 			assert(
 				http.header(body.trailers(), "X-End") == option.Some("yes"),
 			)
 		}
-		& (False) { assert(body.trailers() == http.Headers([])) }
+		& (False()) { assert(body.trailers() == http.Headers([])) }
 	res = http.response(http.Status(200))
 	http.Response(..res, body = bytes)
 }

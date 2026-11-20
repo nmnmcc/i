@@ -77,8 +77,8 @@ Each command prints this result. Filters match substrings, with no exact-name or
 suite("arithmetic", () {
 	test("addition", () { assert(1 + 1 == 2) })
 	each("double", [("zero", 0), ("two", 2)], (n) { assert(n + n == 2 * n) })
-	skip("disabled", () { assert(False) })
-	fails("expected assertion", () { assert(False) })
+	skip("disabled", () { assert(False()) })
+	fails("expected assertion", () { assert(False()) })
 })
 ```
 
@@ -100,8 +100,8 @@ Use each test file independently when comparing counts. `fails` expects a runtim
 	testlib = (test, only) = i/test
 )
 
-test("other", () { assert(False) })
-only("working", () { assert(True) })
+test("other", () { assert(False()) })
+only("working", () { assert(True()) })
 ```
 
 ```text

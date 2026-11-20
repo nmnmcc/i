@@ -616,7 +616,7 @@ fn parameters_alternatives_guards() {
     // one_annotation_boundary_for_declarations_patterns_and_function_results.
     let f = value("f = (x : { Int | y }) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 1);
-    let f = value("f = (True | _ : Int) { 1 }");
+    let f = value("f = (True() | _ : Int) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);
     // the guard is after the last item and ends at `)`.
     let f = value("f = (a : Int, b : Int ? a > b) -> Int { a - b }");

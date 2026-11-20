@@ -401,7 +401,7 @@ test("exercise", () {
 		}
 		& (_) { panic("wrong splice captures") }
 	failed = syntax._match(pattern, syntax._template(2))
-	assert(syntax._match_ok(failed) == False)
+	assert(syntax._match_ok(failed) == False())
 	()
 })
 "#,

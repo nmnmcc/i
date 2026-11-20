@@ -2679,10 +2679,10 @@ mod value_type_interfaces {
     #[test]
     fn union_instantiation_covers_correlated_and_independent_parameters() {
         let old = interface(
-            "(\n\tpick\n)\npick = <A>(flag : Bool, x : A, y : A) -> (value = A) {\n\t(value = flag |> (True) { x } & (False) { y })\n}",
+            "(\n\tpick\n)\npick = <A>(flag : Bool, x : A, y : A) -> (value = A) {\n\t(value = flag |> (True()) { x } & (False()) { y })\n}",
         );
         let new = interface(
-            "(\n\tpick\n)\npick = <A, B>(flag : Bool, x : A, y : B) -> (value = A | B) {\n\t(value = flag |> (True) { x } & (False) { y })\n}",
+            "(\n\tpick\n)\npick = <A, B>(flag : Bool, x : A, y : B) -> (value = A | B) {\n\t(value = flag |> (True()) { x } & (False()) { y })\n}",
         );
         let diff = Diff::new(&old, &new).unwrap();
         assert!(diff.changed.is_empty());

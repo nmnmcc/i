@@ -117,11 +117,11 @@ Function parameters are **contravariant**: accepting more inputs permits substit
 
 f = (x : { Int | String }) -> String { "f accepted" }
 g = (x : { String | Bool }) -> String { "g accepted" }
-choose = (c : Bool) { c |> (True) { f } & (False) { g } }
+choose = (c : Bool) { c |> (True()) { f } & (False()) { g } }
 
 main = () {
-	first = choose(True)
-	second = choose(False)
+	first = choose(True())
+	second = choose(False())
 	stdio.print(first("shared"))
 	stdio.print(second("shared"))
 }
@@ -137,10 +137,10 @@ Choosing one function gives a union of function types; only inputs accepted by b
 ```i error E0501 package=tour title="src/main.i"
 f = (x : { Int | String }) -> String { "f accepted" }
 g = (x : { String | Bool }) -> String { "g accepted" }
-choose = (c : Bool) { c |> (True) { f } & (False) { g } }
+choose = (c : Bool) { c |> (True()) { f } & (False()) { g } }
 
 main = () {
-	chosen = choose(False)
+	chosen = choose(False())
 	chosen(7)
 }
 ```

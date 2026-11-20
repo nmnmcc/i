@@ -624,11 +624,11 @@ record : (String) -> ()
 make_float = (x : Float) { (v : Float) -> Float { v +. x } }
 bounded_float = (x : Float) -> Float {
 	{ x >=. -.1.0 } |>
-		(False) { x }
-		& (True) {
+		(False()) { x }
+		& (True()) {
 			{ x <=. 1.0 } |>
-				(False) { x }
-				& (True) {
+				(False()) { x }
+				& (True()) {
 					a = x *. 0.5 +. 0.25
 					a *. 0.5 -. 0.125
 				}
@@ -742,17 +742,17 @@ unused_field = (x : Float) -> Float {
 }
 tie_add = (x : Float) -> Float {
 	{ x <=. 1.0e292 } |>
-		(True) {
+		(True()) {
 			{ x >=. 0.0 } |>
-				(True) { x +. 1.7976931348623157e308 }
-				& (False) { 0.0 }
+				(True()) { x +. 1.7976931348623157e308 }
+				& (False()) { 0.0 }
 		}
-		& (False) { 0.0 }
+		& (False()) { 0.0 }
 }
 bounded_div = (x : Float, y : Float) -> Float {
 	{ y >=. -.1.0e-300 } |>
-		(True) { { y <=. 1.0e-300 } |> (True) { x /. y } & (False) { 0.0 } }
-		& (False) { 0.0 }
+		(True()) { { y <=. 1.0e-300 } |> (True()) { x /. y } & (False()) { 0.0 } }
+		& (False()) { 0.0 }
 }
 "#,
     );

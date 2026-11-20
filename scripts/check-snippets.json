@@ -1477,7 +1477,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -1494,7 +1494,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -1798,7 +1798,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -1820,7 +1820,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -1837,7 +1837,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render the Rust format template using its actual SPIN constant and escaped braces."
@@ -1854,7 +1854,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
@@ -1938,7 +1938,7 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/wasi.rs:dce8e21640ce6174": {
+  "crates/ilang-cli/tests/wasi.rs:e8c8b20ef01e3f69": {
     "substitutions": [
       [
         "{wasi_module}",
@@ -2382,7 +2382,7 @@
       ]
     ]
   },
-  "crates/ilang-cli/tests/multicore.rs:c414ae96779cf8b4": {
+  "crates/ilang-cli/tests/multicore.rs:c2d6e4ee67e51a30": {
     "substitutions": [
       [
         "{{",
@@ -2394,12 +2394,12 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
-  "crates/ilang-cli/tests/multicore.rs:1b558a72799d32d4": {
+  "crates/ilang-cli/tests/multicore.rs:517f02438fc002fb": {
     "substitutions": [
       [
         "{{",
@@ -2411,12 +2411,12 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
-  "crates/ilang-cli/tests/multicore.rs:5b46861c947bbc74": {
+  "crates/ilang-cli/tests/multicore.rs:49feaee18e283b4b": {
     "substitutions": [
       [
         "{{",
@@ -2428,7 +2428,7 @@
       ],
       [
         "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
       ]
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."

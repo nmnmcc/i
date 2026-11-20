@@ -486,7 +486,7 @@ Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 ThirdSum = Third | Over
 
-keep = (t) { t |> (Over) { Over } & (t) { t } }
+keep = (t) { t |> (Over()) { Over() } & (t) { t } }
 
 // Not in tail position, so the frame waits.
 inner = (k2) { control.resume(k2, ()) + 1 }
@@ -494,7 +494,7 @@ inner = (k2) { control.resume(k2, ()) + 1 }
 h = (b3, k2) {
 	control.suspend(b3, (k3) { Third(k3) })
 	inner(k2)
-	Over
+	Over()
 }
 "#;
 
@@ -554,11 +554,11 @@ main = () {
 		k = {
 			control.boundary((b) {
 				h_tail(b)
-				Done
+				Done()
 			})
 		} |>
 			(Paused(k)) { k }
-			& (Done) { panic("not paused") }
+			& (Done()) { panic("not paused") }
 		{
 			control.resume(k, ())
 			()
@@ -599,11 +599,11 @@ main = () {
 		k = {
 			control.boundary((b) {
 				h_tail(b)
-				Done
+				Done()
 			})
 		} |>
 			(Paused(k)) { k }
-			& (Done) { panic("not paused") }
+			& (Done()) { panic("not paused") }
 		{
 			control.cancel(k)
 			()
@@ -642,13 +642,13 @@ body = (outer) {
 		)
 	})
 	say("after inner: " <> x)
-	Done
+	Done()
 }
 
 main = () <- (io : Io) {
 	k = { control.boundary((outer) { body(outer) }) } |>
 		(Paused(k)) { k }
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 	say("cancel")
 	control.cancel(k)
 	say("cancel gave ()")
@@ -689,11 +689,11 @@ paused = () {
 				)
 			})
 			fail.raise(7)
-			Done
+			Done()
 		})
 	} |>
 		(Paused(k)) { k }
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 }
 
 // `cancel` forwards the continuation need. Here it runs the ordinary code
@@ -708,11 +708,11 @@ main = () <- (io : Io) {
 	r = fail.catch(() {
 		held = control.boundary((hold) {
 			resource.ensure(() { 99 }, () { with(hold, k) })
-			Over
+			Over()
 		})
 		held |>
 			(Held(k2)) { control.resume(k2, ()) }
-			& (Over) { panic("not held") }
+			& (Over()) { panic("not held") }
 	})
 	io.print(core.inspect(r))
 }
@@ -1104,11 +1104,11 @@ fn nested_source(depth: u32) -> String {
 Done = ()
 More = (Int, Continuation((), Step, Never))
 Step = Done | More
-check = (ok) { ok |> (True) { () } & (False) { panic("tree walk") } }
+check = (ok) { ok |> (True()) { () } & (False()) { panic("tree walk") } }
 emit = (b, n) { control.suspend(b, (k) { More(n, k) }) }
 copy = (b, step) {
 	step |>
-		(Done) { () }
+		(Done()) { () }
 		& (More(v, k)) {
 			emit(b, v)
 			copy(b, control.resume(k, ()))
@@ -1122,17 +1122,17 @@ walk = (b, n) {
 				b,
 				control.boundary((child) {
 					walk(child, n - 1)
-					Done
+					Done()
 				}),
 			)
 			emit(b, n)
 			emit(b, -n)
 		}
 }
-next = (n) { { n > 0 } |> (True) { -n } & (False) { 1 - n } }
+next = (n) { { n > 0 } |> (True()) { -n } & (False()) { 1 - n } }
 drive = (step, count, sum, want) {
 	step |>
-		(Done) {
+		(Done()) {
 			check(count == TreeCount)
 			check(sum == 0)
 		}
@@ -1146,7 +1146,7 @@ main = () {
 	drive(
 		control.boundary((b) {
 			walk(b, TreeDepth)
-			Done
+			Done()
 		}),
 		0,
 		0,
@@ -1257,7 +1257,7 @@ run = (b) {
 	x = inside(b)
 	Done(x <> "/" <> name())
 }
-check = (ok) { ok |> (True) { () } & (False) { panic("resume environment") } }
+check = (ok) { ok |> (True()) { () } & (False()) { panic("resume environment") } }
 
 main = () {
 	{
@@ -1295,7 +1295,7 @@ fn counted_frames() {
 Done = ()
 More = (String, Continuation((), Step, Never))
 Step = Done | More
-check = (ok) { ok |> (True) { () } & (False) { panic("counted frame") } }
+check = (ok) { ok |> (True()) { () } & (False()) { panic("counted frame") } }
 layer = (b, n) {
 	n |>
 		(0) {
@@ -1314,7 +1314,7 @@ next = (step, want) {
 			check(s == want)
 			k
 		}
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 }
 
 main = () {
@@ -1333,7 +1333,7 @@ main = () {
 						})
 					},
 				)
-				Done
+				Done()
 			}),
 			"start",
 		)

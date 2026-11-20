@@ -11,7 +11,7 @@ Find the source and test directory for a behavior you want to change.
 	i/bool
 )
 
-test("negation", () { assert(bool.not(False) == True) })
+test("negation", () { assert(bool.not(False()) == True()) })
 ```
 
 ```text

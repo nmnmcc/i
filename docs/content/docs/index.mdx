@@ -53,11 +53,11 @@ description: "Functions, data, checked types and services, compiled to WebAssemb
 Ready = ()
 Waiting = (Int)
 message =
-	(Ready) { "ready" }
+	(Ready()) { "ready" }
 	& (Waiting(minutes)) { int.to_string(minutes) <> " min left" }
 
 main = () {
-	stdio.print(message(Ready))
+	stdio.print(message(Ready()))
 	stdio.print(message(Waiting(2)))
 }
 ```
@@ -81,7 +81,7 @@ ready
 
 Late = ()
 remaining = (due) {
-	due - now() |> (n ? n < 0) { fail.raise(Late) } & (n) { n }
+	due - now() |> (n ? n < 0) { fail.raise(Late()) } & (n) { n }
 }
 ```
 
@@ -188,8 +188,8 @@ main = () { stdio.print(unit(2)) }
 (@ macro
   (= if
     (-> (, c a b) _
-      {(= true_branch `(-> (, True) _ ~a))
-       `(|> ~c (& ~true_branch (-> (, False) _ ~b)))})))
+      {(= true_branch `(-> (, (True)) _ ~a))
+       `(|> ~c (& ~true_branch (-> (, (False)) _ ~b)))})))
 ```
 </details>
 

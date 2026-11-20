@@ -214,11 +214,11 @@ The rest of a list is another list, which can be reused unchanged.
 )
 
 main = () {
-	ready : Bool = True
+	ready : Bool = True()
 	left = 5 + 2
 	right = 1 + 1
 	stdio.print(
-		core.inspect((ready && False, ready || False, core.not(ready))),
+		core.inspect((ready && False(), ready || False(), core.not(ready))),
 	)
 	stdio.print(core.inspect((left > right, 1.5 <. 2.0)))
 	stdio.print(core.inspect((left == right, left != right)))
@@ -248,7 +248,7 @@ Maybe = Present | Absent
 main = () {
 	found : Maybe = Present(7)
 	stdio.print(core.inspect(found))
-	stdio.print(core.inspect(Absent))
+	stdio.print(core.inspect(Absent()))
 }
 ```
 

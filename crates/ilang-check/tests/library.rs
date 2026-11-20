@@ -556,7 +556,7 @@ fn the_prelude_is_not_importable() {
         );
     }
     // The built-in names need no import.
-    let main = "check = (x : Result(Int, ())) -> Bool {\n\tx |>\n\t\t(Ok(_)) { True }\n\t\t& (Error(_)) { panic(\"no\") }\n}\n";
+    let main = "check = (x : Result(Int, ())) -> Bool {\n\tx |>\n\t\t(Ok(_)) { True() }\n\t\t& (Error(_)) { panic(\"no\") }\n}\n";
     let (graph, program, diags) = common::check_files(&[("src/main.i", main)]);
     let errors: Vec<_> = diags.iter().filter(|d| d.is_error()).cloned().collect();
     let rendered = graph.sources.render_all(&errors);

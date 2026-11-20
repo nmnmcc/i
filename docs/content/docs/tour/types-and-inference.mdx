@@ -42,7 +42,7 @@ main = () {
 	raw : Point = (x = 3, y = 4)
 	labelled = ScreenPoint(x = 3, y = 4)
 	position : Position = raw
-	stdio.print(core.inspect((raw, (labelled.x, labelled.y), position, Hidden)))
+	stdio.print(core.inspect((raw, (labelled.x, labelled.y), position, Hidden())))
 }
 ```
 
@@ -86,11 +86,11 @@ show : (NumberOrText) -> String = (x) {
 	x |> (n : Int) { core.inspect(n) } & (s : String) { s }
 }
 choose : (Bool) -> { Int | String } = (flag) {
-	flag |> (True) { 7 } & (False) { "seven" }
+	flag |> (True()) { 7 } & (False()) { "seven" }
 }
 
 main = () {
-	value : { Int | String } = choose(False)
+	value : { Int | String } = choose(False())
 	count : Int = 7
 	stdio.print(show(value))
 	stdio.print(show(count))

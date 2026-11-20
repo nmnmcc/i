@@ -16,7 +16,7 @@ fn declared_frames_hide_outer_variables_and_generalize() {
     // Every declared frame makes fresh variables, while a variable
     // used from an outer frame remains that variable.
     let (_, c) = checked(
-        "outer = <A>(x : A) {\n\tinner = <A>(y : A) { y }\n\t(inner(1), inner(True), x)\n}\nnested = <A>(x : A) {\n\tinner = <B>(y : B, z : A) { (y, z) }\n\tinner(1, x)\n}\nid = <A>(x : A) {\n\ty : A = x\n\ty\n}\nuses = () { (id(1), id(True)) }",
+        "outer = <A>(x : A) {\n\tinner = <A>(y : A) { y }\n\t(inner(1), inner(True()), x)\n}\nnested = <A>(x : A) {\n\tinner = <B>(y : B, z : A) { (y, z) }\n\tinner(1, x)\n}\nid = <A>(x : A) {\n\ty : A = x\n\ty\n}\nuses = () { (id(1), id(True())) }",
         &["outer", "nested", "uses"],
     );
     let p = c.program.as_ref().unwrap();
@@ -40,7 +40,7 @@ fn declared_external_variables_are_general_in_library_declarations() {
     // operation, whose declarations are not restricted to ABI types.
     let (mut graph, _, _) = common::check_files(&[(
         "src/main.i",
-        "(i/core)\nf = () { (core.inspect(1), core.inspect(True)) }",
+        "(i/core)\nf = () { (core.inspect(1), core.inspect(True())) }",
     )]);
     // `i/core` is in the dependency `i`, not built in.
     let (package, index) = graph.standard_library_module("i/core").unwrap();

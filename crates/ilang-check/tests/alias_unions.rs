@@ -35,10 +35,10 @@ fn nominal_union(n: usize) -> String {
         .map(|i| format!("\t\t& (C{i}(a, r)) {{ a + f0(r) }}"))
         .collect();
     out.push(format!(
-        "f0 = (e) {{\n\te |>\n\t\t(C0) {{ 0 }}\n{}\n}}",
+        "f0 = (e) {{\n\te |>\n\t\t(C0()) {{ 0 }}\n{}\n}}",
         clauses.join("\n")
     ));
-    out.push("main = () { f0(C1(1, C0)) }".to_string());
+    out.push("main = () { f0(C1(1, C0())) }".to_string());
     out.join("\n") + "\n"
 }
 
@@ -70,7 +70,7 @@ fn nominal_union_recursive_match_scales() {
 
 #[test]
 fn union_is_displayed_by_its_declared_name() {
-    let source = "Some(A) = (A)\nNone = ()\nOption(A) = Some(A) | None\nfirst = (xs : List(Option(Int))) -> Int {\n\txs |> ([Some(x), ..r]) { x } & (_) { 0 }\n}\npick = (b : Bool) { b |> (True) { Some(1) } & (False) { None } }\nmain = () { first([pick(True)]) }\n";
+    let source = "Some(A) = (A)\nNone = ()\nOption(A) = Some(A) | None\nfirst = (xs : List(Option(Int))) -> Int {\n\txs |> ([Some(x), ..r]) { x } & (_) { 0 }\n}\npick = (b : Bool) { b |> (True()) { Some(1) } & (False()) { None() } }\nmain = () { first([pick(True())]) }\n";
     let lines = lines(source);
     for expected in [
         "app/main.first : (List(Option(Int))) -> Int",

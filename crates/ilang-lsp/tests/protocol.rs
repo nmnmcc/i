@@ -1891,7 +1891,7 @@ fn lsp_completion_fields_of_a_value() {
 #[test]
 fn lsp_completion_constructors_in_a_match() {
     let dir = tempfile::tempdir().unwrap();
-    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } & () { 2 } }\n";
+    let text = /* old-syntax-check: E0101 */ "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot()) { 0 } & (Circle(1)) { 1 } & () { 2 } }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -2386,7 +2386,7 @@ fn lsp_code_action_removes_an_unused_import() {
 #[test]
 fn lsp_code_action_adds_the_missing_clauses() {
     let dir = tempfile::tempdir().unwrap();
-    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot()) { 0 } & (Circle(1)) { 1 } }\n\nmain = () { f(Dot()) }\n";
     package(dir.path(), &[("src/main.i", text)]);
     let main = file_uri(&dir.path().join("src/main.i"));
     let mut c = Client::start();
@@ -3140,7 +3140,7 @@ fn lsp_capabilities_are_advertised() {
     c.shutdown();
 }
 
-const MATCH: &str = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } }\n\nmain = () { f(Dot) }\n";
+const MATCH: &str = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot()) { 0 } & (Circle(1)) { 1 } }\n\nmain = () { f(Dot()) }\n";
 
 #[test]
 fn lsp_code_action_missing_clauses_lisp_surface() {

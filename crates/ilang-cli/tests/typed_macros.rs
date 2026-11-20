@@ -266,7 +266,7 @@ fn typed_macro_cannot_delay_effectful_argument() {
     );
     reject(
         &m,
-        "(m = app/macros)\nmain = () { m.m(assert(True)) }",
+        "(m = app/macros)\nmain = () { m.m(assert(True())) }",
         "cannot delay an argument",
     );
 }

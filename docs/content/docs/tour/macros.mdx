@@ -172,7 +172,7 @@ Template references resolve in the defining module. Macros have no host file, ne
 (, if)
 
 (= _branches
-  (-> (, then else) _ `(& (-> (, True) _ ~then) (-> (, False) _ ~else))))
+  (-> (, then else) _ `(& (-> (, (True)) _ ~then) (-> (, (False)) _ ~else))))
 (@ macro (= if (-> (, test then else) _ `(|> ~test ~(_branches then else)))))
 ```
 
@@ -187,7 +187,7 @@ sign = (n) { if(n < 0, "negative", "not negative") }
 test("if is a macro", () {
 	assert(sign(-1) == "negative")
 	assert(sign(0) == "not negative")
-	assert(fail.catch(() { if(True, 42, fail.raise("unused")) }) == Ok(42))
+	assert(fail.catch(() { if(True(), 42, fail.raise("unused")) }) == Ok(42))
 })
 ```
 

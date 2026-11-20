@@ -2,7 +2,7 @@
 // expect: compile-error E0501
 
 // `True` alone is the constructor, of type `() -> True`, not a value of Bool.
-x : Bool = True()
+x : Bool = True
 
 main = () {
 	assert(x)

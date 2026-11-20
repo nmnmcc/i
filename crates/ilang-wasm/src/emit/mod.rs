@@ -392,13 +392,27 @@ fn closure(arity: u32, shape: ShapeId, f: FuncId, captures: &str, patched: bool)
 fn dispatcher(n: u32) -> String {
     let params: String = (0..n).map(|i| format!(" (param $a{i} eqref)")).collect();
     let args: String = (0..n).map(|i| format!(" (local.get $a{i})")).collect();
+    // A function whose parameter is the empty data ignores the argument, so a
+    // closure of arity 0 is called with no argument when one of arity `n` is
+    // expected.
+    let (zero_local, zero_attempt) = if n == 0 {
+        (String::new(), String::new())
+    } else {
+        (
+            " (local $c0 (ref null $clo0))".to_string(),
+            "(drop (block $zero (result eqref)\n\
+               (local.set $c0 (br_on_cast_fail $zero eqref (ref $clo0) (local.get $f)))\n\
+               (return_call_ref $fn0 (local.get $c0) (local.get $env) (struct.get $clo0 9 (local.get $c0)))))\n\
+             ".to_string(),
+        )
+    };
     format!(
         "(func $dispatch{n} (param $f eqref) (param $shape i64) (param $env (ref null $env)){params} (result eqref)\n\
-         (local $c (ref null $clo{n})) (local $m (ref $multi)) (local $shapes (ref $shapes)) (local $i i32)\n\
+         (local $c (ref null $clo{n})) (local $m (ref $multi)) (local $shapes (ref $shapes)) (local $i i32){zero_local}\n\
          (drop (block $multi (result eqref)\n\
            (local.set $c (br_on_cast_fail $multi eqref (ref $clo{n}) (local.get $f)))\n\
            (return_call_ref $fn{n} (local.get $c) (local.get $env){args} (struct.get $clo{n} 9 (local.get $c)))))\n\
-         (local.set $m (ref.cast (ref $multi) (local.get $f)))\n\
+         {zero_attempt}(local.set $m (ref.cast (ref $multi) (local.get $f)))\n\
          (local.set $shapes (struct.get $multi 9 (local.get $m)))\n\
          (loop $scan\n\
            (if (i32.ge_u (local.get $i) (array.len (local.get $shapes))) (then unreachable))\n\

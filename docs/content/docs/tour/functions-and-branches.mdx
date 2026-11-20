@@ -149,7 +149,7 @@ In a chain, the annotations test union members; a single ordinary parameter anno
 )
 
 main = () {
-	{ 2 < 3 } |> (True) { stdio.print("yes") } & (False) { stdio.print("no") }
+	{ 2 < 3 } |> (True()) { stdio.print("yes") } & (False()) { stdio.print("no") }
 }
 ```
 
@@ -211,12 +211,12 @@ A keyed data pattern matches each labelled part by its key. This pattern binds `
 Item = (value = Int)
 Empty = ()
 unpack = (value : { Item | Empty }) {
-	value |> (Item(value = n)) { n } & (Empty) { 0 }
+	value |> (Item(value = n)) { n } & (Empty()) { 0 }
 }
 
 main = () {
 	stdio.print(
-		core.inspect((unpack(Item(value = 8)), unpack(Empty))),
+		core.inspect((unpack(Item(value = 8)), unpack(Empty()))),
 	)
 }
 ```

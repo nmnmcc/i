@@ -191,7 +191,7 @@ fn check_reports_missing_blank_lines_after_header_groups() {
 
 #[test]
 fn constructor_values_and_patterns_are_written_as_calls() {
-    let old = "f = (b : Bool) -> Int { b |> (True) { 1 } & (False) { 0 } }\ng = () { f(True) }\nh = (a = Int) -> Int { a |> (Int) { a } }\n";
+    let old = "f = (b : Bool) -> Int { b |> (True()) { 1 } & (False()) { 0 } }\ng = () { f(True()) }\nh = (a = Int) -> Int { a |> (Int) { a } }\n";
     let called = "g = () { True() }\n";
     let dir = package(&[("src/old.i", old), ("src/called.i", called)]);
     let out = fmt(&[], dir.path());
@@ -227,7 +227,7 @@ fn constructor_values_and_patterns_are_written_as_calls() {
 #[test]
 fn conversion_to_lisp_writes_constructor_values_as_calls() {
     let source =
-        "x = True\ny = Some(1)\nf = (b : Bool) -> Int { b |> (True) { 1 } & (False) { 0 } }\n";
+        "x = True()\ny = Some(1)\nf = (b : Bool) -> Int { b |> (True()) { 1 } & (False()) { 0 } }\n";
     let dir = package(&[("src/main.i", source)]);
     let out = fmt(&["--to", "is"], dir.path());
     assert!(

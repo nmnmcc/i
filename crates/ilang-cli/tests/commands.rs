@@ -434,7 +434,7 @@ divide = (a : Int, b : Int) {
 
 // `()` and `Bool` errors have their own tags.
 check = (n : Int) -> Float {
-	n |> (0) { fail.raise(()) } & (1) { fail.raise(True) } & (_) { 1.5 }
+	n |> (0) { fail.raise(()) } & (1) { fail.raise(True()) } & (_) { 1.5 }
 }
 
 // The `Assert` of a host export stops the program (§9.6).
@@ -445,7 +445,7 @@ positive = (n : Int) {
 
 // A `BitArray` error.
 bits = (b : Bool) -> () {
-	b |> (True) { fail.raise(<<1, 2>>) } & (False) { () }
+	b |> (True()) { fail.raise(<<1, 2>>) } & (False()) { () }
 }
 "#,
         ),
