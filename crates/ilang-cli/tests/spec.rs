@@ -493,12 +493,12 @@ fn main() {
                     };
                     let Some(case) = ready.get(i) else { break };
                     let started = std::time::Instant::now();
-                    let r = run_case(case);
+                    let (r, update) = run_case(case);
                     let seconds = started.elapsed().as_secs_f64();
                     results
                         .lock()
                         .unwrap()
-                        .push((case.name.clone(), seconds, r));
+                        .push((case.name.clone(), seconds, r, update));
                 }
             });
         }
@@ -516,7 +516,7 @@ fn main() {
             .append(true)
             .open(&path)
             .unwrap();
-        for (name, seconds, _) in &results {
+        for (name, seconds, _, _) in &results {
             writeln!(
                 file,
                 "{{\"set\":\"spec-cases\",\"key\":{name:?},\"seconds\":{seconds:.3}}}"
@@ -525,7 +525,11 @@ fn main() {
         }
     }
     let mut passed = 0;
-    for (name, _, r) in results {
+    let mut pending = Vec::new();
+    for (name, _, r, update) in results {
+        if let Some(update) = update {
+            pending.push(update);
+        }
         match r {
             Ok(()) => {
                 passed += 1;
@@ -545,6 +549,9 @@ fn main() {
     if skipped > 0 {
         println!("spec: {skipped} cases skipped as pending (tests/spec/syn3-pending.txt)");
     }
+    // Publish regenerated headers only when every case passed. On a failure
+    // the files keep their bytes and each is named as not updated.
+    spec_header::commit(&pending, failures.is_empty()).unwrap();
     if !failures.is_empty() {
         println!("\nfailures:");
         for f in &failures {
@@ -562,19 +569,28 @@ fn both_levels() -> bool {
         .unwrap_or(true)
 }
 
-fn run_case(case: &Case) -> Result<(), String> {
+fn run_case(case: &Case) -> (Result<(), String>, Option<(PathBuf, String)>) {
     let trace = std::env::var_os("I_SPEC_TRACE").map(|_| case.name.as_str());
-    let o0 = run(&case.project, Level::O0, trace).map_err(|e| format!("--opt 0: {e}"))?;
+    let o0 = match run(&case.project, Level::O0, trace) {
+        Ok(o0) => o0,
+        Err(e) => return (Err(format!("--opt 0: {e}")), None),
+    };
     if let Some(name) = trace {
         eprintln!("spec trace {name} O0: done");
     }
     let o2 = if both_levels() {
-        let o2 = run(&case.project, Level::O2, trace).map_err(|e| format!("--opt 2: {e}"))?;
+        let o2 = match run(&case.project, Level::O2, trace) {
+            Ok(o2) => o2,
+            Err(e) => return (Err(format!("--opt 2: {e}")), None),
+        };
         if let Some(name) = trace {
             eprintln!("spec trace {name} O2: done");
         }
         if o0 != o2 {
-            return Err(format!("--opt 0 and --opt 2 differ:\n{o0:#?}\n{o2:#?}"));
+            return (
+                Err(format!("--opt 0 and --opt 2 differ:\n{o0:#?}\n{o2:#?}")),
+                None,
+            );
         }
         Some(o2)
     } else {
@@ -597,19 +613,29 @@ fn run_case(case: &Case) -> Result<(), String> {
         } else {
             lines.map(str::to_string).collect()
         };
-        let text = std::fs::read_to_string(&case.header_path).map_err(|e| e.to_string())?;
-        let updated = spec_header::rewrite(&text, case.comment, first, &at)?;
+        let text = match std::fs::read_to_string(&case.header_path) {
+            Ok(text) => text,
+            Err(e) => return (Err(e.to_string()), None),
+        };
+        let updated = match spec_header::rewrite(&text, case.comment, first, &at) {
+            Ok(updated) => updated,
+            Err(e) => return (Err(e), None),
+        };
         if updated != text {
             update = Some(updated);
         }
         expect = Expect::Stop(first.to_string(), at);
     }
-    check(case, &o0, &expect).map_err(|e| format!("--opt 0: {e}"))?;
-    if let Some(o2) = &o2 {
-        check(case, o2, &expect).map_err(|e| format!("--opt 2: {e}"))?;
-    }
-    if let Some(updated) = update {
-        std::fs::write(&case.header_path, updated).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    let result = check(case, &o0, &expect)
+        .map_err(|e| format!("--opt 0: {e}"))
+        .and_then(|()| match &o2 {
+            Some(o2) => check(case, o2, &expect).map_err(|e| format!("--opt 2: {e}")),
+            None => Ok(()),
+        });
+    // Nothing is written here: the caller publishes a regenerated header
+    // only after every case succeeded.
+    (
+        result,
+        update.map(|content| (case.header_path.clone(), content)),
+    )
 }
