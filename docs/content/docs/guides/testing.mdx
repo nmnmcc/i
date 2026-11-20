@@ -63,7 +63,7 @@ pass guide_tests/count_test.adds one
 1 passed, 0 failed
 ```
 
-Each command prints this result. Filters match substrings, with no exact-name or file flag; include the module's trailing dot to select its tests. `--project` chooses the directory; `--opt` chooses the optimization level.
+Each command prints this result. Filters match substrings, with no exact-name or file flag; include the module's trailing dot to select its tests. `--project` chooses the directory; `--opt` chooses the optimization level. A filter that matches nothing prints `0 passed, 0 failed` and exits 0, and so does a package with no `[test]` collection or no test files; check the count where a silent zero would pass CI.
 
 `--shard K/N` runs shard `K` of `N` (counted from 0): the tests are sorted by qualified name and placed into shards by the shared cost-aware algorithm (heaviest first, each to the least-loaded shard), so the union of all shards is the full set; the name filter then applies within the shard.
 

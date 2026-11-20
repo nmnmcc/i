@@ -9,6 +9,7 @@ Run a WASI command and call an exported function through the host SDK.
 name = "guide_interop"
 
 [dependencies]
+i = "github.com/nmnmcc/i//stdlib@X.Y.Z"
 
 [wasm]
 exports = ["guide_interop/main.add"]
@@ -31,7 +32,7 @@ main = () { stdio.print("hello from Wasm") }
 hello from Wasm
 ```
 
-Create `guide-interop/` in the i source folder; run commands there. The Wasm engine needs garbage collection, typed function references, tail calls, and exception handling with `exnref`.
+Create `guide-interop/` in the i source folder; run commands there. The Wasm engine needs garbage collection, typed function references, tail calls, and exception handling with `exnref`. Install `wasmtime` (for example from [wasmtime.dev](https://wasmtime.dev/)) for the WASI command; the Node runner needs only `node`.
 
 ## WASI command
 
