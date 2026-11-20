@@ -28,7 +28,10 @@ An implemented row keeps its ID and a `fixed (<commit>)` status.
 - **Migration count**: call sites/files/tests to touch, or `unmeasured`.
 - **Owner line** and **depends on** make the schedule explicit.
 
-Status values: `open`, `in progress`, `needs owner`, `fixed`.
+Status: implementation rows are tracked as `open`, `in progress` or `fixed` in
+[`spec-known-gaps.md`](spec-known-gaps.md). A rows carried by PR #56 are
+`in progress`; the held A4/A7/A8 are `needs owner`. K rows are `open` unless
+the decision is a justified exception.
 
 ## 1. Contradictions inside the standard (A)
 
