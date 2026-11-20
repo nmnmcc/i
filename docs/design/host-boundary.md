@@ -495,7 +495,7 @@ Rows outside this surface (B1, B30, B1a/B1b, etc.) are unaffected.
 
 | Option | Cost | Why not |
 |---|---|---|
-| Delete all three (chosen) | 509 attribute occurrences + 22 manifests + spec | required by the decision; no compatibility |
+| Delete all three (chosen) | 497 attribute occurrences + 21 manifests + spec | required by the decision; no compatibility |
 | Keep `@external` for runtime intrinsics only | 150 fewer edits | it is visible in `stdlib/src` and keeps the bad name; `@runtime` cleanly separates "compiler op" from "host call" |
 | Keep `@js` | 17 occurrences, no implementation | it never worked; one uniform import attribute is the rule, and 0.2.0 can retire it without a replacement |
 
@@ -781,7 +781,7 @@ twice, for no earlier user value. Alternative: hide first, hostcall second
 The full 152 names are Appendix A. Split by file:
 
 - `stdlib/src/request.i`: 15 exported functions + 3 types.
-- `stdlib/src/task.i`: 24 exported functions; 22 more private signatures.
+- `stdlib/src/task.i`: 24 exported functions; 17 more private signatures.
 - `stdlib/src/{clock,fs,process,net,tls,fetch,stdio}.i`: 71 exported signatures
   (wrapper rows; most drop `Await, Owner` only).
 - `stdlib/src/{http,log,time,calendar,cli,crypto,deferred,queue,schedule,semaphore}.i`:
@@ -855,7 +855,7 @@ project-level errors. Names are fixed here so the tests can be written in
 parallel with the implementation.
 
 1. **Product**: missing entry E0617 with the literal "if this package is a
-   library, set `product = "library"`" sentence; bad `product` value E0613;
+   library, set `product = "library"` in i.toml" sentence; bad `product` value E0613;
    program+`@export` E0330 naming `product = "library"`; library+`[entries]`
    E0614; program dependency E0615; `i run` a library E0331; native build of a
    library E0332.
@@ -919,7 +919,7 @@ All seven are accepted as proposed, with the owner's additions:
 
 - **P1 accepted.** `product` stays optional with program default. `E0617` must
   carry the literal sentence "if this package is a library, set
-  `product = "library"`"; `E0330` names the same fix. §1.1 and §8 case 1 pin
+  `product = "library"` in i.toml"; `E0330` names the same fix. §1.1 and §8 case 1 pin
   the exact text.
 - **P2 accepted.** `@export` is function-only; no whole-service export.
 - **P3 accepted.** The same-module `make_<Type>` accessor, no `src/gen/`

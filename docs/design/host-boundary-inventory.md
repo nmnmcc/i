@@ -103,7 +103,7 @@ Pinning tests that must be rewritten or replaced:
 
 ## 2. Manifest `[wasm]`
 
-22 `i.toml` files, all with `exports`, **none** with `synchronous`:
+21 `i.toml` files, all with `exports`, **none** with `synchronous`:
 
 `crates/ilang-check/tests/projects/entry_dependency/i.toml:8-9`,
 `crates/ilang-check/tests/projects/ok_dependency_manifest/u/i.toml:5-6`,
@@ -236,7 +236,7 @@ review fixtures + 9 `expected.json` lines, `tests/browser/fixtures/r2`, and
 
 ## 5. What this means for the plan
 
-- The library conversion is the large mechanical part: 159 attribute lines in
+- The library conversion is the large mechanical part: 162 attribute lines in
   `stdlib/src` + prelude, plus 152 signature edits.
 - The checker/codegen change is the risk: attribute contract, import kind,
   host service mode, entry stubs, export inference, ABI.
