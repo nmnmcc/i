@@ -7,7 +7,7 @@ the implementation choices; their behavior is checked by implementation tests.
 
 Sources, in order: spec.md; syntax.md as amended by the user's confirmed SYN2
 decisions; literal-types.md, value-types.md, types-joint.md, records.md at the
-ledger-accepted 0d0ce19 (the copy in this merge is older), js.md and runtime.md;
+ledger-accepted 0d0ce19 (the copy in this merge is older), js.md;
 the plan's decided design and M tracks; the ledger through its meta restart.
 The user's later removal of the test attribute also controls. The SYN2 scope
 rulings retain brace type groups and the general pipe into a clause function.
