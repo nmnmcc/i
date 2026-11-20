@@ -626,6 +626,7 @@ Outside B's list in the plan: `runtime/stops.rs`, `runtime/mod.rs`, `emit/mod.rs
 
 This uses the new syntax, so it is committed after A1+A2 land.
 
+<!-- old-syntax-check: E0101,E0101,E0101,E0101,E0101 -->
 ```i
 //// Resuming a paused computation at depth 10, 100 and 1000. `scripts/bench`
 //// runs these with `i test --time` at `--opt 2`. A resume and the next

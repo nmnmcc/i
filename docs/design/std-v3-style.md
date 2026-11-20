@@ -303,6 +303,7 @@ are inferred, as specified in `docs/spec.md` §6.8.
 | Do not add `try_` merely because a callback may raise. | Fail is already a need. Ordinary map propagates it. | `list.map(texts, parse_port)`; use `fail.catch` if the whole traversal should return Result. |
 | Use shape groups for a default and an explicit configuration of one operation. | Avoid `_with` families when shape alone expresses the difference. | The `split` definition below. |
 
+<!-- old-syntax-check: E0101 -->
 ```i
 (
 	i/string
@@ -366,6 +367,7 @@ ordinary public validation would raise, with Result created at the caller's
 chosen boundary. This is a deliberate pre-stability API change, not a claim
 that E3 alone changes those functions.
 
+<!-- old-syntax-check: E0101 -->
 ```i
 (
 	i/fail
@@ -434,6 +436,7 @@ Effect/Layer to the type. Keep the smallest useful capability together.
 Two independently replaceable services need distinct nominal type constructors
 because needs are keyed by constructor (`docs/spec.md` §9.2).
 
+<!-- old-syntax-check: E0101 -->
 ```i
 (
 	option = (Option, Some, None) = i/option

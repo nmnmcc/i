@@ -164,7 +164,7 @@ context. A subsequent export call/test/instance gets a fresh one. A host-wide al
 is shared across those contexts. Each map entry records its context, kind, OS resource
 and operation leases; a number is never an OS fd, pointer or request-table slot.
 Unknown, nonpositive, closed, wrong-kind or foreign-context numbers give code closed;
-close on them gives Nil. Checking arguments never downcasts a resource merely because
+close on them gives (). Checking arguments never downcasts a resource merely because
 its number exists.
 
 **N9.2. Numbers are never reissued within one live host.** Allocate positive
@@ -536,7 +536,7 @@ main = () {
 	task.scope((s) {
 		task.go(s, spin)
 		task.go(s, () { panic("first") })
-		Nil
+		()
 	})
 }
 ```
@@ -558,11 +558,11 @@ supervisor completion.
 
 **Close while another worker waits.** Arrange a read to own its lease, then close from
 another worker. Repeat for accept, File read and Child wait. Close wins:
-Error(NetError("read", "", "closed")) for the read; close gives Nil; a second close
-gives Nil. Completion wins first: retain the original bytes. A second concurrent read
+Error(NetError("read", "", "closed")) for the read; close gives (); a second close
+gives (). Completion wins first: retain the original bytes. A second concurrent read
 gives busy; a simultaneous write may proceed. These are N9.3/runtime §7 results, not
 arbitrary byte distribution under D1. Concurrent close callers cannot both own the
-cleanup; an already-removed alias gives Nil.
+cleanup; an already-removed alias gives ().
 
 **Forged number and namespace.** This module imports no standard net module:
 
@@ -589,7 +589,7 @@ any host call.
 
 **Two runs, exhaustion and hidden state.** In run A open number n, retain n in a
 host-only fixture, then end A; in run B create n+1 and issue raw operations on n. Expect
-closed/Nil, never the new resource (N9.1/N9.2). Repeat with two tests sharing standard
+closed/(), never the new resource (N9.1/N9.2). Repeat with two tests sharing standard
 host options and with a second export call on one instance. Set the allocator near an
 injected limit and create two provisional resources: the first gets the final fresh
 number; the second closes any OS result and stops for memory exhaustion. Nothing wraps
@@ -685,7 +685,7 @@ timeouts and plugin cleanup, not only tasks.
 	i/request
 )
 @host("review:gate/v1", "request")
-Gate = (wait = () -> Request(Nil))
+Gate = (wait = () -> Request(()))
 
 main = () <- (gate : Gate, root : request.Root) {
 	pending = gate.wait()
@@ -701,7 +701,7 @@ main = () <- (gate : Gate, root : request.Root) {
 ```
 
 Expected: count is 1 whether child runs on the maker or another worker; after
-cancel the count is 0, readiness true and wait-none returns Nil. No operation
+cancel the count is 0, readiness true and wait-none returns (). No operation
 returns the maker's Ticket. Also run two groups on separate workers: cancel-all
 of one leaves the other's count 1; cancel-all-root makes both zero but permits
 later starts; close-root forbids later starts. Complete between check and
@@ -773,7 +773,7 @@ main = () {
 	task.run(() { assert(task.sync(event) == 1) })
 	task.run(() { assert(task.sync(event) == 1) })
 	control.boundary((b) {
-		e = task.map(task.always(Nil), (_) { b })
+		e = task.map(task.always(()), (_) { b })
 		assert(
 			core.not(core.portable(e)),
 		)
@@ -797,7 +797,7 @@ by a nested run on the same worker:
 	i/request
 )
 @host("review:gate/v1", "request")
-Gate = (wait = () -> Request(Nil))
+Gate = (wait = () -> Request(()))
 
 main = () <- (gate : Gate) {
 	pending = gate.wait()
@@ -805,7 +805,7 @@ main = () <- (gate : Gate) {
 }
 ```
 
-Expected: after the fixture answers, the nested run returns Nil, without a
+Expected: after the fixture answers, the nested run returns (), without a
 deadlock stop. Its logical waitable set is owned program-root work union
 explicitly awaited borrowed Waiting work, deduplicated by identity; group
 observers contribute underlying members, not themselves. Repeat with an
@@ -1109,13 +1109,13 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > |---|---|
 > | `open` | `(path : String, mode : String) -> Request(Result(File,String))` |
 > | `read` | `(file : File, max_bytes : Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(file : File, bytes : BitArray) -> Request(Result(Nil,String))` |
-> | `flush` | `(file : File) -> Request(Result(Nil,String))` |
-> | `close` | `(file : File) -> Request(Nil)` |
-> | `remove` | `(path : String) -> Request(Result(Nil,String))` |
-> | `rename` | `(from : String, to : String) -> Request(Result(Nil,String))` |
+> | `write` | `(file : File, bytes : BitArray) -> Request(Result((),String))` |
+> | `flush` | `(file : File) -> Request(Result((),String))` |
+> | `close` | `(file : File) -> Request(())` |
+> | `remove` | `(path : String) -> Request(Result((),String))` |
+> | `rename` | `(from : String, to : String) -> Request(Result((),String))` |
 > | `read_file` | `(path : String) -> Request(Result(BitArray,String))` |
-> | `write_file` | `(path : String, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `write_file` | `(path : String, bytes : BitArray) -> Request(Result((),String))` |
 >
 > Public open takes OpenMode and encodes `read`, `truncate`, `append`, or
 > `read_write`; write modes create the file if absent, read_write does not
@@ -1137,13 +1137,13 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > |---|---|
 > | `open` | `(path : String, mode : String) -> Request(Result(Int,String))` |
 > | `read` | `(file : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(file : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
-> | `flush` | `(file : Int) -> Request(Result(Nil,String))` |
-> | `close` | `(file : Int) -> Request(Nil)` |
-> | `remove` | `(path : String) -> Request(Result(Nil,String))` |
-> | `rename` | `(from : String, to : String) -> Request(Result(Nil,String))` |
+> | `write` | `(file : Int, bytes : BitArray) -> Request(Result((),String))` |
+> | `flush` | `(file : Int) -> Request(Result((),String))` |
+> | `close` | `(file : Int) -> Request(())` |
+> | `remove` | `(path : String) -> Request(Result((),String))` |
+> | `rename` | `(from : String, to : String) -> Request(Result((),String))` |
 > | `read_file` | `(path : String) -> Request(Result(BitArray,String))` |
-> | `write_file` | `(path : String, bytes : BitArray) -> Request(Result(Nil,String))` |
+> | `write_file` | `(path : String, bytes : BitArray) -> Request(Result((),String))` |
 >
 > Public open returns File by wrapping the successful Int, takes OpenMode and encodes `read`, `truncate`, `append`, or
 > `read_write`; write modes create the file if absent, read_write does not
@@ -1160,7 +1160,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > rename errors use the from path; no path normalization or sandboxing is hidden
 > in the i wrapper. Expected access denial is code denied. One read/write/flush
 > holds the cursor lease; a competing operation gives busy. Missing, closed,
-> foreign-context or wrong-kind numbers give closed; close gives Nil. Close wakes
+> foreign-context or wrong-kind numbers give closed; close gives (). Close wakes
 > pending operations with closed unless their answer already committed.
 >
 > The resource-bearing parts of the File wrappers are explicit ordinary i:
@@ -1205,10 +1205,10 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | `accept` | `(listener : Listener) -> Request(Result(Stream,String))` |
 > | `connect` | `(address : String, port : Int) -> Request(Result(Stream,String))` |
 > | `read` | `(stream : Stream, max_bytes : Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(stream : Stream, bytes : BitArray) -> Request(Result(Nil,String))` |
-> | `shutdown_write` | `(stream : Stream) -> Request(Result(Nil,String))` |
-> | `close_stream` | `(stream : Stream) -> Request(Nil)` |
-> | `close_listener` | `(listener : Listener) -> Request(Nil)` |
+> | `write` | `(stream : Stream, bytes : BitArray) -> Request(Result((),String))` |
+> | `shutdown_write` | `(stream : Stream) -> Request(Result((),String))` |
+> | `close_stream` | `(stream : Stream) -> Request(())` |
+> | `close_listener` | `(listener : Listener) -> Request(())` |
 >
 > The same names are public wrappers with the same parameters and success types,
 > `^ NetError`, and no errors for the two close functions. Address is a numeric
@@ -1234,10 +1234,10 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | `accept` | `(listener : Int) -> Request(Result(Int,String))` |
 > | `connect` | `(address : String, port : Int) -> Request(Result(Int,String))` |
 > | `read` | `(stream : Int, max_bytes : Int) -> Request(Result(BitArray,String))` |
-> | `write` | `(stream : Int, bytes : BitArray) -> Request(Result(Nil,String))` |
-> | `shutdown_write` | `(stream : Int) -> Request(Result(Nil,String))` |
-> | `close_stream` | `(stream : Int) -> Request(Nil)` |
-> | `close_listener` | `(listener : Int) -> Request(Nil)` |
+> | `write` | `(stream : Int, bytes : BitArray) -> Request(Result((),String))` |
+> | `shutdown_write` | `(stream : Int) -> Request(Result((),String))` |
+> | `close_stream` | `(stream : Int) -> Request(())` |
+> | `close_listener` | `(listener : Int) -> Request(())` |
 >
 > Public listen returns Listener; accept/connect return Stream. Public resource
 > parameters use Listener or Stream as appropriate. Other result types stay the
@@ -1281,7 +1281,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > read and write are allowed. A second concurrent read, write, or accept on the
 > same direction/object gives busy, not an unspecified interleaving. DNS is part
 > of i/net; TLS is i/tls (a later task); UDP follows the same resource rules (runtime §7.3). Missing, closed, foreign-context or wrong-kind
-> numbers give closed; close gives Nil. Stream values can cross workers, while
+> numbers give closed; close gives (). Stream values can cross workers, while
 > their pending Request values cannot.
 
 - Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3.
@@ -1298,8 +1298,8 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | `entropy` | `(bytes : Int) -> Request(Result(BitArray,String))` |
 > | `spawn` | `(program : String, args : BitArray) -> Request(Result(Child,String))` |
 > | `wait` | `(child : Child) -> Request(Result(Int,String))` |
-> | `terminate` | `(child : Child) -> Request(Result(Nil,String))` |
-> | `close` | `(child : Child) -> Request(Nil)` |
+> | `terminate` | `(child : Child) -> Request(Result((),String))` |
+> | `close` | `(child : Child) -> Request(())` |
 >
 > Public args gives List(String); spawn takes `(program : String, args : List(String))`;
 > other wrappers keep raw parameters/success values, with `^ ProcessError` except
@@ -1321,8 +1321,8 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | `entropy` | `(bytes : Int) -> Request(Result(BitArray,String))` |
 > | `spawn` | `(program : String, args : BitArray) -> Request(Result(Int,String))` |
 > | `wait` | `(child : Int) -> Request(Result(Int,String))` |
-> | `terminate` | `(child : Int) -> Request(Result(Nil,String))` |
-> | `close` | `(child : Int) -> Request(Nil)` |
+> | `terminate` | `(child : Int) -> Request(Result((),String))` |
+> | `close` | `(child : Int) -> Request(())` |
 >
 > Public args gives List(String); spawn takes `(program : String, args : List(String))`
 > and returns Child; wait/terminate/close take Child. Match Child(number)
@@ -1365,7 +1365,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > failed termination request. A raw OS process may be slow to terminate, so close/final
 > completion has no bounded duration. Pipes and changed cwd/env are later API
 > extensions, not unspecified behavior of this version. Missing, closed,
-> foreign-context or wrong-kind numbers give closed; close gives Nil. Close wakes
+> foreign-context or wrong-kind numbers give closed; close gives (). Close wakes
 > a pending wait/terminate with closed unless its answer already committed.
 >
 > Inside i/process, encode_args is the ordinary codec above (it raises
@@ -1448,7 +1448,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > records its resource kind. One host-wide allocator never reissues a number,
 > including provisional/failed creations, across contexts, tests or instances.
 > Unknown, zero/negative, foreign-context and wrong-kind numbers give closed;
-> close gives Nil. Checked allocation failure stops for memory exhaustion, never
+> close gives (). Checked allocation failure stops for memory exhaustion, never
 > wraps or truncates to u64/fd. A host restart begins another identity domain;
 > retaining raw numbers across host restarts is unsupported.
 >
@@ -1462,11 +1462,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > all aliases and settles pending operations with closed. An operation retains a
 > lease/private OS reference, never a bare pointer into a removed entry, and tests
 > its lease before publishing success. Release happens once after references are
-> safe. Close returns Nil when cleanup completes (Child also awaits reaping);
+> safe. Close returns () when cleanup completes (Child also awaits reaping);
 > it never waits for a lock held by a pending read/wait. Cancelling close cannot
 > restore the entry or cancel its host-owned cleanup. A close already in progress
 > has a context/kind-checked cleanup receipt;
-> concurrent closes join that receipt (in particular Child reaping), then give Nil.
+> concurrent closes join that receipt (in particular Child reaping), then give ().
 > Teardown includes these jobs even after their live table entries were removed;
 > completed receipts are freed, not retained as permanent tombstones.
 > Request cancellation drops its future and registration immediately. OS side effects already committed may
@@ -1608,9 +1608,9 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | random | Pure i | Same pure i | Same pure i | Same pure i |
 > | task | i FIFO loop over v3 | Same loop; promises, AbortSignal, macrotask polling | Same loop on calling thread; never block it | Same i loop; raw host calls complete synchronously; no status hand-off |
 > | clock | Reactor timers and OS clocks | Monotonic/system clocks and abortable timers | Performance/system clocks and abortable timers | Ordinary blocking service imports; preview-1 command supplies no i:clock adapter |
-> | fs | OS files, with the cancellation rule above | Node file operations, closed/busy state, explicit close | Every raw operation gives unsupported, except close gives Nil | Ordinary blocking imports; opaque File needs an export-aware embedder, not plain preload |
-> | net | Reactor TCP | Node TCP, cancellation destroys provisional sockets and removes listeners | All operations give unsupported, close gives Nil; browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
-> | process | OS args/env/cwd/entropy/child processes | Node process data, entropy, spawn/wait/terminate/close | args gives an encoded empty list; env gives denied; cwd/spawn/wait/terminate give unsupported; entropy uses platform secure entropy; close gives Nil | Ordinary blocking imports; no default process/entropy adapter or spawn implementation |
+> | fs | OS files, with the cancellation rule above | Node file operations, closed/busy state, explicit close | Every raw operation gives unsupported, except close gives () | Ordinary blocking imports; opaque File needs an export-aware embedder, not plain preload |
+> | net | Reactor TCP | Node TCP, cancellation destroys provisional sockets and removes listeners | All operations give unsupported, close gives (); browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
+> | process | OS args/env/cwd/entropy/child processes | Node process data, entropy, spawn/wait/terminate/close | args gives an encoded empty list; env gives denied; cwd/spawn/wait/terminate give unsupported; entropy uses platform secure entropy; close gives () | Ordinary blocking imports; no default process/entropy adapter or spawn implementation |
 > | stdio | Per-source input broker/subscribers and byte output | Node standard byte streams with cancelable subscribers | Default byte read/write/flush operations give unsupported; an embedder can give explicit byte sources/sinks | Ordinary blocking imports; no new i:stdio adapter; legacy i/io continues to use fd_write |
 >
 > The JS factory is an explicit SDK option, not a language name-resolution rule.
@@ -1644,9 +1644,9 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | random | Pure i | Same pure i | Same pure i | Same pure i |
 > | task | i FIFO loop over v3 | Same loop; promises, AbortSignal, macrotask polling | Same loop on calling thread; never block it | Same i loop; raw host calls complete synchronously; no status hand-off |
 > | clock | Reactor timers and OS clocks | Monotonic/system clocks and abortable timers | Performance/system clocks and abortable timers | Ordinary blocking service imports; preview-1 command supplies no i:clock adapter |
-> | fs | OS files, with the cancellation rule above | Node context-owned Int table, closed/busy leases, explicit close | Every raw operation gives unsupported, except close gives Nil | Blocking Int imports; buffer-aware embedder/linked adapter needed, no default fs adapter |
-> | net | Reactor TCP | Node context-owned Int table; provisional cleanup and close wakeups | All operations give unsupported, close gives Nil; browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
-> | process | OS args/env/cwd/entropy/child processes | Node process data, entropy, spawn/wait/terminate/close | args gives an encoded empty list; env gives denied; cwd/spawn/wait/terminate give unsupported; entropy uses platform secure entropy; close gives Nil | Ordinary blocking imports; no default process/entropy adapter or spawn implementation |
+> | fs | OS files, with the cancellation rule above | Node context-owned Int table, closed/busy leases, explicit close | Every raw operation gives unsupported, except close gives () | Blocking Int imports; buffer-aware embedder/linked adapter needed, no default fs adapter |
+> | net | Reactor TCP | Node context-owned Int table; provisional cleanup and close wakeups | All operations give unsupported, close gives (); browser fetch is not raw TCP | Ordinary blocking imports; no default listen/connect adapter |
+> | process | OS args/env/cwd/entropy/child processes | Node process data, entropy, spawn/wait/terminate/close | args gives an encoded empty list; env gives denied; cwd/spawn/wait/terminate give unsupported; entropy uses platform secure entropy; close gives () | Ordinary blocking imports; no default process/entropy adapter or spawn implementation |
 > | stdio | Per-source input broker/subscribers and byte output | Node standard byte streams with cancelable subscribers | Default byte read/write/flush operations give unsupported; an embedder can give explicit byte sources/sinks | Ordinary blocking imports; no new i:stdio adapter; legacy i/io continues to use fd_write |
 >
 > The JS factory is an explicit SDK option, not a language name-resolution rule.
@@ -1694,7 +1694,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > copy = (stream) {
 >   net.read(stream, 65536) |> {
->     <<>> -> Nil
+>     <<>> -> ()
 >     bytes -> {
 >       net.write(stream, bytes)
 >       copy(stream)
@@ -1709,7 +1709,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >     (stream) {
 >       task.go(scope, () { serve_next(scope, listener) })
 >       fail.catch(() { copy(stream) })
->       Nil
+>       ()
 >     }
 >   )
 > }
@@ -1722,7 +1722,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >     (listener) {
 >       task.local_scope((scope) {
 >         task.go(scope, () { serve_next(scope, listener) })
->         Nil
+>         ()
 >       })
 >     }
 >   )
@@ -1762,7 +1762,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > copy = (stream) {
 >   net.read(stream, 65536) |> {
->     <<>> -> Nil
+>     <<>> -> ()
 >     bytes -> {
 >       net.write(stream, bytes)
 >       copy(stream)
@@ -1777,7 +1777,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >     (stream) {
 >       task.go(scope, () { serve_next(scope, listener) })
 >       fail.catch(() { copy(stream) })
->       Nil
+>       ()
 >     }
 >   )
 > }
@@ -1790,7 +1790,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >     (listener) {
 >       task.scope((scope) {
 >         task.go(scope, () { serve_next(scope, listener) })
->         Nil
+>         ()
 >       })
 >     }
 >   )
@@ -2115,7 +2115,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Net read(0); fs write with partial byte; process NUL argument | Typed invalid errors with the named operation; §7 validation |
 > | Stream write of N bytes followed by peer EOF | Peer receives the exact N-byte prefix before EOF; §7.3 write-all/half-close |
 > | Two concurrent stream reads; read concurrent with write | busy for second read; opposite directions work; §7.3 leases |
-> | Close File/Stream/Child twice | Nil both times, underlying release once; §7/§8 idempotence |
+> | Close File/Stream/Child twice | () both times, underlying release once; §7/§8 idempotence |
 > | Process args codec for ["a","é"] | Bytes `<<2,0,0,0,1,0,0,0,97,2,0,0,0,195,169>>`; §7.4 UTF-8 framing |
 > | Missing env variable; browser raw TCP | ProcessError(...,"not_found"); NetError(...,"unsupported"); §7 and target matrix |
 > | WASI pure tasks/random; WASI module requiring Fs | Pure calculations work; report ordinary blocking imports requiring an embedder; §B.7, no fake fd-as-externref |
@@ -2164,7 +2164,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Net read(0); fs write with partial byte; process NUL argument | Typed invalid errors with the named operation; §7 validation |
 > | Stream write of N bytes followed by peer EOF | Peer receives the exact N-byte prefix before EOF; §7.3 write-all/half-close |
 > | Two concurrent stream reads; read concurrent with write | busy for second read; opposite directions work; §7.3 leases |
-> | Close File/Stream/Child twice | Nil both times, underlying release once; §7/§8 idempotence |
+> | Close File/Stream/Child twice | () both times, underlying release once; §7/§8 idempotence |
 > | Close while another worker awaits read/accept/wait | closed if close commits first; prior committed answer stays; §8.1 leases |
 > | Stop with outstanding accept and forgotten Ready spawn, then run another test | No i finals; empty new table, fresh numbers and host-owned child cleanup; §8.1/native N12 |
 > | Redeclare raw namespace or external alias | No automatic binding; local fake still works; native §3.1 |
@@ -3013,7 +3013,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - Old sentence(s):
 
 > 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : ()) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 > 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 > 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 > 5. How long may a victim wait before it answers a steal request? Poll points only, or a heartbeat in function prologues later?
@@ -3024,7 +3024,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 - New sentence(s):
 
 > 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+> 2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : ()) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 > 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 > 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 > 5. Which general typed byte-state transaction interface implements part 7 without running i code under a lock? Recommended: ordinary request-mode services; require the MC-D prototype before MC-I.
@@ -3154,7 +3154,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > **N9. IO resources are integer handles, not host references.** A socket, a listener, a file and a child process are values of a private nominal type that holds one `Int`. The raw host service takes and gives that `Int`, and ordinary i code in the library module wraps and unwraps it. This changes `runtime.md` D9.
 >
-> - *Reason for this form (review):* §10.3 lets only `Nil`, `Bool`, `Int`, `Float`, `String`, `BitArray` and custom types with no constructors go to the host. A custom type with an integer field gives E0320, and a type with no constructors is a host reference, which is not portable. A private type around an ABI `Int` needs no special case in the compiler.
+> - *Reason for this form (review):* §10.3 lets only `()`, `Bool`, `Int`, `Float`, `String`, `BitArray` and custom types with no constructors go to the host. A custom type with an integer field gives E0320, and a type with no constructors is a host reference, which is not portable. A private type around an ABI `Int` needs no special case in the compiler.
 > - Such a handle is portable by the S7 rules, with no special case. So one accept loop with `go` for each connection uses all cores, as in Go.
 > - The number is never used again, so the table is a map from numbers to resources, and a use after close finds nothing. (The first form of this note had an index and a generation; one number that is not reused is simpler.)
 > - An `Int` can be made by any code, where a host reference cannot. So the raw services are not exported from the library modules; only the wrapped functions are. If this is enough is a question for the IO design (part 9).
@@ -3386,7 +3386,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > is shared across those contexts. Each map entry records its context, kind, OS resource
 > and operation leases; a number is never an OS fd, pointer or request-table slot.
 > Unknown, nonpositive, closed, wrong-kind or foreign-context numbers give code closed;
-> close on them gives Nil. Checking arguments never downcasts a resource merely because
+> close on them gives (). Checking arguments never downcasts a resource merely because
 > its number exists.
 >
 > **N9.2. Numbers are never reissued within one live host.** Allocate positive
@@ -3754,7 +3754,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >   task.scope((s) {
 >     task.go(s, spin)
 >     task.go(s, () { panic("first") })
->     Nil
+>     ()
 >   })
 > }
 > ```
@@ -3776,11 +3776,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > **Close while another worker waits.** Arrange a read to own its lease, then close from
 > another worker. Repeat for accept, File read and Child wait. Close wins:
-> Error(NetError("read", "", "closed")) for the read; close gives Nil; a second close
-> gives Nil. Completion wins first: retain the original bytes. A second concurrent read
+> Error(NetError("read", "", "closed")) for the read; close gives (); a second close
+> gives (). Completion wins first: retain the original bytes. A second concurrent read
 > gives busy; a simultaneous write may proceed. These are N9.3/runtime §7 results, not
 > arbitrary byte distribution under D1. Concurrent close callers cannot both own the
-> cleanup; an already-removed alias gives Nil.
+> cleanup; an already-removed alias gives ().
 >
 > **Forged number and namespace.** This module imports no standard net module:
 >
@@ -3808,7 +3808,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > **Two runs, exhaustion and hidden state.** In run A open number n, retain n in a
 > host-only fixture, then end A; in run B create n+1 and issue raw operations on n. Expect
-> closed/Nil, never the new resource (N9.1/N9.2). Repeat with two tests sharing standard
+> closed/(), never the new resource (N9.1/N9.2). Repeat with two tests sharing standard
 > host options and with a second export call on one instance. Set the allocator near an
 > injected limit and create two provisional resources: the first gets the final fresh
 > number; the second closes any OS result and stops for memory exhaustion. Nothing wraps
@@ -3923,9 +3923,9 @@ Old sentence(s)/block:
 > | Function | Type | Rule |
 > |---|---|---|
 > | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
-> | `close_root` | `(root : Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+> | `close_root` | `(root : Root) -> ()` | Close every live group of this root and the root itself; idempotent |
 > | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
-> | `close_owner` | `(owner : Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+> | `close_owner` | `(owner : Owner) -> ()` | Cancel its outstanding work and remove the live group; idempotent |
 > | `outstanding` | `(owner : Owner) -> List(Ticket)` | Current outstanding requests in this group, in start order |
 > | `outstanding_root` | `(root : Root) -> List(Ticket)` | Outstanding requests of every group of this root, in start order |
 > | `within(A,E,N)` | `(body : () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
@@ -3934,38 +3934,38 @@ Old sentence(s)/block:
 > | `state(A)` | `(r : Request(A)) -> RequestState(A)` | Reads do not consume the answer |
 > | `take(A)` | `(r : Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
 > | `settled` | `(r : Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-> | `cancel` | `(r : Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+> | `cancel` | `(r : Ticket) -> ()` | Idempotent; cancels only Waiting, discards a Ready answer |
 > | `await(A)` | `(r : Request(A)) -> A ! Await` | Wait, then take the Ready value |
-> | `wait_any` | `(rs : List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
-> | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+> | `wait_any` | `(rs : List(Ticket)) -> ()` | Root wait; return when any listed ticket settles |
+> | `poll` | `() -> ()` | Root hand-off with status 2, even with no requests |
 
 New sentence(s)/block:
 
 > | Function | Type | Rule |
 > |---|---|---|
 > | `open_root` | `() -> Root ! Root` | Open an independent request run within the current entry context |
-> | `close_root` | `(root : Root) -> Nil` | Close every live group of this root and the root itself; idempotent |
+> | `close_root` | `(root : Root) -> ()` | Close every live group of this root and the root itself; idempotent |
 > | `open_owner` | `() -> Owner ! Root` | Register a group at the current root; changing Owner does not change that root |
-> | `close_owner` | `(owner : Owner) -> Nil` | Cancel its outstanding work and remove the live group; idempotent |
+> | `close_owner` | `(owner : Owner) -> ()` | Cancel its outstanding work and remove the live group; idempotent |
 > | `count` | `(owner : Owner) -> Int` | Number of outstanding requests in this group |
 > | `count_root` | `(root : Root) -> Int` | Number of outstanding requests in all groups of this root |
 > | `settled_owner` | `(owner : Owner) -> Bool` | True exactly when count(owner) is zero |
 > | `settled_root` | `(root : Root) -> Bool` | True exactly when count_root(root) is zero |
-> | `cancel_all` | `(owner : Owner) -> Nil` | Cancel the group's outstanding work at this step; leave the group open |
-> | `cancel_all_root` | `(root : Root) -> Nil` | Cancel outstanding work in all its groups at this step; leave them open |
-> | `wait_none` | `(owner : Owner) -> Nil ! Await` | Await until this group's count is zero |
-> | `wait_none_root` | `(root : Root) -> Nil ! Await` | Await until this root's count is zero |
+> | `cancel_all` | `(owner : Owner) -> ()` | Cancel the group's outstanding work at this step; leave the group open |
+> | `cancel_all_root` | `(root : Root) -> ()` | Cancel outstanding work in all its groups at this step; leave them open |
+> | `wait_none` | `(owner : Owner) -> () ! Await` | Await until this group's count is zero |
+> | `wait_none_root` | `(root : Root) -> () ! Await` | Await until this root's count is zero |
 > | `within(A,E,N)` | `(body : () -> A ^ E ! N) -> A ^ E ! Root \| N - Owner` | Fresh Owner environment; ensure close_owner on exit |
 > | `ready(A)` | `(value : A) -> Request(A)` | A fresh completed request; available in pure fakes |
 > | `ticket(A)` | `(r : Request(A)) -> Ticket` | The same underlying request identity; no answer access |
 > | `state(A)` | `(r : Request(A)) -> RequestState(A)` | Reads do not consume the answer |
 > | `take(A)` | `(r : Request(A)) -> A` | Ready becomes Taken atomically; other states stop |
 > | `settled` | `(r : Ticket) -> Bool` | True for Ready, Cancelled or Taken |
-> | `cancel` | `(r : Ticket) -> Nil` | Idempotent; cancels only Waiting, discards a Ready answer |
+> | `cancel` | `(r : Ticket) -> ()` | Idempotent; cancels only Waiting, discards a Ready answer |
 > | `await(A)` | `(r : Request(A)) -> A ! Await` | Borrow the producer, wait, then take the Ready value |
 > | `await_owned(A)` | `(r : Request(A)) -> A ! Await` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
-> | `wait_any` | `(rs : List(Ticket)) -> Nil` | Root wait; return when any listed ticket settles |
-> | `poll` | `() -> Nil` | Root hand-off with status 2, even with no requests |
+> | `wait_any` | `(rs : List(Ticket)) -> ()` | Root wait; return when any listed ticket settles |
+> | `poll` | `() -> ()` | Root hand-off with status 2, even with no requests |
 
 Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization. N-R2: distinguish owned non-creating operations from borrowed waits and ensure cancellation releases their leases; retain creator guards.
 
@@ -4020,7 +4020,7 @@ New sentence(s)/block:
 >
 > wait_none/wait_none_root use Await, so a task waits without pausing runnable
 > siblings. They return immediately on zero, including for a closed group.
-> Otherwise a private local Request(Nil) observation cell subscribes to the group
+> Otherwise a private local Request(()) observation cell subscribes to the group
 > and settles on its next zero observation. It has no host id, producer operation
 > or Owner membership: a wait is not work that can complete itself. Its Ticket
 > never leaves the observer's worker. Check-and-subscribe shares the registration
@@ -4045,7 +4045,7 @@ Reason: N-R1: use placement-independent group observations/cancellation, keep al
 Old sentence(s)/block:
 
 > Root and Owner are ordinary services, not primitive types or built-in names.
-> They use Key(Nil) and are portable; outstanding request values remain non-portable.
+> They use Key(()) and are portable; outstanding request values remain non-portable.
 > Root/group registration and enumeration require no ABI import; closing live
 > work uses only v3 cancel. Generic
 > request groups also serve batch cancellation, request timeouts, and host plugin
@@ -4059,7 +4059,7 @@ Old sentence(s)/block:
 New sentence(s)/block:
 
 > Root and Owner are ordinary services, not primitive types or built-in names.
-> They use Key(Nil) and are portable; outstanding request values remain non-portable.
+> They use Key(()) and are portable; outstanding request values remain non-portable.
 > Root/group registration and observation use internal accounting. Local Ticket
 > cancel uses v3 cancel on its home worker; MC group cancellation uses the
 > registered host cancellation actions above and retires the home id once. MC
@@ -4090,7 +4090,7 @@ Old sentence(s)/block:
 >   A and E ABI-admissible as in §10.3. Its ABI signature is the same as the async
 >   function with result A/errors E; no Request or Result is sent across the wire.
 >   The call starts and returns a handle immediately. A raw field returning
->   `Request(Result(Nil,Never))` is allowed, though `Request(Nil)` is simpler.
+>   `Request(Result((),Never))` is allowed, though `Request(())` is simpler.
 > * No other occurrence of Request/Result is allowed as a boundary type. A
 >   synchronous function, external, or host export cannot take or return Request.
 >   Opaque references inside its A are valid, because only the decoded answer is
@@ -4109,7 +4109,7 @@ New sentence(s)/block:
 >   A and E ABI-admissible as in §10.3. Its ABI signature is the same as the async
 >   function with result A/errors E; no Request or Result is sent across the wire.
 >   The call starts and returns a handle immediately. A raw field returning
->   `Request(Result(Nil,Never))` is allowed, though `Request(Nil)` is simpler.
+>   `Request(Result((),Never))` is allowed, though `Request(())` is simpler.
 > * No other occurrence of Request/Result is allowed as a boundary type. A
 >   synchronous function, external, or host export cannot take or return Request.
 >   Opaque references inside its A are valid, because only the decoded answer is
@@ -4721,7 +4721,7 @@ Old sentence(s)/block:
 > | Net read(0); fs write with partial byte; process NUL argument | Typed invalid errors with the named operation; §7 validation |
 > | Stream write of N bytes followed by peer EOF | Peer receives the exact N-byte prefix before EOF; §7.3 write-all/half-close |
 > | Two concurrent stream reads; read concurrent with write | busy for second read; opposite directions work; §7.3 leases |
-> | Close File/Stream/Child twice | Nil both times, underlying release once; §7/§8 idempotence |
+> | Close File/Stream/Child twice | () both times, underlying release once; §7/§8 idempotence |
 > | Close while another worker awaits read/accept/wait | closed if close commits first; prior committed answer stays; §8.1 leases |
 > | Stop with outstanding accept and forgotten Ready spawn, then run another test | No i finals; empty new table, fresh numbers and host-owned child cleanup; §8.1/native N12 |
 > | Redeclare raw namespace or external alias | No automatic binding; local fake still works; native §3.1 |
@@ -4775,7 +4775,7 @@ New sentence(s)/block:
 > | Net read(0); fs write with partial byte; process NUL argument | Typed invalid errors with the named operation; §7 validation |
 > | Stream write of N bytes followed by peer EOF | Peer receives the exact N-byte prefix before EOF; §7.3 write-all/half-close |
 > | Two concurrent stream reads; read concurrent with write | busy for second read; opposite directions work; §7.3 leases |
-> | Close File/Stream/Child twice | Nil both times, underlying release once; §7/§8 idempotence |
+> | Close File/Stream/Child twice | () both times, underlying release once; §7/§8 idempotence |
 > | Close while another worker awaits read/accept/wait | closed if close commits first; prior committed answer stays; §8.1 leases |
 > | Stop with outstanding accept and forgotten Ready spawn, then run another test | No i finals; empty new table, fresh numbers and host-owned child cleanup; §8.1/native N12 |
 > | Redeclare raw namespace or external alias | No automatic binding; local fake still works; native §3.1 |
@@ -4822,7 +4822,7 @@ Old sentence(s)/block:
 > a caller still needs Runner. The revised schemes express exactly these cases.
 > A public ordinary function needing Request(Int) needs no privileged module
 > import or type declaration. RequestState's unlabeled Ready pattern agrees with
-> spec §7.1. Owner's Key(Nil) is portable while a ticket returned by outstanding
+> spec §7.1. Owner's Key(()) is portable while a ticket returned by outstanding
 > is not. There is no static conversion that can read a Ticket as a Request(Int).
 
 New sentence(s)/block:
@@ -4832,7 +4832,7 @@ New sentence(s)/block:
 > a caller still needs Runner. The revised schemes express exactly these cases.
 > A public ordinary function needing Request(Int) needs no privileged module
 > import or type declaration. RequestState's unlabeled Ready pattern agrees with
-> spec §7.1. Owner's Key(Nil) is portable while Request/Ticket values are not; group
+> spec §7.1. Owner's Key(()) is portable while Request/Ticket values are not; group
 > operations expose no ticket enumeration. There is no static conversion that can read a Ticket as a Request(Int).
 
 Reason: N-R1: use placement-independent group observations/cancellation, keep all cells local, and remove foreign-Ticket enumeration; specify observer and cancellation synchronization.
@@ -5291,7 +5291,7 @@ New sentence(s)/block:
 > ```i
 > (i/task, i/request)
 > @host("review:gate/v1", "request")
-> Gate { Gate(wait: () -> Request(Nil)) }
+> Gate { Gate(wait: () -> Request(())) }
 >
 > main = (gate ! Gate, root ! request.Root) {
 >   pending = gate.wait()
@@ -5307,7 +5307,7 @@ New sentence(s)/block:
 > ```
 >
 > Expected: count is 1 whether child runs on the maker or another worker; after
-> cancel the count is 0, readiness true and wait-none returns Nil. No operation
+> cancel the count is 0, readiness true and wait-none returns (). No operation
 > returns the maker's Ticket. Also run two groups on separate workers: cancel-all
 > of one leaves the other's count 1; cancel-all-root makes both zero but permits
 > later starts; close-root forbids later starts. Complete between check and
@@ -5372,7 +5372,7 @@ New sentence(s)/block:
 >   task.run(() { assert(task.sync(event) == 1) })
 >   task.run(() { assert(task.sync(event) == 1) })
 >   control.boundary((b) {
->     e = task.map(task.always(Nil), (_) { b })
+>     e = task.map(task.always(()), (_) { b })
 >     assert(core.not(core.portable(e)))
 >   })
 > }
@@ -5391,7 +5391,7 @@ New sentence(s)/block:
 > ```i
 > (i/task, i/request)
 > @host("review:gate/v1", "request")
-> Gate { Gate(wait: () -> Request(Nil)) }
+> Gate { Gate(wait: () -> Request(())) }
 >
 > main = (gate ! Gate) {
 >   pending = gate.wait()
@@ -5399,7 +5399,7 @@ New sentence(s)/block:
 > }
 > ```
 >
-> Expected: after the fixture answers, the nested run returns Nil, without a
+> Expected: after the fixture answers, the nested run returns (), without a
 > deadlock stop. Its logical waitable set is owned program-root work union
 > explicitly awaited borrowed Waiting work, deduplicated by identity; group
 > observers contribute underlying members, not themselves. Repeat with an

@@ -121,6 +121,7 @@ case to a stable closed error family is breaking.
 
 This complete example already uses syntax three and today's failure API:
 
+<!-- old-syntax-check: E0101 -->
 ```i
 (
 	i/fail
@@ -242,7 +243,7 @@ stay separate from Fail. No test keyword or special standard-library runner.
 
 test("mapping preserves order", () {
 	assert(list.map([2, 3], (n) { n * 2 }) == [4, 6])
-	Nil
+	()
 })
 ```
 
@@ -331,13 +332,13 @@ catch : <A,N>(() <- (..N, Assert) -> A) <- N -> Result(A,AssertionFailure)
 boundary : <R,N>((Boundary(R,N)) <- N -> R) <- N -> R
 suspend : <A,R,N>(Boundary(R,N), (Continuation(A,R,N)) <- N -> R) -> A
 resume : <A,R,N>(Continuation(A,R,N), A) <- N -> R
-cancel : <A,R,N>(Continuation(A,R,N)) <- N -> Nil
+cancel : <A,R,N>(Continuation(A,R,N)) <- N -> ()
 escape : <R,N>(Boundary(R,N), R) -> Never
 keep_env : <A,B,E,N>((A) <- (..N, Fail(E)) -> B) <- N -> (A) <- (Fail(E)) -> B
 // i/resource
 Scope = private service
-ensure : <A,N>(() <- N -> A, () <- N -> Nil) <- N -> A
-acquire : <A,N>(() <- N -> A, (A) -> Nil) <- (..N, Scope) -> A
+ensure : <A,N>(() <- N -> A, () <- N -> ()) <- N -> A
+acquire : <A,N>(() <- N -> A, (A) -> ()) <- (..N, Scope) -> A
 scoped : <A,N>(() <- (..N, Scope) -> A) <- N -> A
 // i/key
 Found(A) = (A)
@@ -347,34 +348,34 @@ new : <A>() -> Key(A)
 wrap : <A>(Key(A),A) -> Keyed
 unwrap : <A>(Key(A),Keyed) -> Lookup(A)
 // i/request
-Await = (wait = (Ticket) -> Nil)
-Root = (key = Key(Nil))
-Owner = (key = Key(Nil), root = Root)
+Await = (wait = (Ticket) -> ())
+Root = (key = Key(()))
+Owner = (key = Key(()), root = Root)
 Waiting = (); Ready(A) = (A); Cancelled = (); Taken = ()
 RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 open_root : () <- (Root) -> Root
-close_root : (Root) -> Nil
+close_root : (Root) -> ()
 open_owner : () <- (Root) -> Owner
-close_owner : (Owner) -> Nil
+close_owner : (Owner) -> ()
 count : (Owner) -> Int
 count_root : (Root) -> Int
 settled_owner : (Owner) -> Bool
 settled_root : (Root) -> Bool
-cancel_all : (Owner) -> Nil
-cancel_all_root : (Root) -> Nil
-wait_none : (Owner) <- (Await) -> Nil
-wait_none_root : (Root) <- (Await) -> Nil
+cancel_all : (Owner) -> ()
+cancel_all_root : (Root) -> ()
+wait_none : (Owner) <- (Await) -> ()
+wait_none_root : (Root) <- (Await) -> ()
 within : <A,N>(() <- (..N, Owner) -> A) <- (..N, Root) -> A
 ready : <A>(A) -> Request(A)
 ticket : <A>(Request(A)) -> Ticket
 state : <A>(Request(A)) -> RequestState(A)
 take : <A>(Request(A)) -> A
 settled : (Ticket) -> Bool
-cancel : (Ticket) -> Nil
+cancel : (Ticket) -> ()
 await : <A>(Request(A)) <- (Await) -> A
 await_owned : <A>(Request(A)) <- (Await) -> A
-wait_any : (List(Ticket)) -> Nil
-poll : () -> Nil
+wait_any : (List(Ticket)) -> ()
+poll : () -> ()
 ```
 
 Scope registers releases in reverse acquisition order. Use kept non-Fail
@@ -459,9 +460,9 @@ Position = ImportItem | ExportItem | Item | Attribute | Type | DataTypeItem |
 // Each Position member has data ().
 SyntaxError = (message = String, at = Syntax)
 Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
-Items = (add = (Syntax,Syntax,List((String,String)),Syntax) <- (Fail(SyntaxError)) -> Nil,
-         expose = (Syntax) <- (Fail(SyntaxError)) -> Nil)
-Diagnostics = (note = (String) -> Nil)
+Items = (add = (Syntax,Syntax,List((String,String)),Syntax) <- (Fail(SyntaxError)) -> (),
+         expose = (Syntax) <- (Fail(SyntaxError)) -> ())
+Diagnostics = (note = (String) -> ())
 Yes = (); No = (); NotKnown = (); Truth = Yes | No | NotKnown
 Types = (type_of = (Syntax) <- (Fail(SyntaxError)) -> Syntax,
          signature = () -> Syntax,
@@ -598,7 +599,7 @@ key_find : <K, V>(List((K, V)), K) -> Option(V)
 key_filter : <K, V>(List((K, V)), K) -> List(V)
 key_pop : <K, V>(List((K, V)), K) -> Option((V, List((K, V))))
 key_set : <K, V>(List((K, V)), K, V) -> List((K, V))
-each : <A, B, N>(List(A), (A) <- N -> B) <- N -> Nil
+each : <A, B, N>(List(A), (A) <- N -> B) <- N -> ()
 partition : <A, N>(List(A), (A) <- N -> Bool) <- N -> ( List(A), List(A), )
 permutations : <A>(List(A)) -> List(List(A))
 window : <A>(List(A), Int) -> List(List(A))
@@ -640,7 +641,7 @@ to_list : <K, V>(Dict(K, V)) -> List((K, V))
 keys : <K, V>(Dict(K, V)) -> List(K)
 values : <K, V>(Dict(K, V)) -> List(V)
 fold : <K, V, Acc, N>( Dict(K, V), Acc, (Acc, K, V) <- N -> Acc ) <- N -> Acc
-each : <K, V, A, N>(Dict(K, V), (K, V) <- N -> A) <- N -> Nil
+each : <K, V, A, N>(Dict(K, V), (K, V) <- N -> A) <- N -> ()
 map_values : <K, V, W, N>(Dict(K, V), (K, V) <- N -> W) <- N -> Dict( K, W, )
 filter : <K, V, N>(Dict(K, V), (K, V) <- N -> Bool) <- N -> Dict(K, V)
 take : <K, V>(Dict(K, V), List(K)) -> Dict(K, V)
@@ -655,7 +656,7 @@ same_entries : <K,V>(Dict(K,V),Dict(K,V)) -> Bool
 
 Persistent membership and set algebra. Reference: E `HashSet.ts`; G `set.gleam`.
 
-Keep all items; add same_elements. Storage stays Dict(A,Nil); no duplicate hashing engine.
+Keep all items; add same_elements. Storage stays Dict(A,()); no duplicate hashing engine.
 
 ```text
 Set(A) = private
@@ -668,7 +669,7 @@ contains : <A>(Set(A), A) -> Bool
 to_list : <A>(Set(A)) -> List(A)
 from_list : <A>(List(A)) -> Set(A)
 fold : <A, Acc, N>(Set(A), Acc, (Acc, A) <- N -> Acc) <- N -> Acc
-each : <A, B, N>(Set(A), (A) <- N -> B) <- N -> Nil
+each : <A, B, N>(Set(A), (A) <- N -> B) <- N -> ()
 map : <A, B, N>(Set(A), (A) <- N -> B) <- N -> Set(B)
 filter : <A, N>(Set(A), (A) <- N -> Bool) <- N -> Set(A)
 take : <A>(Set(A), List(A)) -> Set(A)
@@ -711,7 +712,7 @@ drop : <A>(Sequence(A), Int) -> Sequence(A)
 reverse : <A>(Sequence(A)) -> Sequence(A)
 map : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> Sequence(B)
 fold : <A, Acc, N>( Sequence(A), Acc, (Acc, A) <- N -> Acc ) <- N -> Acc
-each : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> Nil
+each : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> ()
 same_elements : <A>(Sequence(A), Sequence(A)) -> Bool
 
 ```
@@ -773,7 +774,7 @@ compare : (Bool, Bool) -> Order
 ### 3.4 Numbers, text and bytes — lane E
 
 Operational failures in these modules move from Result to the named Fail.
-No parse error uses Nil. Existing total predicates and absence queries remain
+No parse error uses (). Existing total predicates and absence queries remain
 total. Shared error shapes:
 
 ```text
@@ -1125,15 +1126,15 @@ scope, local_scope : <A,E,N>((Group(E)) <- (..N,Fail(E)) -> A)
 go : <A,E,N>(Group(E),() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> A)
   <- (..N,Scheduler) -> Task(A,E)
 join : <A,E>(Task(A,E)) <- (Fail(E),Scheduler) -> A
-yield : () <- (Scheduler) -> Nil
+yield : () <- (Scheduler) -> ()
 path : () <- (Scheduler) -> List(Int)
 random : () <- (Scheduler) -> random.Generator
 keep : <A,B,E,N>((A) <- (..N,Fail(E),Scheduler,Runner,request.Await) -> B)
   <- (..N,Scheduler) -> (A) <- (Fail(E),Scheduler) -> B
 channel, local_channel : <A>() <- (Scheduler) -> Channel(A)
-send : <A>(Channel(A),A) <- (Scheduler) -> Nil
+send : <A>(Channel(A),A) <- (Scheduler) -> ()
 receive : <A>(Channel(A)) <- (Scheduler) -> A
-send_event : <A>(Channel(A),A) -> Event(Nil,Never,Never)
+send_event : <A>(Channel(A),A) -> Event((),Never,Never)
 receive_event : <A>(Channel(A)) -> Event(A,Never,Never)
 join_event : <A,E>(Task(A,E)) -> Event(A,E,Never)
 always : <A>(A) -> Event(A,Never,Never)
@@ -1145,7 +1146,7 @@ share : <A,E>(Group(E),A) <- (Scheduler) -> Shared(A)
 get : <A>(Shared(A)) <- (Scheduler) -> A
 get : <A>(Ref(A)) <- (Scheduler) -> A
 ref : <A>(A) <- (Scheduler) -> Ref(A)
-set : <A>(Ref(A),A) <- (Scheduler) -> Nil
+set : <A>(Ref(A),A) <- (Scheduler) -> ()
 update : <A,B>(Ref(A),(A) -> (A,B)) <- (Scheduler) -> B
 both : <A,B,E,N>(() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> A,
   () <- (..N,Fail(E),Scheduler,Runner,request.Await) -> B) <- Tasks[N,E] -> (A,B)
@@ -1160,7 +1161,7 @@ map_concurrently : <A,B,E,N>(List(A),Int,
 Revision(A) = private
 snapshot : <A>(Ref(A)) <- (Scheduler) -> (value = A, revision = Revision(A))
 changed : <A>(Revision(A)) -> Event(A,Never,Never)
-quiesce : () <- (Scheduler) -> Nil
+quiesce : () <- (Scheduler) -> ()
 ```
 
 The two-argument map defaults to 32 workers; the explicit limit must be
@@ -1197,10 +1198,10 @@ Invalid handle use keeps the task stop contract; input capacity errors are Fail.
 |---|---|---|
 | `i/deferred` | One completion, many readers. E `Deferred.ts`. | `Deferred(A,E)` private; `new : () <- C -> Deferred(A,E)`; `complete : (Deferred(A,E),Result(A,E)) <- (Scheduler) -> Bool`; `await : (Deferred(A,E)) <- (Scheduler,Fail(E)) -> A`; `poll : (Deferred(A,E)) <- (Scheduler) -> Option(Result(A,E))`; `is_done : (Deferred(A,E)) <- (Scheduler) -> Bool`. |
 | `i/semaphore` | FIFO admission with safe release. E `Semaphore.ts`; Go `sync/`. | `Semaphore` private; `SemaphoreError = InvalidPermits`, `InvalidPermits = (Int)`; `new : (Int) <- (C,Fail(SemaphoreError)) -> Semaphore`; `with_permits : (Semaphore,Int,() <- N -> A) <- (..N,Scheduler,Fail(SemaphoreError)) -> A`; `with_permit : (Semaphore,() <- N -> A) <- (..N,Scheduler) -> A`; `available : (Semaphore) <- (Scheduler) -> Int`. |
-| `i/queue` | Bounded/unbounded FIFO handoff. E `Queue.ts`. | `Queue(A,E)` private; `QueueError = InvalidCapacity | Closed`, `InvalidCapacity = (Int)`, `Closed = ()`; `bounded, dropping, sliding : (Int) <- (C,Fail(QueueError)) -> Queue(A,E)`; `unbounded : () <- C -> Queue(A,E)`; `offer : (Queue(A,E),A) <- (Scheduler,Fail(QueueError)) -> Bool`; `take : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `poll : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `size : (Queue(A,E)) <- (Scheduler) -> Int`; `end : (Queue(A,E)) <- (Scheduler) -> Nil`; `fail : (Queue(A,E),E) <- (Scheduler) -> Nil`; `shutdown : (Queue(A,E)) <- (Scheduler) -> Nil`. |
-| `i/pubsub` | Scoped broadcast to current subscribers. E `PubSub.ts`. | `PubSub(A)`, `Subscription(A)` private; `PubSubError = InvalidCapacity | Closed`, cases as above; `bounded, dropping, sliding : (Int) <- (C,Fail(PubSubError)) -> PubSub(A)`; `subscribe : (PubSub(A)) <- (C,Fail(PubSubError)) -> Subscription(A)`; `publish : (PubSub(A),A) <- (Scheduler,Fail(PubSubError)) -> Bool`; `take : (Subscription(A)) <- (Scheduler) -> Option(A)`; `unsubscribe : (Subscription(A)) <- (Scheduler) -> Nil`; `end, shutdown : (PubSub(A)) <- (Scheduler) -> Nil`. |
-| `i/latch` | Reusable open/closed gate. E `Latch.ts`. | `Latch` private; `new : (Bool) <- C -> Latch`; `open, close, release, await : (Latch) <- (Scheduler) -> Nil`; `is_open : (Latch) <- (Scheduler) -> Bool`. |
-| `i/fiber_set` | Dynamic jobs within one structured group. E `FiberSet.ts`. | `FiberSet(E,N)` private; `scoped : ((FiberSet(E,N)) <- (..N,Fail(E),Scheduler) -> A) <- Tasks[N,E] -> A`; `spawn : (FiberSet(E,N),() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> Nil) <- (..N,Scheduler) -> Nil`; `size : (FiberSet(E,N)) <- (Scheduler) -> Int`; `await_empty : (FiberSet(E,N)) <- (Scheduler,Fail(E)) -> Nil`. |
+| `i/queue` | Bounded/unbounded FIFO handoff. E `Queue.ts`. | `Queue(A,E)` private; `QueueError = InvalidCapacity | Closed`, `InvalidCapacity = (Int)`, `Closed = ()`; `bounded, dropping, sliding : (Int) <- (C,Fail(QueueError)) -> Queue(A,E)`; `unbounded : () <- C -> Queue(A,E)`; `offer : (Queue(A,E),A) <- (Scheduler,Fail(QueueError)) -> Bool`; `take : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `poll : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `size : (Queue(A,E)) <- (Scheduler) -> Int`; `end : (Queue(A,E)) <- (Scheduler) -> ()`; `fail : (Queue(A,E),E) <- (Scheduler) -> ()`; `shutdown : (Queue(A,E)) <- (Scheduler) -> ()`. |
+| `i/pubsub` | Scoped broadcast to current subscribers. E `PubSub.ts`. | `PubSub(A)`, `Subscription(A)` private; `PubSubError = InvalidCapacity | Closed`, cases as above; `bounded, dropping, sliding : (Int) <- (C,Fail(PubSubError)) -> PubSub(A)`; `subscribe : (PubSub(A)) <- (C,Fail(PubSubError)) -> Subscription(A)`; `publish : (PubSub(A),A) <- (Scheduler,Fail(PubSubError)) -> Bool`; `take : (Subscription(A)) <- (Scheduler) -> Option(A)`; `unsubscribe : (Subscription(A)) <- (Scheduler) -> ()`; `end, shutdown : (PubSub(A)) <- (Scheduler) -> ()`. |
+| `i/latch` | Reusable open/closed gate. E `Latch.ts`. | `Latch` private; `new : (Bool) <- C -> Latch`; `open, close, release, await : (Latch) <- (Scheduler) -> ()`; `is_open : (Latch) <- (Scheduler) -> Bool`. |
+| `i/fiber_set` | Dynamic jobs within one structured group. E `FiberSet.ts`. | `FiberSet(E,N)` private; `scoped : ((FiberSet(E,N)) <- (..N,Fail(E),Scheduler) -> A) <- Tasks[N,E] -> A`; `spawn : (FiberSet(E,N),() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> ()) <- (..N,Scheduler) -> ()`; `size : (FiberSet(E,N)) <- (Scheduler) -> Int`; `await_empty : (FiberSet(E,N)) <- (Scheduler,Fail(E)) -> ()`. |
 
 `Deferred.complete` accepts caught outcome data. First completion returns True;
 later ones return False and change nothing. Cancelling one waiter does not
@@ -1246,10 +1247,10 @@ Random service or duplicate TestRandom execution mechanism is added.
 // i/clock: raw Request(Result) fields are host reply data, not public sequencing.
 Clock = (monotonic_ns = () -> Request(Result(Int,String)),
          unix_ns = () -> Request(Result(Int,String)),
-         sleep_ns = (Int) -> Request(Result(Nil,String)))
+         sleep_ns = (Int) -> Request(Result((),String)))
 ClockError = (operation = String, code = String)
 monotonic_ns, unix_ns : () <- IO[Clock,ClockError] -> Int
-sleep_ns : (Int) <- IO[Clock,ClockError] -> Nil
+sleep_ns : (Int) <- IO[Clock,ClockError] -> ()
 // i/random
 Generator = private
 InvalidBound = (Int); InvalidPath = (List(Int))
@@ -1276,7 +1277,7 @@ DivisionByZero = (); BadText = (String); ClockFailure = (clock.ClockError)
 TimeError = DivisionByZero | BadText | ClockFailure
 Clock = (now = () <- (Fail(TimeError),Scheduler,request.Await,request.Owner) -> Instant,
          monotonic = () <- (Fail(TimeError),Scheduler,request.Await,request.Owner) -> Duration,
-         sleep = (Duration) <- (Fail(TimeError),Scheduler,request.Await,request.Owner) -> Nil)
+         sleep = (Duration) <- (Fail(TimeError),Scheduler,request.Await,request.Owner) -> ())
 nanoseconds, milliseconds, seconds, minutes, hours : (Int) -> Duration
 to_nanoseconds : (Duration) -> Int
 add, subtract : (Duration,Duration) -> Duration
@@ -1293,7 +1294,7 @@ format : (Duration) -> String
 native : () <- (clock.Clock) -> Clock
 now : () <- (Clock,Fail(TimeError),Scheduler,request.Await,request.Owner) -> Instant
 monotonic : () <- (Clock,Fail(TimeError),Scheduler,request.Await,request.Owner) -> Duration
-sleep : (Duration) <- (Clock,Fail(TimeError),Scheduler,request.Await,request.Owner) -> Nil
+sleep : (Duration) <- (Clock,Fail(TimeError),Scheduler,request.Await,request.Owner) -> ()
 measure : <A,E,N>(() <- (..N,Fail(E)) -> A)
   <- (..N,Clock,Scheduler,request.Await,request.Owner,Fail(E | TimeError)) -> (A,Duration)
 // i/test_clock
@@ -1302,8 +1303,8 @@ TestClockError = NegativeAdvance
 NegativeAdvance = (time.Duration)
 new : (time.Instant) <- (resource.Scope,Scheduler) -> TestClock
 clock : (TestClock) -> time.Clock
-advance : (TestClock,time.Duration) <- (Scheduler,Fail(TestClockError)) -> Nil
-set_time : (TestClock,time.Instant) <- (Scheduler) -> Nil
+advance : (TestClock,time.Duration) <- (Scheduler,Fail(TestClockError)) -> ()
+set_time : (TestClock,time.Instant) <- (Scheduler) -> ()
 pending : (TestClock) <- (Scheduler) -> List(time.Duration)
 ```
 
@@ -1694,8 +1695,8 @@ map : (Parser(A,E,N),(A) <- (..N,Fail(E)) -> B) -> Parser(B,E,N)
 map2 : (Parser(A,E,N),Parser(B,E,N),(A,B) <- (..N,Fail(E)) -> C) -> Parser(C,E,N)
 parse : (List(String),Parser(A,E,N)) <- (..N,Fail(E | CliError)) -> A
 read : (Parser(A,E,N)) <- (..N,IO[iprocess.Arguments,E | CliError | iprocess.ProcessError]) -> A
-run : (Parser(A,E,N),String,(A) <- N -> Nil)
-  <- (..N,IO[iprocess.Arguments,stdio.Stdio,E | CliError | iprocess.ProcessError | stdio.StdioError]) -> Nil
+run : (Parser(A,E,N),String,(A) <- N -> ())
+  <- (..N,IO[iprocess.Arguments,stdio.Stdio,E | CliError | iprocess.ProcessError | stdio.StdioError]) -> ()
 help : (Parser(A,E,N),String) <- (Fail(CliError)) -> String
 text : (String) -> String
 integer : (String) <- (Fail(int.IntError)) -> Int
@@ -1784,7 +1785,7 @@ take, drop : (Stream(A,E,N),Int) -> Stream(A,E,N)
 take_while : (Stream(A,E,N),(A) <- (..N,Fail(F)) -> Bool) -> Stream(A,E | F,N)
 fold : (Stream(A,E,N),B,(B,A) <- N -> B) <- (..N,Fail(E)) -> B
 fold_until : (Stream(A,E,N),B,(B,A) <- N -> list.ContinueOrStop(B)) <- (..N,Fail(E)) -> B
-each : (Stream(A,E,N),(A) <- N -> B) <- (..N,Fail(E)) -> Nil
+each : (Stream(A,E,N),(A) <- N -> B) <- (..N,Fail(E)) -> ()
 to_list : (Stream(A,E,N)) <- (..N,Fail(E)) -> List(A)
 from_results : (List(Result(A,E))) -> Stream(A,E,N)
 attempt : (Stream(A,E,N)) -> Stream(Result(A,E),Never,N)
@@ -1858,7 +1859,7 @@ fold_until : (B,(B,A) <- (..N,Fail(E)) -> list.ContinueOrStop(B)) -> Sink(A,B,E,
 collect : () -> Sink(A,List(A),E,N)
 take : (Int) <- (Fail(stream.StreamError)) -> Sink(A,List(A),E,N)
 head : () -> Sink(A,Option(A),E,N)
-each : ((A) <- (..N,Fail(E)) -> Nil) -> Sink(A,Nil,E,N)
+each : ((A) <- (..N,Fail(E)) -> ()) -> Sink(A,(),E,N)
 map : (Sink(A,B,E,N),(B) <- (..N,Fail(E)) -> C) -> Sink(A,C,E,N)
 zip : (Sink(A,B,E,N),Sink(A,C,E,N)) -> Sink(A,(B,C),E,N)
 ```
@@ -1884,7 +1885,7 @@ Reader(E,N) = (read = (Int) <- (..N,Fail(E | IoError)) -> Option(BitArray))
 Writer(E,N) = (write = (BitArray) <- (..N,Fail(E | IoError)) -> Int)
 read_exact : (Reader(E,N),Int) <- (..N,Fail(E | IoError)) -> BitArray
 read_all : (Reader(E,N),max_bytes = Int) <- (..N,Fail(E | IoError)) -> BitArray
-write_all : (BitArray,Writer(E,N)) <- (..N,Fail(E | IoError)) -> Nil
+write_all : (BitArray,Writer(E,N)) <- (..N,Fail(E | IoError)) -> ()
 copy : (Reader(E,N),Writer(E,N),max_bytes = Int) <- (..N,Fail(E | IoError)) -> Int
 limit : (Reader(E,N),Int) <- (Fail(IoError)) -> Reader(E,N)
 tee : (Reader(E,N),Writer(E,N)) -> Reader(E,N)
@@ -1902,7 +1903,7 @@ successor state in i/bytes; from_bytes uses a scheduler Ref for IO-style reads.
 Writer.write returns the accepted prefix length, 0..input byte count. It may
 raise after external partial effects. An empty write returns zero. write_all
 handles short writes, rejects zero progress on nonempty input, and never
-claims atomicity after an error. Today's Nil-returning host writes map success
+claims atomicity after an error. Today's ()-returning host writes map success
 to the full supplied byte count; their documented full-write promise must be
 tested. A host that can short-write must loop or report progress in its adapter.
 This chooses the style audit's counted-progress option; it is not a new ABI.
@@ -1926,7 +1927,7 @@ No new host operation or unsupported-only platform provider is added.
 
 | Module | Public types and disposition |
 |---|---|
-| `i/io` | Keep the specified public `Io = (print = (String) -> Nil)` service and no free functions. Best-effort newline printing intentionally reports no error. |
+| `i/io` | Keep the specified public `Io = (print = (String) -> ())` service and no free functions. Best-effort newline printing intentionally reports no error. |
 | `i/stdio` | Keep public Stdio constructor and all seven functions. Stdio's existing read/write/write_error/flush/flush_error Request fields stay. StdioError gains a typed reason; raw code remains diagnostic. |
 | `i/fs` | Keep private raw Fs/File constructors, OpenMode and Metadata. Keep minimal operations below. open is scope-owned through resource.Scope. FsError carries an FsProblem reason with the host code kept. copy (chunked, gives bytes) and walk (depth first, name order, capped at depth 32) are the new operations. Move read_file/write_file/read_lines algorithms to i/fs; update spec §9.12's convenience-operation location in the migration, rather than leaving two implementations.  `Fs` is provided on `native`, `nodejs` and `wasi`; any other target rejects an entry that needs it with E0523. |
 | `i/process` | Keep Arguments/Environment/WorkingDirectory/Entropy public constructors, raw Process and Child private. Keep all fourteen operations. Directory's value constructor becomes AtDirectory, fixing the duplicate name; the union is DirectoryMode. spawn, spawn_piped and spawn_config are scope-owned through resource.Scope. ProcessError carries a ProcessProblem reason with the host code kept. collect (both piped streams drained concurrently with task.both, unbounded, no wait) is the new operation.  `Process` and `WorkingDirectory` are provided on `native` and `nodejs`; any other target rejects an entry that needs them with E0523. |
@@ -1959,9 +1960,9 @@ Public native functions use `IO[S,E]` from §3.1:
 ```text
 // i/stdio
 read : (Int) <- IO[Stdio,StdioError] -> BitArray
-write, write_error : (BitArray) <- IO[Stdio,StdioError] -> Nil
-flush, flush_error : () <- IO[Stdio,StdioError] -> Nil
-print, print_error : (String) <- IO[Stdio,StdioError] -> Nil
+write, write_error : (BitArray) <- IO[Stdio,StdioError] -> ()
+flush, flush_error : () <- IO[Stdio,StdioError] -> ()
+print, print_error : (String) <- IO[Stdio,StdioError] -> ()
 // i/fs
 File, Fs = private
 File = (number = Int, path = String)
@@ -1972,11 +1973,11 @@ FsProblem = NotFound | Denied | Exists | Closed | Busy | Invalid | Unsupported |
 FsError = (operation = String, path = String, reason = FsProblem, code = String)
 open : (String,OpenMode) <- (resource.Scope,Fs,Fail(FsError)) -> File
 read : (File,Int) <- IO[Fs,FsError] -> BitArray
-write : (File,BitArray) <- IO[Fs,FsError] -> Nil
-flush : (File) <- IO[Fs,FsError] -> Nil
-close : (File) <- IO[Fs] -> Nil
-remove, mkdir : (String) <- IO[Fs,FsError] -> Nil
-rename : (String,String) <- IO[Fs,FsError] -> Nil
+write : (File,BitArray) <- IO[Fs,FsError] -> ()
+flush : (File) <- IO[Fs,FsError] -> ()
+close : (File) <- IO[Fs] -> ()
+remove, mkdir : (String) <- IO[Fs,FsError] -> ()
+rename : (String,String) <- IO[Fs,FsError] -> ()
 list : (String) <- IO[Fs,FsError] -> List(String)
 metadata : (String) <- IO[Fs,FsError] -> Metadata
 temp_dir : () <- IO[Fs,FsError] -> String
@@ -2005,35 +2006,35 @@ spawn_piped : (String,List(String),Stdio,Stdio,Stdio) <- (resource.Scope,Process
 spawn_config : (String,List(String),Stdio,Stdio,Stdio,EnvironmentMode,DirectoryMode)
   <- (resource.Scope,Process,Fail(ProcessError)) -> Child
 read_stdout, read_stderr : (Child,Int) <- IO[Process,ProcessError] -> BitArray
-write_stdin : (Child,BitArray) <- IO[Process,ProcessError] -> Nil
-close_stdin : (Child) <- IO[Process,ProcessError] -> Nil
+write_stdin : (Child,BitArray) <- IO[Process,ProcessError] -> ()
+close_stdin : (Child) <- IO[Process,ProcessError] -> ()
 wait : (Child) <- IO[Process,ProcessError] -> Int
-terminate : (Child) <- IO[Process,ProcessError] -> Nil
-close : (Child) <- IO[Process] -> Nil
+terminate : (Child) <- IO[Process,ProcessError] -> ()
+close : (Child) <- IO[Process] -> ()
 collect : (Child) <- (resource.Scope,Process,task.Scheduler,task.Runner,Fail(ProcessError))
   -> (stdout = BitArray, stderr = BitArray)
 // spawn* attach the Child's release to the current resource.Scope before returning: terminate, wait (reaps), close; terminate/wait errors are dropped so the release cannot fail.
 // i/net
 Net, Listener, Stream, Datagram = private
 bind : (String,Int) <- IO[Net,NetError] -> Datagram
-send_to : (Datagram,String,Int,BitArray) <- IO[Net,NetError] -> Nil
+send_to : (Datagram,String,Int,BitArray) <- IO[Net,NetError] -> ()
 receive_from : (Datagram,Int) <- IO[Net,NetError] -> (address = String, port = Int, data = BitArray)
 local_address : (Datagram) <- IO[Net,NetError] -> String
-close_datagram : (Datagram) <- IO[Net] -> Nil
+close_datagram : (Datagram) <- IO[Net] -> ()
 listen : (String,Int) <- IO[Net,NetError] -> Listener
 local_port : (Listener | Datagram) <- IO[Net,NetError] -> Int
 accept : (Listener) <- IO[Net,NetError] -> Stream
 connect : (String,Int) <- IO[Net,NetError] -> Stream
 resolve : (String) <- IO[Net,NetError] -> List(String)
 read : (Stream,Int) <- IO[Net,NetError] -> BitArray
-write : (Stream,BitArray) <- IO[Net,NetError] -> Nil
-shutdown_write : (Stream) <- IO[Net,NetError] -> Nil
-close_stream : (Stream) <- IO[Net] -> Nil
-close_listener : (Listener) <- IO[Net] -> Nil
+write : (Stream,BitArray) <- IO[Net,NetError] -> ()
+shutdown_write : (Stream) <- IO[Net,NetError] -> ()
+close_stream : (Stream) <- IO[Net] -> ()
+close_listener : (Listener) <- IO[Net] -> ()
 stream_number : (Stream) -> Int
 byte_stream : (Stream) -> (read = (Int) <- IO[Net,NetError] -> BitArray,
-  write = (BitArray) <- IO[Net,NetError] -> Nil,
-  shutdown_write = () <- IO[Net,NetError] -> Nil, close = () <- IO[Net] -> Nil)
+  write = (BitArray) <- IO[Net,NetError] -> (),
+  shutdown_write = () <- IO[Net,NetError] -> (), close = () <- IO[Net] -> ())
 // i/tls
 Tls, Stream = private
 options : () -> (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)
@@ -2046,19 +2047,19 @@ dial : (String,Int,(alpn = List(String),cert = BitArray,key = BitArray,roots = B
   <- IO[Tls,net.Net,TlsError | net.NetError] -> Stream
 alpn : (Stream) <- IO[Tls,TlsError] -> String
 read : (Stream,Int) <- IO[Tls,TlsError] -> BitArray
-write : (Stream,BitArray) <- IO[Tls,TlsError] -> Nil
-shutdown_write : (Stream) <- IO[Tls,TlsError] -> Nil
-close : (Stream) <- IO[Tls] -> Nil
+write : (Stream,BitArray) <- IO[Tls,TlsError] -> ()
+shutdown_write : (Stream) <- IO[Tls,TlsError] -> ()
+close : (Stream) <- IO[Tls] -> ()
 byte_stream : (Stream) -> (read = (Int) <- IO[Tls,TlsError] -> BitArray,
-  write = (BitArray) <- IO[Tls,TlsError] -> Nil,
-  shutdown_write = () <- IO[Tls,TlsError] -> Nil, close = () <- IO[Tls] -> Nil)
+  write = (BitArray) <- IO[Tls,TlsError] -> (),
+  shutdown_write = () <- IO[Tls,TlsError] -> (), close = () <- IO[Tls] -> ())
 // i/fetch
 Fetch, Response = private
 open : (String,String,String,BitArray) <- IO[Fetch,FetchError] -> Response
 status : (Response) <- IO[Fetch,FetchError] -> Int
 headers : (Response) <- IO[Fetch,FetchError] -> String
 read : (Response,Int) <- IO[Fetch,FetchError] -> BitArray
-close : (Response) <- IO[Fetch] -> Nil
+close : (Response) <- IO[Fetch] -> ()
 ```
 
 The lib-only net/TLS byte records remain different because their nominal
@@ -2078,12 +2079,12 @@ It reuses i/ifs.OpenMode/Metadata/FsError; it defines no second filesystem error
 
 ```text
 File(N) = (reader = io.Reader(ifs.FsError,N), writer = io.Writer(ifs.FsError,N),
-           flush = () <- (..N,Fail(ifs.FsError)) -> Nil, close = () <- N -> Nil)
+           flush = () <- (..N,Fail(ifs.FsError)) -> (), close = () <- N -> ())
 FileSystem(N) = (
   open = (String,ifs.OpenMode) <- (..N,resource.Scope,Fail(ifs.FsError)) -> File(N),
-  remove = (String) <- (..N,Fail(ifs.FsError)) -> Nil,
-  rename = (String,String) <- (..N,Fail(ifs.FsError)) -> Nil,
-  mkdir = (String) <- (..N,Fail(ifs.FsError)) -> Nil,
+  remove = (String) <- (..N,Fail(ifs.FsError)) -> (),
+  rename = (String,String) <- (..N,Fail(ifs.FsError)) -> (),
+  mkdir = (String) <- (..N,Fail(ifs.FsError)) -> (),
   list = (String) <- (..N,Fail(ifs.FsError)) -> List(String),
   metadata = (String) <- (..N,Fail(ifs.FsError)) -> ifs.Metadata,
   temp_dir = () <- (..N,Fail(ifs.FsError)) -> String)
@@ -2092,13 +2093,13 @@ memory : (dict.Dict(String,BitArray)) <- (resource.Scope,Scheduler) -> FileSyste
 open : (String,ifs.OpenMode) <- (FileSystem(N),..N,resource.Scope,Fail(ifs.FsError)) -> File(N)
 read_file : (String,max_bytes = Int)
   <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError)) -> BitArray
-write_file : (String,BitArray) <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError)) -> Nil
+write_file : (String,BitArray) <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError)) -> ()
 read_lines : (String,max_bytes = Int)
   <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError | unicode.UnicodeError)) -> List(String)
 stream : (String,chunk_bytes = Int)
   <- (FileSystem(N),..N,resource.Scope,Fail(ifs.FsError)) -> stream.Stream(BitArray,ifs.FsError | io.IoError,N)
 write_sink : (String) <- (FileSystem(N),..N,resource.Scope,Fail(ifs.FsError))
-  -> sink.Sink(BitArray,Nil,ifs.FsError | io.IoError,N)
+  -> sink.Sink(BitArray,(),ifs.FsError | io.IoError,N)
 copy : (String,String,max_bytes = Int)
   <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError)) -> Int
 walk : (String,max_depth = Int) <- (FileSystem(N),..N,resource.Scope,Fail(ifs.FsError))
@@ -2156,10 +2157,10 @@ Command = (program = String, args = List(String), directory = iprocess.Directory
            stdout = iprocess.Stdio, stderr = iprocess.Stdio)
 Child(N) = (stdin = io.Writer(iprocess.ProcessError,N),
             stdout = io.Reader(iprocess.ProcessError,N), stderr = io.Reader(iprocess.ProcessError,N),
-            close_stdin = () <- (..N,Fail(iprocess.ProcessError)) -> Nil,
+            close_stdin = () <- (..N,Fail(iprocess.ProcessError)) -> (),
             wait = () <- (..N,Fail(iprocess.ProcessError)) -> Int,
-            terminate = () <- (..N,Fail(iprocess.ProcessError)) -> Nil,
-            close = () <- N -> Nil)
+            terminate = () <- (..N,Fail(iprocess.ProcessError)) -> (),
+            close = () <- N -> ())
 Spawner(N) = (spawn = (Command) <- (..N,resource.Scope,Fail(iprocess.ProcessError)) -> Child(N))
 Output = (status = Int, stdout = BitArray, stderr = BitArray)
 command : (String,List(String)) -> Command
@@ -2191,7 +2192,7 @@ TerminalError = LineTooLong
 LineTooLong = (limit = Int)
 read_line : (max_bytes = Int)
   <- IO[stdio.Stdio,TerminalError | stdio.StdioError | unicode.UnicodeError] -> Option(String)
-display : (String) <- IO[stdio.Stdio,stdio.StdioError] -> Nil
+display : (String) <- IO[stdio.Stdio,stdio.StdioError] -> ()
 prompt : (String,max_bytes = Int)
   <- IO[stdio.Stdio,TerminalError | stdio.StdioError | unicode.UnicodeError] -> Option(String)
 ```
@@ -2391,13 +2392,13 @@ Debug = (); Info = (); Warning = (); Error = (); Level = Debug | Info | Warning 
 Value = json.Json | config.Secret
 Entry = (level = Level, message = String, fields = List((String,Value)), at = Option(time.Instant))
 Logger(E,N) = private service
-make : ((Level) -> Bool,(Entry) <- (..N,Fail(E)) -> Nil) -> Logger(E,N)
+make : ((Level) -> Bool,(Entry) <- (..N,Fail(E)) -> ()) -> Logger(E,N)
 silent : () -> Logger(Never,Never)
 filter : (Logger(E,N),(Level) -> Bool) -> Logger(E,N)
 minimum : (Logger(E,N),Level) -> Logger(E,N)
 enabled : (Level) <- (Logger(E,N)) -> Bool
-write : (Entry) <- (Logger(E,N),..N,Fail(E)) -> Nil
-lazy : (Level,() <- N -> String) <- (Logger(E,N),..N,Fail(E)) -> Nil
+write : (Entry) <- (Logger(E,N),..N,Fail(E)) -> ()
+lazy : (Level,() <- N -> String) <- (Logger(E,N),..N,Fail(E)) -> ()
 format, format_json : (Entry) -> String
 stdout, stderr : () -> Logger(stdio.StdioError,(stdio.Stdio,request.Await,request.Owner))
 file : (String) <- (fs.FileSystem(N),..N,resource.Scope,Fail(ifs.FsError))
@@ -2432,15 +2433,15 @@ Value = Count | Level | Buckets
 Sample = (name = String, labels = List((String,String)), value = Value)
 Measurement = Add | Set | Observe
 Add = (Counter,Int); Set = (Gauge,Float); Observe = (Histogram,Float)
-Registry = (record = (Measurement) <- (Scheduler,Fail(MetricError)) -> Nil,
+Registry = (record = (Measurement) <- (Scheduler,Fail(MetricError)) -> (),
             snapshot = () <- (Scheduler) -> List(Sample))
 registry : (max_series = Int) <- (resource.Scope,Scheduler,Fail(MetricError)) -> Registry
 counter : (String,List((String,String))) <- (Fail(MetricError)) -> Counter
 gauge : (String,List((String,String))) <- (Fail(MetricError)) -> Gauge
 histogram : (String,List((String,String)),List(Float)) <- (Fail(MetricError)) -> Histogram
-add : (Counter,Int) <- (Registry,Scheduler,Fail(MetricError)) -> Nil
-set : (Gauge,Float) <- (Registry,Scheduler,Fail(MetricError)) -> Nil
-observe : (Histogram,Float) <- (Registry,Scheduler,Fail(MetricError)) -> Nil
+add : (Counter,Int) <- (Registry,Scheduler,Fail(MetricError)) -> ()
+set : (Gauge,Float) <- (Registry,Scheduler,Fail(MetricError)) -> ()
+observe : (Histogram,Float) <- (Registry,Scheduler,Fail(MetricError)) -> ()
 snapshot : () <- (Registry,Scheduler) -> List(Sample)
 ```
 
@@ -2467,7 +2468,7 @@ Span = (context = SpanContext, parent = Option(SpanContext), name = String,
         ended = Option(time.Duration), status = SpanStatus,
         cause = Option(cause.Cause(String)))
 Tracer(N) = private service
-make : (random.Generator,(Span) <- N -> Nil) <- (resource.Scope,Scheduler) -> Tracer(N)
+make : (random.Generator,(Span) <- N -> ()) <- (resource.Scope,Scheduler) -> Tracer(N)
 root : () -> ParentSpan
 with_span : (String,List((String,json.Json)),() <- (..N,ParentSpan,Fail(E)) -> A)
   <- (Tracer(N),ParentSpan,time.Clock,Scheduler,request.Await,request.Owner,
@@ -2500,10 +2501,10 @@ scoped : ((K) <- (..N,Fail(E),Scheduler,Runner,request.Await) -> A,Options,
   <- (..N,time.Clock,Scheduler,request.Await,request.Owner,Fail(F | CacheError | time.TimeError)) -> R
 get : (Cache(K,A,E),K) <- (Scheduler,Fail(E | CacheError | time.TimeError)) -> A
 get_cached : (Cache(K,A,E),K) <- (Scheduler,Fail(CacheError | time.TimeError)) -> Option(Result(A,E))
-set : (Cache(K,A,E),K,A) <- (Scheduler,Fail(CacheError | time.TimeError)) -> Nil
+set : (Cache(K,A,E),K,A) <- (Scheduler,Fail(CacheError | time.TimeError)) -> ()
 refresh : (Cache(K,A,E),K) <- (Scheduler,Fail(E | CacheError | time.TimeError)) -> A
-invalidate : (Cache(K,A,E),K) <- (Scheduler) -> Nil
-invalidate_all : (Cache(K,A,E)) <- (Scheduler) -> Nil
+invalidate : (Cache(K,A,E),K) <- (Scheduler) -> ()
+invalidate_all : (Cache(K,A,E)) <- (Scheduler) -> ()
 size : (Cache(K,A,E)) <- (Scheduler) -> Int
 ```
 
@@ -2542,7 +2543,7 @@ scoped : ((List(Item(I))) <- (..N,Fail(E),Scheduler,Runner,request.Await) -> Lis
   Options,(Batcher(I,O,E)) <- (..N,Fail(F),Scheduler) -> R)
   <- (..N,time.Clock,Scheduler,request.Await,request.Owner,Fail(F | BatchError | time.TimeError)) -> R
 submit : (Batcher(I,O,E),I) <- (Scheduler,Fail(E | BatchError | time.TimeError)) -> O
-flush : (Batcher(I,O,E)) <- (Scheduler,Fail(BatchError | time.TimeError)) -> Nil
+flush : (Batcher(I,O,E)) <- (Scheduler,Fail(BatchError | time.TimeError)) -> ()
 pending : (Batcher(I,O,E)) <- (Scheduler) -> Int
 ```
 
@@ -2564,8 +2565,8 @@ one contract; neither imports a hidden global store.
 
 ```text
 Store(N) = (get = (String) <- (..N,Fail(KvError)) -> Option(BitArray),
-            set = (String,BitArray) <- (..N,Fail(KvError)) -> Nil,
-            remove = (String) <- (..N,Fail(KvError)) -> Nil,
+            set = (String,BitArray) <- (..N,Fail(KvError)) -> (),
+            remove = (String) <- (..N,Fail(KvError)) -> (),
             keys = () <- (..N,Fail(KvError)) -> List(String))
 KvError = (operation = String, key = String, reason = KvProblem)
 KvProblem = InvalidKey | FileFailure | IoFailure | InvalidValue
@@ -2575,14 +2576,14 @@ memory : () <- (resource.Scope,Scheduler) -> Store(Scheduler)
 file_store : (String,max_bytes = Int)
   <- (fs.FileSystem(N),..N,resource.Scope,Scheduler,Fail(KvError)) -> Store((N,Scheduler))
 get : (String) <- (Store(N),..N,Fail(KvError)) -> Option(BitArray)
-set : (String,BitArray) <- (Store(N),..N,Fail(KvError)) -> Nil
-remove : (String) <- (Store(N),..N,Fail(KvError)) -> Nil
+set : (String,BitArray) <- (Store(N),..N,Fail(KvError)) -> ()
+remove : (String) <- (Store(N),..N,Fail(KvError)) -> ()
 keys : () <- (Store(N),..N,Fail(KvError)) -> List(String)
 prefix : (Store(N),String) -> Store(N)
 get_schema : (String,schema.Schema(A,E,N,W))
   <- (Store(N),..N,Fail(KvError | schema.SchemaError | json.JsonError | unicode.UnicodeError | E)) -> Option(A)
 set_schema : (String,A,schema.Schema(A,E,D,N))
-  <- (Store(N),..N,Fail(KvError | schema.SchemaError | E)) -> Nil
+  <- (Store(N),..N,Fail(KvError | schema.SchemaError | E)) -> ()
 ```
 
 Only a missing key yields None. A corrupt stored value raises its typed decode
@@ -2642,7 +2643,7 @@ string : (Int) <- (Fail(PropertyError)) -> Gen(String)
 check : (Gen(A),Config,(A) <- N -> Verdict) <- N -> Report(A)
 replay : (Gen(A),Int,Int,Int,List(Int)) -> Option(A)
 format : (Report(A),(A) -> String) -> String
-test : (Gen(A),Config,(A) <- (..N,Assert) -> Nil,(A) -> String) <- (..N,Assert) -> Nil
+test : (Gen(A),Config,(A) <- (..N,Assert) -> (),(A) -> String) <- (..N,Assert) -> ()
 ```
 
 check repeats a callback while shrinking. Effectful properties must install
@@ -2662,7 +2663,7 @@ Do not create a special test keyword, test Layer mechanism or second runner.
 
 ```text
 // i/test (test.is)
-tests : Nil
+tests : ()
 test, skip, only, fails : (Syntax,Syntax) <- (syntax.Items,Fail(syntax.SyntaxError)) -> Syntax
 suite : (Syntax,Syntax) -> Syntax
 each : (Syntax,Syntax,Syntax) <- (syntax.Items,Fail(syntax.SyntaxError)) -> Syntax
@@ -2675,7 +2676,7 @@ TraceRecorder = (tracer = trace.Tracer(Scheduler), spans = () <- (Scheduler) -> 
 console : (BitArray) <- (resource.Scope,Scheduler) -> Console
 logs : () <- (resource.Scope,Scheduler) -> LogRecorder
 traces : (random.Generator) <- (resource.Scope,Scheduler) -> TraceRecorder
-round_trip : (A,schema.Schema(A,E,N,N)) <- (..N,Assert,Fail(E | schema.SchemaError)) -> Nil
+round_trip : (A,schema.Schema(A,E,N,N)) <- (..N,Assert,Fail(E | schema.SchemaError)) -> ()
 ```
 
 Raw Stdio request fields cannot call Scheduler. Console exposes the
