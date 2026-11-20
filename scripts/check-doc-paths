@@ -14,13 +14,18 @@ import re
 import sys
 from pathlib import Path
 
-ROOTS = ('crates', 'stdlib', 'lib', 'scripts', 'examples', 'docs')
+ROOTS = ('crates', 'stdlib', 'std', 'lib', 'scripts', 'examples', 'docs')
 DOCS = ('README.md', 'docs/**/*.md', 'docs/**/*.mdx')
 # A path is a word starting with a root dir, or a `./` form. A match inside a
 # URL is skipped: there the character before the root is a plain slash and
 # the two before it are not `./`.
 TOKEN = re.compile(
     r'(?:(?<![\w/.-])|(?<=\./))(' + '|'.join(ROOTS) + r')/[A-Za-z0-9_./{},*<>-]+'
+)
+# The same paths in a GitHub blob link: the link there is the documentation's
+# own claim and must hold too.
+URL = re.compile(
+    r'https://github\.com/nmnmcc/i/blob/main/(' + '|'.join(ROOTS) + r')/[A-Za-z0-9_./{},*<>-]+'
 )
 SKIP_LINE = re.compile(r'^\s*(?:import|export|use|mod)\b')
 # Reference-repository paths that start like ours.
@@ -52,7 +57,7 @@ REMOVED = {
 
 def normalize(token):
     """Strip what belongs to the citation, not the path."""
-    token = token.split(' ')[0]
+    token = token.split(' ')[0].removeprefix('https://github.com/nmnmcc/i/blob/main/')
     token = token.split('::')[0]
     token = re.split(r':\d', token)[0]
     return token.rstrip('.,;:)]*')
@@ -75,7 +80,7 @@ def check_file(root, path):
     for number, line in enumerate(text.splitlines(), 1):
         if SKIP_LINE.match(line):
             continue
-        for match in TOKEN.finditer(line):
+        for match in list(TOKEN.finditer(line)) + list(URL.finditer(line)):
             token = normalize(match.group(0))
             candidates = expand(token)
             if not candidates:

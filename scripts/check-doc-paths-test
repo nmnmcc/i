@@ -40,12 +40,27 @@ def main():
         result = run(root)
         assert result.returncode == 0, result.stderr
 
-        # A path inside a GitHub URL is not a repository path here.
-        write(root, '[x](https://github.com/nmnmcc/i/blob/main/no/such/file.rs)\n')
+        # A path inside another repository's URL is not checked, but one in
+        # this repository's blob URL is.
+        write(root, '[x](https://github.com/other/repo/blob/main/no/such/file.rs)\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+        write(root, '[x](https://github.com/nmnmcc/i/blob/main/crates/gone/src/lib.rs)\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+
+        # Reference-repository roots that look like ours are left alone.
+        write(root, '`lib/elixir/lib/module/types/apply.ex`\n')
         result = run(root)
         assert result.returncode == 0, result.stderr
 
+        # The old std/ prefix is still checked.
+        write(root, '`std/src/lib.rs`\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+
         # Installed modules are not ours to check.
+        write(root, '`crates/one/src/lib.rs`\n')
         (root / 'docs' / 'node_modules' / 'x').mkdir(parents=True)
         (root / 'docs' / 'node_modules' / 'x' / 'README.md').write_text('`crates/elsewhere/lib.rs`\n')
         result = run(root)

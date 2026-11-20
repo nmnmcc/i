@@ -2,7 +2,7 @@
 
 Status: adopted, revision 4 (2026-11-10). The ledger's “Native proposal ADOPTED” records
 the user's adoption of revision 2, including the four replacements in §8. This revision
-reconciles runtime.md (removed; its installed task and IO rules are in the standard and in this note) and multicore.md and closes the lifetime, stop and forged-number
+reconciles runtime.md (removed; still readable at `f10e7f487`; its installed task and IO rules are in the standard and in this note) and multicore.md and closes the lifetime, stop and forged-number
 gaps. Revision 4 applies coordinator rulings N-R1–N-R6 after the independent
 review of 60f37f2; §11.1 records the repairs and regression cases. It changes no implementation. Performance targets are acceptance goals, not
 measurements.
@@ -1240,12 +1240,12 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > Public listen returns Listener; accept/connect return Stream. Public resource
 > parameters use Listener or Stream as appropriate. Other result types stay the
 > same, with NetError, except the error-free close functions. Explicit wrappers
-> inside i/net include (resource.acquire is defined in §8.1):
+> inside i/net include (resource.acquire is defined in `stdlib/src/resource.i`):
 >
 > ```i
 > accept = (Listener(number), raw ! Net) {
 >   Stream(fail.map_error(
->     () { resource.acquire(() { request.await_owned(raw.accept(number)) }, (n) { request.await_owned(close_stream) }) }
+>     () { resource.acquire(() { request.await_owned(raw.accept(number)) }, (n) { request.await_owned(raw.close_stream(n)) }) }
 >     (code) { NetError("accept", "", code) }
 >   ))
 > }
@@ -4314,7 +4314,7 @@ Old sentence(s)/block:
 > ```i
 > accept = (Listener(number), raw ! Net) {
 >   Stream(fail.map_error(
->     () { resource.acquire(() { request.await_owned(raw.accept(number)) }, (n) { request.await_owned(close_stream) }) }
+>     () { resource.acquire(() { request.await_owned(raw.accept(number)) }, (n) { request.await_owned(raw.close_stream(n)) }) }
 >     (code) { NetError("accept", "", code) }
 >   ))
 > }

@@ -7,7 +7,7 @@ references below mean that commit, unless another revision is named. The spec
 in this checkout already has the syntax migration; all examples use that syntax.
 Signature inventories describe bindings with bodies, not bodyless declarations.
 `Option`, `Some`, `None` come from `i/option`; `Order` from `i/order`.
-`Result`, `Ok`, `Error`, `List`, and `()` are built-in names.
+`Result`, `Ok`, `Error` and `List` are built-in names; `()` is the built-in unit type.
 
 ## 1. Problem, evidence, and boundaries
 

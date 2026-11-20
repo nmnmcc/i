@@ -1601,7 +1601,7 @@ Host = ()
 Target = (Js | NodeJS | Wasi | Native | Host)
 ```
 
-`Target` is a service that the platform provides at every entry, holding the target the program was built for. Only §10.1.2's certified entry binding is known to hold the build's target. A program may provide another `Target`.
+`Target` is a service that the platform provides at every entry, holding the target the program was built for. Only §10.1.2's certified entry binding is known to hold the build's target. A program may provide another `Target` through its entry's needs.
 
 At an entry the **platform** of the target provides its services: `Assert`, `Scope`, `Fail`, `Root`, `Owner`, `Await`, `Runner`, `Scheduler`, `Target`, and the host services of this table. No library and no package chooses services for the program: every other service is provided in the program's code, normally in `main`. A program built for targets that need different services has one entry for each such target.
 
@@ -2452,7 +2452,7 @@ This declares a function that the host gives. It is the Wasm import `function` i
 The form is
 `@js("expression") name : T`, where T expands to one opaque type (§4.3). No holes, type variables, unions, functions or constructed
 resource types. The annotation is required. It creates no i constructor or
-cast between labelled types. `i/js.Value = Opaque` is one ordinary use; packages can
+cast between labelled types. `i/js.Value = Opaque` is one ordinary use once `i/js` is in the standard library; packages can
 define `Element = Opaque` or other opaque types. JS is specific to this attribute;
 it is not a target-neutral foreign language feature.
 

@@ -8,7 +8,7 @@ Reviewed against syntax-3 §7.2 row E4 and §2.10.6:
 > in stage E4.
 
 The table lists 75 exported operations with written or inferred `Result`
-return types in `i/src`; each now raises its existing error. The private `_name_result`
+return types in `stdlib/src`; each now raises its existing error. The private `_name_result`
 helpers retain the original implementation and same-module Result composition.
 Other std and example callers use `fail.catch` to keep their previous Result
 handling, including every success/error assertion. Function-valued uses are
