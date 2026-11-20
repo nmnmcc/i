@@ -515,13 +515,19 @@ def site_problem(data, surface_name, start, end, name):
     """Why the bytes at a site do not match what the parser said, or None."""
     if not (0 <= start < end <= len(data)):
         return "offsets %d..%d are outside the file" % (start, end)
+    # A module-qualified site covers the whole written form (`m.C`, or
+    # `(. m C)` in the Lisp surface); an unqualified one covers the name.
+    module, dot, base = name.rpartition(".")
     written = data[start:end]
-    if written != name.encode("utf-8"):
-        module, dot, base = name.rpartition(".")
-        lisp_form = re.compile(
+    if dot and surface_name == "lisp":
+        form = re.compile(
             rb"\(\.\s+" + re.escape(module.encode("utf-8")) + rb"\s+"
             + re.escape(base.encode("utf-8")) + rb"\s*\)\Z")
-        if not (dot and surface_name == "lisp" and lisp_form.match(written)):
+        if not form.match(written):
+            return "bytes %d..%d hold %r, not %r" % (start, end, written, name)
+    else:
+        expected = name if dot else base
+        if written != expected.encode("utf-8"):
             return "bytes %d..%d hold %r, not %r" % (start, end, written, name)
     if surface_name == "normal":
         if data[end:end + 1] == b"(":
