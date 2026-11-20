@@ -12,7 +12,7 @@ permissions:
 
 env:
   BEFORE: "193ba0adcf51c0c216b974a704745b89da2bf4a3"
-  AFTER: "d1a099c63"
+  AFTER: "d1a099c63eb7649ea46a66981c3f68d11b7e3bd3"
   RAYON_NUM_THREADS: 1
   REPEATS: "5"
 
