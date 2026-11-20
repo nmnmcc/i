@@ -916,6 +916,24 @@ test("sort_stability_test", () {
 	()
 })
 
+test("sort_stability_many_test", () {
+	// 40 items with four repeated keys: many runs, both merge directions and
+	// odd run counts. Equal keys must keep their original order.
+	items = list.map(list.range(0, 39), (i) { (i % 4, i) })
+	tags = list.map(list.sort(items, (a, b) { int.compare(a.0, b.0) }), (p) {
+		p.1
+	})
+	expected = list.concat(
+		list.map(list.range(0, 3), (k) {
+			list.filter_map(list.range(0, 39), (i) {
+				{ i % 4 == k } |> (True) { Some(i) } & (False) { None }
+			})
+		}),
+	)
+	assert(tags == expected)
+	()
+})
+
 test("sort_tco_test", () {
 	// TCO test
 	int.range(recursion_test_cycles, -1, [], list.prepend)

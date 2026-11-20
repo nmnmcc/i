@@ -1331,3 +1331,52 @@ mixed union, depth over the cap); float boundaries (`-0.0 == 0.0`,
 `0.1 +. 0.2 != 0.3`); and a stop case showing that a NaN cannot become a
 Float value, so `NaN == NaN` is unreachable rather than defined. The full CI
 gate passes, and corpus output is unchanged at O0 and O2.
+## `list.sort`: one list cell per element per merge level (2026-11-20)
+
+The merge built each output element twice: a cons into the accumulator, then a
+cons again in `reverse_onto`. `sort` now alternates the merge direction by
+level. Ascending runs are merged into a descending run and descending runs into
+an ascending run; both write one cons per element and need no per-level
+reverse. Only a carried run and a final descending level pay for one reverse.
+The sorting order and stability are unchanged; `sort_stability_test` and the
+new `sort_stability_many_test` pin equal keys in their original order.
+
+Method: release `i` from this commit, `i test --project bench --opt {0,2}
+--time`, five alternating rounds (old/new rotated), median wall seconds, one
+process at a time pinned to four CPUs. Same machine, same run.
+
+| Benchmark | `--opt 0` before | `--opt 0` after | `--opt 2` before | `--opt 2` after |
+|---|---:|---:|---:|---:|
+| `list_sort` | 4.913 | 3.776 (-23%) | 1.609 | 1.100 (-32%) |
+| `list_merge` | 1.233 | 1.242 (+1%) | 0.707 | 0.728 (+3%) |
+| `dict_insert` | 1.086 | 1.090 (0%) | 0.840 | 0.899 (+7%) |
+
+`list_merge` and `dict_insert` do not use `sort`; their differences are run
+noise (individual `dict_insert` `--opt 2` runs ranged 0.78-0.97). The change is
+confined to `sort`'s merge.
+
+## Stage report card (2026-11-20)
+
+The four retained compiler changes of this stage, the two directions rejected
+by probes, and the standard library's sort-cell change. Every row is a paired
+run on one runner, five alternating rounds (seven for the dict repeat), and
+`--opt 2` unless stated. Different items ran on different runner models, so
+only the deltas within a row are comparable.
+
+| Item | Machine | Change | Result |
+|---|---|---|---|
+| always-inline 40 | Xeon 6975P-C | `list_sort` 1.966 -> 1.615 s; `list_build` -19.0% | -17.9%; no benchmark slower |
+| known-argument devirtualization | Xeon 6975P-C | `list_sort` 1.990 -> 1.226 s; 10 comparator `call_ref` sites -> 0 in the clones | -38.4%; module +0.35% |
+| comparison-frame reuse | 8573C / EPYC 7763 | `equality` 0.367 -> 0.246 s / 0.444 -> 0.256 s | -33.0% / -42.3% |
+| type-directed structural equality | Xeon 6975P-C | `equality` 0.180 -> 0.116 s | -35.6%; compile +1.2%; equality probe +0.09% bytes |
+| pass 2 probe (rejected) | Xeon 6975P-C | 89.5% of 6331 direct call sites already target a body within `ALWAYS_INLINE`; after Binaryen only 10.5% of the 3427 remaining calls target a body of at most 40 lines | small direct gain, not built |
+| pass 3 probe (rejected) | Xeon 6975P-C | `dict_insert` 0.385 -> 0.328 s with the per-level result tuples removed | 14.8% upper bound, below the 20% target |
+| standard library: alternating merge | Xeon 6975P-C, O2 / O0 | `list_sort` 1.220 -> 0.840 s / 3.090 -> 2.500 s | -31.1% / -19.1% |
+
+The std change also moved the two neighbouring benchmarks, inconsistently:
+`list_merge` -8.8% at O2 and +6.1% at O0, `dict_insert` +7.3% at O2 on this
+machine and -2.8% (0.720 -> 0.700 s) in a repeat on an EPYC 7763, 0.0% at O0.
+`stdlib/src/dict.i` and the compiler are identical before and after, so the
+one +7% reading is run variance, not a regression. Load stayed between 0.4
+and 1.6 in every round; the protocol is in the section above. All four
+compiler changes passed the full gate with corpus output unchanged.
