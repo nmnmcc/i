@@ -14,7 +14,7 @@ fn accepted(source: &str) {
 fn zero_payload_constructor_as_a_function_value() {
     accepted(
         "apply = (f : () -> Bool, v : Bool) -> Bool { f() }\n\
-         main = () { apply(True(), True()) }\n",
+         main = () { apply(True, True()) }\n",
     );
 }
 
