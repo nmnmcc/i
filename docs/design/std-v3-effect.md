@@ -21,8 +21,8 @@ points, not complete export lists. Methods count as entry points too.
 
 The language sources are `docs/spec.md`, especially §§4.6, 6.12, 7, 9,
 11 and 14, and `docs/design/syntax-3.md`, especially §2.10 and §6.9.
-The library inventory covers every module in `stdlib/src/` and `std/src/`.
-Selected implementation bodies, `std/test/`, and `examples/` establish the
+The library inventory covers every module in `stdlib/src/` and `stdlib/src/`.
+Selected implementation bodies, `stdlib/test/`, and `examples/` establish the
 details below. Existing tests are source evidence, not proof of passing tests.
 No build or test was run for this audit.
 
@@ -106,7 +106,7 @@ Sources: `effect/packages/effect/src/Cause.ts`,
 ### i today and the gap
 
 `stdlib/src/fail.i` exports `raise`, `catch`, `from_result`, and `map_error`.
-`std/src/result.i` adds `map`, `map_error`, `then`, `recover`, `partition`,
+`stdlib/src/result.i` adds `map`, `map_error`, `then`, `recover`, `partition`,
 `all`, `catch`, and conversions to `Option`. `Result`, `Ok`, `Error` and
 `Fail` are already described by `docs/spec.md` §§9.3 and 12.
 `stdlib/src/fail.i` contains a separate transitional service-based implementation
@@ -161,8 +161,8 @@ is written in normal code. Sources: `docs/spec.md` §9.2;
 
 The current library already uses replaceable services: `clock.Clock`,
 `process.Environment`, `http.Client`, and `log.Sink(E,N)`.
-`std/test/clock_test.i` supplies a fake clock with `<-`.
-`std/src/http.i` has native and fetch client factories. `examples/cli-log/src/main.i`
+`stdlib/test/clock_test.i` supplies a fake clock with `<-`.
+`stdlib/src/http.i` has native and fetch client factories. `examples/cli-log/src/main.i`
 and `examples/http-server/src/main.i` are application entry examples.
 
 The gap is a consistent construction guide and resource-safe service factories.
@@ -260,7 +260,7 @@ Three gaps deserve early work:
   Source: `stdlib/src/task.i`, `spawn_values`, `map_concurrently`.
 - General timeout and retry helpers. HTTP has a timeout wrapper built from
   `task.race` and clock sleep. There is no common computation timeout module in
-  the audited library inventory. Sources: `std/src/http.i`, `send_timeout`;
+  the audited library inventory. Sources: `stdlib/src/http.i`, `send_timeout`;
   `stdlib/src/task.i`; `stdlib/src/clock.i`.
 - Dynamic scoped work management. There is no public FiberSet/FiberMap-style
   registry. Build it from groups, immutable dictionaries, refs and owner tasks.
@@ -297,9 +297,9 @@ retryable-error predicate. Sources: `effect/packages/effect/src/Schedule.ts`,
 `effect/ai-docs/src/06_schedule/10_schedules.ts`.
 
 There is no schedule module or reusable retry/repeat API in `stdlib/src/` or
-`std/src/`. `docs/spec.md` §9.1 has a simple recursive retry example, not a
+`stdlib/src/`. `docs/spec.md` §9.1 has a simple recursive retry example, not a
 shipped schedule library. Clocks, exact durations, pure generators and
-structured tasks already exist in `stdlib/src/clock.i`, `std/src/time.i`,
+structured tasks already exist in `stdlib/src/clock.i`, `stdlib/src/time.i`,
 `stdlib/src/random.i`, and `stdlib/src/task.i`.
 
 Express a policy as immutable state plus a step function. Return a stop or a
@@ -336,16 +336,16 @@ This streaming Channel is not a task rendezvous channel.
 
 ### i today and the gap
 
-`std/src/stream.i` already has `Stream(A,E,N)`, `Done`, `Next`, construction,
+`stdlib/src/stream.i` already has `Stream(A,E,N)`, `Done`, `Next`, construction,
 unfold, map/filter/flat-map, append, zip, take/drop, folds, `attempt` and
 `map_environment`. Its pull is an ordinary computation needing
 `Fail(E)` and `N`. Construction is pure. Pulling the same stream again repeats
 the work; it does not advance or memoize a cursor.
 
 The module explicitly owns no resource and does not close on early termination.
-`std/test/stream_test.i` checks finite observations and call-time service use.
-`std/src/csv.i` supplies stream consumers/producers for rows and records.
-`std/src/http.i` and `stdlib/src/fs.i` have separate incremental I/O interfaces.
+`stdlib/test/stream_test.i` checks finite observations and call-time service use.
+`stdlib/src/csv.i` supplies stream consumers/producers for rows and records.
+`stdlib/src/http.i` and `stdlib/src/fs.i` have separate incremental I/O interfaces.
 
 Missing capabilities are:
 
@@ -447,11 +447,11 @@ Source: `effect/packages/effect/src/Arbitrary.ts`.
 
 ### i today and the gap
 
-`std/src/schema.i` is already a two-way JSON codec library. It has primitives,
+`stdlib/src/schema.i` is already a two-way JSON codec library. It has primitives,
 lists, dictionaries, tuples, field builders, optional fields, unions, tagged
 unions, lazy recursion, mapping and refinement. `SchemaError` has a path and
-expected text. `std/test/schema_test.i` defines round-trip and path checks.
-`std/src/http.i`, `std/src/csv.i` and `examples/http-server/src/main.i` already
+expected text. `stdlib/test/schema_test.i` defines round-trip and path checks.
+`stdlib/src/http.i`, `stdlib/src/csv.i` and `examples/http-server/src/main.i` already
 consume this schema API.
 
 The representation is just
@@ -459,7 +459,7 @@ The representation is just
 It cannot recover field metadata, structural checks or annotations from those
 callbacks. `refine` checks decoding only. Encoding does not validate again.
 `transform` is an alias of pure bidirectional `map`; it is not a fallible or
-service-using transformation. Source: `std/src/schema.i`.
+service-using transformation. Source: `stdlib/src/schema.i`.
 
 The missing foundation is schemas as inspectable immutable data. Add one
 description that structural combinators build. Derive decoding, encoding,
@@ -479,7 +479,7 @@ Macros can remove repetitive field getters and setters. They must use ordinary
 depend on the removed record-graph machinery or bypass private constructors.
 Sources: `docs/spec.md` §§14.7–14.8; `stdlib/src/syntax.i`;
 `docs/design/syntax-3.md` §6.9. Runtime schema data must remain useful without
-macros. Do not add compiler special cases for `std/schema`.
+macros. Do not add compiler special cases for `i/schema`.
 
 ## 11. Config and ConfigProvider
 
@@ -499,15 +499,15 @@ errors, so fallback need not hide bad configuration. Sources: those same files.
 
 i has `process.Environment`, `env`, arguments, a CLI parser, JSON, schemas and
 filesystem access. It has no shared config/provider module. Sources:
-`stdlib/src/process.i`, `std/src/cli.i`, `std/src/json.i`,
-`std/src/schema.i`, `stdlib/src/fs.i`.
+`stdlib/src/process.i`, `stdlib/src/cli.i`, `stdlib/src/json.i`,
+`stdlib/src/schema.i`, `stdlib/src/fs.i`.
 
 Make `ConfigProvider` an ordinary service whose reads return explicit missing,
 present and source-error cases. Use schema data to decode config. Compose
 environment, file, CLI and in-memory sources explicitly in the program entry.
 Specify precedence, empty versus missing values, nested path syntax and
 fallback policy. Do not default an invalid port as though it were absent.
-Add safe rendering for secrets; string fields in `std/log.Entry` do not provide
+Add safe rendering for secrets; string fields in `i/log.Entry` do not provide
 redaction by themselves. A secret wrapper must not be advertised as erasing
 the original string from memory.
 
@@ -523,15 +523,15 @@ the original string from memory.
 
 ### i today and the gap
 
-`std/src/log.i` already has structured `Entry`, four levels, `Sink(E,N)`,
+`stdlib/src/log.i` already has structured `Entry`, four levels, `Sink(E,N)`,
 lazy messages, filtering, minimum level, deterministic formatting, stdout,
 stderr, file output and explicit timestamps. Its errors and needs remain
-visible. A sink is a provided service. `std/test/log_test.i` tests this model.
+visible. A sink is a provided service. `stdlib/test/log_test.i` tests this model.
 This should be extended, not replaced by Effect-shaped logging calls.
 
 There is no metric registry or tracer/span module in the audited library
 inventory. Common contextual fields, fan-out, JSON formatting and scoped
-batching are also absent from `std/src/log.i` exports. File logging currently
+batching are also absent from `stdlib/src/log.i` exports. File logging currently
 opens, writes, flushes and closes for every accepted entry.
 
 Use immutable log context and span context as services. Enter a span with a
@@ -568,8 +568,8 @@ Sources: `effect/packages/effect/src/testing/index.ts`,
 
 ### i today and the gap
 
-`std/src/time.i` has exact signed nanosecond `Duration` and Unix `Instant`,
-arithmetic, comparison, sleep and monotonic measurement. `std/src/calendar.i`
+`stdlib/src/time.i` has exact signed nanosecond `Duration` and Unix `Instant`,
+arithmetic, comparison, sleep and monotonic measurement. `stdlib/src/calendar.i`
 has proleptic Gregorian dates, civil times, fixed offsets, weekday/day arithmetic,
 and parsing/formatting. It explicitly has no timezone database or leap seconds.
 `stdlib/src/clock.i` exposes replaceable wall/monotonic reads and sleep requests.
@@ -578,12 +578,12 @@ and parsing/formatting. It explicitly has no timezone database or leap seconds.
 float draws, split and path-derived streams. `stdlib/src/task.i` has per-task
 generator access. This is already stronger explicit control than replacing
 every draw with ambient random state. Secure bytes are a separate capability:
-`stdlib/src/process.i` exposes entropy; `std/src/crypto.i` provides `random_bytes`.
+`stdlib/src/process.i` exposes entropy; `stdlib/src/crypto.i` provides `random_bytes`.
 
-`std/test/clock_test.i` supplies a fixed fake whose sleeps return ready requests.
+`stdlib/test/clock_test.i` supplies a fixed fake whose sleeps return ready requests.
 That tests clock substitution. It does not implement a virtual timer queue.
 `task.test` supplies seeded scheduling and scripted task paths, but that alone
-does not advance time. Sources: `std/test/clock_test.i`; `stdlib/src/task.i`.
+does not advance time. Sources: `stdlib/test/clock_test.i`; `stdlib/src/task.i`.
 
 The largest gap is reusable virtual time integrated with task waits. Define
 sleep registration, advancing to deadlines, cancellation removal and quiescence
@@ -625,9 +625,9 @@ i's `Request(A)` is a host-operation handle, not this logical data-loading
 description. It already has ownership, cancellation and replaceable waits.
 Do not replace it or overload its name with a resolver abstraction.
 Source: `stdlib/src/request.i`; `docs/spec.md` §9.11.
-There is no public logical batching or cache module in `stdlib/src/` or `std/src/`.
+There is no public logical batching or cache module in `stdlib/src/` or `stdlib/src/`.
 HTTP's idle connection pool is specific transport reuse, not a general cache.
-Source: `std/src/http.i`, `Pool`, `network_client`.
+Source: `stdlib/src/http.i`, `Pool`, `network_client`.
 
 Add a scoped cache whose loader is a normal function with needs and `Fail(E)`.
 Store immutable entry state behind an owner task/ref; coordinate in-progress
@@ -664,7 +664,7 @@ use normal constructors, not `_tag` strings or a second pattern evaluator.
 | `effect/packages/effect/src/Data.ts`: immutable data class and tagged enum helpers | `Class`, `TaggedClass`, `taggedEnum`, `Error`, `TaggedError` | Labelled data, constructors and unions are language features. No Data class hierarchy is needed. `docs/spec.md` §§4.3–4.4. |
 | `effect/packages/effect/src/Equal.ts`: `Equal` protocol | `equals`, `asEquivalence`, `isEqual`, `makeCompareMap`, `makeCompareSet`, `byReference` | i has one `==` with specified structural and identity rules. Do not add overridable equality. `docs/spec.md` §11.4. |
 | `effect/packages/effect/src/Hash.ts`: `Hash` protocol | `hash`, `combine`, `number`, `string`, `structure`, `array` | `core.hash` already agrees with i equality. No user hash protocol is required. `stdlib/src/core.i`; `docs/spec.md` §13. |
-| `effect/packages/effect/src/Order.ts`: `Order<A>` | `make`, `flip`, `combine`, `combineAll`, `mapInput`, `Tuple`, `Struct`, `min`, `max`, `clamp` | `std/order` has order values and tie-breaking. Type modules have compare functions. Comparator projection and composition are useful ordinary functions. `std/src/order.i`, `std/src/int.i`, `std/src/string.i`. |
+| `effect/packages/effect/src/Order.ts`: `Order<A>` | `make`, `flip`, `combine`, `combineAll`, `mapInput`, `Tuple`, `Struct`, `min`, `max`, `clamp` | `i/order` has order values and tie-breaking. Type modules have compare functions. Comparator projection and composition are useful ordinary functions. `stdlib/src/order.i`, `stdlib/src/int.i`, `stdlib/src/string.i`. |
 
 Effect 4's `Equal.equals` compares plain arrays and objects structurally by
 default and supports custom equality. That is a change from v3, documented in
@@ -673,10 +673,10 @@ default and supports custom equality. That is a change from v3, documented in
 hook in i.
 
 Two existing collection contracts need attention before promising value
-interchangeability. `std/src/dict.i` documents insertion-order differences
-inside equal-hash collision buckets. `std/src/sequence.i` documents that `==`
+interchangeability. `stdlib/src/dict.i` documents insertion-order differences
+inside equal-hash collision buckets. `stdlib/src/sequence.i` documents that `==`
 and hash observe private tree shape; its `equal` compares elements instead.
-`std/test/sequence_test.i` deliberately checks element observations. Decide
+`stdlib/test/sequence_test.i` deliberately checks element observations. Decide
 and document canonical representations or explicit conversion boundaries.
 This audit recommends representation fixes where feasible, not a second `==`.
 
@@ -684,13 +684,13 @@ This audit recommends representation fixes where feasible, not a second `==`.
 
 | Effect source and central types | Selected entry points | i today and gap |
 |---|---|---|
-| `effect/packages/effect/src/Option.ts`: `Option<A>`, `Some`, `None` | `some`, `none`, `map`, `flatMap`, `match`, `all`, `filter`, `zipWith` | `std/src/option.i` already has `Some/None`, map/then, flatten, defaults, all/filter/map2 and Result conversion. Mostly naming and consistency work. |
-| `effect/packages/effect/src/Result.ts`: `Result<A,E>`, `Success`, `Failure` | `succeed`, `fail`, `map`, `mapError`, `flatMap`, `match`, `all`, `orElse`, `fromOption` | This checkout has `Result.ts`, not `Either.ts`. i has prelude `Result/Ok/Error` and a rich `std/src/result.i`. Keep one result type; do not add Either. |
-| `effect/packages/effect/src/Array.ts`: readonly and non-empty array types | `fromIterable`, `range`, `get`, `map`, `flatMap`, `filter`, `reduce`, `sortBy`, `groupBy`, `chunksOf`, `window`, `zip` | `std/src/list.i` already covers most transformations, grouping, sorting, windows, chunks, scans and combinations. `std/src/sequence.i` supplies persistent indexed operations. No need for a mutable Array clone. |
-| `effect/packages/effect/src/Record.ts`: `ReadonlyRecord<K,V>` | `empty`, `fromEntries`, `get`, `set`, `remove`, `map`, `mapKeys`, `filter`, `union`, `intersection` | Dynamic string keys fit `std/dict.Dict(String,A)`. Closed record shapes remain language data, not runtime field maps. `std/src/dict.i`; `docs/spec.md` §6.4. |
-| `effect/packages/effect/src/HashMap.ts`: `HashMap<K,V>` | `empty`, `fromIterable`, `get`, `set`, `remove`, `modifyAt`, `union`, `map`, `filter`, `reduce` | `std/src/dict.i` is an immutable hash trie with broad operations. No absent hash map foundation. Address collision equality and document traversal order. |
-| `effect/packages/effect/src/HashSet.ts`: `HashSet<A>` | `empty`, `fromIterable`, `add`, `has`, `remove`, `union`, `intersection`, `difference`, `isSubset` | `std/src/set.i` is already built on Dict and has these capabilities plus symmetric difference. It inherits the representation concerns of Dict. |
-| `effect/packages/effect/src/Chunk.ts`: `Chunk<A>`, `NonEmptyChunk<A>` | `fromIterable`, `append`, `appendAll`, `take`, `drop`, `get`, `map`, `flatMap`, `reduce`, `toArray` | `std/src/sequence.i` supplies a persistent measured finger tree with append, split and indexed access. It overlaps Chunk's role. Streaming batches can use List or Sequence; do not add another general sequence without a measured need. |
+| `effect/packages/effect/src/Option.ts`: `Option<A>`, `Some`, `None` | `some`, `none`, `map`, `flatMap`, `match`, `all`, `filter`, `zipWith` | `stdlib/src/option.i` already has `Some/None`, map/then, flatten, defaults, all/filter/map2 and Result conversion. Mostly naming and consistency work. |
+| `effect/packages/effect/src/Result.ts`: `Result<A,E>`, `Success`, `Failure` | `succeed`, `fail`, `map`, `mapError`, `flatMap`, `match`, `all`, `orElse`, `fromOption` | This checkout has `Result.ts`, not `Either.ts`. i has prelude `Result/Ok/Error` and a rich `stdlib/src/result.i`. Keep one result type; do not add Either. |
+| `effect/packages/effect/src/Array.ts`: readonly and non-empty array types | `fromIterable`, `range`, `get`, `map`, `flatMap`, `filter`, `reduce`, `sortBy`, `groupBy`, `chunksOf`, `window`, `zip` | `stdlib/src/list.i` already covers most transformations, grouping, sorting, windows, chunks, scans and combinations. `stdlib/src/sequence.i` supplies persistent indexed operations. No need for a mutable Array clone. |
+| `effect/packages/effect/src/Record.ts`: `ReadonlyRecord<K,V>` | `empty`, `fromEntries`, `get`, `set`, `remove`, `map`, `mapKeys`, `filter`, `union`, `intersection` | Dynamic string keys fit `i/dict.Dict(String,A)`. Closed record shapes remain language data, not runtime field maps. `stdlib/src/dict.i`; `docs/spec.md` §6.4. |
+| `effect/packages/effect/src/HashMap.ts`: `HashMap<K,V>` | `empty`, `fromIterable`, `get`, `set`, `remove`, `modifyAt`, `union`, `map`, `filter`, `reduce` | `stdlib/src/dict.i` is an immutable hash trie with broad operations. No absent hash map foundation. Address collision equality and document traversal order. |
+| `effect/packages/effect/src/HashSet.ts`: `HashSet<A>` | `empty`, `fromIterable`, `add`, `has`, `remove`, `union`, `intersection`, `difference`, `isSubset` | `stdlib/src/set.i` is already built on Dict and has these capabilities plus symmetric difference. It inherits the representation concerns of Dict. |
+| `effect/packages/effect/src/Chunk.ts`: `Chunk<A>`, `NonEmptyChunk<A>` | `fromIterable`, `append`, `appendAll`, `take`, `drop`, `get`, `map`, `flatMap`, `reduce`, `toArray` | `stdlib/src/sequence.i` supplies a persistent measured finger tree with append, split and indexed access. It overlaps Chunk's role. Streaming batches can use List or Sequence; do not add another general sequence without a measured need. |
 
 Effect's Array/Chunk/HashMap families also have different representation and
 interop roles in TypeScript. Their existence is not evidence that i needs all
@@ -701,9 +701,9 @@ files; the recommendation is to keep one home for each operation in i.
 
 | Effect source and central types | Selected entry points | i today and gap |
 |---|---|---|
-| `effect/packages/effect/src/String.ts`: string helpers | `length`, `slice`, `split`, `trim`, `replaceAll`, `normalize`, `codePointAt`, `linesIterator`, `snakeCase`, `camelCase` | `std/src/string.i` already has scalar indexing, slicing, searching, case conversion, line/word splitting and traversal. Missing normalization, grapheme operations and richer naming transforms need explicit Unicode policy. Preserve codepoint indexes. |
-| `effect/packages/effect/src/Number.ts`: numeric helpers | `sum`, `multiply`, `divide`, `remainder`, `clamp`, `parse`, `round`, `sumAll` | `std/src/int.i` and `std/src/float.i` already cover parsing, arithmetic, aggregation, comparison, powers, rounding and trigonometry. i Float is finite; do not copy NaN/infinity or zero-divisor behavior. `docs/spec.md` §§11.2–11.3. |
-| `effect/packages/effect/src/BigInt.ts`: arbitrary-size integer helpers | `sum`, `multiply`, `divide`, `remainder`, `gcd`, `lcm`, `sqrt`, `fromString`, `toNumber` | i Int is already arbitrary size. `stdlib/src/big.i` contains support arithmetic; `std/src/int.i` exposes the public numeric API. Add missing useful algorithms such as gcd/lcm there, not a second integer type. |
+| `effect/packages/effect/src/String.ts`: string helpers | `length`, `slice`, `split`, `trim`, `replaceAll`, `normalize`, `codePointAt`, `linesIterator`, `snakeCase`, `camelCase` | `stdlib/src/string.i` already has scalar indexing, slicing, searching, case conversion, line/word splitting and traversal. Missing normalization, grapheme operations and richer naming transforms need explicit Unicode policy. Preserve codepoint indexes. |
+| `effect/packages/effect/src/Number.ts`: numeric helpers | `sum`, `multiply`, `divide`, `remainder`, `clamp`, `parse`, `round`, `sumAll` | `stdlib/src/int.i` and `stdlib/src/float.i` already cover parsing, arithmetic, aggregation, comparison, powers, rounding and trigonometry. i Float is finite; do not copy NaN/infinity or zero-divisor behavior. `docs/spec.md` §§11.2–11.3. |
+| `effect/packages/effect/src/BigInt.ts`: arbitrary-size integer helpers | `sum`, `multiply`, `divide`, `remainder`, `gcd`, `lcm`, `sqrt`, `fromString`, `toNumber` | i Int is already arbitrary size. `stdlib/src/big.i` contains support arithmetic; `stdlib/src/int.i` exposes the public numeric API. Add missing useful algorithms such as gcd/lcm there, not a second integer type. |
 | `effect/packages/effect/src/BigDecimal.ts`: `BigDecimal`, `RoundingMode` | `make`, `normalize`, `fromString`, `format`, `sum`, `multiply`, `divide`, `scale`, `round`, `truncate`, `floor`, `ceil` | No decimal module appears in the audited i inventory. Exact decimal coefficient/scale, parsing and explicit rounding are a real gap for money and data exchange. Build on Int. |
 
 Effect BigDecimal supplies an exact decimal representation and explicit rounding
@@ -737,8 +737,8 @@ upgrades; its comments delimit which features work with HTTP/2. Source:
 i already has an incremental HTTP parser/serializer, headers, queries, routes,
 client and transport services, native TCP/TLS and fetch clients, redirect
 handling, idle connection reuse, body decoders, timeout and server loops.
-Sources: `std/src/http.i`, `std/src/uri.i`, `stdlib/src/fetch.i`,
-`stdlib/src/net.i`, `stdlib/src/tls.i`. `std/test/http_network_test.i` contains network,
+Sources: `stdlib/src/http.i`, `stdlib/src/uri.i`, `stdlib/src/fetch.i`,
+`stdlib/src/net.i`, `stdlib/src/tls.i`. `stdlib/test/http_network_test.i` contains network,
 redirect and timeout cases. `examples/http-get/src/main.i` and
 `examples/http-server/src/main.i` show actual application use.
 
@@ -747,7 +747,7 @@ calls the buffered `provider.send` first, then reads slices from a `task.ref`
 holding `res.body`. It is a pull facade over a buffered body. `fetch_stream`
 does incrementally call the host reader. Server `serve_stream` gives a live
 request reader only during the handler, but returns the existing buffered
-`Response` model. Source: `std/src/http.i`.
+`Response` model. Source: `stdlib/src/http.i`.
 
 Make native and fetch lifetime/stream contracts consistent. Generalize timeout
 and retry policies instead of keeping them HTTP-only. Add bounded server
@@ -755,7 +755,7 @@ admission; `accept_loop` currently spawns for each accepted connection without
 a limit. Add body-size limits at consumption boundaries, response streaming,
 middleware composition and test client support. Cookies, multipart and tracing
 are later concrete capabilities. Sources for current behavior:
-`std/src/http.i`, `serve_stream`, `accept_loop`, `ResponseStream`,
+`stdlib/src/http.i`, `serve_stream`, `accept_loop`, `ResponseStream`,
 `native_client`, `fetch_stream`, `send_timeout`.
 
 There is also a lifetime boundary to fix before supporting a live native body.
@@ -764,13 +764,13 @@ There is also a lifetime boundary to fix before supporting a live native body.
 consumed. The current native body is buffered and the fetch provider's close
 is a no-op; these do not establish safety for a transport whose reader needs
 the provider to remain open. Make the consumer own that scope, or transfer
-the provider's close into a scoped reader release. Source: `std/src/http.i`,
+the provider's close into a scoped reader release. Source: `stdlib/src/http.i`,
 `send_stream`, `native_client`, `fetch_client`.
 
 Connection reuse exists, but ordinary `http.send` creates and closes a client
 per call. An explicitly retained `http.client()` can share its transport.
 Document and scope that construction before claiming cross-call pooling as a
-default. Source: `std/src/http.i`, `client`, `send`, `network_client`.
+default. Source: `stdlib/src/http.i`, `client`, `send`, `network_client`.
 
 ### FileSystem and Path
 
@@ -796,7 +796,7 @@ Effect `Path` supplies `join`, `normalize`, `basename`, `dirname`, `extname`,
 `effect/packages/platform/node/src/NodePath.ts`. The latter has host-default,
 POSIX and Windows providers.
 
-`std/src/path.i` already offers lexical POSIX cleaning, joining, splitting,
+`stdlib/src/path.i` already offers lexical POSIX cleaning, joining, splitting,
 base/dir/extension, absolute checks and relative paths. It deliberately does
 not consult a current directory or treat backslashes as separators.
 Keep this pure API. Add explicit native/Windows path support and file-URL
@@ -832,7 +832,7 @@ Sources: `effect/packages/effect/src/Terminal.ts`,
 These solve interactive sizing, key events and line input.
 
 i has byte stdin/stdout/stderr with flush and text helpers, plus a CLI parser.
-Sources: `stdlib/src/stdio.i`, `stdlib/src/io.i`, `std/src/cli.i`.
+Sources: `stdlib/src/stdio.i`, `stdlib/src/io.i`, `stdlib/src/cli.i`.
 It lacks terminal size/events, raw input and interactive line editing.
 Those need an optional terminal host service and scoped restoration of terminal
 mode. Keep byte stdio available on targets with no terminal.
@@ -847,7 +847,7 @@ Sources: `effect/packages/effect/src/persistence/KeyValueStore.ts`,
 The browser file supplies local-storage, session-storage and IndexedDB layers.
 
 i has dictionaries, files and schemas but no common durable key/value service.
-Sources: `std/src/dict.i`, `stdlib/src/fs.i`, `std/src/schema.i` and the audited
+Sources: `stdlib/src/dict.i`, `stdlib/src/fs.i`, `stdlib/src/schema.i` and the audited
 module inventory. Define an ordinary service with memory and file providers,
 then typed schema views. Specify atomic update guarantees, missing keys,
 serialization errors and persistence boundaries. A file backend's atomicity
@@ -914,11 +914,11 @@ TestConsole, TestSchema and Arbitrary inspected here are marked unstable in
 their named files. Do not assume their whole surface is a settled standard.
 
 i already has library macros `test`, `skip`, `only`, `fails`, `suite` and
-`each` in `std/src/test.is`. They register collected items rather than giving
+`each` in `stdlib/src/test.is`. They register collected items rather than giving
 test syntax privileged compiler semantics. `stdlib/src/assertion.i` catches test
-assertion failures. `std/src/property.i` has pure generators, lazy shrink
+assertion failures. `stdlib/src/property.i` has pure generators, lazy shrink
 trees, deterministic seeds, budgets, reports and replay.
-`std/test/property_test.i` exercises generator and shrinking behavior.
+`stdlib/test/property_test.i` exercises generator and shrinking behavior.
 `stdlib/src/task.i` has seeded/scripted scheduling through `task.test`.
 
 Extend these tools with shared scoped fixtures, output/metric/span recorders,
@@ -927,7 +927,7 @@ tool is the virtual timer scheduler described in §13. Preserve separate
 controls for random seed, scheduler choices and virtual time; one seed alone
 does not determine host I/O arrival order.
 
-The checked-in `std/src/test.is` still recognizes an older suite environment
+The checked-in `stdlib/src/test.is` still recognizes an older suite environment
 statement in its syntax matcher. Reconcile it with ordinary provide during
 the syntax/effects migration. This is a source observation, not a claim about
 a failing test run. Avoid redesigning the test runner solely to match Vitest.
@@ -1003,7 +1003,7 @@ than expanding many unrelated module export lists.
 | `Match` builders — `effect/packages/effect/src/Match.ts` | i has branches, patterns, guards, narrowing and coverage checks. | Ordinary matching and small reusable predicates. |
 | `Data.Class`, `TaggedClass`, tagged errors — `effect/packages/effect/src/Data.ts` | Labelled constructors, unions and immutable data are native. | Normal domain types and error values. |
 | Custom Equal/Hash protocols — `effect/packages/effect/src/Equal.ts`; `effect/packages/effect/src/Hash.ts` | i defines one equality and a compatible core hash. | Fix representation laws; use explicit projection/comparison functions for domain ordering. |
-| Separate Either and BigInt concepts — `effect/packages/effect/src/Result.ts`; `effect/packages/effect/src/BigInt.ts` | Effect 4 already uses Result here; i already has Result and arbitrary-size Int. | `std/result`, `std/int`, and a distinct decimal type only for decimal semantics. |
+| Separate Either and BigInt concepts — `effect/packages/effect/src/Result.ts`; `effect/packages/effect/src/BigInt.ts` | Effect 4 already uses Result here; i already has Result and arbitrary-size Int. | `i/result`, `i/int`, and a distinct decimal type only for decimal semantics. |
 | The full Array/Chunk/Record naming split — `effect/packages/effect/src/Array.ts`; `effect/packages/effect/src/Chunk.ts`; `effect/packages/effect/src/Record.ts` | i has List, Sequence, Dict and closed language data. | Add missing operations to the correct existing module; prove a new representation's purpose first. |
 | Worker as the way to request parallel execution — `effect/packages/effect/src/workers/Worker.ts` | i tasks already run across host-selected workers, with defined portability. | Keep worker placement hidden; use an explicit transport service only for external interop. |
 | Schema classes and TypeScript type-level machinery — `effect/packages/effect/src/Schema.ts`; `effect/packages/effect/src/SchemaAST.ts` | i needs schema functionality, but ordinary immutable descriptions and macros can express it. No library may be compiler-special-cased. | One schema description interpreted by codecs, validators, exporters and generators. |

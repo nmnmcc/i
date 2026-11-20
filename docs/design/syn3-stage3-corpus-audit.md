@@ -363,7 +363,7 @@ for precisely these five full-output differences:
 | --- | --- | --- |
 | `review-a1/cases/32_call_constructor_boundary` | shown type | `f : () -> Token` becomes `() -> Stop`. Syntax-three §2.8: “A labelled type with data `D` has the constructor function `(D) -> T(…)`”; sums are union aliases. `Stop` is the constructor's own type. |
 | `review-a1/runtime-new/32` | shown type | The same `Token` → `Stop` result; runtime phases and outputs are unchanged. Same §2.8 paragraph. |
-| `review-r2/never_yields` | shown type | `Fail(task.ScheduleError)` becomes `Fail(task.NotRunnable)` in `main`'s need. `lib/i/task.i` defines `ScheduleError = NotRunnable`; this names the same type. §2.8: “A name is a transparent alias, as today.” All phase exits and runtime output match. |
+| `review-r2/never_yields` | shown type | `Fail(task.ScheduleError)` becomes `Fail(task.NotRunnable)` in `main`'s need. `stdlib/src/task.i` defines `ScheduleError = NotRunnable`; this names the same type. §2.8: “A name is a transparent alias, as today.” All phase exits and runtime output match. |
 | `review-t1/fuzz-111` | message only | E0516's uncovered witness becomes `("", True)` instead of `("", _)`. |
 | `review-t1/fuzz-22` | message only | E0516's uncovered witness becomes `("b", True)` instead of `("b", _)`. |
 

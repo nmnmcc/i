@@ -192,7 +192,7 @@ look of the language.
 | Evaluation grammar against the rest | `ParamItem` admits `..rest` at the top of a parameter group | No rest at the top of a group, because shape groups must be syntactic (§2.4, [R4] Q7). |
 | Answers B1 claim against this note's analysis | "Checking against the selected domains is sound whether or not known types are reliable" | Not true in general; see §2.6.6. The choice stands; the guarantee is restated and the invariant "known types are facts" is added ([R4] Q9). |
 | Third round against fourth round on Q13 | The third round records `Node = (…)` "pending confirmation against the plain union name `Node = Name \| Int \| …`" | The fourth round settles it: with the outer parentheses, a labelled type. |
-| Today's Lisp surface against the new rows | Today a pipe `a \|> f` is written `(\| a f)` in `.is` files (`lisp/to_ast.rs`:489, `std/src/test.is`), while SYN3 uses `&` for the branch join | The pipe head becomes `\|>`; `(& …)` in an expression is a chain (§6.8). |
+| Today's Lisp surface against the new rows | Today a pipe `a \|> f` is written `(\| a f)` in `.is` files (`lisp/to_ast.rs`:489, `stdlib/src/test.is`), while SYN3 uses `&` for the branch join | The pipe head becomes `\|>`; `(& …)` in an expression is a chain (§6.8). |
 | `meta.md` §2.3 against `spec.md` | The meta table writes a match as `e.{ p -> v }`; the spec and the code write `e \|> { … }` | The spec controls. The new rows in §6.8 replace both. |
 | O16 against the effects proposal | Reads `db ! Db` in blocks and `! Db = e` | Later owner text: `<-` in heads, `e <- (s)` (O24, O29). Mid-block reads disappear (review gap 6). |
 | Effects proposal `catch` against rule B | The proposal writes the body as `() <- (Fail(E)) -> A`, a closed need that rejects every body needing another service | The body is `() <- (..N, Fail(E)) -> A` (review Q1; confirmed by the coordinator). |
@@ -549,7 +549,7 @@ type is smaller), and a multi-shape type is a subtype of each of its shapes,
 any call site, including inside a library compiled without knowledge of it;
 the run time handles it there (§6.4).
 
-`list.first` gives an `Option` (std/src/list.i:158), so the runnable form of
+`list.first` gives an `Option` (stdlib/src/list.i:158), so the runnable form of
 the owner's example is `Some(f) = list.first(fs)` followed by `f(2.0)` and
 `f(3.0, 4.0)`, a refutable binding that reports to `Assert` (§2.12). The
 owner's sketch leaves this out; it does not change the decision.
@@ -1020,7 +1020,7 @@ catch = <A, E, N>(body: () <- (..N, Fail(E)) -> A) -> Result(A, E) {
 - `Assert` stays a separate service type, so `catch` does not take assertion
   failures, as today.
 - **Library style.** An operation that may fail reports through `Fail`;
-  `Result` is data used after `catch`. About 140 functions of `std/src` and
+  `Result` is data used after `catch`. About 140 functions of `i/src` and
   `stdlib/src` that return `Result` today (`json.parse`, `float.divide`, …) change
   in stage E4.
 - **A `Fail` that outlives its `catch`.** A `Fail` value returned, stored, or
@@ -1675,7 +1675,7 @@ No ambiguity was found that needs a comma.
 
 "Before" is today's language at 5c186400; "after" is SYN3.
 
-### 4.1 `list.count` (std/src/list.i:114)
+### 4.1 `list.count` (stdlib/src/list.i:114)
 
 ```text
 // before
@@ -2670,8 +2670,8 @@ The fourth round chose `(-> (, a b) R e)` over the first version's
   (parameters as a bare list, data as `(, …)`).
 - **Size.** One token more per function and per function type.
 - **Migration of `.is` files and macros.** There are three `.is` files:
-  `std/src/test.is` (14 lines), its copy
-  `tests/review/cases/review-k4s/std/src/test.is`, and
+  `stdlib/src/test.is` (14 lines), its copy
+  `tests/review/cases/review-k4s/stdlib/src/test.is`, and
   `tests/spec/6/interpolation_macro/src/macros.is` (3 lines). `test.is` has
   12 function literals with parameters, 4 quoted zero-parameter templates or
   patterns `` `(-> () _ {…}) `` and 13 clauses; `macros.is` has 1 function.
@@ -2691,7 +2691,7 @@ The fourth round chose `(-> (, a b) R e)` over the first version's
 
 No cost was found that the first form does not also have; the form stays.
 
-For example, two definitions of `std/src/test.is` after the conversion
+For example, two definitions of `stdlib/src/test.is` after the conversion
 (`text` uses the new `Node`):
 
 ```text
@@ -2729,7 +2729,7 @@ becomes `(Syntax, …) <- (Assert, Definitions, Diagnostics, Fail(SyntaxError), 
 the generated wrapper text (`crates/ilang-macro/src/prepare.rs`:243) is
 regenerated in stage E3.
 
-**`suite`** (review gap 10). The `suite` macro of `std/src/test.is`:11 copies
+**`suite`** (review gap 10). The `suite` macro of `stdlib/src/test.is`:11 copies
 `(! service value)` statements into test bodies today; it is rewritten to
 wrap each body as `(<- body (, value …))`, the provide of §2.10.5.
 
@@ -2772,11 +2772,11 @@ its migrator uses `parser_legacy`).
 | 1 | Solver: unannotated recursive matches over parametric unions of one-constructor types (B2); display folds unions to declared names (D7) | `crates/ilang-check/src/types/solve.rs`, `display.rs`, `shown.rs`, `shown_tree.rs`; new `scripts/gen-syn3-union.py`; new fixtures `tests/spec/4.4/syn3_union_perf/` (12 members, generated) and `tests/spec/4.7/syn3_display_name.i` | `timeout 2 I check --project tests/spec/4.4/syn3_union_perf` exits 0; `cargo test -p ilang-cli --test spec --locked` passes, with the display fixture expecting `first : (xs : List(Option(Int))) -> Int` | No | Yes |
 | E1 | (after 1) Directed need rows: R4 merge by direction, rule A for function subtyping, rule B (handled obligation, directed), one canonical entry per (row variable, constructor) | `crates/ilang-check/src/types/solve.rs`, `infer.rs`, `display.rs`; fixtures under `tests/spec/9/` | Fixtures: `both = (f ! Fail(Int \| String)) { need_int() }` checks (today's syntax); a provider `Yield(Never)` for a need `Yield(Int)` is rejected; `collect` over a body emitting `Int` and `String` shows `List(Int \| String)` (review gap 13); the Q1-B split of `catch` is rejected; a covariant merge to `Never` is an error; `cargo test -p ilang-cli --test spec --locked` | No | Yes |
 | E2 | `control.escape`; light (escape-only) boundary; library `Fail`, `raise`, `catch` beside today's `i/fail` | `crates/ilang-wasm/src/emit/control.rs`, `emit/mod.rs`, `ir.rs`, `lower.rs`, `stdlib/src/control.i`, `stdlib/src/fail.i`, prelude | A fixture runs `catch` + `raise` through nested catches and `resource.ensure`; `escape` on an inactive boundary stops; the bench gate of §2.10.7 (≤ 1.25x today's `fail.catch`, with and without an error) | No | Yes |
-| E3 | (after E1, E2) Remove the error channel: `-> R ^ E ! N` becomes `-> R ! Fail(E) \| N` everywhere; entries get the platform `Fail` (O31); host-service, export and `@external` glue (§2.10.12); macro signatures (§6.9); delete `FnTy.err`, `Op::Raise`, `Op::Catch`, `$fail_catch`, `$catch_run`, `$catch_reenter` | migrator subcommand `errors`; `types/*`, `ilang-wasm`, `ilang-macro`, `lib/**`, `std/**`, `tests/**`, `examples/**` | `! grep -rn 'Op::Catch' crates`; `scripts/checks` passes | Migration yes; checker and codegen no | Yes |
-| E4 | (after E3) Std API: about 140 `-> Result(` signatures report through `Fail`; callers and tests; `resource.acquire` on `Scope` (§2.10.9) | `std/src`, `std/test`, `stdlib/src`, examples | `scripts/checks`; `json.parse("{")` under `fail.catch` gives `Error(…)` | Partly (per-function judgement) | Yes |
+| E3 | (after E1, E2) Remove the error channel: `-> R ^ E ! N` becomes `-> R ! Fail(E) \| N` everywhere; entries get the platform `Fail` (O31); host-service, export and `@external` glue (§2.10.12); macro signatures (§6.9); delete `FnTy.err`, `Op::Raise`, `Op::Catch`, `$fail_catch`, `$catch_run`, `$catch_reenter` | migrator subcommand `errors`; `types/*`, `ilang-wasm`, `ilang-macro`, `lib/**`, `i/**`, `tests/**`, `examples/**` | `! grep -rn 'Op::Catch' crates`; `scripts/checks` passes | Migration yes; checker and codegen no | Yes |
+| E4 | (after E3) Std API: about 140 `-> Result(` signatures report through `Fail`; callers and tests; `resource.acquire` on `Scope` (§2.10.9) | `i/src`, `i/test`, `stdlib/src`, examples | `scripts/checks`; `json.parse("{")` under `fail.catch` gives `Error(…)` | Partly (per-function judgement) | Yes |
 | E5 | (after E3) Entry stub and per-target platform table; delete the provider plan (§2.10.11, spec §2.6.1); per-target entries in the package file; `task.Scope(E)` renamed `task.Group(E)` | `types/provider.rs` (deleted), `ilang-wasm/src/lower.rs` provider section, `emit/host.rs`:575-640, the three fixture packages under `tests/spec/9.11/`, provider tests | `test ! -e crates/ilang-check/src/providers.rs`; `i run` of `examples/echo`, `http-get`, `http-server` works; `i check --target js` of a program needing `Net` gives the one "not provided by the target" error | Deletion yes; stub no | Yes |
 | 2 | Fitting of constructor patterns `B <: Q \| r - Q`, with the disjointness warning (D4) | `types/pattern.rs`, `infer.rs`, `coverage.rs`; fixtures `tests/spec/4.8/syn3_refutable_member.i` (expects a stop `assertion failed: pattern Some(q) did not match None`) and `tests/spec/4.8/syn3_refutable_disjoint.i` (expects the warning) | `cargo test -p ilang-cli --test spec --locked` | No | Yes |
-| 3 | Types in today's syntax: every multi-constructor type becomes one-constructor types plus an alias, prelude included (`True { True }`, `False { False }`, `Bool = True \| False`, …); `T {}` stays; then a definition with two or more constructors is a compile error | migrator `crates/ilang-syntax/examples/legacy/migrate-syntax3.rs` (subcommand `types`); `lib/**`, `std/**`, `tests/**`, `examples/**`, docs; `crates/ilang-wasm/src/lower.rs`:905-940 and `crates/ilang-check/src/resolve.rs`:2423 (prelude representations), `types/infer.rs`:254 | `cargo run -p ilang-syntax --example migrate-syntax3 -- --check types` reports 0 multi-constructor definitions; `scripts/checks` passes | Yes, after 1 and 2; wrappers of a built-in of the same name and other name clashes are a manual list (§7.3); `i/syntax.Node` is rewritten by hand to `Node { Node(Name \| Discard \| … \| Int \| Float \| …) }` with one-constructor member types, which is today's spelling of §2.8's `Node` | Yes |
+| 3 | Types in today's syntax: every multi-constructor type becomes one-constructor types plus an alias, prelude included (`True { True }`, `False { False }`, `Bool = True \| False`, …); `T {}` stays; then a definition with two or more constructors is a compile error | migrator `crates/ilang-syntax/examples/legacy/migrate-syntax3.rs` (subcommand `types`); `lib/**`, `i/**`, `tests/**`, `examples/**`, docs; `crates/ilang-wasm/src/lower.rs`:905-940 and `crates/ilang-check/src/resolve.rs`:2423 (prelude representations), `types/infer.rs`:254 | `cargo run -p ilang-syntax --example migrate-syntax3 -- --check types` reports 0 multi-constructor definitions; `scripts/checks` passes | Yes, after 1 and 2; wrappers of a built-in of the same name and other name clashes are a manual list (§7.3); `i/syntax.Node` is rewritten by hand to `Node { Node(Name \| Discard \| … \| Int \| Float \| …) }` with one-constructor member types, which is today's spelling of §2.8's `Node` | Yes |
 | 4 | Labels in today's syntax: labelled calls of non-constructor functions become positional (evaluation order kept); constructor calls give every labelled field by label; constructor patterns write every label (no punning); labels in function types removed (also `@external`, host-service fields, doc tables); then a labelled argument to a non-constructor function is a compile error | migrator (subcommand `labels`, resolver-aware: runs on the checked HIR's spans); `types/infer.rs`; fixture `tests/spec/6.6/syn3_label_call_rejected.i` (`t9(second : 1, first : 5)` expects a compile error) | `cargo test -p ilang-cli --test spec --locked`; `scripts/checks` | Yes (needs the resolver) | Yes |
 | 5 | `\|>` level in today's syntax: group every `a \|> f OP b` (OP at levels 1 to 5) as `{ a \|> f } OP b` and every `a OP b \|> f` as `a OP { b \|> f }`; then move `\|>` to the lowest level | migrator (subcommand `pipe`); `crates/ilang-syntax/src/parse.rs`:1005-1056; fixture `tests/spec/6.9/syn3_pipe_weakest.i` | `scripts/checks` passes before and after the level change, with no source edit between | Yes | Yes |
 | 6 | Remove open records in today's syntax: `Record`, type spreads, forgetting, label parameters, string and `UpName` labels, `i/record`, width subtyping; records become closed labelled data; tuples and records share `Head::Shape`; `()` has the type `()`; `Ty::Graph` deleted; record run time deleted; text form `(label = value)` | `crates/ilang-check/src/types/solve.rs`, `infer.rs`, `known.rs`, `display.rs`, `scheme_wire.rs`, `value_types.rs`, `alias.rs`, `mod.rs`; `crates/ilang-wasm/src/runtime/values.rs`, `inspect.rs`, `lower.rs`; the 23 test files that use open records rewritten or deleted; `tests/t3-record-*.py` (deleted) | `test ! -e crates/ilang-check/src/types/records.rs && ! grep -rn "Ty::Graph" crates`; `scripts/checks` passes; fixture `tests/spec/11/syn3_data_equality.i` (`(a : 1) == (a : 1)`, `(1, 2) != (a : 1, b : 2)`, inspect `(a = 1)`) | No | Yes |

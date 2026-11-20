@@ -449,7 +449,7 @@ No-value-type programs bypass demand collection/closure/trial work. Do not promi
 8. Add deferred exports, Typed.alias_types, queries and canonical package comparison, including parameterized aliases containing a closed Of.
 9. Run the T2 tests in §10. With T1 integrated, run spec tests and `scripts/checks rust`; compare existing checker/interface goldens. Use the coordinator's heavy wrapper for **every** cargo invocation. No Rust implementation or compiler run is part of this design-note commit.
 10. T3 adds record/Without closure and shape arms, label checks, shown-place checks and the §5.9 builder test. M1/M2 add or reconcile the Lisp/Definitions rows; M4 applies the expansion restrictions. Each track owns and runs its deferred tests.
-11. Run std/spec with reversed independent-group tie breaking and with recovery enabled. Measure std time with the accepted T1 measurement procedure; investigate any regression. Audit WAT for existing programs and for type-only changes, allowing only differences justified by changed inferred runtime tests.
+11. Run i/spec with reversed independent-group tie breaking and with recovery enabled. Measure std time with the accepted T1 measurement procedure; investigate any regression. Audit WAT for existing programs and for type-only changes, allowing only differences justified by changed inferred runtime tests.
 
 ## 10. Tests and expected results
 
@@ -489,7 +489,7 @@ These are implementation requirements, not tests reported as passing. Each expec
 | Queries | Head/source/binder navigation, multi-binder outline, inferred/failed hover. | Existing head target, source binding target, individual alias targets; stable outline without inference; X4. |
 | Macros (M2/M4) | Body macro yielding a value name in a generic alias; generated direct Of; generated alias from ancestor/non-ancestor/imported source. | No reclassification; E0531; accepted/E0531/accepted only after imported completion; P1/M3. Definitions returns the written item, not an inferred body. |
 | Records (T3) | records.md §5.9 codec plus later encode calls; read encode side without lower bounds; read record key/label-parameter binding. | User = { age: Int, name: String }; encode calls work; E0534; E0543/E0542; M1/V4. |
-| No feature | Existing std/spec without Of or patterns; reverse independent order. | Same accepted programs, canonical types, needs and init; no demand batches; O2. Measure rather than assume timing. |
+| No feature | Existing i/spec without Of or patterns; reverse independent order. | Same accepted programs, canonical types, needs and init; no demand batches; O2. Measure rather than assume timing. |
 
 A complete, ordinary i fixture for the invariant Cell tests (no host or mutable primitive is required to exercise invariant type constraints):
 

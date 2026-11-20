@@ -36,12 +36,12 @@ only the prose cleanup was then applied.
 | `stdlib/src/assertion.i` | Kept current assertions and Fail calls; removed obsolete duplicate signature documentation. |
 | `stdlib/src/fail.i` | Kept ordinary Fail implementation and imports; removed comment citations. |
 | `lib/i/failure.i` | Kept deletion; no obsolete failure alias restored. |
-| `std/src/calendar.i` | Kept Fail-based API and evaluation order; removed duplicate signature inventory and comment citations. |
-| `std/src/cli.i` | Kept Fail-based API and evaluation-order temporaries; removed duplicate signature inventory and comment citations. |
-| `std/src/float.i` | Kept e4 numerical implementation and evaluation order; cleaned documentation citations. |
-| `std/src/list.i` | Kept e4 list implementation and Fail behavior; cleaned documentation citations. |
-| `std/src/time.i` | Kept e4 time implementation and Fail behavior; cleaned documentation citations. |
-| `std/test/uri_test.i` | Kept e4 URI fixture code and expectations; removed incidental test-comment references. |
+| `stdlib/src/calendar.i` | Kept Fail-based API and evaluation order; removed duplicate signature inventory and comment citations. |
+| `stdlib/src/cli.i` | Kept Fail-based API and evaluation-order temporaries; removed duplicate signature inventory and comment citations. |
+| `stdlib/src/float.i` | Kept e4 numerical implementation and evaluation order; cleaned documentation citations. |
+| `stdlib/src/list.i` | Kept e4 list implementation and Fail behavior; cleaned documentation citations. |
+| `stdlib/src/time.i` | Kept e4 time implementation and Fail behavior; cleaned documentation citations. |
+| `stdlib/test/uri_test.i` | Kept e4 URI fixture code and expectations; removed incidental test-comment references. |
 
 The source-token proof checks every existing tracked Rust file and the library,
 standard-library and three extra checker-fixture sources. Exact literals,

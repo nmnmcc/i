@@ -17,7 +17,7 @@ This document is complete in itself, except that the principality argument (§4.
 - what programs do when they run, and the text form of values (§11);
 - the binary interface between a compiled module and its host (§10 and Appendix B).
 
-The library modules above are modules of the **standard library**: the package in the directory `stdlib` of the repository `github.com/nmnmcc/i`, which a package names with the dependency name `i` (§2.1, §2.6). They are i source, got and versioned like any other package; no compiler builds a library module in. A compiler supplies the built-in operations that these modules declare because they cannot be written in i (§13), and must accept the versions of the standard library made for it. The target modules `i/target`, `i/js`, and `i/wasi` have the contracts of §9.7, §10.1 and §B.7.1. Only the standard library, or a fork of it, may be named `i` (§2.6), so no other package defines a module with any of these library paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
+The library modules above are modules of the **standard library**: the package in the directory `stdlib` of the repository `github.com/nmnmcc/i`, which a package names with the dependency name `i` (§2.1, §2.6). They are i source, got and versioned like any other package; no compiler builds a library module in. A compiler supplies the built-in operations that these modules declare because they cannot be written in i (§13), and must accept the versions of the standard library made for it. The target modules `i/target`, `i/js`, and `i/wasi` (§9.7, §10.1, §B.7.1) are not in the standard library yet: the platform provides the `Target` service, but the type has no written name until they are. Only the standard library, or a fork of it, may be named `i` (§2.6), so no other package defines a module with any of these library paths. Other library modules, command-line behavior not specified in §2.6, and the way test results are shown are not part of the language.
 
 
 i is small, and every part of it is what it looks like. A thing that looks like a function is a normal function, and a chain of branches is a function too (§6.12). A binding is a binding wherever it is written, and a parameter group is a pattern matched as a binding matches. Where two forms look the same, they have the same rules, with this exception, where the place of a form decides its rules:
@@ -1590,7 +1590,7 @@ Storage = (read = (String) <- (Fail(String)) -> String)
 
 **Targets and platform services.**
 
-The module `i/target` exports these types; the modules `i/js` and `i/wasi` export the roots named in them (§10.1, §B.7.1):
+The module `i/target` is to export these types, and `i/js` and `i/wasi` the roots named in them (§10.1, §B.7.1). Until the modules are in the standard library, `Target` is provided by the platform but is not a writable source type:
 
 ```i
 Js = (js = js.Js)

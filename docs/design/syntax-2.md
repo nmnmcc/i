@@ -383,7 +383,7 @@ that pattern; it is not a record field.
 | `f(a: b)` and `f (a: b)` | Labelled call, not a record argument. Use `f((a: b))` for that. |
 | `f` then `(a : b)` on the next line in a block | Two expressions; the second is a record. A break inside an enclosing parenthesis instead separates items. |
 | `(name : path)` at file start | Invalid header, not a record expression statement. Top-level expression statements are not permitted. Imports use `name = package/module`, not colon. |
-| `(name: std/path)` at file start | Still invalid; the slash does not validate the colon. |
+| `(name: i/path)` at file start | Still invalid; the slash does not validate the colon. |
 | `(a, b) = value` at file start | Existing tuple-pattern binding. |
 | Block's first expression `(a : b)` | Record if no function suffix follows. No brace-record scan needed. |
 | `(n) { (name: n) }` | Function returning a record; function bodies remain blocks. |
@@ -633,8 +633,8 @@ signatures without changing their checking or runtime rules.
 
 ### Companion notes: exhaustive supersession checklist
 
-This list identifies the prose rules that become false, beyond mechanical
-changes to examples/signatures. It is not authority to rewrite historical
+This list identifies the prose rules that become false, beyond mechanical changes to
+examples and signatures. It is not authority to rewrite historical
 reports or expected-error fixtures indiscriminately.
 
 | Source region | Sentences/rules to remove or replace |
@@ -765,8 +765,8 @@ values/types/patterns. A zero does not count empty parameter lists as tuples.
 
 | Directory | Parsed files | Edited files | Match | Ordinary pipe | Error slot | V / T / P |
 |---|---:|---:|---:|---:|---:|---|
-| `std/src` | 21 | 21 | 730 | 0 | 216 | 0 / 0 / 0 |
-| `std/test` | 22 | 18 | 104 | 204 | 17 | 1 / 0 / 0 |
+| `i/src` | 21 | 21 | 730 | 0 | 216 | 0 / 0 / 0 |
+| `i/test` | 22 | 18 | 104 | 204 | 17 | 1 / 0 / 0 |
 | `lib` | 14 | 5 | 16 | 0 | 16 | 0 / 0 / 0 |
 | `examples` | 2 | 2 | 3 | 0 | 0 | 0 / 0 / 0 |
 | `bench` | 2 | 2 | 10 | 0 | 0 | 0 / 0 / 0 |
@@ -786,8 +786,8 @@ strings and invalid fixtures. They are not semantic counts:
 
 | Directory | All `.i` files | Old pipe token text | Question-mark text | Empty-parenthesis text |
 |---|---:|---:|---:|---:|
-| `std/src` | 21 | 739 | 259 | 107 |
-| `std/test` | 22 | 315 | 55 | 1,834 |
+| `i/src` | 21 | 739 | 259 | 107 |
+| `i/test` | 22 | 315 | 55 | 1,834 |
 | `lib` | 14 | 16 | 18 | 14 |
 | `examples` | 2 | 3 | 0 | 2 |
 | `bench` | 2 | 10 | 0 | 13 |
@@ -800,11 +800,11 @@ strings and invalid fixtures. They are not semantic counts:
 The relayed “737, of which 732 matches” is reproducible as a **line count**:
 737 lines contain the old pipe token, and 732 lines contain that token followed
 by a clause brace. The other five lines are documentation examples of ordinary
-pipes. `rg -o '\|>' std/src --glob '*.i'` counts occurrences instead and gives
+pipes. `rg -o '\|>' i/src --glob '*.i'` counts occurrences instead and gives
 739, because two comment lines have two pipes each. AST traversal finds 730
 executable matches and zero ordinary pipes. The nine documentation occurrences
-are two matches (`std/src/dict.i:327`, `std/src/list.i:519`) and seven pipes
-(`std/src/dict.i:82,134,353,433`, `std/src/set.i:82`).
+are two matches (`stdlib/src/dict.i:327`, `stdlib/src/list.i:519`) and seven pipes
+(`stdlib/src/dict.i:82,134,353,433`, `stdlib/src/set.i:82`).
 The source file list for executable edits is kept locally in
 `target/syn2/files-to-migrate.txt`; this is a lower bound for a full migration.
 
@@ -819,8 +819,8 @@ record counts or instructions to replace braces automatically.
 
 | Extracted directory/kind | Empty brace-record text | Spread-prefix candidates | Label-colon brace candidates |
 |---|---:|---:|---:|
-| `std/src`, `lib`, `examples`, `bench`, `editors` | 0 | 0 | 0 |
-| `std/test` | 0 | 9 | 1 |
+| `i/src`, `lib`, `examples`, `bench`, `editors` | 0 | 0 | 0 |
+| `i/test` | 0 | 9 | 1 |
 | `crates` whole files | 0 | 0 | 37 |
 | `tests` except review | 0 | 9 | 33 |
 | `tests/review` | 3 | 50 | 207 |
@@ -841,8 +841,8 @@ The ten affected files with real empty tuples are:
 - `fn_vs_tuple.i` (one value).
 - `patterns.i` (one pattern).
 - `types.i` (one type).
-- `std/test/string_test.i` and its review-corpus copy under
-  `tests/review/cases/review-k4s/std/test/string_test.i` (one value each).
+- `stdlib/test/string_test.i` and its review-corpus copy under
+  `tests/review/cases/review-k4s/stdlib/test/string_test.i` (one value each).
 - `tests/spec/11/text_form.i:83` and `tests/spec/6/data.i:42` (one value each).
 - `tests/spec/7/patterns.i:153–154` (one value and one nested pattern).
 

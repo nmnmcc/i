@@ -725,7 +725,7 @@ Ordinary extrusion is insufficient: flexible variables may acquire bounds;
 skolems may not.
 
 The actual restriction is explicit in
-[syn3/lower.rs](../../crates/ilang-syntax/src/syn3/lower.rs), `Cx::fn_type`:
+[syn3/lower.rs](../../crates/ilang-syntax/src/parse.rs), `Cx::fn_type`:
 generics on a function type other than the type of a binding report that
 stage 7 is unavailable. `Cx::chain` similarly rejects generic function
 literals outside a binding value. A binding's outer generics are lifted to
@@ -915,7 +915,7 @@ Directness is syntactic, so no purity inference is needed. `maker()` is not
 generalized even when it returns an identity; a direct alias of its result
 must not quantify the inherited weak variable.
 
-Enforcement: [syn3/lower.rs](../../crates/ilang-syntax/src/syn3/lower.rs)
+Enforcement: [syn3/lower.rs](../../crates/ilang-syntax/src/parse.rs)
 and [resolve.rs](../../crates/ilang-check/src/resolve.rs) retain binding
 directness. [infer.rs](../../crates/ilang-check/src/types/infer.rs),
 `local_binding`, raises the level only for direct values and generalizes
@@ -1254,7 +1254,7 @@ The three conflicts were resolved as follows:
 The solver/inference changes merged automatically. Main's whole-service
 inhabitance check, no universal-entry removal, explicit duplicate-provider
 E0225 behavior, and checker performance changes are retained. No changes
-relative to main remain in `std/`, `lib/`, or `examples/`: all 75 exported
+relative to main remain in `i/`, `lib/`, or `examples/`: all 75 exported
 Fail conversions in `effects-e4.md` and their adapted callers are unchanged.
 The first merged focused `deferred` row-scheme run passes both tests,
 including method-only acceptance and required-field rejection locally and

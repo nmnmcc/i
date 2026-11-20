@@ -218,7 +218,7 @@ Every step leaves the tree green. A step moves whole consumers.
   - `syntax.rs`, `render.rs`, `to_source.rs`, `stdlib/src/syntax.i`,
     `ilang-host`: `Position` of §6.7; `show_as` reads the datum with the new
     reader and prints with the new printer.
-  - `std/src/test.is` and the test macros that look at nodes by hand.
+  - `stdlib/src/test.is` and the test macros that look at nodes by hand.
   - deleted: `lisp/encode.rs`, `encode_charge.rs`, `to_ast.rs`, `from_ast.rs`,
     `unconvert_quote`, `convert_quote` moves to the migrator.
 - 2d. **The engine's tree**: `Parsed.ast` is a `syn3::Module`; `body_walk`,
@@ -572,7 +572,7 @@ No result for it is claimed by this lane's requested-gate checks.
 22:47 checkpoint: the full Rust gate passes 683 tests (four existing
 ignored, the one requested recovery-corpus skip), CLI passes all 144,
 and macro examples pass 13 with the existing skip. Std O0 passes 2170,
-including `std/schema_test.null_round`; this is the baseline before the
+including `i/schema_test.null_round`; this is the baseline before the
 fa2 final-reader switch. Std O2 is queued since 22:36. The wrapper takes
 both memory slots for O2, so no second heavy command is started.
 
@@ -633,7 +633,7 @@ macro and LSP packages pass again; syntax/check package code and dependencies
 are unchanged from their successful targets in the full run. The second
 CLI pass is 144/144 and macro examples pass 13 with the existing skip.
 Std O0 is running without failures. Workspace check passes on the repair;
-remaining std/spec/fmt/clippy gates still precede the conversion commit.
+remaining i/spec/fmt/clippy gates still precede the conversion commit.
 
 00:24 GREEN conversion checkpoint through `31ecae801`: workspace all-target
 check; the syntax/check targets of the full Rust run and repaired full
@@ -706,7 +706,7 @@ with their existing skip. Std O0 now running with final readers enabled;
 spec chapter filters, Rust/source fmt, clippy and std O2 remain. No switch
 commit is claimed until those complete.
 
-01:18: `std/schema_test.null_round` passes with FINAL_AST_READERS=true
+01:18: `i/schema_test.null_round` passes with FINAL_AST_READERS=true
 on the final native snapshot; source and assertion are unchanged. It also
 passed on the committed baseline at both levels. The old fa2 failure is
 not reproduced; no guessed backend change or expectation relaxation is
@@ -781,7 +781,7 @@ earlier no-commit-before-full-green notes are historical.
 
 
 Nov14 05:35 preparation milestone: the unused guarded deletion tools are
-retained under `scripts/syn3-delete-*.py`, with the exact five-case capture
+retained as now-removed `scripts/syn3-delete-*.py` tools, with the exact five-case capture
 helper and an ordered deletion procedure (all since removed). All Python syntax checks
 and the driver dry run pass. No production tree or Rust test is changed by
 this milestone. Preparation fixes the macro dev-dependency boundary, retains

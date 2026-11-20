@@ -631,7 +631,7 @@ This uses the new syntax, so it is committed after A1+A2 land.
 //// runs these with `i test --time` at `--opt 2`. A resume and the next
 //// suspend should take the same time at every depth (docs/performance.md).
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/control
 	i/core
 )
@@ -839,7 +839,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 - `tests/spec/9/control_lazy_env_unwind.i`: the mode 1 and mode 2 path of walk W (lemma Env). The first part:
 
   ```i
-  (testlib = (test) = std/test)
+  (testlib = (test) = i/test)
 
   f = (b, outer) {
     ! Name = Name("in")
@@ -892,7 +892,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 - `tests/spec/9/control_lazy_long_pending.i`: `$shadow_insert` with far more slots than `$shadow` holds (D14). The pending list grows with each re-suspend while `$sp` stays low:
 
   ```i
-  (testlib = (test) = std/test)
+  (testlib = (test) = i/test)
 
   Gen { More(Continuation(Nil, Gen, Never, Never))  End }
 
@@ -944,7 +944,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 - `tests/spec/11/stop_lazy_after_catch.i`: the restore of `d` just before a call in mode 1 (D13, P3). Every other stop case stops in mode 0, and the other cases that call a record in mode 1 or 2 either start with `$sp == d` or check only values. Here the error reaches the trampoline with `$sp = d + 1`:
 
   ```i
-  (testlib = (test) = std/test)
+  (testlib = (test) = i/test)
 
   Paused { Paused(Continuation(Nil, Paused, Never, Never)) }
 

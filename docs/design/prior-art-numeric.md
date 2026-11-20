@@ -519,7 +519,7 @@ Std-3 F1.
 
 The current plain-i library already uses TwoSum, a split-product residual,
 fast endpoint agreement, and outward integer intervals
-(`F:std/src/float.i:1333–1371`, `certify`, `two_sum`, `two_product`;
+(`F:stdlib/src/float.i:1333–1371`, `certify`, `two_sum`, `two_product`;
 :1478–1545, `fast_round`, `fast_reduce`, `fast_sincos`). It is already in the
 same broad certified-fast/accurate-fallback family. The choice is not between
 certification and CORE-MATH: CORE-MATH supplies better studied reductions,
@@ -699,7 +699,7 @@ constraints. FMA/table-dependent proofs must be adapted to those constraints.
 
 1. Keep compiler N0–N3 first on its own track. In the float track, first replace
    repeated pi construction with generated, certified reciprocal-pi/pi bounds
-   and a windowed reducer. Target `F:std/src/float.i:1144–1251` and Std-3 F7.
+   and a windowed reducer. Target `F:stdlib/src/float.i:1144–1251` and Std-3 F7.
    Retain an exact outward error bound and refinement fallback. Do not promise
    every hard input is solved by a fixed table without its proof.
 2. Next trial sin/cos table-assisted small-domain polynomials with i-specific
@@ -801,7 +801,7 @@ existing ownership dependencies.
 | 2 | Scalar locals and known-call workers with generic wrappers | GHC `WorkWrap/Utils.hs`, `mkWwBodies`; wasm_of_ocaml `generate.ml`, signature construction | N1/N2; `ir.rs:113–120,499–508`, `emit/mod.rs:284–295` |
 | 3 | Remove pair construction across helper calls | GHC `CprAnal.hs`, `cprTransformDataConWork` | N3/R5 inlining first; out-of-line result summaries remain a later proposal |
 | 4 | Judge inlining by eliminated work and cap scalar arity | GHC `tryUnfolding`, `finaliseArgBoxities`; OCaml `Benefit.evaluate` | R3; worker selector and general diagnostics |
-| 5 | Replace repeated high-precision pi evaluation with bounded table reduction | CORE-MATH `reduce_large_acc`; Go `trigReduce` | Std-3 F7; `F:std/src/float.i:1144–1251` |
+| 5 | Replace repeated high-precision pi evaluation with bounded table reduction | CORE-MATH `reduce_large_acc`; Go `trigReduce` | Std-3 F7; `F:stdlib/src/float.i:1144–1251` |
 | 6 | Port math proof/data generation with the algorithm | CORE-MATH `cr_sin_moderate`, `computeT`, fpminimax scripts | Std-3 F6–F9; regenerated tables, operation-specific bounds |
 | 7 | Validate every representation edge, including saved locals | OCaml `transl_let`; Flambda2 `make_decisions`; native `scan_stack_frames` | R1/R7; checker facts, control saves and checker |
 | 8 | Optimize small Int regions, keeping exact promotion | GHC `integerAdd`/`integerMul`; Zarith `add`/`ml_z_reduce` | N4/R4; guards and existing big fallback |
@@ -945,7 +945,7 @@ collection folds. No source type or new feature is required.
 
 Attack endpoint equality near zero: i equates ±0, so numeric endpoint equality
 alone is not enough to certify a signed underflow. Existing `fast_round` rejects
-zero endpoints and `certify` compares bits (`F:std/src/float.i:1478–1485,1333–1340`).
+zero endpoints and `certify` compares bits (`F:stdlib/src/float.i:1478–1485,1333–1340`).
 The proposed port keeps those conditions and exact tiny-input shortcuts; test
 sin(-0.0) and the least negative subnormal by bits, not only `==` (F1–F5).
 
@@ -974,7 +974,7 @@ self-review, not independent approval or a proof of a future implementation.
    deferred. Add benefit accounting and an arity budget before product expansion;
    do not require a full demand solver, full CPR, speculative simplifier or
    new heap layout before first gains. Keep the transitive may-suspend ban.
-2. **Should std/float follow CORE-MATH?** Recommend yes, method and checked
+2. **Should i/float follow CORE-MATH?** Recommend yes, method and checked
    data generation, one function at a time. First fix full-range reduction;
    retain the existing certified interval path until each replacement has a
    complete no-FMA proof. Acquire matching proof artifacts before adoption.

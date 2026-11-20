@@ -5,9 +5,9 @@ Source baseline: `68b720e9ebc0d643a3a7831a32a1b97c7ab3c915`.
 
 ## Scope and evidence
 
-This report inventories every module in `stdlib/src/*.i` and `std/src/*.i`.
-That is 22 `i/` modules and 27 `std/` modules. It also includes
-`std/src/test.is`, the Lisp-surface test module. The report changes no code.
+This report inventories every module in `stdlib/src/*.i` and `stdlib/src/*.i`.
+That is 22 `i/` modules and 27 `i/` modules. It also includes
+`stdlib/src/test.is`, the Lisp-surface test module. The report changes no code.
 No build, test, formatter, compiler type query or benchmark was run.
 
 The language authority is `docs/spec.md`. The accepted migration rules are
@@ -43,7 +43,7 @@ some need rows. Those parameters are removed by E3; they must not become a
 second error mechanism. The E3 control types are listed in the migration
 findings below.
 
-For `std/`, types come from the written source heads. Parameter binder names
+For `i/`, types come from the written source heads. Parameter binder names
 are removed. Immediate callback needs are included, as required by spec §9.2
 and syntax-3.md §2.10.3 R2. Returning a deferred function or stream does not
 execute its callback. Source-derived types for unannotated clock/IO adapters
@@ -68,7 +68,7 @@ Transport. It is a source name, not an explicit export.
 
 A test count is the number of literal `test(...)` registrations in the named
 files. It is not an assertion count, generated sample count or passing count.
-The standard test counts include all 31 `.i` files in `std/test/`.
+The standard test counts include all 31 `.i` files in `stdlib/test/`.
 Some tests contain hundreds of cases or property checks. Counts are therefore
 useful for inventory, not a coverage percentage.
 
@@ -127,12 +127,12 @@ unstable even though the package version is stable.
 | Service construction | `effect/packages/effect/src/Context.ts` defines service keys and contexts. `effect/packages/effect/src/Layer.ts` describes acquisition, dependency wiring, scoped release and sharing. | Use labelled service values, ordinary constructor functions and `<-`. Resource sharing and lifetime policy still need implementation, but no second Layer type is required. |
 | Scoped cleanup | `effect/packages/effect/src/Effect.ts` has scoped/acquireRelease, and `effect/packages/effect/src/Scope.ts` registers cleanup for a lifetime boundary. | Current ensure/acquire is only the bracket foundation. E4 resource Scope fills a real missing capability. |
 | Retry, repetition and timing | `effect/packages/effect/src/Schedule.ts` describes stepwise retry/repeat/pacing policies. `effect/packages/effect/src/Effect.ts` exposes retry/repeat/timeout and concurrency options. | There is no equivalent reusable schedule API in these 49 modules. HTTP has a local timeout built with task.race. map_concurrently has no public concurrency bound. |
-| Lazy streams and queues | `effect/packages/effect/src/Stream.ts` covers lifecycle, buffering, timing, errors and consumption. `effect/packages/effect/src/Queue.ts` defines bounded, sliding, dropping and unbounded constructors. | Current std/stream is a sound sequential replayable pull foundation. Buffered queues, bounded stream concurrency and timing policies are missing. Build them through scoped tasks and immutable transitions. |
+| Lazy streams and queues | `effect/packages/effect/src/Stream.ts` covers lifecycle, buffering, timing, errors and consumption. `effect/packages/effect/src/Queue.ts` defines bounded, sliding, dropping and unbounded constructors. | Current i/stream is a sound sequential replayable pull foundation. Buffered queues, bounded stream concurrency and timing policies are missing. Build them through scoped tasks and immutable transitions. |
 | Stateful services | `effect/packages/effect/src/Ref.ts` includes mutable Ref operations; `effect/packages/effect/src/Scope.ts` also has mutable runtime scope state. | Do not copy mutation into i values. Existing task.Ref is an immutable service handle with explicit scheduler effects; document that state protocol. |
-| Schemas | `effect/packages/effect/src/Schema.ts` covers validation, codecs, refinements, transformations, derived test data and representation tooling. | Current JSON-only codecs are a useful subset. They lack native Fail/need-polymorphic transforms and derivation. Derive through i/syntax, not compiler recognition of std/schema. |
+| Schemas | `effect/packages/effect/src/Schema.ts` covers validation, codecs, refinements, transformations, derived test data and representation tooling. | Current JSON-only codecs are a useful subset. They lack native Fail/need-polymorphic transforms and derivation. Derive through i/syntax, not compiler recognition of i/schema. |
 | Deterministic time | `effect/packages/effect/src/testing/TestClock.ts` advances virtual time for sleeps, timeouts and schedules. | Current clock fake only returns ready requests. A reusable controllable Clock provider is a functional gap. |
 | Host services | `effect/packages/effect/src/FileSystem.ts` defines file operations, streams, sinks and watching. `effect/packages/effect/src/http/HttpClient.ts` supplies outgoing HTTP policy. `effect/packages/platform/browser/src/BrowserHttpClient.ts` supplies browser adapters. Each is marked unstable in these files. | Compare capability breadth, without presenting every platform API as a stable model. i/fs and i/http can share ordinary byte operations and service substitution. |
-| List port and error style | `gleam-stdlib/src/gleam/list.gleam` contains group, index_map, prepend, fold and try_fold with the same broad roles and argument order. `gleam-stdlib/src/gleam/int.gleam` and `gleam-stdlib/src/gleam/float.gleam` use Result for parse/divide. | The family resemblance is visible in std/list/int/float. i already has callback needs and Fail, so try_* sequencing and operational Result returns should not be kept merely because the port has them. |
+| List port and error style | `gleam-stdlib/src/gleam/list.gleam` contains group, index_map, prepend, fold and try_fold with the same broad roles and argument order. `gleam-stdlib/src/gleam/int.gleam` and `gleam-stdlib/src/gleam/float.gleam` use Result for parse/divide. | The family resemblance is visible in i/list/int/float. i already has callback needs and Fail, so try_* sequencing and operational Result returns should not be kept merely because the port has them. |
 | Absence | `gleam-stdlib/src/gleam/option.gleam` recommends Result for fallible functions and reserves Option for optional arguments or stored data. | i intentionally differs: list.first/dict.get already return Option. Keep ordinary absence distinct from Fail. Do not import that Gleam style rule unchanged. |
 | Small data helpers | `gleam-stdlib/src/gleam/pair.gleam` and `gleam-stdlib/src/gleam/order.gleam` contain comparable projections, maps and ordering helpers. | Keep useful higher-order adapters, but recognize pair.new/first/second as syntax facades. |
 | Ported convenience surface | `gleam-stdlib/src/gleam/bool.gleam`, `gleam-stdlib/src/gleam/bit_array.gleam`, `gleam-stdlib/src/gleam/dict.gleam`, `gleam-stdlib/src/gleam/set.gleam`, `gleam-stdlib/src/gleam/result.gleam`, `gleam-stdlib/src/gleam/string.gleam`, and `gleam-stdlib/src/gleam/uri.gleam` show the related operation families. | Resemblance is API lineage, not proof of copied implementation. i's hash trie, scalar text and validated URI contracts need their own docs. |
@@ -141,9 +141,9 @@ unstable even though the package version is stable.
 | Small IO contracts | `go/src/io/io.go` defines Reader/Writer/Closer and precise partial-read/write/EOF rules. `go/src/io/fs/fs.go` defines filesystem interfaces and path rules. | i/net and i/tls duplicate a byte-stream record, while fs/stdio lack one common public contract. Copy clarity about short reads, EOF, ownership and cancellation into immutable BitArray APIs. Do not copy mutable buffers. |
 | Cancellation and iteration | `go/src/context/context.go` carries cancellation/deadline state across calls. `go/src/iter/iter.go` defines callback iteration with an early-stop signal. | Needs and structured scopes already carry i's environment/lifetime. fold_until and stream demand already provide stopping. No Go-like context parameter or keyword is needed. |
 | HTTP reuse | `go/src/net/http/client.go` separates Client/Transport and documents reuse, redirects and sensitive headers. | i/http already implements pooling and redirect rules. Tests should preserve those contracts while separating buffering and resource lifetime. |
-| Paths and CSV | `go/src/path/path.go` explicitly handles slash-separated lexical paths. `go/src/encoding/csv/reader.go` specifies whitespace, blank lines, CRLF and byte-based error columns. | std/path fits a pure lexical module. std/csv deliberately uses scalar columns instead; document that difference rather than implying exact Go parity. |
+| Paths and CSV | `go/src/path/path.go` explicitly handles slash-separated lexical paths. `go/src/encoding/csv/reader.go` specifies whitespace, blank lines, CRLF and byte-based error columns. | i/path fits a pure lexical module. i/csv deliberately uses scalar columns instead; document that difference rather than implying exact Go parity. |
 | Time and regex | `go/src/time/time.go` distinguishes wall-time and monotonic uses. `go/src/regexp/regexp.go` documents search and repeated-match variants with byte indices. | Keep i's explicit Instant/Duration and monotonic measurement. i/regex uses scalar offsets and documents a different repeated-search bound. |
-| Timing-sensitive comparison | `go/src/crypto/subtle/constant_time.go` documents content-independent comparison with public length. | std/crypto promises only source-level control flow. A compiled host timing guarantee needs separate evidence; it is not established by ordinary vector tests. |
+| Timing-sensitive comparison | `go/src/crypto/subtle/constant_time.go` documents content-independent comparison with public length. | i/crypto promises only source-level control flow. A compiled host timing guarantee needs separate evidence; it is not established by ordinary vector tests. |
 
 ## Module inventory
 
@@ -202,7 +202,7 @@ from_int : (Int, Int, Bool) -> BitArray
 
 **Language use.** Uses bit syntax, exact Int arithmetic, matching and immutable chunk lists. Two private primitives handle narrow chunks. Keep it pure. It needs neither a task service nor resources. A public checked entry would need defined invalid-width and bounds errors.
 
-**Old style, overlap and thin surface.** The algorithms are real i code. The module comment describes a runtime call hook. std/bit_array owns user codecs; this module owns integer segment representation.
+**Old style, overlap and thin surface.** The algorithms are real i code. The module comment describes a runtime call hook. i/bit_array owns user codecs; this module owns integer segment representation.
 
 **Tests.** No dedicated std tests or importing spec fixtures. The wide_integer_segments_match_their_encoding test in crates/ilang-cli/tests/big_int.rs tests the language path. Direct negative-width and out-of-range read behavior is not specified here.
 
@@ -231,7 +231,7 @@ sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> N
 
 **Old style, overlap and thin surface.** The wrappers translate host Result data into Fail correctly. They add ownership and structured errors, so they are not mere renames. Units are explicit in names; the functions lack item docs.
 
-**Tests.** std/test/clock_test.i has 1 named fake-clock test. Two spec fixtures import the module. examples/io-clock/src/main.i checks real sleep. There is no reusable virtual-clock test API, nor a named fake test for monotonic/unix error mapping.
+**Tests.** stdlib/test/clock_test.i has 1 named fake-clock test. Two spec fixtures import the module. examples/io-clock/src/main.i checks real sleep. There is no reusable virtual-clock test API, nor a named fake test for monotonic/unix error mapping.
 
 **Missing item documentation.** `monotonic_ns`, `unix_ns`, `sleep_ns`.
 
@@ -299,9 +299,9 @@ portable : (A) -> Bool
 
 **Language use.** Uses external declarations and polymorphic values; Result represents raw conversion and search outcomes. Keep the intrinsic boundary small. E4 should define which fallible public operations become Fail; raw ABI result data can remain private.
 
-**Old style, overlap and thin surface.** All 30 explicit value exports are external declarations. Most are justified primitives. std/bool, std/int, std/float, std/string and std/bit_array publish many forwarding wrappers. No explicit type exports appear in this header, although spec §4.3 describes qualified built-in types.
+**Old style, overlap and thin surface.** All 30 explicit value exports are external declarations. Most are justified primitives. i/bool, i/int, i/float, i/string and i/bit_array publish many forwarding wrappers. No explicit type exports appear in this header, although spec §4.3 describes qualified built-in types.
 
-**Tests.** 82 spec fixtures import core. Standard numeric, text and bit-array tests exercise it indirectly. There is no standalone std/core test file; primitive coverage must be read with language operator tests, not inferred from std wrapper counts.
+**Tests.** 82 spec fixtures import core. Standard numeric, text and bit-array tests exercise it indirectly. There is no standalone i/core test file; primitive coverage must be read with language operator tests, not inferred from std wrapper counts.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
@@ -320,9 +320,9 @@ map_error : (() <- (Fail(E), ..N) -> A, (E) <- N -> B) <- (Fail(B), ..N) -> A
 
 **Language use.** Uses Fail, open need rows, matching and Result as caught data. Use the ordinary-service implementation on E3 landing. Add ordinary function combinators only where they add policy; no Effect wrapper or Layer type.
 
-**Old style, overlap and thin surface.** raise and catch are still @external intrinsics in this checkout. i/failure duplicates both in i. from_result and map_error are useful bridges; std/result republishes bridges under other names.
+**Old style, overlap and thin surface.** raise and catch are still @external intrinsics in this checkout. i/failure duplicates both in i. from_result and map_error are useful bridges; i/result republishes bridges under other names.
 
-**Tests.** 54 spec fixtures import i/fail. std/test/list_test.i and std/test/stream_test.i check callback failures. No dedicated std/fail file; the E3 ordinary-service replacement still needs its existing boundary and unwind contracts carried over.
+**Tests.** 54 spec fixtures import i/fail. stdlib/test/list_test.i and stdlib/test/stream_test.i check callback failures. No dedicated i/fail file; the E3 ordinary-service replacement still needs its existing boundary and unwind contracts carried over.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
@@ -368,9 +368,9 @@ close : (Response) <- (Fetch, request.Await, request.Owner) -> Nil
 
 **Language use.** Uses a labelled service, a hidden response handle, owned requests and Fail(String). Use structured fetch errors and attach response cleanup to resource.Scope when E4 lands. A fake service is ordinary provision.
 
-**Old style, overlap and thin surface.** The wrappers do ownership and error translation. Errors remain unstructured strings; headers use a String transport encoding. std/http implements the user-facing HTTP policy.
+**Old style, overlap and thin surface.** The wrappers do ownership and error translation. Errors remain unstructured strings; headers use a String transport encoding. i/http implements the user-facing HTTP policy.
 
-**Tests.** No dedicated std/fetch file or importing spec fixture. HTTP integration is indirect. Browser provider response cancellation, early close and partial reads need explicit adapter contract coverage.
+**Tests.** No dedicated i/fetch file or importing spec fixture. HTTP integration is indirect. Browser provider response cancellation, early close and partial reads need explicit adapter contract coverage.
 
 **Missing item documentation.** `open`, `status`, `headers`, `read`, `close`.
 
@@ -386,7 +386,7 @@ to_string : (Float) -> String
 
 **Language use.** Uses exact integer intervals, tuples, list matching and core float bits. It appropriately uses no service, Fail, macro, task or resource API.
 
-**Old style, overlap and thin surface.** It is a substantial formatter. std/float.to_string reaches it indirectly through core.inspect. Small reverse/append/digit helpers overlap other modules but this implementation cannot recurse through core.inspect.
+**Old style, overlap and thin surface.** It is a substantial formatter. i/float.to_string reaches it indirectly through core.inspect. Small reverse/append/digit helpers overlap other modules but this implementation cannot recurse through core.inspect.
 
 **Tests.** No dedicated std file or importing spec fixture. crates/ilang-cli/tests/float_text.rs declares 4 tests, including an independent reference and many finite values. No claim is made here about performance or passing status.
 
@@ -433,7 +433,7 @@ read_lines : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Li
 
 **Old style, overlap and thin surface.** Host-operation wrappers add ownership and errors. read_chunks recursively buffers and concatenates; read_lines buffers the whole file. Metadata makes two separate host calls for size and kind. Most public operations lack item docs.
 
-**Tests.** examples/io-fs/test/fs_test.i has 1 named test; no importing spec fixture. examples/io-fs/src/main.i checks rename, mkdir, list and metadata. There is no dedicated std/fs suite for cancellation at each acquisition point, streaming reads, or metadata consistency.
+**Tests.** examples/io-fs/test/fs_test.i has 1 named test; no importing spec fixture. examples/io-fs/src/main.i checks rename, mkdir, list and metadata. There is no dedicated i/fs suite for cancellation at each acquisition point, streaming reads, or metadata consistency.
 
 **Missing item documentation.** `open`, `read`, `write`, `flush`, `close`, `remove`, `rename`, `mkdir`, `list`, `metadata`, `temp_dir`, `read_file`, `write_file`, `read_lines`.
 
@@ -453,7 +453,7 @@ Exported functions: none.
 
 **Old style, overlap and thin surface.** Io.print overlaps i/stdio.print but has no typed IO failure or flush contract. Its module comment still describes entry-provider behavior; E5 changes that plan.
 
-**Tests.** No dedicated std/io tests or importing spec fixtures. examples/hello/src/main.i uses Io. crates/ilang-cli/tests/wasi.rs and package_commands.rs contain integration coverage. A common documented choice between Io and Stdio is missing.
+**Tests.** No dedicated i/io tests or importing spec fixtures. examples/hello/src/main.i uses Io. crates/ilang-cli/tests/wasi.rs and package_commands.rs contain integration coverage. A common documented choice between Io and Stdio is missing.
 
 **Documentation.** There are no public lowercase values. The service has module/type documentation.
 
@@ -610,7 +610,7 @@ at_path : (Generator, List(Int)) <- (Fail(RandomError)) -> Generator
 
 **Old style, overlap and thin surface.** This is substantial i code. Invalid bounds/paths already use Fail. Helper names int and float are consistent with constructors in other modules. Its seed/path protocol deserves a stability statement.
 
-**Tests.** 14 spec fixtures import i/random. std/test/property_test.i exercises path-derived generators indirectly. No dedicated std/random file. Statistical quality and cross-version reproducibility are not proven by fixture counts.
+**Tests.** 14 spec fixtures import i/random. stdlib/test/property_test.i exercises path-derived generators indirectly. No dedicated i/random file. Statistical quality and cross-version reproducibility are not proven by fixture counts.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
@@ -663,7 +663,7 @@ poll : () -> Nil
 
 **Old style, overlap and thin surface.** Most wrappers translate typed handles and add ownership. await and await_owned differ in cancellation semantics. Root/Owner count/cancel/wait families repeat structure; private _provider_* entries are E5 migration material.
 
-**Tests.** 29 spec fixtures import i/request. Clock/stdio fake tests use ready, and IO examples use request ownership. No dedicated std/request file. Post-E5 entry lifetimes and complete public state-transition coverage cannot be inferred from those mixed fixtures.
+**Tests.** 29 spec fixtures import i/request. Clock/stdio fake tests use ready, and IO examples use request ownership. No dedicated i/request file. Post-E5 entry lifetimes and complete public state-transition coverage cannot be inferred from those mixed fixtures.
 
 **Missing item documentation.** `open_root`, `close_root`, `open_owner`, `close_owner`, `count`, `count_root`, `settled_owner`, `settled_root`, `cancel_all`, `cancel_all_root`, `wait_none`, `wait_none_root`, `within`, `ticket`, `state`, `take`, `settled`, `cancel`.
 
@@ -682,7 +682,7 @@ acquire : (() <- (Fail(E), ..N) -> A, (A) <- N -> Nil, (A) <- (Fail(E), ..N) -> 
 
 **Old style, overlap and thin surface.** The current bracket is useful but cannot register several independently acquired resources in one surrounding scope. task.Scope(E) is a different concept and is slated for Group in E5.
 
-**Tests.** 50 spec fixtures import i/resource. std/test/stream_test.i includes stream_resource_scope. No dedicated std/resource file. Scope registration order, nested scopes and early-exit lifetime tests cannot exist for the absent E4 API.
+**Tests.** 50 spec fixtures import i/resource. stdlib/test/stream_test.i includes stream_resource_scope. No dedicated i/resource file. Scope registration order, nested scopes and early-exit lifetime tests cannot exist for the absent E4 API.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
@@ -713,7 +713,7 @@ print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner
 
 **Old style, overlap and thin surface.** Wrappers add failure translation. print overlaps Io.print. The _error suffix means standard error, whereas map_error elsewhere means a failure payload. All public functions lack item docs.
 
-**Tests.** std/test/stdio_test.i has 1 fake test for read, print and print_error, including invalid read. flush and flush_error are provided but never called there. Pending cancellation and output-failure mapping are not tested in that named case.
+**Tests.** stdlib/test/stdio_test.i has 1 fake test for read, print and print_error, including invalid read. flush and flush_error are provided but never called there. Pending cancellation and output-failure mapping are not tested in that named case.
 
 **Missing item documentation.** `read`, `write`, `write_error`, `flush`, `flush_error`, `print`, `print_error`.
 
@@ -856,7 +856,7 @@ map_concurrently : (List(A), (A) <- (Fail(E), ..N) -> B) <- (Fail(E), N - reques
 
 **Old style, overlap and thin surface.** This is the largest module, not a thin facade. Public Event is deferred selection data, so it does not itself justify duplicating ordinary function types. Ref/update represent state through a scheduler service; public values remain immutable, but the state semantics need explicit documentation. Most public entries lack item docs.
 
-**Tests.** 77 spec fixtures import i/task. Task fixtures cover structured joins, cancellation, race, events, scheduling, locality and failures. No dedicated std/task file. Bounded map limits, retry schedules and buffered-queue contracts are absent APIs, so they have no public tests.
+**Tests.** 77 spec fixtures import i/task. Task fixtures cover structured joins, cancellation, race, events, scheduling, locality and failures. No dedicated i/task file. Bounded map limits, retry schedules and buffered-queue contracts are absent APIs, so they have no public tests.
 
 **Missing item documentation.** `top`, `run`, `test`, `scope`, `local_scope`, `go`, `join`, `yield`, `path`, `random`, `keep`, `channel`, `local_channel`, `send`, `receive`, `send_event`, `receive_event`, `join_event`, `always`, `never`, `choose`, `map`, `sync`, `share`, `get`, `update`, `both`, `race`, `map_concurrently`.
 
@@ -892,13 +892,13 @@ byte_stream : (Stream) -> (close = () <- (Tls, request.Await, request.Owner) -> 
 
 **Old style, overlap and thin surface.** The options data is a useful native-language feature. byte_stream duplicates net. TLS error strings are split at a colon before becoming labelled errors. accept takes opts but forwards only opts.alpn; roots/cert/key in that argument do not configure the host accept call.
 
-**Tests.** No dedicated std/tls file or importing spec fixture. crates/ilang-cli/tests/tls.rs has 1 test for round trip, ALPN, trust and host-name rejection. Direct shutdown_write, cancellation at handshake completion and all option-field behavior lack isolated named cases there.
+**Tests.** No dedicated i/tls file or importing spec fixture. crates/ilang-cli/tests/tls.rs has 1 test for round trip, ALPN, trust and host-name rejection. Direct shutdown_write, cancellation at handshake completion and all option-field behavior lack isolated named cases there.
 
 **Missing item documentation.** `options`, `identity`, `connect`, `accept`, `dial`, `alpn`, `read`, `write`, `shutdown_write`, `close`, `byte_stream`.
 
-### std/bit_array
+### i/bit_array
 
-Source: `std/src/bit_array.i`. Provides immutable bit-array operations and Base16/Base64 codecs.
+Source: `stdlib/src/bit_array.i`. Provides immutable bit-array operations and Base16/Base64 codecs.
 
 Exported types: none.
 
@@ -927,13 +927,13 @@ base64_url_decode : (String) -> Result(BitArray, Nil)
 
 **Old style, overlap and thin surface.** bit_size, concat, to_string and inspect wrap core; from_string wraps bit syntax. Many codecs and comparison algorithms are real i code. Boolean padding arguments and six codec names need a consistent convention.
 
-**Tests.** 147 named tests: `std/test/bit_array_test.i` (147). All public values are referenced in the dedicated file. It covers invalid encodings, alignment, UTF-8, slicing and round trips. It does not test the planned Fail interface or optional-argument shapes.
+**Tests.** 147 named tests: `stdlib/test/bit_array_test.i` (147). All public values are referenced in the dedicated file. It covers invalid encodings, alignment, UTF-8, slicing and round trips. It does not test the planned Fail interface or optional-argument shapes.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/bool
+### i/bool
 
-Source: `std/src/bool.i`. Provides Boolean algebra, conversions and conditional callback helpers.
+Source: `stdlib/src/bool.i`. Provides Boolean algebra, conversions and conditional callback helpers.
 
 Exported types: none.
 
@@ -956,13 +956,13 @@ lazy_guard : <A, N>( Bool, () <- N -> A, () <- N -> A ) <- N -> A
 
 **Old style, overlap and thin surface.** not only forwards core.not; and/or are eager functions, while language &&/|| short-circuit. xor versus exclusive_nor is inconsistent vocabulary.
 
-**Tests.** 34 named tests: `std/test/bool_test.i` (34). Every exported function appears in the dedicated tests. The source is small; new shape-overloaded lazy/eager forms have no tests because they do not exist.
+**Tests.** 34 named tests: `stdlib/test/bool_test.i` (34). Every exported function appears in the dedicated tests. The source is small; new shape-overloaded lazy/eager forms have no tests because they do not exist.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/calendar
+### i/calendar
 
-Source: `std/src/calendar.i`. Converts and formats validated Gregorian dates, civil times and fixed offsets.
+Source: `stdlib/src/calendar.i`. Converts and formats validated Gregorian dates, civil times and fixed offsets.
 
 Export visibility: `Date`, `TimeOfDay`, `Offset`, `Civil(..)`, `Weekday(..)`, `CalendarError(..)`. Hidden representations below are descriptive only.
 
@@ -1017,15 +1017,15 @@ format_now : () <- (clock.Clock, Fail(clock.ClockError), request.Await, request.
 
 **Language use.** Uses hidden validated Date/TimeOfDay/Offset, labelled Civil and error/weekday unions. now forwards clock needs. Validation and parsing should use Fail under E4. Shape groups could supply zero nanoseconds or UTC defaults. Keep pure calendar arithmetic independent of Clock.
 
-**Old style, overlap and thin surface.** Most APIs lack item docs despite detailed module laws. Parts are positional tuples. Fixed offsets are not time-zone rules. now/format_now duplicate composition of std/time and UTC formatting.
+**Old style, overlap and thin surface.** Most APIs lack item docs despite detailed module laws. Parts are positional tuples. Fixed offsets are not time-zone rules. now/format_now duplicate composition of i/time and UTC formatting.
 
-**Tests.** 5 named tests: `std/test/calendar_test.i` (5). Five named tests contain validation, known dates, broad day laws, boundaries and text cases. clock_test adds now/format_now. No named time-zone/DST tests exist; the module offers fixed offsets only. E4 failure behavior remains untested.
+**Tests.** 5 named tests: `stdlib/test/calendar_test.i` (5). Five named tests contain validation, known dates, broad day laws, boundaries and text cases. clock_test adds now/format_now. No named time-zone/DST tests exist; the module offers fixed offsets only. E4 failure behavior remains untested.
 
 **Missing item documentation.** `date`, `time_of_day`, `offset`, `utc`, `date_parts`, `time_parts`, `offset_minutes`, `is_leap_year`, `days_in_month`, `day_number`, `from_day_number`, `weekday`, `add_days`, `days_between`, `at`, `to_instant`, `parse`, `format`.
 
-### std/cli
+### i/cli
 
-Source: `std/src/cli.i`. Builds composable argument parsers and runs commands with process arguments.
+Source: `stdlib/src/cli.i`. Builds composable argument parsers and runs commands with process arguments.
 
 Export visibility: `Parser`, `Names(..)`, `DefinitionError(..)`, `CliError(..)`. Hidden representations below are descriptive only.
 
@@ -1071,13 +1071,13 @@ integer : (String) -> Result(Int, String)
 
 **Old style, overlap and thin surface.** Pure parsers rebuild a Result pipeline even though ordinary functions can carry failure. read returns Result(CliError) while process errors escape through Fail. run bridges both, prints usage and re-raises. Most functions lack item docs.
 
-**Tests.** 10 named tests: `std/test/cli_test.i` (10). Ten named tests cover parsing, definition checks, token ownership, errors, laws, help and long inputs. read/run have no direct calls in cli_test.i. crates/ilang-cli/tests/cli_log.rs has 2 end-to-end cases through examples/cli-log. Fake argument/stdio failure and effectful validator contracts are not covered as a public parser feature.
+**Tests.** 10 named tests: `stdlib/test/cli_test.i` (10). Ten named tests cover parsing, definition checks, token ownership, errors, laws, help and long inputs. read/run have no direct calls in cli_test.i. crates/ilang-cli/tests/cli_log.rs has 2 end-to-end cases through examples/cli-log. Fake argument/stdio failure and effectful validator contracts are not covered as a public parser feature.
 
 **Missing item documentation.** `pure`, `flag`, `option`, `optional`, `many`, `argument`, `rest`, `map`, `map2`, `parse`, `help`, `text`, `integer`.
 
-### std/crypto
+### i/crypto
 
-Source: `std/src/crypto.i`. Implements SHA-2, HMAC, key derivation, byte comparison and secure random bytes.
+Source: `stdlib/src/crypto.i`. Implements SHA-2, HMAC, key derivation, byte comparison and secure random bytes.
 
 Export visibility: `CryptoError(..)`. Hidden representations below are descriptive only.
 
@@ -1110,13 +1110,13 @@ random_bytes : (Int) <- (process.Entropy, Fail(process.ProcessError), request.Aw
 
 **Old style, overlap and thin surface.** random_bytes exposes two failure styles in one call. HMAC takes key before input; extract takes salt before input; other KDF calls put input first. constant_time_equal documents a source control-flow property, not a host timing guarantee.
 
-**Tests.** 88 named tests: `std/test/crypto_test.i` (88). 88 named tests include vectors and parameter errors. hkdf_expand_sha512 has no direct reference in crypto_test.i, although hkdf_sha512 reaches it. No runtime timing guarantee or complete cross-provider entropy cancellation proof follows from these tests.
+**Tests.** 88 named tests: `stdlib/test/crypto_test.i` (88). 88 named tests include vectors and parameter errors. hkdf_expand_sha512 has no direct reference in crypto_test.i, although hkdf_sha512 reaches it. No runtime timing guarantee or complete cross-provider entropy cancellation proof follows from these tests.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/csv
+### i/csv
 
-Source: `std/src/csv.i`. Parses and prints CSV and lazily decodes chunk streams into rows or records.
+Source: `stdlib/src/csv.i`. Parses and prints CSV and lazily decodes chunk streams into rows or records.
 
 Export visibility: `Options`, `CsvError(..)`. Hidden representations below are descriptive only.
 
@@ -1144,13 +1144,13 @@ decode : <A, E>( schema.Schema(A, E), dict.Dict(String, String) ) -> Result(A, E
 
 **Old style, overlap and thin surface.** The parser is substantial and uses demand carefully. decode takes the codec before the row. Its Result duplicates schema.decode. One place should own this conversion. The module documents positions and line endings well.
 
-**Tests.** 107 named tests: `std/test/csv_test.i` (107). 107 named tests cover strict parsing, width, Unicode, many chunk boundaries, demand and source errors. All exports are referenced. There is no unified Fail(CsvError) pull API or reusable IO-reader integration test yet.
+**Tests.** 107 named tests: `stdlib/test/csv_test.i` (107). 107 named tests cover strict parsing, width, Unicode, many chunk boundaries, demand and source errors. All exports are referenced. There is no unified Fail(CsvError) pull API or reusable IO-reader integration test yet.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/dict
+### i/dict
 
-Source: `std/src/dict.i`. Implements immutable hash-trie dictionaries and transformations.
+Source: `stdlib/src/dict.i`. Implements immutable hash-trie dictionaries and transformations.
 
 Export visibility: `Dict`. Hidden representations below are descriptive only.
 
@@ -1185,15 +1185,15 @@ group : <V, K, N>(List(V), (V) <- N -> K) <- N -> Dict(K, List(V))
 
 **Language use.** Uses hidden nominal Dict, internal unions, equality/hash primitives, Option absence and need-polymorphic callbacks. It already fits immutable i well. More service machinery is unnecessary. Collision equality and iteration order need stable documented contracts.
 
-**Old style, overlap and thin surface.** group is also exported by std/list, which delegates here. Private reverse_onto duplicates list helpers to avoid the dependency cycle. Structural equality can distinguish collision insertion orders, as the module comment states.
+**Old style, overlap and thin surface.** group is also exported by i/list, which delegates here. Private reverse_onto duplicates list helpers to avoid the dependency cycle. Structural equality can distinguish collision insertion orders, as the module comment states.
 
-**Tests.** 97 named tests: `std/test/dict_test.i` (97). 97 named tests reference every export and cover persistence and collisions. They do not establish extensional equality for every collision history; the documented representation exception remains. No E4 error migration is needed for ordinary missing-key Option.
+**Tests.** 97 named tests: `stdlib/test/dict_test.i` (97). 97 named tests reference every export and cover persistence and collisions. They do not establish extensional equality for every collision history; the documented representation exception remains. No E4 error migration is needed for ordinary missing-key Option.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/float
+### i/float
 
-Source: `std/src/float.i`. Parses finite binary64 floats and supplies arithmetic and elementary functions.
+Source: `stdlib/src/float.i`. Parses finite binary64 floats and supplies arithmetic and elementary functions.
 
 Exported types: none.
 
@@ -1248,13 +1248,13 @@ degrees : (Float) -> Result(Float, Nil)
 
 **Old style, overlap and thin surface.** Several functions rename core or operators. to_string delegates to core.inspect. The elementary algorithms are substantial. max_finite/min_positive/pi/tau are values, not functions. The header still says errors are Result.
 
-**Tests.** 337 named tests: `std/test/float_test.i` (337). 337 named tests reference every export, with edge values and property checks. This audit does not establish correctly rounded transcendental functions over all finite inputs. New typed Fail errors have no tests yet.
+**Tests.** 337 named tests: `stdlib/test/float_test.i` (337). 337 named tests reference every export, with edge values and property checks. This audit does not establish correctly rounded transcendental functions over all finite inputs. New typed Fail errors have no tests yet.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/http
+### i/http
 
-Source: `std/src/http.i`. Implements HTTP/1.1 framing, clients, routing and scoped servers.
+Source: `stdlib/src/http.i`. Implements HTTP/1.1 framing, clients, routing and scoped servers.
 
 Export visibility: `Client(..)`, `Transport(..)`, `ResponseStream`, `Method(..)`, `Status(..)`, `Headers(..)`, `Request(..)`, `Response(..)`, `HttpError(..)`, `Progress(..)`, `BodyError(..)`. Hidden representations below are descriptive only.
 
@@ -1332,13 +1332,13 @@ connection : String
 
 **Old style, overlap and thin surface.** native_client.stream calls provider.send first and stores res.body in task.ref: it buffers the entire response. send_stream runs provider.close before returning its reader. Headers is defined both nominally and as a union. ClientFunctions is a named source type returned by public client but is not explicitly exported. Many item docs are missing.
 
-**Tests.** 66 named tests: `std/test/http_network_test.i` (2), `std/test/http_test.i` (64). 64 framing/provider tests plus 2 network tests under std/test. crates/ilang-cli/tests/http.rs adds 11 tests for servers, timeout, DNS, redirect rules, reuse, request streaming and origin separation. Body decoder exports and native/fetch streaming lifetimes lack direct dedicated std calls. Native response demand before full-body completion is not tested by the request-streaming case.
+**Tests.** 66 named tests: `stdlib/test/http_network_test.i` (2), `stdlib/test/http_test.i` (64). 64 framing/provider tests plus 2 network tests under i/test. crates/ilang-cli/tests/http.rs adds 11 tests for servers, timeout, DNS, redirect rules, reuse, request streaming and origin separation. Body decoder exports and native/fetch streaming lifetimes lack direct dedicated std calls. Native response demand before full-body completion is not tested by the request-streaming case.
 
 **Missing item documentation.** `native_client`, `fetch_client`, `send_stream`, `request`, `response`, `feed_request`, `feed_response`, `feed_request_limit`, `header`, `header_bytes`, `headers`, `add_header`, `serialize_request`, `serialize_response`, `reason`, `parse_query`, `build_query`, `get`, `post`, `send`, `client`, `body_text`, `body_json`, `body_decode`, `content_length`, `content_type`, `transfer_encoding`, `host`, `connection`.
 
-### std/int
+### i/int
 
-Source: `std/src/int.i`. Parses arbitrary precision integers and provides checked arithmetic and bit operations.
+Source: `stdlib/src/int.i`. Parses arbitrary precision integers and provides checked arithmetic and bit operations.
 
 Exported types: none.
 
@@ -1386,13 +1386,13 @@ range : <Acc, N>( Int, Int, Acc, (Acc, Int) <- N -> Acc ) <- N -> Acc
 
 **Old style, overlap and thin surface.** to_float and bitwise_* rename core; add/subtract/multiply rename operators. to_string uses inspect. to_base2/8/16/36 are specialized names over to_base; optional radix shapes could reduce API repetition.
 
-**Tests.** 180 named tests: `std/test/int_test.i` (180). 180 named tests reference every export and cover radix, signs, large values and arithmetic errors. They test Result contracts, not the planned Fail API. Range callback row composition is present in source; count is not a proof for every service combination.
+**Tests.** 180 named tests: `stdlib/test/int_test.i` (180). 180 named tests reference every export and cover radix, signs, large values and arithmetic errors. They test Result contracts, not the planned Fail API. Range callback row composition is present in source; count is not a proof for every service combination.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/json
+### i/json
 
-Source: `std/src/json.i`. Parses, prints and inspects an immutable JSON value tree.
+Source: `stdlib/src/json.i`. Parses, prints and inspects an immutable JSON value tree.
 
 Export visibility: `Json(..)`, `JsonError(..)`. Hidden representations below are descriptive only.
 
@@ -1428,13 +1428,13 @@ as_object : (Json) -> Option(List((String, Json)))
 
 **Old style, overlap and thin surface.** The parser is real i code. Json wraps Bool/Int/Float/String even though their built-in types are distinguishable union members. Consider direct scalar members, following the Node migration rule in syntax-3.md §2.8; Array/Object still need distinct tags because both are list-backed. Changing those members also changes whole-sum export syntax. All public functions lack item docs. Json object data is an ordered list of pairs, not Dict, so duplicate/order policy must be explicit.
 
-**Tests.** 78 named tests: `std/test/json_test.i` (78). 78 named tests cover parser/printer cases. as_bool/as_int/as_float/as_string/as_array/as_object have no direct references in json_test.i. Duplicate-field policy and decode-query negative cases need visible API documentation and targeted tests.
+**Tests.** 78 named tests: `stdlib/test/json_test.i` (78). 78 named tests cover parser/printer cases. as_bool/as_int/as_float/as_string/as_array/as_object have no direct references in json_test.i. Duplicate-field policy and decode-query negative cases need visible API documentation and targeted tests.
 
 **Missing item documentation.** `parse`, `print`, `pretty`, `field`, `index`, `as_bool`, `as_int`, `as_float`, `as_string`, `as_array`, `as_object`.
 
-### std/list
+### i/list
 
-Source: `std/src/list.i`. Provides eager immutable list queries, transformations and combinatorics.
+Source: `stdlib/src/list.i`. Provides eager immutable list queries, transformations and combinatorics.
 
 Export visibility: `ContinueOrStop(..)`. Hidden representations below are descriptive only.
 
@@ -1520,13 +1520,13 @@ min : <A, N>(List(A), (A, A) <- N -> Order) <- N -> Option(A)
 
 **Old style, overlap and thin surface.** try_map/try_fold/try_each reimplement short-circuiting for Result callbacks. group forwards dict.group. new/wrap and prepend wrap literal syntax but can help higher-order use. Comments still show ^ E ! N and an obsolete dict literal example.
 
-**Tests.** 269 named tests: `std/test/list_test.i` (269). 269 named tests reference every export. They include million-step tail calls, callback error handling and order-sensitive cases. New consolidated Fail and shape-group APIs are not covered; public count alone does not imply every combinatorial size is stress-tested.
+**Tests.** 269 named tests: `stdlib/test/list_test.i` (269). 269 named tests reference every export. They include million-step tail calls, callback error handling and order-sensitive cases. New consolidated Fail and shape-group APIs are not covered; public count alone does not imply every combinatorial size is stress-tested.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/log
+### i/log
 
-Source: `std/src/log.i`. Delivers structured entries through a call-time Sink service.
+Source: `stdlib/src/log.i`. Delivers structured entries through a call-time Sink service.
 
 Export visibility: `Level(..)`, `Entry(..)`, `Sink`. Hidden representations below are descriptive only.
 
@@ -1561,13 +1561,13 @@ timestamped : (Entry) <- (clock.Clock, Fail(clock.ClockError), request.Await, re
 
 **Old style, overlap and thin surface.** Sink keeps an unused (N)->Nil variance marker. Old header types use ?/! and obsolete labelled declarations. stdout/file/timestamped are useful adapters but have little direct dedicated coverage. Failure is a log level name, not Fail.
 
-**Tests.** 11 named tests: `std/test/log_test.i` (11). 11 named tests cover delivery, laziness, filters, errors, formatting and generic service gates. clock_test covers timestamped; cli_log.rs has 2 integration cases using stderr. stdout and file have no direct log_test.i calls. File-open/write/flush cleanup failures need isolated cases.
+**Tests.** 11 named tests: `stdlib/test/log_test.i` (11). 11 named tests cover delivery, laziness, filters, errors, formatting and generic service gates. clock_test covers timestamped; cli_log.rs has 2 integration cases using stderr. stdout and file have no direct log_test.i calls. File-open/write/flush cleanup failures need isolated cases.
 
 **Missing item documentation.** `make`, `silent`, `filter`, `minimum`, `enabled`, `write`, `lazy`, `format`.
 
-### std/option
+### i/option
 
-Source: `std/src/option.i`. Represents absence and transforms optional values.
+Source: `stdlib/src/option.i`. Represents absence and transforms optional values.
 
 Export visibility: `Option(..)`. Hidden representations below are descriptive only.
 
@@ -1599,15 +1599,15 @@ map2 : <A, B, C, N>( Option(A), Option(B), (A, B) <- N -> C ) <- N -> Option(C)
 
 **Language use.** Uses a one-constructor Some, nullary None, their union and need-polymorphic callbacks. Keep ordinary absence as Option. Failure conversion belongs in one bridge location. Lazy/eager pairs could share shape-selected APIs where types stay clear.
 
-**Old style, overlap and thin surface.** Most operations are useful data operations. to_result/from_result overlap std/result.from_option/to_option. A private reverse duplicates list traversal because imports would cycle. Its header still claims all fallible std calls return Result.
+**Old style, overlap and thin surface.** Most operations are useful data operations. to_result/from_result overlap i/result.from_option/to_option. A private reverse duplicates list traversal because imports would cycle. Its header still claims all fallible std calls return Result.
 
-**Tests.** 40 named tests: `std/test/option_test.i` (40). 40 named tests reference every export and cover None/Some branches and callback behavior. No new failure policy is needed for ordinary optional data. Future unified bridge names have no tests.
+**Tests.** 40 named tests: `stdlib/test/option_test.i` (40). 40 named tests reference every export and cover None/Some branches and callback behavior. No new failure policy is needed for ordinary optional data. Future unified bridge names have no tests.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/order
+### i/order
 
-Source: `std/src/order.i`. Represents comparison results and combines ordering decisions.
+Source: `stdlib/src/order.i`. Represents comparison results and combines ordering decisions.
 
 Export visibility: `Order(..)`. Hidden representations below are descriptive only.
 
@@ -1638,13 +1638,13 @@ is_greater : (Order) -> Bool
 
 **Old style, overlap and thin surface.** The three-way comparison value is useful. max/min/compare on Order are a broad convenience surface. reverse transforms a comparator, while negate transforms an Order; that distinction needs to remain clear.
 
-**Tests.** 30 named tests: `std/test/order_test.i` (30). 30 named tests reference every export. No missing direct export reference was found. Callback-service composition under the future merged lazy API is not tested because that API does not exist.
+**Tests.** 30 named tests: `stdlib/test/order_test.i` (30). 30 named tests reference every export. No missing direct export reference was found. Callback-service composition under the future merged lazy API is not tested because that API does not exist.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/pair
+### i/pair
 
-Source: `std/src/pair.i`. Constructs, reads and maps ordinary two-position data.
+Source: `stdlib/src/pair.i`. Constructs, reads and maps ordinary two-position data.
 
 Exported types: none.
 
@@ -1661,13 +1661,13 @@ map_second : <A, B, C, N>((A, B), (B) <- N -> C) <- N -> (A, C)
 
 **Old style, overlap and thin surface.** new/first/second restate (a,b), .0 and .1. swap/map_first/map_second add composition. The API resembles `gleam-stdlib/src/gleam/pair.gleam`; it already propagates needs rather than imposing purity.
 
-**Tests.** 14 named tests: `std/test/pair_test.i` (14). 14 named tests reference every export. No dedicated missing branch exists for this small total API. The audit does not infer arbitrary callback-service coverage from those examples.
+**Tests.** 14 named tests: `stdlib/test/pair_test.i` (14). 14 named tests reference every export. No dedicated missing branch exists for this small total API. The audit does not infer arbitrary callback-service coverage from those examples.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/path
+### i/path
 
-Source: `std/src/path.i`. Manipulates lexical slash-separated paths without host IO.
+Source: `stdlib/src/path.i`. Manipulates lexical slash-separated paths without host IO.
 
 Export visibility: `RelativeError(..)`. Hidden representations below are descriptive only.
 
@@ -1694,13 +1694,13 @@ relative : (String, String) -> Result(String, RelativeError)
 
 **Old style, overlap and thin surface.** The implementation is substantial and well documented. It overlaps URI path work conceptually but percent escapes, separators and validation have different contracts. join takes all pieces as one List rather than supporting a two-piece shape.
 
-**Tests.** 5 named tests: `std/test/path_test.i` (5). Five named tests include examples, exhaustive small laws and long paths; every export is referenced. Windows drive semantics and filesystem resolution are absent by contract, not missing tests for promised features. The Fail version is not tested.
+**Tests.** 5 named tests: `stdlib/test/path_test.i` (5). Five named tests include examples, exhaustive small laws and long paths; every export is referenced. Windows drive semantics and filesystem resolution are absent by contract, not missing tests for promised features. The Fail version is not tested.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/property
+### i/property
 
-Source: `std/src/property.i`. Generates reproducible values and shrinks failures through immutable lazy trees.
+Source: `stdlib/src/property.i`. Generates reproducible values and shrinks failures through immutable lazy trees.
 
 Export visibility: `Gen`, `Tree(..)`, `Config(..)`, `BuildError(..)`, `Verdict(..)`, `Failure(..)`, `Report(..)`. Hidden representations below are descriptive only.
 
@@ -1755,13 +1755,13 @@ test : <A>( Gen(A), Config, (A) <- (Assert) -> Nil, (A) -> String ) <- (Assert) 
 
 **Old style, overlap and thin surface.** Callbacks are deliberately pure except the Assert adapter. property.Fail(String) shadows the prelude service name within the module and can confuse readers. Reports do not imply globally minimal failures. The source explains replay and budget limits well.
 
-**Tests.** 14 named tests: `std/test/property_test.i` (14). 14 named tests reference all exports and cover laws, paths, budgets, discards and shrink order. std/test/property_failures.py defines a separate subprocess adapter check, not run here. Its embedded Config(42,1,0,0,0) still supplies positional fields to a labelled constructor and needs migration. Concurrent/effectful property protocols and schema derivation are absent APIs.
+**Tests.** 14 named tests: `stdlib/test/property_test.i` (14). 14 named tests reference all exports and cover laws, paths, budgets, discards and shrink order. stdlib/test/property_failures.py defines a separate subprocess adapter check, not run here. Its embedded Config(42,1,0,0,0) still supplies positional fields to a labelled constructor and needs migration. Concurrent/effectful property protocols and schema derivation are absent APIs.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/regex
+### i/regex
 
-Source: `std/src/regex.i`. Compiles Unicode-scalar regular expressions to immutable NFA programs and searches text.
+Source: `stdlib/src/regex.i`. Compiles Unicode-scalar regular expressions to immutable NFA programs and searches text.
 
 Export visibility: `Regex`, `RegexError(..)`, `Match(..)`, `Captures`. Hidden representations below are descriptive only.
 
@@ -1791,13 +1791,13 @@ split : (Regex, String) -> List(String)
 
 **Old style, overlap and thin surface.** This is a substantial engine with Unicode tables. Pattern object comes before input, unlike the common data-first transforms. Repeated full searches have a documented O(m*n^2) worst case; do not transfer a single-search bound to every iterator.
 
-**Tests.** 130 named tests: `std/test/regex_test.i` (130). 130 named tests reference all exports and cover Unicode, captures, flags, zero-width results and invalid syntax. Exhaustive Unicode and all adversarial program/input sizes are not proven. A new Fail compile contract remains untested.
+**Tests.** 130 named tests: `stdlib/test/regex_test.i` (130). 130 named tests reference all exports and cover Unicode, captures, flags, zero-width results and invalid syntax. Exhaustive Unicode and all adversarial program/input sizes are not proven. A new Fail compile contract remains untested.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/result
+### i/result
 
-Source: `std/src/result.i`. Transforms explicit success/error data and bridges caught computations.
+Source: `stdlib/src/result.i`. Transforms explicit success/error data and bridges caught computations.
 
 Exported types: none.
 
@@ -1830,13 +1830,13 @@ catch : <A, E, N>(() <- (Fail(E), ..N) -> A) <- N -> Result(A, E)
 
 **Old style, overlap and thin surface.** catch forwards fail.catch and to_error forwards fail.from_result. from_option/to_option duplicate option conversions. then/recover are meaningful for stored results but should not become the default computation sequencing protocol.
 
-**Tests.** 55 named tests: `std/test/result_test.i` (55). 55 named tests. unwrap_both has no direct reference in result_test.i. Ordinary result values and lazy branches are covered; a consolidated canonical failure bridge API is not present yet.
+**Tests.** 55 named tests: `stdlib/test/result_test.i` (55). 55 named tests. unwrap_both has no direct reference in result_test.i. Ordinary result values and lazy branches are covered; a consolidated canonical failure bridge API is not present yet.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/schema
+### i/schema
 
-Source: `std/src/schema.i`. Builds two-way JSON codecs for validated application data.
+Source: `stdlib/src/schema.i`. Builds two-way JSON codecs for validated application data.
 
 Export visibility: `Schema(..)`, `SchemaError(..)`, `Path(..)`, `ParseError(..)`. Hidden representations below are descriptive only.
 
@@ -1885,13 +1885,13 @@ lazy : <A>(() -> Schema(A, SchemaError)) -> Schema(A, SchemaError)
 
 **Old style, overlap and thin surface.** optional aliases nullable exactly, despite different missing-field meanings implied by the names; optional_field is separate. transform aliases map. Schema and first-argument codecs make piping decoded data awkward. All 25 public values lack item docs.
 
-**Tests.** 52 named tests: `std/test/schema_test.i` (52). 52 named tests reference all exports, including recursive codecs, tagged cases, paths and literal types. They do not cover effectful codec needs or macro derivation, which are absent. The Result-to-Fail migration needs caller and test updates.
+**Tests.** 52 named tests: `stdlib/test/schema_test.i` (52). 52 named tests reference all exports, including recursive codecs, tagged cases, paths and literal types. They do not cover effectful codec needs or macro derivation, which are absent. The Result-to-Fail migration needs caller and test updates.
 
 **Missing item documentation.** `decode`, `encode`, `parse`, `print`, `int`, `float`, `string`, `bool`, `null`, `literal_string`, `literal_int`, `optional`, `nullable`, `list`, `dict`, `tuple`, `object`, `field`, `optional_field`, `union`, `tagged_union`, `map`, `transform`, `refine`, `lazy`.
 
-### std/sequence
+### i/sequence
 
-Source: `std/src/sequence.i`. Provides persistent indexed deques using measured finger trees.
+Source: `stdlib/src/sequence.i`. Provides persistent indexed deques using measured finger trees.
 
 Export visibility: `Sequence`. Hidden representations below are descriptive only.
 
@@ -1929,13 +1929,13 @@ equal : <A>(Sequence(A), Sequence(A)) -> Bool
 
 **Old style, overlap and thin surface.** This is substantial i code, with documented worst-case bounds. equal is elementwise, while ordinary ==/hash/inspect observe the private tree shape. This can surprise Dict/Set users; conversion to List is the documented key workaround.
 
-**Tests.** 8 named tests: `std/test/sequence_test.i` (8). Eight named tests reference all exports and include small exhaustive cases, persistent models, large boundaries, callback rows and independent histories. They do not turn ordinary == into extensional sequence equality; that is an API design gap, not a missing passing assertion.
+**Tests.** 8 named tests: `stdlib/test/sequence_test.i` (8). Eight named tests reference all exports and include small exhaustive cases, persistent models, large boundaries, callback rows and independent histories. They do not turn ordinary == into extensional sequence equality; that is an API design gap, not a missing passing assertion.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/set
+### i/set
 
-Source: `std/src/set.i`. Implements immutable mathematical set operations over Dict keys.
+Source: `stdlib/src/set.i`. Implements immutable mathematical set operations over Dict keys.
 
 Export visibility: `Set`. Hidden representations below are descriptive only.
 
@@ -1970,13 +1970,13 @@ is_disjoint : <A>(Set(A), Set(A)) -> Bool
 
 **Old style, overlap and thin surface.** Dict collision-order equality can leak through the Set representation. contains uses a different membership verb from dict.has. new/from_list and algebraic operations are appropriate domain functions.
 
-**Tests.** 31 named tests: `std/test/set_test.i` (31). 31 named tests reference every export and cover algebraic cases. Collision-history extensional equality is not guaranteed by the underlying representation. Future equality policy needs explicit tests across independently built sets.
+**Tests.** 31 named tests: `stdlib/test/set_test.i` (31). 31 named tests reference every export and cover algebraic cases. Collision-history extensional equality is not guaranteed by the underlying representation. Future equality policy needs explicit tests across independently built sets.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/stream
+### i/stream
 
-Source: `std/src/stream.i`. Represents replayable lazy sequences whose pull functions can need services and fail.
+Source: `stdlib/src/stream.i`. Represents replayable lazy sequences whose pull functions can need services and fail.
 
 Export visibility: `Stream`, `Step(..)`. Hidden representations below are descriptive only.
 
@@ -2019,13 +2019,13 @@ map_environment : <A, E, N, M>( Stream(A, E, N), (() <- (Fail(E), ..N) -> Step(A
 
 **Old style, overlap and thin surface.** The phantom (N)->Nil marker forces invariant N. map_environment is a stream-specific callback runner; ordinary <- already provides services. There is no public file/socket source, buffer, merge or timeout. Core sequential transforms are substantial and demand-aware.
 
-**Tests.** 13 named tests: `std/test/stream_test.i` (13). 13 named tests reference all exports and cover algebraic laws, demand, replay, call-time services, error positions, callback order, resource scope and factories. Buffered, concurrent and scheduled sources have no public tests because the APIs do not exist.
+**Tests.** 13 named tests: `stdlib/test/stream_test.i` (13). 13 named tests reference all exports and cover algebraic laws, demand, replay, call-time services, error positions, callback order, resource scope and factories. Buffered, concurrent and scheduled sources have no public tests because the APIs do not exist.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/string
+### i/string
 
-Source: `std/src/string.i`. Provides Unicode-scalar text operations and conversions.
+Source: `stdlib/src/string.i`. Provides Unicode-scalar text operations and conversions.
 
 Exported types: none.
 
@@ -2087,15 +2087,15 @@ fold : <A, N>(String, A, (A, UtfCodepoint) <- N -> A) <- N -> A
 
 **Language use.** Uses core UTF-8 primitives, list matching, Option absence and need-polymorphic callbacks; split_when explicitly propagates Fail. E4 should use Fail for invalid scalar construction. Services are otherwise needed only by callbacks. Shape groups could reduce default/search and replacement variants.
 
-**Old style, overlap and thin surface.** byte_size, concat, to_upper/to_lower, inspect and codepoint conversion wrap core. inspect is polymorphic over every value despite living in string. Core index_of uses byte offsets; std/string.index_of uses scalar offsets. These are overlapping names with different units.
+**Old style, overlap and thin surface.** byte_size, concat, to_upper/to_lower, inspect and codepoint conversion wrap core. inspect is polymorphic over every value despite living in string. Core index_of uses byte offsets; i/string.index_of uses scalar offsets. These are overlapping names with different units.
 
-**Tests.** 333 named tests: `std/test/string_additions_test.i` (5), `std/test/string_test.i` (328). 328 named tests plus 5 additions tests. is_empty has no direct reference in those files. Many Unicode and long-input cases exist. This is scalar text, not a promise of grapheme segmentation or normalization; those APIs and their tests are absent.
+**Tests.** 333 named tests: `stdlib/test/string_additions_test.i` (5), `stdlib/test/string_test.i` (328). 328 named tests plus 5 additions tests. is_empty has no direct reference in those files. Many Unicode and long-input cases exist. This is scalar text, not a promise of grapheme segmentation or normalization; those APIs and their tests are absent.
 
 **Documentation.** All explicit public lowercase values have attached item docs. Constructor and module-level contract gaps are described above.
 
-### std/time
+### i/time
 
-Source: `std/src/time.i`. Represents exact durations and Unix instants and supplies clock adapters.
+Source: `stdlib/src/time.i`. Represents exact durations and Unix instants and supplies clock adapters.
 
 Export visibility: `Duration`, `Instant`, `TimeError(..)`. Hidden representations below are descriptive only.
 
@@ -2134,13 +2134,13 @@ measure : <A, E, N>(() <- (Fail(E), ..N) -> A) <- (clock.Clock, Fail(E | clock.C
 
 **Old style, overlap and thin surface.** The nominal distinction prevents adding two instants. Unit constructors are useful, not intrinsic renames. Pure APIs have uneven item docs. measure uses monotonic time; now uses wall time.
 
-**Tests.** 4 named tests: `std/test/time_test.i` (4). Four named tests cover units, arithmetic, instants and huge counts. clock_test.i adds observation/sleep/measure. No reusable controllable clock or schedule policy exists; multi-step virtual-time ordering and timeout policies therefore lack library-level tests.
+**Tests.** 4 named tests: `stdlib/test/time_test.i` (4). Four named tests cover units, arithmetic, instants and huge counts. clock_test.i adds observation/sleep/measure. No reusable controllable clock or schedule policy exists; multi-step virtual-time ordering and timeout policies therefore lack library-level tests.
 
 **Missing item documentation.** `add`, `subtract`, `scale`, `compare`, `unix_nanoseconds`, `shift`, `compare_instants`.
 
-### std/uri
+### i/uri
 
-Source: `std/src/uri.i`. Parses, validates, resolves and encodes URI references and query forms.
+Source: `stdlib/src/uri.i`. Parses, validates, resolves and encodes URI references and query forms.
 
 Export visibility: `Uri`, `Parts(..)`, `Authority(..)`, `Host(..)`, `UriPart(..)`, `UriProblem(..)`, `UriError(..)`, `CodecError(..)`. Hidden representations below are descriptive only.
 
@@ -2199,13 +2199,13 @@ build_query : (List((String, String))) -> String
 
 **Old style, overlap and thin surface.** HTTP republishes parse_query/build_query. Internal parsers catch Fail back into Result. Offsets are documented as bytes; regex/string use scalars. has_scheme and encode_bytes lack item docs. The implementation is substantially stricter than a string-splitting facade.
 
-**Tests.** 10 named tests: `std/test/uri_test.i` (10). Ten named tests reference all exports and include errors, resolution and long inputs. They test the Result surface. Browser URL policy, DNS validity, arbitrary schemes and port-range policy are explicitly outside URI syntax validation.
+**Tests.** 10 named tests: `stdlib/test/uri_test.i` (10). Ten named tests reference all exports and include errors, resolution and long inputs. They test the Result surface. Browser URL policy, DNS validity, arbitrary schemes and port-range policy are explicitly outside URI syntax validation.
 
 **Missing item documentation.** `has_scheme`, `encode_bytes`.
 
-### std/test (Lisp surface)
+### i/test (Lisp surface)
 
-Source: `std/src/test.is`. It registers tests by expanding syntax into items.
+Source: `stdlib/src/test.is`. It registers tests by expanding syntax into items.
 This module is included even though the requested glob is `.i`.
 
 Exported types: none. `tests : Nil` is the item-group anchor.
@@ -2236,7 +2236,7 @@ Its error text still says “environment statements”. New `<-` provides should
 be part of the macro contract. This file has no module or per-item docs.
 The implementation also has private append and syntax-list walkers.
 
-**Tests.** There is no `std/test/test_test.i`. The 31 standard test files use
+**Tests.** There is no `stdlib/test/test_test.i`. The 31 standard test files use
 test registration. `examples/macro-tests/test/examples.i` contains 3 named
 tests and `examples/tour/test/sugar_test.i` exercises test sugar.
 Macro and generated-test Rust suites add integration coverage.
@@ -2290,12 +2290,12 @@ rule explicit.
 |---|---|
 | `stdlib/src/task.i` | Runner and Scheduler are each first declared as labelled data and later redeclared as unions containing the same name. |
 | `stdlib/src/process.i` | Directory is first `(String)` and later `InheritDirectory \| Directory`. |
-| `std/src/http.i` | Headers is first `(List((String,String)))` and later `Headers \| RawHeaders`. Public client returns source alias ClientFunctions, absent from its export list. |
+| `stdlib/src/http.i` | Headers is first `(List((String,String)))` and later `Headers \| RawHeaders`. Public client returns source alias ClientFunctions, absent from its export list. |
 | `stdlib/src/syntax.i` | Int/Float wrapper constructors and the old Node/Position definitions remain, against syntax-3.md §§2.8 and 6.8. |
 | `stdlib/src/fail.i` | Intrinsic error entry points and ordinary-service entry points coexist. E3 is the stated consolidation point. |
-| `stdlib/src/assertion.i`, `std/src/list.i`, `std/src/log.i`, `std/src/test.is` | Old ^/!/?, old type declarations or quoted environment statements survive in comments/macros. Comments can mislead even where executable source has moved. |
-| `std/test/property_failures.py` | The embedded probe uses positional `property.Config(42,1,0,0,0)` although Config has labelled fields. This probe needs the same syntax migration as ordinary .i tests. |
-| `std/test/std3_interfaces.py` | This script compares 35 property/string type strings against `docs/design/std-3.md`. It is not an all-std public-interface snapshot, and its expected strings need review when E4 changes APIs. |
+| `stdlib/src/assertion.i`, `stdlib/src/list.i`, `stdlib/src/log.i`, `stdlib/src/test.is` | Old ^/!/?, old type declarations or quoted environment statements survive in comments/macros. Comments can mislead even where executable source has moved. |
+| `stdlib/test/property_failures.py` | The embedded probe uses positional `property.Config(42,1,0,0,0)` although Config has labelled fields. This probe needs the same syntax migration as ordinary .i tests. |
+| `stdlib/test/std3_interfaces.py` | This script compares 35 property/string type strings against `docs/design/std-3.md`. It is not an all-std public-interface snapshot, and its expected strings need review when E4 changes APIs. |
 | `stdlib/src/big.i`, `stdlib/src/bits.i`, `stdlib/src/float_text.i` | Comments state runtime call hooks for library algorithms. Distinguish a necessary primitive ABI from compiler recognition of library names; the owner forbids library privilege. This audit does not change those hooks. |
 
 Some hidden exported type representations also mention private implementation
@@ -2346,34 +2346,34 @@ requirement that every pure module use every feature.
 | `i/syntax` | S | Y | - | - | - | Y | 1/U/O | API | - | - |
 | `i/task` | S/N | Y | Y | Y | - | Y | 1/U | - | Y | Y |
 | `i/tls` | S | Y | Y | - | - | Y | 1 | - | - | Y |
-| `std/bit_array` | - | - | Y | - | - | - | - | - | - | - |
-| `std/bool` | N | - | - | - | - | - | - | - | - | - |
-| `std/calendar` | I | Y | Y | - | - | Y | 1/U | - | - | I |
-| `std/cli` | N | Y | Y | - | - | Y | 1/U | - | - | I |
-| `std/crypto` | I | I | Y | - | - | - | 1/U | - | - | I |
-| `std/csv` | N | Y | Y | - | - | Y | 1 | - | - | - |
-| `std/dict` | N | - | - | - | - | - | 1/U | - | - | - |
-| `std/float` | - | - | Y | - | - | - | - | - | - | - |
-| `std/http` | S/N | Y | Y | Y | - | Y | 1/U | - | Y | Y |
-| `std/int` | N | - | Y | - | - | - | - | - | - | - |
-| `std/json` | - | Y | Y | - | - | Y | 1/U | - | - | - |
-| `std/list` | N | I | Y | - | - | - | 1/U | - | - | - |
-| `std/log` | S/N | Y | - | - | - | Y | 1/U | - | - | Y |
-| `std/option` | N | - | Y | - | - | - | 1/U | - | - | - |
-| `std/order` | N | - | - | - | - | - | 1/U | - | - | - |
-| `std/pair` | N | - | - | - | - | - | - | - | - | - |
-| `std/path` | - | - | Y | - | - | - | 1/U | - | - | - |
-| `std/property` | S | Y | Y | - | - | Y | 1/U | - | - | I |
-| `std/regex` | - | Y | Y | - | - | Y | 1/U | - | - | - |
-| `std/result` | N | Y | Y | - | - | - | - | - | - | - |
-| `std/schema` | - | - | Y | - | - | Y | 1/U | - | - | - |
-| `std/sequence` | N | I | - | - | - | - | 1/U | - | - | - |
-| `std/set` | N | - | - | - | - | - | 1 | - | - | - |
-| `std/stream` | N | Y | Y | - | - | - | 1/U | - | - | - |
-| `std/string` | N | Y | Y | - | - | - | - | - | - | - |
-| `std/time` | I | I | Y | - | - | - | 1 | - | - | I |
-| `std/uri` | - | Y | Y | - | - | Y | 1/U | - | - | - |
-| `std/test` | S | I | - | - | - | - | - | Y | - | - |
+| `i/bit_array` | - | - | Y | - | - | - | - | - | - | - |
+| `i/bool` | N | - | - | - | - | - | - | - | - | - |
+| `i/calendar` | I | Y | Y | - | - | Y | 1/U | - | - | I |
+| `i/cli` | N | Y | Y | - | - | Y | 1/U | - | - | I |
+| `i/crypto` | I | I | Y | - | - | - | 1/U | - | - | I |
+| `i/csv` | N | Y | Y | - | - | Y | 1 | - | - | - |
+| `i/dict` | N | - | - | - | - | - | 1/U | - | - | - |
+| `i/float` | - | - | Y | - | - | - | - | - | - | - |
+| `i/http` | S/N | Y | Y | Y | - | Y | 1/U | - | Y | Y |
+| `i/int` | N | - | Y | - | - | - | - | - | - | - |
+| `i/json` | - | Y | Y | - | - | Y | 1/U | - | - | - |
+| `i/list` | N | I | Y | - | - | - | 1/U | - | - | - |
+| `i/log` | S/N | Y | - | - | - | Y | 1/U | - | - | Y |
+| `i/option` | N | - | Y | - | - | - | 1/U | - | - | - |
+| `i/order` | N | - | - | - | - | - | 1/U | - | - | - |
+| `i/pair` | N | - | - | - | - | - | - | - | - | - |
+| `i/path` | - | - | Y | - | - | - | 1/U | - | - | - |
+| `i/property` | S | Y | Y | - | - | Y | 1/U | - | - | I |
+| `i/regex` | - | Y | Y | - | - | Y | 1/U | - | - | - |
+| `i/result` | N | Y | Y | - | - | - | - | - | - | - |
+| `i/schema` | - | - | Y | - | - | Y | 1/U | - | - | - |
+| `i/sequence` | N | I | - | - | - | - | 1/U | - | - | - |
+| `i/set` | N | - | - | - | - | - | 1 | - | - | - |
+| `i/stream` | N | Y | Y | - | - | - | 1/U | - | - | - |
+| `i/string` | N | Y | Y | - | - | - | - | - | - | - |
+| `i/time` | I | I | Y | - | - | - | 1 | - | - | I |
+| `i/uri` | - | Y | Y | - | - | Y | 1/U | - | - | - |
+| `i/test` | S | I | - | - | - | - | - | Y | - | - |
 
 A Fail entry in a callback type is real use of the native need mechanism,
 although the module may not itself raise. Likewise, deferred stream errors
@@ -2385,31 +2385,31 @@ public contract rather than an explicit service binder.
 | Modules / names | Nature of overlap | One-place direction |
 |---|---|---|
 | i/fail.raise/catch; i/failure.raise/catch | Two public implementations of failure entry points. | Consolidate at E3 into ordinary-service i/fail. |
-| i/fail.catch; std/result.catch | Exact forwarding facade. | One canonical catch; document compatibility separately. |
-| i/fail.from_result; std/result.to_error | Same active failure bridge under different names. | One bridge with an action-revealing name. |
-| std/option.to_result; std/result.from_option | Same conversion implementation. | Choose one canonical conversion home. |
-| std/option.from_result; std/result.to_option | Same conversion implementation. | Choose one canonical conversion home. |
-| std/list.group; std/dict.group | list.group forwards to dict.group. | Keep the algorithm in one place and decide whether an alias earns its public cost. |
-| i/core.not; std/bool.not | One-call intrinsic wrapper. | Separate primitive ABI from discoverable public facade explicitly. |
-| i/core.to_float/bit_* /shift_*; std/int.to_float/bitwise_* | Same primitive operations, longer public names. | One documented public vocabulary; avoid independent contracts. |
-| i/core.ceiling/floor/truncate; std/float.ceiling/floor/truncate | One-call primitive wrappers. | Same judgement as numeric facades. |
-| i/core.concat/byte_size/to_upper/to_lower/from_codepoints/codepoint_to_int; std/string equivalents | Mostly direct forwarding. | Keep policy such as units in the public layer; avoid duplicate implementations. |
-| i/core.inspect; std/string.inspect, std/bit_array.inspect, std/int.to_string, std/float.to_string | Several text-formatting doors; string.inspect accepts any type. | Put generic inspection in one clear home. Specialized formatting may remain discoverable aliases. |
-| i/float_text.to_string; core.inspect(Float); std/float.to_string | One algorithm reached through several API layers. | Preserve the single formatter; document the layering and runtime coupling. |
-| i/core.bit_size/bit_array_concat/bit_array_to_string; std/bit_array.bit_size/concat/to_string | Direct primitive facades. | Do not mistake codec algorithms for these wrappers. |
-| std/int/float add/subtract/multiply; std/bool and/or; pair.new/first/second; list.new/wrap/prepend | Restate syntax, operators or field reads. | Keep only where higher-order use or discoverability justifies it. Boolean evaluation differs from short-circuit operators. |
-| std/list map/fold/each versus try_map/try_fold/try_each | Two sequencing protocols, despite ordinary callback Fail support. | Prefer native needs; keep Result collection as explicit data handling. |
-| std/schema.optional/nullable; transform/map | Literal aliases, with optional/nullable suggesting different meanings. | One name per operation; preserve missing-field semantics in optional_field. |
-| std/http.parse_query/build_query; std/uri.parse_query/build_query | Exact public query-codec forwarding. | URI/query codec home, used by HTTP. |
-| std/csv.decode; std/schema.decode plus row-to-JSON conversion | Overlapping codec dispatch with codec-first order. | Define the row representation adapter once. |
+| i/fail.catch; i/result.catch | Exact forwarding facade. | One canonical catch; document compatibility separately. |
+| i/fail.from_result; i/result.to_error | Same active failure bridge under different names. | One bridge with an action-revealing name. |
+| i/option.to_result; i/result.from_option | Same conversion implementation. | Choose one canonical conversion home. |
+| i/option.from_result; i/result.to_option | Same conversion implementation. | Choose one canonical conversion home. |
+| i/list.group; i/dict.group | list.group forwards to dict.group. | Keep the algorithm in one place and decide whether an alias earns its public cost. |
+| i/core.not; i/bool.not | One-call intrinsic wrapper. | Separate primitive ABI from discoverable public facade explicitly. |
+| i/core.to_float/bit_* /shift_*; i/int.to_float/bitwise_* | Same primitive operations, longer public names. | One documented public vocabulary; avoid independent contracts. |
+| i/core.ceiling/floor/truncate; i/float.ceiling/floor/truncate | One-call primitive wrappers. | Same judgement as numeric facades. |
+| i/core.concat/byte_size/to_upper/to_lower/from_codepoints/codepoint_to_int; i/string equivalents | Mostly direct forwarding. | Keep policy such as units in the public layer; avoid duplicate implementations. |
+| i/core.inspect; i/string.inspect, i/bit_array.inspect, i/int.to_string, i/float.to_string | Several text-formatting doors; string.inspect accepts any type. | Put generic inspection in one clear home. Specialized formatting may remain discoverable aliases. |
+| i/float_text.to_string; core.inspect(Float); i/float.to_string | One algorithm reached through several API layers. | Preserve the single formatter; document the layering and runtime coupling. |
+| i/core.bit_size/bit_array_concat/bit_array_to_string; i/bit_array.bit_size/concat/to_string | Direct primitive facades. | Do not mistake codec algorithms for these wrappers. |
+| i/int/float add/subtract/multiply; i/bool and/or; pair.new/first/second; list.new/wrap/prepend | Restate syntax, operators or field reads. | Keep only where higher-order use or discoverability justifies it. Boolean evaluation differs from short-circuit operators. |
+| i/list map/fold/each versus try_map/try_fold/try_each | Two sequencing protocols, despite ordinary callback Fail support. | Prefer native needs; keep Result collection as explicit data handling. |
+| i/schema.optional/nullable; transform/map | Literal aliases, with optional/nullable suggesting different meanings. | One name per operation; preserve missing-field semantics in optional_field. |
+| i/http.parse_query/build_query; i/uri.parse_query/build_query | Exact public query-codec forwarding. | URI/query codec home, used by HTTP. |
+| i/csv.decode; i/schema.decode plus row-to-JSON conversion | Overlapping codec dispatch with codec-first order. | Define the row representation adapter once. |
 | i/net.byte_stream; i/tls.byte_stream; HTTP private transport adapters | Similar closed data for read/write/close, with differing error/lifetime contracts. | One ordinary immutable byte-operation contract; adapters translate errors once. |
 | i/io.Io.print; i/stdio.print | Both print text with LF, but failure and host contracts differ. | Document or consolidate the compatibility boundary. |
-| i/clock sleep_ns/unix_ns; std/time.sleep/now; std/calendar.now/format_now | Raw versus domain-typed clock operations. | Useful layering, not duplicate algorithms. Keep one clock service and explicit units. |
-| std/list, std/sequence, std/stream | Eager linked lists, persistent indexed deques and lazy effectful pulls. | Keep distinct semantics and shared naming; these are not interchangeable duplicate containers. |
-| std/dict, std/set | Set is Dict(A,Nil) with set semantics. | Useful abstraction; no independent hashing implementation. |
-| Private list reversals in i/bits, i/float_text, i/task, i/syntax, std/option, std/result, std/dict | Repeated elementary traversal, often to avoid lib→std dependency or std import cycles. | Audit dependency direction before deduplicating. The foundation cannot import std/list. |
-| std/path splitting; std/uri path normalization; std/http route splitting | Similar text operations with different escaping/validation semantics. | Share only primitives whose units and escaping rules match. |
-| std/stream.map_environment; control.keep_env; task.keep | All adapt deferred environments but have different lifetime/return contracts. | Use ordinary provision as the base; preserve stream-tail rebuilding and scheduler ownership where required. |
+| i/clock sleep_ns/unix_ns; i/time.sleep/now; i/calendar.now/format_now | Raw versus domain-typed clock operations. | Useful layering, not duplicate algorithms. Keep one clock service and explicit units. |
+| i/list, i/sequence, i/stream | Eager linked lists, persistent indexed deques and lazy effectful pulls. | Keep distinct semantics and shared naming; these are not interchangeable duplicate containers. |
+| i/dict, i/set | Set is Dict(A,Nil) with set semantics. | Useful abstraction; no independent hashing implementation. |
+| Private list reversals in i/bits, i/float_text, i/task, i/syntax, i/option, i/result, i/dict | Repeated elementary traversal, often to avoid lib→std dependency or std import cycles. | Audit dependency direction before deduplicating. The foundation cannot import i/list. |
+| i/path splitting; i/uri path normalization; i/http route splitting | Similar text operations with different escaping/validation semantics. | Share only primitives whose units and escaping rules match. |
+| i/stream.map_environment; control.keep_env; task.keep | All adapt deferred environments but have different lifetime/return contracts. | Use ordinary provision as the base; preserve stream-tail rebuilding and scheduler ownership where required. |
 
 ### Public names and argument orders that diverge from common conventions
 
@@ -2422,7 +2422,7 @@ or ambiguities, not a claim that the language reserves any name.
 |---|---|---|
 | schema.decode/encode/parse/print; csv.decode | Codec before the data. | `value \|> schema.decode(codec)` passes value as the codec. |
 | regex.is_match/find/find_all/captures/replace/replace_all/split | Regex before input. | A pipeline of input text needs a lambda or a different chosen subject convention. |
-| http.send_with/send_timeout | Send function before Request. | Request pipelines need a lambda. Timeout also takes raw ns while std/time has Duration. |
+| http.send_with/send_timeout | Send function before Request. | Request pipelines need a lambda. Timeout also takes raw ns while i/time has Duration. |
 | http.route | Request is third, after method and pattern. | A pipeline of requests cannot feed it directly. |
 | crypto.hmac_sha256/512; hkdf_extract_sha256/512; hkdf_expand_sha256/512 | HMAC puts key first, extract puts salt first, expand puts key first; combined hkdf puts input first. | The meaning of piped bytes changes across the same family. Decide key-as-subject versus input-as-subject once. |
 | bool.xor versus exclusive_nor | Abbreviated and expanded names in one small family. | Users cannot predict the complement name. |
@@ -2437,9 +2437,9 @@ or ambiguities, not a claim that the language reserves any name.
 | schema.transform versus map | Same function under two names. | No extra capability. |
 | csv.parse_with/print_with; json.pretty; option/result.lazy_unwrap/lazy_or; order.lazy_break_tie; bool.lazy_guard | Separate variant names replace shape-selected calls. | Optional/configured/lazy behavior does not use the available shape-group feature. Same-shape type overloads need careful inference; do not merge blindly. |
 | net.close_stream/close_listener/close_datagram versus fs/tls/process/fetch.close | Kind-specific suffixes in one module only. | Argument unions or type selection could provide one close, if the contracts agree. |
-| std/string.index_of and i/core.index_of | Same base name, scalar versus byte index. | A result cannot safely be reused across the two APIs without conversion. |
+| i/string.index_of and i/core.index_of | Same base name, scalar versus byte index. | A result cannot safely be reused across the two APIs without conversion. |
 | regex.Match offsets; csv.CsvError positions; uri/json parse offsets | Regex/scalar and CSV/scalar positions differ from URI/JSON byte offsets. | Position units belong in public docs and types where valuable. The inventory does not propose treating all Int positions as interchangeable. |
-| std/log.Failure; property.Fail; i/failure; prelude Fail(E) | Nearby words mean a level, verdict, module and error service. | Use qualification and reduce migration-only aliases; no keyword restriction is needed. |
+| i/log.Failure; property.Fail; i/failure; prelude Fail(E) | Nearby words mean a level, verdict, module and error service. | Use qualification and reduce migration-only aliases; no keyword restriction is needed. |
 | task.Scope(E); planned resource.Scope | Same word for task-group ownership and resource lifetime. | Follow the documented E5 Group rename; do not conflate the services. |
 
 ### Size, public surface and dedicated test counts
@@ -2475,34 +2475,34 @@ and retain their spec/example/Rust evidence in the module sections.
 | `i/syntax` | 639 | 20 | 55 | 10 | 0 |
 | `i/task` | 4735 | 41 | 42 | 30 | 0 |
 | `i/tls` | 182 | 14 | 14 | 11 | 0 |
-| `std/bit_array` | 332 | 18 | 18 | 18 | 147 |
-| `std/bool` | 78 | 12 | 12 | 12 | 34 |
-| `std/calendar` | 472 | 26 | 41 | 20 | 5 |
-| `std/cli` | 836 | 19 | 30 | 15 | 10 |
-| `std/crypto` | 678 | 14 | 17 | 13 | 88 |
-| `std/csv` | 517 | 12 | 12 | 10 | 107 |
-| `std/dict` | 531 | 23 | 23 | 22 | 97 |
-| `std/float` | 1560 | 44 | 44 | 44 | 337 |
-| `std/http` | 2012 | 46 | 61 | 35 | 66 |
-| `std/int` | 391 | 37 | 37 | 37 | 180 |
-| `std/json` | 555 | 13 | 20 | 11 | 78 |
-| `std/list` | 1147 | 68 | 70 | 67 | 269 |
-| `std/log` | 223 | 15 | 19 | 12 | 11 |
-| `std/option` | 148 | 16 | 18 | 15 | 40 |
-| `std/order` | 92 | 12 | 15 | 11 | 30 |
-| `std/pair` | 40 | 6 | 6 | 6 | 14 |
-| `std/path` | 187 | 9 | 11 | 8 | 5 |
-| `std/property` | 760 | 29 | 39 | 22 | 14 |
-| `std/regex` | 1077 | 14 | 14 | 10 | 130 |
-| `std/result` | 202 | 22 | 22 | 22 | 55 |
-| `std/schema` | 438 | 29 | 33 | 25 | 52 |
-| `std/sequence` | 652 | 24 | 24 | 23 | 8 |
-| `std/set` | 161 | 21 | 21 | 20 | 31 |
-| `std/stream` | 302 | 25 | 27 | 23 | 13 |
-| `std/string` | 763 | 53 | 53 | 53 | 333 |
-| `std/time` | 148 | 22 | 23 | 19 | 4 |
-| `std/uri` | 829 | 20 | 43 | 12 | 10 |
-| `std/test` (.is) | 111 | 7 | 7 | 7 | 0 |
+| `i/bit_array` | 332 | 18 | 18 | 18 | 147 |
+| `i/bool` | 78 | 12 | 12 | 12 | 34 |
+| `i/calendar` | 472 | 26 | 41 | 20 | 5 |
+| `i/cli` | 836 | 19 | 30 | 15 | 10 |
+| `i/crypto` | 678 | 14 | 17 | 13 | 88 |
+| `i/csv` | 517 | 12 | 12 | 10 | 107 |
+| `i/dict` | 531 | 23 | 23 | 22 | 97 |
+| `i/float` | 1560 | 44 | 44 | 44 | 337 |
+| `i/http` | 2012 | 46 | 61 | 35 | 66 |
+| `i/int` | 391 | 37 | 37 | 37 | 180 |
+| `i/json` | 555 | 13 | 20 | 11 | 78 |
+| `i/list` | 1147 | 68 | 70 | 67 | 269 |
+| `i/log` | 223 | 15 | 19 | 12 | 11 |
+| `i/option` | 148 | 16 | 18 | 15 | 40 |
+| `i/order` | 92 | 12 | 15 | 11 | 30 |
+| `i/pair` | 40 | 6 | 6 | 6 | 14 |
+| `i/path` | 187 | 9 | 11 | 8 | 5 |
+| `i/property` | 760 | 29 | 39 | 22 | 14 |
+| `i/regex` | 1077 | 14 | 14 | 10 | 130 |
+| `i/result` | 202 | 22 | 22 | 22 | 55 |
+| `i/schema` | 438 | 29 | 33 | 25 | 52 |
+| `i/sequence` | 652 | 24 | 24 | 23 | 8 |
+| `i/set` | 161 | 21 | 21 | 20 | 31 |
+| `i/stream` | 302 | 25 | 27 | 23 | 13 |
+| `i/string` | 763 | 53 | 53 | 53 | 333 |
+| `i/time` | 148 | 22 | 23 | 19 | 4 |
+| `i/uri` | 829 | 20 | 43 | 12 | 10 |
+| `i/test` (.is) | 111 | 7 | 7 | 7 | 0 |
 | **Total** | 23979 | 912 | 1070 | 790 | 2170 |
 
 The standard test total above counts each of the 31 files once. It is not

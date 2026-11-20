@@ -2006,7 +2006,7 @@ based on code that already solves the relevant problem.
 ### 21.1 Sources read and alternatives
 
 The prior-art study was read in full from `lane/note-pa-types`,
-`docs/design/prior-art-types.md`. At this revision’s initial merge attempt,
+the `lane/note-pa-types` prior-art study. At this revision’s initial merge attempt,
 local `redesign` was still c2f41b7 and the merge was already up to date.
 A later update to redesign 1a8fee2 was merged; it adds the numeric and
 concurrency studies, without changing compiler code. The type study remains
@@ -2309,7 +2309,7 @@ existing local-code hand-off. Reference citations use §21.1’s pinned roots.
 | Substitution, instantiation and invariant simplification | MLstruct `ConstraintSolver.scala::freshenAbove` (:549); `TypeSimplifier.scala` (:317–380, :582–652); MLscript `TypeSimplifier.scala::subst` (:176) | J7; one variable map, polarity-aware memo; reorder changed BDD predicates through apply. Run invariant alias/read and weak-variable tests as well as atom-reordering probes. |
 | Known-field summaries | MLstruct `TyperHelpers.scala::recordUnion` (:66), used only as a warning about approximation; Elixir `map_dnf_fetch_static` (:3597) for exact projection comparison | U5 only. No invariant equality, no alias publication from a summary. Keep existing J2 tests. |
 | Resource accounting and diagnostics | GHC `HsToCore/Pmc/Check.hs::throttle` (:98); TS Go `checker.go::removeSubtypes` (:26057–26147) | U6, distinct resource result; GHC approximation and TS’s discriminant False are not i subtype verdicts. Charge BDD apply and projection too. |
-| Graph display, scheme/interface serialization | tsrs `docs/CHECKER.md` (:242–390) for stable handles; MLstruct `freshenAbove` for binder identity | No reference here supplies i’s exact wire format. Implement the existing versioned graph contract with scope/bound metadata; no expanded DNF, no loss of invariant sharing. Round-trip and package tests required. |
+| Graph display, scheme/interface serialization | tsrs `tsrs/docs/CHECKER.md` (:242–390) for stable handles; MLstruct `freshenAbove` for binder identity | No reference here supplies i’s exact wire format. Implement the existing versioned graph contract with scope/bound metadata; no expanded DNF, no loss of invariant sharing. Round-trip and package tests required. |
 
 Normative replacement text, in addition to the existing R1–R4 sentences:
 

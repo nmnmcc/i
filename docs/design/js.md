@@ -16,7 +16,7 @@ probe results are labelled separately. All i examples use accepted syntax.
 
 ## Implemented JS step 02
 
-`std/http.Client` now has package-owned provider defaults: native and Node
+`i/http.Client` now has package-owned provider defaults: native and Node
 capture Net/Tls, JS captures `i/fetch.Fetch`. Selection uses the general plan
 resolver. Dependency packages may default only their own nominal services;
 the root can override those cells. `i deps --target js` shows the chosen entry

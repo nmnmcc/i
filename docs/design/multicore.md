@@ -513,9 +513,9 @@ The `hash` row: "Which number is not fixed." becomes:
 
 - `docs/spec.md`: §2.5, §4.2, §4.5, §9.2, §9.4 (rules 3, 4 and 7), §9.7, new §9.8 (`i/key`, `Key`, `Keyed`), §10.1, §11.1, §11.4, §11.7, §11.8, new §11.9, §12, §13, §B.1, §B.4 (part 13).
 - `docs/design/meta.md` §8: one sentence that a `Syntax` value is not portable (§11.9), whatever its form.
-- `lib/i/core.i`: export `portable` as an `@external("ilang:core", …)` declaration, like `not` and `hash`.
-- `lib/i/key.i` (new): `new`, `wrap` and `unwrap` as `@external("ilang:core", …)` declarations.
-- `lib/i/control.i`: `keep_env`.
+- `stdlib/src/core.i`: export `portable` as an `@external("ilang:core", …)` declaration, like `not` and `hash`.
+- `stdlib/src/key.i` (new): `new`, `wrap` and `unwrap` as `@external("ilang:core", …)` declarations.
+- `stdlib/src/control.i`: `keep_env`.
 - `crates/ilang-wasm/src/lower.rs`: add `portable` and the key functions to the `CORE` and `CORE_FUNCS` name tables near `:120` and `:130`; the `keep_env` op, which keeps the `$env` array as it is (part 4); bit 0 of field 1 for closures with patched captures (part 3.6). `captures_of` (`:389`) is the definition of captures; it does not change, and a comment points at §11.9.
 - `crates/ilang-wasm/src/emit/mod.rs`: `closure()` writes the patch flag in field 1 and gives a patched closure's captures array its last element, the walk stamp (part 3.6). The `$clo{n}` types do not change.
 - `crates/ilang-wasm/src/emit/control.rs`: `$keep_reenter` and the frame record of a kept function (part 4).
@@ -523,7 +523,7 @@ The `hash` row: "Which number is not fixed." becomes:
 - `crates/ilang-wasm/src/runtime/values.rs`: `$core_portable`, a walk with an explicit stack like `$value_compare_i32`, with the walk stamp of part 3.6 (one new token for each walk). It gives False at tags 10, 11 and 12 and at a host request, and walks field 5 of `$obj` (tuples, custom values, closure captures, records), `$cons` heads and tails, `Keyed` values, and kept services. The key functions.
 - `crates/ilang-wasm/src/runtime/mod.rs`: the tag table (`:46`) gains a "portable" note, the patch flag, the key tag, and the planned `$clo` layout of part 3.4.
 - `crates/ilang-check/tests/library.rs`: the core and control export lists.
-- `lib/i/task.i`, `lib/i/random.i`: following part 18.
+- `stdlib/src/task.i`, `stdlib/src/random.i`: following part 18.
 - `docs/performance.md`: channel state kept until the channel's scope ends (part 7), the cost of `portable` checks (also on DAGs, part 3.6), pinned tasks under boundary services (part 4), the start-up conditions of part 3.5, and the distinction between portable IO wrappers and pinned arbitrary host references (part 12).
 
 **Track B (now, small):** frame records carry the point index (part 12).

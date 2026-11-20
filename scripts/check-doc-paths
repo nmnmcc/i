@@ -23,6 +23,30 @@ TOKEN = re.compile(
     r'(?:(?<![\w/.-])|(?<=\./))(' + '|'.join(ROOTS) + r')/[A-Za-z0-9_./{},*<>-]+'
 )
 SKIP_LINE = re.compile(r'^\s*(?:import|export|use|mod)\b')
+# Removed files still cited on purpose: a note other notes cite by line, the
+# pinned lane/b snapshot, and rows that record a deletion. Paths under lib/
+# that are not lib/i or lib/prelude.i belong to reference repositories.
+REMOVED = {
+    'docs/design/runtime.md',
+    'lib/i/task.i',
+    'lib/i/request.i',
+    'crates/ilang-check/src/providers.rs',
+    'crates/ilang-check/tests/provider_graph.rs',
+    'crates/ilang-cli/tests/providers.rs',
+    'lib/i/failure.i',
+    'crates/ilang-check/src/types/records.rs',
+    'crates/ilang-syntax/src/parser_legacy.rs',
+    'scripts/old-syntax-check',
+    'lib/i',
+    # Planned or measured artifacts this tree does not carry.
+    'docs/design/std-v3-api.json',
+    'docs/design/std-v3-behavior.md',
+    'scripts/syn3-delete-*.py',
+    'stdlib/test/float_oracle.py',
+    'stdlib/test/float_hosts.py',
+    'stdlib/test/float_gate.py',
+    'stdlib/test/test_test.i',
+}
 
 
 def normalize(token):
@@ -30,7 +54,7 @@ def normalize(token):
     token = token.split(' ')[0]
     token = token.split('::')[0]
     token = re.split(r':\d', token)[0]
-    return token.rstrip('.,;:)]')
+    return token.rstrip('.,;:)]*')
 
 
 def expand(token):
@@ -55,13 +79,23 @@ def check_file(root, path):
             candidates = expand(token)
             if not candidates:
                 continue
+            if token.startswith('lib/') and not token.startswith(('lib/i', 'lib/prelude.i')):
+                continue
             found = False
             for candidate in candidates:
-                if '*' in candidate:
-                    if glob.glob(str(root / candidate)):
-                        found = True
-                elif (root / candidate).exists():
+                if candidate in REMOVED:
                     found = True
+                    break
+                # A page may name a path from its own directory, as
+                # `project=examples/x` does below docs/content/docs.
+                for base in (root, path.parent):
+                    if '*' in candidate:
+                        if glob.glob(str(base / candidate)):
+                            found = True
+                    elif (base / candidate).exists():
+                        found = True
+                    if found:
+                        break
                 if found:
                     break
             if not found:
