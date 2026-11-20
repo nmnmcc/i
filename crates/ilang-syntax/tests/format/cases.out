@@ -17,7 +17,7 @@ shapes = (shape) {
 			area / 2
 		}
 		& (Triangle(base, height)) { base * height / 2 }
-		& (Line | Point) { 0 }
+		& (Line() | Point()) { 0 }
 }
 
 pairs = (a, b) {

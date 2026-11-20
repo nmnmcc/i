@@ -13,7 +13,7 @@ make = () {
 		name = "a long name for the user",
 		age = 42,
 		email_address = "someone@example.com",
-		is_administrator = False,
+		is_administrator = False(),
 		created = 0,
 	)
 	short = 1 // one

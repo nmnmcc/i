@@ -544,6 +544,55 @@ mod tests {
         assert_eq!(text(&sum[2]), "1");
     }
 
+    /// `text` with a constructor called without arguments written bare:
+    /// `(True)` is `True` and `((. m True))` is `(. m True)`. The datum
+    /// builder writes a constructor value and a constructor pattern with
+    /// their call; the table keeps the spelling of the source.
+    fn uncalled(text: &str) -> String {
+        let upper = |s: &str| {
+            s.starts_with(char::is_uppercase) && s.chars().all(|c| c.is_alphanumeric() || c == '_')
+        };
+        let mut out = text.to_string();
+        loop {
+            let mut changed = false;
+            let mut i = 0;
+            while let Some(at) = out[i..].find('(').map(|x| x + i) {
+                let rest = &out[at + 1..];
+                // `(. m Name)` inside the round, then its close.
+                let qualified = rest.strip_prefix("(. ").and_then(|r| {
+                    let e = r.find("))")?;
+                    let (m, n) = r[..e].split_once(' ')?;
+                    (!m.contains(['(', ')', ' ']) && upper(n))
+                        .then(|| (rest[..e + 4].to_string(), e + 5))
+                });
+                let inner = qualified.or_else(|| {
+                    rest.find(')')
+                        .filter(|&e| upper(&rest[..e]))
+                        .map(|e| (rest[..e].to_string(), e + 1))
+                });
+                match inner {
+                    Some((bare, len)) => {
+                        out.replace_range(at..at + 1 + len, &bare);
+                        changed = true;
+                        i = at + bare.len();
+                    }
+                    None => i = at + 1,
+                }
+            }
+            if !changed {
+                return out;
+            }
+        }
+    }
+
+    #[test]
+    fn uncalled_writes_a_constructor_bare() {
+        assert_eq!(uncalled("(= x (True))"), "(= x True)");
+        assert_eq!(uncalled("(= x ((. m Some)))"), "(= x (. m Some))");
+        assert_eq!(uncalled("(True x)"), "(True x)");
+        assert_eq!(uncalled("((. m Some) x)"), "((. m Some) x)");
+    }
+
     /// The table gives what the reader and the datum builder of the source syntax
     /// give for the same text: the tree without groups, written as datums.
     #[test]
@@ -586,8 +635,8 @@ mod tests {
                 let expected = migration_syntax::lisp::show(&lisp::item_datum(&module.items[0]));
                 let syntax = Syntax::from_datum(datum, &scope());
                 assert_eq!(
-                    normalize(&syntax, Mode::Item).show(),
-                    expected,
+                    uncalled(&normalize(&syntax, Mode::Item).show()),
+                    uncalled(&expected),
                     "{}",
                     path.display()
                 );

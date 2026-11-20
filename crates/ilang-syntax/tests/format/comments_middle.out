@@ -18,11 +18,11 @@ f = (x) {
 	// before a pipe
 	// before another pipe
 	q = x |>
-		(A) {
+		(A()) {
 			// before an arrow
 			1
 		}
-		& (B ? c) {
+		& (B() ? c) {
 			// before a guard
 			2
 		}
@@ -38,7 +38,7 @@ T = (Int) <- (Fail(String)) -> Int
 // after a question mark
 g = (x) {
 	q = x |>
-		(A | B) {
+		(A() | B()) {
 			// after a bar
 			1
 		}

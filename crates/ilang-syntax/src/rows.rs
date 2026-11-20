@@ -159,6 +159,24 @@ fn apply(head: Datum, span: Span, parts: impl IntoIterator<Item = Datum>) -> Dat
     list(span, std::iter::once(head).chain(parts).collect())
 }
 
+use crate::print::is_constructor;
+
+/// An UpName: its first character is upper case.
+fn is_upper(name: &str) -> bool {
+    name.chars().next().is_some_and(char::is_uppercase)
+}
+
+/// The head of a call: a constructor name is bare, since the call supplies
+/// the list it has in a value position.
+fn head(callee: &Expr) -> Datum {
+    match &callee.kind {
+        ExprKind::Name { module, name } if is_upper(&name.name) => {
+            qualified(module, name, callee.span.0)
+        }
+        _ => expr(callee),
+    }
+}
+
 fn qualified(module: &Option<Ident>, n: &Ident, span: Span) -> Datum {
     match module {
         Some(m) => form_in(
@@ -524,6 +542,9 @@ fn expr(e: &Expr) -> Datum {
                 .unwrap_or_else(|| string("", Span::new(span.start, span.start)));
             it.fold(first, |acc, x| form("<>", span, [acc, x]))
         }
+        ExprKind::Name { module, name } if is_constructor(&name.name) => {
+            list(span, vec![qualified(module, name, span)])
+        }
         ExprKind::Name { module, name } => qualified(module, name, span),
         ExprKind::Data(items) => form(",", span, ditems(items)),
         ExprKind::List { items, rest } => at(
@@ -540,7 +561,7 @@ fn expr(e: &Expr) -> Datum {
         ExprKind::Block(b) => block(b),
         ExprKind::Chain(fs) if fs.len() == 1 => function(&fs[0]),
         ExprKind::Chain(fs) => form("&", span, fs.iter().map(function)),
-        ExprKind::Call { callee, args } => apply(expr(callee), span, ditems(args)),
+        ExprKind::Call { callee, args } => apply(head(callee), span, ditems(args)),
         ExprKind::Provide { target, services } => form_in(
             "<-",
             gap(target.span.0, services.span.0),
@@ -672,6 +693,7 @@ fn pattern(p: &Pattern) -> Datum {
         } => {
             let head = qualified(module, n, n.span.0);
             match args {
+                None if is_constructor(&n.name) => apply(head, span, std::iter::empty()),
                 None => head,
                 Some(args) => apply(head, span, dpitems(args, span)),
             }
