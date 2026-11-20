@@ -450,11 +450,11 @@ paused = () {
 	k = {
 		control.boundary((b) {
 			control.boundary((b2) { g(b, b2) })
-			Done
+			Done()
 		})
 	} |>
 		(Paused(k)) { k }
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 	handed = control.boundary((b0) {
 		{
 			control.cancel(k)
