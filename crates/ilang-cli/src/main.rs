@@ -151,6 +151,10 @@ enum Command {
         /// the name filter applies within the shard.
         #[arg(long, value_name = "K/N")]
         shard: Option<String>,
+        /// Number of Wasm workers: `1` to `255`, or `auto` for the product
+        /// default (`i run`'s count). Defaults to one.
+        #[arg(long, default_value = "1", value_name = "n|auto", value_parser = parse_workers)]
+        workers: usize,
     },
     #[command(flatten)]
     Package(commands::package::PackageCommand),
@@ -262,6 +266,7 @@ fn main() -> ExitCode {
             time,
             target,
             shard,
+            workers,
         } => cmd_test(
             &project,
             opt,
@@ -270,6 +275,7 @@ fn main() -> ExitCode {
             time,
             target.into(),
             shard.as_deref(),
+            workers,
         ),
         Command::Package(c) => commands::package::run(c),
         Command::Cache(c) => return finish(commands::cache::run(c)),
@@ -561,6 +567,7 @@ fn cmd_test(
     time: bool,
     target: Target,
     shard: Option<&str>,
+    workers: usize,
 ) -> anyhow::Result<ExitCode> {
     let shard = match shard.map(parse_shard).transpose() {
         Ok(shard) => shard,
@@ -613,7 +620,7 @@ fn cmd_test(
         },
     };
     let stage = ilang_syntax::trace::stage("Wasmtime compile");
-    let program = b.host_program()?;
+    let program = b.host_program_with_workers(workers)?;
     drop(stage);
     let mut failed = 0;
     let mut passed = 0;
@@ -704,6 +711,20 @@ fn test_name(entry: &ilang_cli::CollectionEntry) -> String {
         .map(|(_, v)| v.as_str())
         .unwrap_or(&entry.target.path);
     format!("{}.{name}", entry.module)
+}
+
+/// `--workers`: a count of 1 to 255, or `auto` for [`ilang_host::worker_count`],
+/// the count that `i run` uses.
+fn parse_workers(text: &str) -> Result<usize, String> {
+    if text.trim() == "auto" {
+        return Ok(ilang_host::worker_count());
+    }
+    match text.trim().parse::<usize>() {
+        Ok(n) if (1..=255).contains(&n) => Ok(n),
+        _ => Err(format!(
+            "--workers expects `auto` or a count from 1 to 255, not {text:?}"
+        )),
+    }
 }
 
 /// `K/N` of `--shard`: N positive and K below it.
