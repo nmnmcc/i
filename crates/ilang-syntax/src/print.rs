@@ -1172,9 +1172,8 @@ impl Printer<'_> {
             }
             PatternKind::Ctor { module, name, args } => {
                 let mut out = vec![t(qualified(module, name))];
-                match args {
-                    Some(args) => out.push(self.data_pattern(args)),
-                    None => {}
+                if let Some(args) = args {
+                    out.push(self.data_pattern(args));
                 }
                 cat(out)
             }
