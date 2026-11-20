@@ -2369,12 +2369,14 @@ impl<'a> Lowerer<'a> {
             return f;
         }
         let info = &self.ctors[&c];
-        let CtorRepr::Record { ctor, ty } = info.repr else {
-            unreachable!("only records have fields")
+        let (body, arity) = match info.repr {
+            CtorRepr::Bool(b) => (CtorBody::Bool(b), 0),
+            CtorRepr::Record { ctor, ty } => {
+                (CtorBody::Record { ctor, ty }, info.labels.len() as u32)
+            }
         };
-        let arity = info.labels.len() as u32;
         let f = self.new_func();
-        self.out.funcs[f.0 as usize] = FuncKind::Ctor { ctor, ty, arity };
+        self.out.funcs[f.0 as usize] = FuncKind::Ctor { body, arity };
         self.ctor_funcs.insert(c, f);
         self.constants.insert(f);
         f
@@ -2792,16 +2794,9 @@ impl<'a> Lowerer<'a> {
                     }
                 }
             },
-            ValueRef::Ctor(c) => {
-                let info = &self.ctors[&c];
-                match info.repr {
-                    CtorRepr::Bool(b) => Atom::Bool(b),
-                    CtorRepr::Record { ctor, ty } if info.labels.is_empty() => {
-                        Atom::Ctor { ctor, ty }
-                    }
-                    CtorRepr::Record { .. } => Atom::Func(self.ctor_func(c)),
-                }
-            }
+            // A constructor used as a value is a function, even one
+            // without fields; only a call makes the value.
+            ValueRef::Ctor(c) => Atom::Func(self.ctor_func(c)),
         }
     }
 
