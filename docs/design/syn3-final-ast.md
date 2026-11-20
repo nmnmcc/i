@@ -153,8 +153,8 @@ file sees `(-> (, x) _ e)` against a pattern lowered to `(-> (x) _ e)`.
 | `ilang-cli/src/commands/fmt.rs` | `--to is`: `parse_module` (old tree) → `lisp::print_with_comments` → `lisp::parse_source` → `shape::canon`. `--to i`: `lisp::parse` → `lisp::parse_module` (old rows) → `lisp::normal_with_comments` → `parse_module` → `shape::canon`. Both write the rows and the normal syntax from before syntax three, so both fail on every converted file (§4, step 2a). |
 | `ilang-cli` tests | `macro_run` (32), `expansion_sites`, `r2_fixtures`, `collections`. |
 | `ilang-lsp/src/analysis.rs` | 312-319: the last statement of a one-function wrapper module. |
-| `ilang-host/src/syntax.rs` | No tree; calls `Syntax::show_as` with a `Position` number (`lib/i/syntax.i` `position_id`). |
-| `lib/i/syntax.i` | `Position` (17 members of the old list, line 95), `position_id` (491), `show_as` (513); `Node` is already the union of §2.8. |
+| `ilang-host/src/syntax.rs` | No tree; calls `Syntax::show_as` with a `Position` number (`stdlib/src/syntax.i` `position_id`). |
+| `stdlib/src/syntax.i` | `Position` (17 members of the old list, line 95), `position_id` (491), `show_as` (513); `Node` is already the union of §2.8. |
 
 ## 3. What the new tree needs before consumers can move
 
@@ -215,7 +215,7 @@ Every step leaves the tree green. A step moves whole consumers.
     `lower_*` until step 3.
   - `source_syntax.rs`: position table of the §6.8 rows.
   - `definitions.rs`: built-in definitions in the item rows of §6.8.
-  - `syntax.rs`, `render.rs`, `to_source.rs`, `lib/i/syntax.i`,
+  - `syntax.rs`, `render.rs`, `to_source.rs`, `stdlib/src/syntax.i`,
     `ilang-host`: `Position` of §6.7; `show_as` reads the datum with the new
     reader and prints with the new printer.
   - `std/src/test.is` and the test macros that look at nodes by hand.
@@ -274,7 +274,7 @@ These are not mechanical, and each changes what a macro sees.
    diagnostic that points at an operator of a macro argument moves to the
    start of the operand; if that must not move, the builder needs the token
    index that `SourceEncoder` has.
-4. **`Position` numbers.** `lib/i/syntax.i` `position_id` and
+4. **`Position` numbers.** `stdlib/src/syntax.i` `position_id` and
    `ilang-host/src/syntax.rs` share the numbers 0 to 16 of the old list. The
    list of §6.7 has 14 members; a compiled macro program and the host must
    change together (they are built together, so there is no stored form).
@@ -289,7 +289,7 @@ These are not mechanical, and each changes what a macro sees.
 | 2c rows flip | GREEN on `lane/fa`, rows enabled; full evening gate passed on conversion merge `52f5e95e` |
 | 2d engine on the new tree | GREEN: Parsed.ast and production macro passes use syn3; resolver/query lower on entry; full evening gate passed at 20:08 |
 | 3 resolver | GREEN at `6de9a39b655edc8fad9dd7e14a848e359df22915`: native resolver/query/lits/LSP/expand, full expanded Nov14 matrix passes |
-| 4 deletion | done: S12 merged; the compiler uses only the native root AST. The old tree, lowerer and readers were deleted from the compiler crates, including the later test-only oracles (§7); only the frozen migration copy under `examples/legacy/` remains |
+| 4 deletion | done: S12 merged; the compiler uses only the native root AST. The old tree, lowerer and readers were deleted from the compiler crates, including the later test-only oracles (§7); only the frozen migration copy under `crates/ilang-syntax/examples/legacy/` remains |
 
 Historical checkpoint after 2b: readers of the old tree were everything in §2 except
 `ilang-cli` `fmt --to`. The Lisp surface for files (`i fmt`, `i fmt --to`,

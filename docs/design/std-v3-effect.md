@@ -21,7 +21,7 @@ points, not complete export lists. Methods count as entry points too.
 
 The language sources are `docs/spec.md`, especially §§4.6, 6.12, 7, 9,
 11 and 14, and `docs/design/syntax-3.md`, especially §2.10 and §6.9.
-The library inventory covers every module in `lib/i/` and `std/src/`.
+The library inventory covers every module in `stdlib/src/` and `std/src/`.
 Selected implementation bodies, `std/test/`, and `examples/` establish the
 details below. Existing tests are source evidence, not proof of passing tests.
 No build or test was run for this audit.
@@ -74,9 +74,9 @@ These are translations, not new public wrapper types.
 | Layer sharing | Construct once, bind once, give that same value to all users | Same source; no automatic dependency ordering or sharing is specified |
 | Error recovery | `fail.catch`, then ordinary matching and re-raising the remaining union | `docs/spec.md` §9.3 |
 | Lifetime and cleanup | Resource scope, `ensure`, control unwinding, structured task groups | `docs/spec.md` §§9.4–9.5, 9.9 |
-| Fiber | A task owned by a group; no detached public spawn | `lib/i/task.i`; `docs/spec.md` §9.9 |
-| Select among concurrent operations | `Event`, `choose`, `sync`; mapping runs for the selected alternative | `lib/i/task.i`; `docs/spec.md` §9.9, events |
-| Schema derivation | Ordinary schema descriptions and interpreters; optional ordinary macros | `docs/spec.md` §14; `lib/i/syntax.i`; proposed library work |
+| Fiber | A task owned by a group; no detached public spawn | `stdlib/src/task.i`; `docs/spec.md` §9.9 |
+| Select among concurrent operations | `Event`, `choose`, `sync`; mapping runs for the selected alternative | `stdlib/src/task.i`; `docs/spec.md` §9.9, events |
+| Schema derivation | Ordinary schema descriptions and interpreters; optional ordinary macros | `docs/spec.md` §14; `stdlib/src/syntax.i`; proposed library work |
 
 Use the normal need row for clocks, logging, configuration, caches and tracing.
 Do not hide their installation in package imports. `docs/spec.md` §9.2 and
@@ -85,7 +85,7 @@ Do not hide their installation in package imports. `docs/spec.md` §9.2 and
 Values remain immutable. `task.Ref(A)` is an immutable handle to scheduler-owned
 state. Only `task.update` replaces that state, through a pure callback.
 This existing distinction is explicit in `docs/spec.md` §9.9 and
-`lib/i/task.i`. New queues and caches should use that mechanism or owner tasks,
+`stdlib/src/task.i`. New queues and caches should use that mechanism or owner tasks,
 not introduce mutable i objects or a second runtime state model.
 
 ## 3. Typed errors, Cause and Exit
@@ -105,25 +105,25 @@ Sources: `effect/packages/effect/src/Cause.ts`,
 
 ### i today and the gap
 
-`lib/i/fail.i` exports `raise`, `catch`, `from_result`, and `map_error`.
+`stdlib/src/fail.i` exports `raise`, `catch`, `from_result`, and `map_error`.
 `std/src/result.i` adds `map`, `map_error`, `then`, `recover`, `partition`,
 `all`, `catch`, and conversions to `Option`. `Result`, `Ok`, `Error` and
 `Fail` are already described by `docs/spec.md` §§9.3 and 12.
-`lib/i/failure.i` contains a separate transitional service-based implementation
+`stdlib/src/fail.i` contains a separate transitional service-based implementation
 using `Syn3ServiceFail`, `control.boundary`, and `control.escape`.
-`lib/i/fail.i` still declares external `raise` and `catch` in this snapshot.
+`stdlib/src/fail.i` still declares external `raise` and `catch` in this snapshot.
 E3 should leave one ordinary `i/fail` implementation and one public error model.
 
 Selective recovery needs no tag-dispatch framework. Catch all errors, match the
 wanted nominal types, and raise the narrowed remainder. That is the example in
 `docs/spec.md` §9.3. Catching a typed error does not catch assertion failure.
-`lib/i/assertion.i` handles that separate service for testing.
+`stdlib/src/assertion.i` handles that separate service for testing.
 
 There is no public general `Cause` or `Exit` library. The task implementation
 has private completion and cancellation records. Its public join still returns
 `A` or needs `Fail(E)`. Scope failure selects the least task path among actual
 failures, after cleanup; it does not return every concurrent error.
-Sources: `lib/i/task.i`; `docs/spec.md` §9.9, rules R2 and R4a.
+Sources: `stdlib/src/task.i`; `docs/spec.md` §9.9, rules R2 and R4a.
 
 The useful gap is structured diagnostics and explicit outcome data where an API
 needs them. It is not permission to make `panic` recoverable. A stop runs no
@@ -175,7 +175,7 @@ If a real use case needs lazy concurrent initialization, use a scoped cache or
 one-shot coordination cell. Specify which scope owns it and whether failures
 are cached. Do not turn optional memoization into a second service mechanism.
 Also keep the E5 task `Scope(E)` to `Group(E)` rename separate from E3;
-`lib/i/task.i` still exports `Scope` here, whereas
+`stdlib/src/task.i` still exports `Scope` here, whereas
 `docs/design/syntax-3.md` §2.10.9 names the future distinction.
 
 ## 5. Scope and resource safety
@@ -204,10 +204,10 @@ The immediate gap is a source/spec mismatch:
 
 | Contract | Source read | Status in this checkout |
 |---|---|---|
-| `ensure(body, final)` | `lib/i/resource.i` | Implemented as an external unwinding primitive |
-| `acquire(open, release, use)` | `lib/i/resource.i` | Implemented in i over `ensure` |
+| `ensure(body, final)` | `stdlib/src/resource.i` | Implemented as an external unwinding primitive |
+| `acquire(open, release, use)` | `stdlib/src/resource.i` | Implemented in i over `ensure` |
 | `Scope`, `acquire(open, release)`, `scoped(body)` | `docs/spec.md` §9.5; `docs/design/syntax-3.md` §2.10.9 | Specified, absent from this module's exports |
-| Cancel an outstanding host operation while releasing an unclaimed acquired handle | `lib/i/fs.i`, `lib/i/net.i`, `lib/i/tls.i`, `lib/i/fetch.i` | Explicit request-state and cleanup logic already exists |
+| Cancel an outstanding host operation while releasing an unclaimed acquired handle | `stdlib/src/fs.i`, `stdlib/src/net.i`, `stdlib/src/tls.i`, `stdlib/src/fetch.i` | Explicit request-state and cleanup logic already exists |
 
 Reconcile this before designing scoped streams, caches, pools or service
 factories. Use one resource service. Keep the task group a different type.
@@ -244,12 +244,12 @@ The signatures and comments distinguish these. Effect also exports
 
 ### i today and the gap
 
-`lib/i/task.i` already provides `run`, `scope`, `local_scope`, `go`, `join`,
+`stdlib/src/task.i` already provides `run`, `scope`, `local_scope`, `go`, `join`,
 `both`, `race`, `map_concurrently`, `yield`, channels, shared values and events.
 It implements its scheduler over control, keys and requests. Task captures and
 transported values obey portability rules. Group ownership and run identity
 checks prevent detached use of handles. These are existing capabilities, not
-missing Fiber machinery. Sources: `lib/i/task.i`; `docs/spec.md` §9.9.
+missing Fiber machinery. Sources: `stdlib/src/task.i`; `docs/spec.md` §9.9.
 
 Three gaps deserve early work:
 
@@ -257,21 +257,21 @@ Three gaps deserve early work:
   before joining. It has no public limit. Build a bounded worker group or
   bounded admission loop. A semaphore around an already spawned task per input
   limits active bodies but still allocates all task handles.
-  Source: `lib/i/task.i`, `spawn_values`, `map_concurrently`.
+  Source: `stdlib/src/task.i`, `spawn_values`, `map_concurrently`.
 - General timeout and retry helpers. HTTP has a timeout wrapper built from
   `task.race` and clock sleep. There is no common computation timeout module in
   the audited library inventory. Sources: `std/src/http.i`, `send_timeout`;
-  `lib/i/task.i`; `lib/i/clock.i`.
+  `stdlib/src/task.i`; `stdlib/src/clock.i`.
 - Dynamic scoped work management. There is no public FiberSet/FiberMap-style
   registry. Build it from groups, immutable dictionaries, refs and owner tasks.
   Key replacement needs a specified cancellation operation or cooperative
   cancellation protocol. The current task exports do not expose arbitrary
-  task interruption. Source: `lib/i/task.i`.
+  task interruption. Source: `stdlib/src/task.i`.
 
 i's `race` does not have Effect's first-success semantics. An observed failure
 initiates ordinary scope failure; a later success cannot rescue it. Successful
 completion cancels the loser and waits for finalizers. Sources:
-`docs/spec.md` §9.9 R5; `lib/i/task.i`, `race` and scope completion logic.
+`docs/spec.md` §9.9 R5; `stdlib/src/task.i`, `race` and scope completion logic.
 Keep this difference visible. Add a separately named first-success helper only
 if needed. Do not change race incidentally while implementing timeout.
 
@@ -296,11 +296,11 @@ example combines exponential delay, a delay cap, jitter, an attempt bound and a
 retryable-error predicate. Sources: `effect/packages/effect/src/Schedule.ts`,
 `effect/ai-docs/src/06_schedule/10_schedules.ts`.
 
-There is no schedule module or reusable retry/repeat API in `lib/i/` or
+There is no schedule module or reusable retry/repeat API in `stdlib/src/` or
 `std/src/`. `docs/spec.md` §9.1 has a simple recursive retry example, not a
 shipped schedule library. Clocks, exact durations, pure generators and
-structured tasks already exist in `lib/i/clock.i`, `std/src/time.i`,
-`lib/i/random.i`, and `lib/i/task.i`.
+structured tasks already exist in `stdlib/src/clock.i`, `std/src/time.i`,
+`stdlib/src/random.i`, and `stdlib/src/task.i`.
 
 Express a policy as immutable state plus a step function. Return a stop or a
 next decision containing output, duration and next state. Any step needs are
@@ -345,7 +345,7 @@ the work; it does not advance or memoize a cursor.
 The module explicitly owns no resource and does not close on early termination.
 `std/test/stream_test.i` checks finite observations and call-time service use.
 `std/src/csv.i` supplies stream consumers/producers for rows and records.
-`std/src/http.i` and `lib/i/fs.i` have separate incremental I/O interfaces.
+`std/src/http.i` and `stdlib/src/fs.i` have separate incremental I/O interfaces.
 
 Missing capabilities are:
 
@@ -395,7 +395,7 @@ Sources: `effect/packages/effect/src/Effect.ts`,
 
 ### i today and the gap
 
-`lib/i/task.i` has rendezvous channels, selectable send/receive/join events,
+`stdlib/src/task.i` has rendezvous channels, selectable send/receive/join events,
 atomic `ref`/`update`, and immutable shared values. It has no public buffered
 queue, broadcast hub, one-shot cell, semaphore, latch, synchronized ref or
 transaction module. The complete public task export block is the basis for
@@ -404,7 +404,7 @@ this absence claim.
 `Request(A)` is not Deferred. Requests have host ownership, tickets, cancellation
 and consumption states. There is `request.ready`, but no public general pending
 request constructor with a matching user completer. Sources:
-`lib/i/request.i`; `docs/spec.md` §9.11.
+`stdlib/src/request.i`; `docs/spec.md` §9.11.
 
 Build a small common coordination family over scheduler state, owner tasks and
 events. Values and handles remain immutable. Define capacity, FIFO order,
@@ -477,7 +477,7 @@ annotations describe encoded versus decoded values.
 Macros can remove repetitive field getters and setters. They must use ordinary
 `Definitions`, `Types`, syntax values and generated library calls. They cannot
 depend on the removed record-graph machinery or bypass private constructors.
-Sources: `docs/spec.md` §§14.7–14.8; `lib/i/syntax.i`;
+Sources: `docs/spec.md` §§14.7–14.8; `stdlib/src/syntax.i`;
 `docs/design/syntax-3.md` §6.9. Runtime schema data must remain useful without
 macros. Do not add compiler special cases for `std/schema`.
 
@@ -499,8 +499,8 @@ errors, so fallback need not hide bad configuration. Sources: those same files.
 
 i has `process.Environment`, `env`, arguments, a CLI parser, JSON, schemas and
 filesystem access. It has no shared config/provider module. Sources:
-`lib/i/process.i`, `std/src/cli.i`, `std/src/json.i`,
-`std/src/schema.i`, `lib/i/fs.i`.
+`stdlib/src/process.i`, `std/src/cli.i`, `std/src/json.i`,
+`std/src/schema.i`, `stdlib/src/fs.i`.
 
 Make `ConfigProvider` an ordinary service whose reads return explicit missing,
 present and source-error cases. Use schema data to decode config. Compose
@@ -572,18 +572,18 @@ Sources: `effect/packages/effect/src/testing/index.ts`,
 arithmetic, comparison, sleep and monotonic measurement. `std/src/calendar.i`
 has proleptic Gregorian dates, civil times, fixed offsets, weekday/day arithmetic,
 and parsing/formatting. It explicitly has no timezone database or leap seconds.
-`lib/i/clock.i` exposes replaceable wall/monotonic reads and sleep requests.
+`stdlib/src/clock.i` exposes replaceable wall/monotonic reads and sleep requests.
 
-`lib/i/random.i` provides immutable SplitMix generators, bounded integer and
-float draws, split and path-derived streams. `lib/i/task.i` has per-task
+`stdlib/src/random.i` provides immutable SplitMix generators, bounded integer and
+float draws, split and path-derived streams. `stdlib/src/task.i` has per-task
 generator access. This is already stronger explicit control than replacing
 every draw with ambient random state. Secure bytes are a separate capability:
-`lib/i/process.i` exposes entropy; `std/src/crypto.i` provides `random_bytes`.
+`stdlib/src/process.i` exposes entropy; `std/src/crypto.i` provides `random_bytes`.
 
 `std/test/clock_test.i` supplies a fixed fake whose sleeps return ready requests.
 That tests clock substitution. It does not implement a virtual timer queue.
 `task.test` supplies seeded scheduling and scripted task paths, but that alone
-does not advance time. Sources: `std/test/clock_test.i`; `lib/i/task.i`.
+does not advance time. Sources: `std/test/clock_test.i`; `stdlib/src/task.i`.
 
 The largest gap is reusable virtual time integrated with task waits. Define
 sleep registration, advancing to deadlines, cancellation removal and quiescence
@@ -591,8 +591,8 @@ before advancing again. The public request API has no user-completable pending
 request pair, so this may need a task-level clock abstraction or an ordinary
 service factory with a controlled wait route. Do not implement a fake that
 blocks the scheduler or just returns immediate sleeps.
-Sources for the constraint: `lib/i/clock.i`, `lib/i/request.i`,
-`lib/i/task.i`.
+Sources for the constraint: `stdlib/src/clock.i`, `stdlib/src/request.i`,
+`stdlib/src/task.i`.
 
 Smaller gaps are duration parsing/formatting and random collection helpers.
 Named timezone support is a separate larger feature needing timezone data and
@@ -624,8 +624,8 @@ one batch, and avoid repeated or concurrent duplicate lookup work.
 i's `Request(A)` is a host-operation handle, not this logical data-loading
 description. It already has ownership, cancellation and replaceable waits.
 Do not replace it or overload its name with a resolver abstraction.
-Source: `lib/i/request.i`; `docs/spec.md` §9.11.
-There is no public logical batching or cache module in `lib/i/` or `std/src/`.
+Source: `stdlib/src/request.i`; `docs/spec.md` §9.11.
+There is no public logical batching or cache module in `stdlib/src/` or `std/src/`.
 HTTP's idle connection pool is specific transport reuse, not a general cache.
 Source: `std/src/http.i`, `Pool`, `network_client`.
 
@@ -663,7 +663,7 @@ use normal constructors, not `_tag` strings or a second pattern evaluator.
 |---|---|---|
 | `effect/packages/effect/src/Data.ts`: immutable data class and tagged enum helpers | `Class`, `TaggedClass`, `taggedEnum`, `Error`, `TaggedError` | Labelled data, constructors and unions are language features. No Data class hierarchy is needed. `docs/spec.md` §§4.3–4.4. |
 | `effect/packages/effect/src/Equal.ts`: `Equal` protocol | `equals`, `asEquivalence`, `isEqual`, `makeCompareMap`, `makeCompareSet`, `byReference` | i has one `==` with specified structural and identity rules. Do not add overridable equality. `docs/spec.md` §11.4. |
-| `effect/packages/effect/src/Hash.ts`: `Hash` protocol | `hash`, `combine`, `number`, `string`, `structure`, `array` | `core.hash` already agrees with i equality. No user hash protocol is required. `lib/i/core.i`; `docs/spec.md` §13. |
+| `effect/packages/effect/src/Hash.ts`: `Hash` protocol | `hash`, `combine`, `number`, `string`, `structure`, `array` | `core.hash` already agrees with i equality. No user hash protocol is required. `stdlib/src/core.i`; `docs/spec.md` §13. |
 | `effect/packages/effect/src/Order.ts`: `Order<A>` | `make`, `flip`, `combine`, `combineAll`, `mapInput`, `Tuple`, `Struct`, `min`, `max`, `clamp` | `std/order` has order values and tie-breaking. Type modules have compare functions. Comparator projection and composition are useful ordinary functions. `std/src/order.i`, `std/src/int.i`, `std/src/string.i`. |
 
 Effect 4's `Equal.equals` compares plain arrays and objects structurally by
@@ -703,7 +703,7 @@ files; the recommendation is to keep one home for each operation in i.
 |---|---|---|
 | `effect/packages/effect/src/String.ts`: string helpers | `length`, `slice`, `split`, `trim`, `replaceAll`, `normalize`, `codePointAt`, `linesIterator`, `snakeCase`, `camelCase` | `std/src/string.i` already has scalar indexing, slicing, searching, case conversion, line/word splitting and traversal. Missing normalization, grapheme operations and richer naming transforms need explicit Unicode policy. Preserve codepoint indexes. |
 | `effect/packages/effect/src/Number.ts`: numeric helpers | `sum`, `multiply`, `divide`, `remainder`, `clamp`, `parse`, `round`, `sumAll` | `std/src/int.i` and `std/src/float.i` already cover parsing, arithmetic, aggregation, comparison, powers, rounding and trigonometry. i Float is finite; do not copy NaN/infinity or zero-divisor behavior. `docs/spec.md` §§11.2–11.3. |
-| `effect/packages/effect/src/BigInt.ts`: arbitrary-size integer helpers | `sum`, `multiply`, `divide`, `remainder`, `gcd`, `lcm`, `sqrt`, `fromString`, `toNumber` | i Int is already arbitrary size. `lib/i/big.i` contains support arithmetic; `std/src/int.i` exposes the public numeric API. Add missing useful algorithms such as gcd/lcm there, not a second integer type. |
+| `effect/packages/effect/src/BigInt.ts`: arbitrary-size integer helpers | `sum`, `multiply`, `divide`, `remainder`, `gcd`, `lcm`, `sqrt`, `fromString`, `toNumber` | i Int is already arbitrary size. `stdlib/src/big.i` contains support arithmetic; `std/src/int.i` exposes the public numeric API. Add missing useful algorithms such as gcd/lcm there, not a second integer type. |
 | `effect/packages/effect/src/BigDecimal.ts`: `BigDecimal`, `RoundingMode` | `make`, `normalize`, `fromString`, `format`, `sum`, `multiply`, `divide`, `scale`, `round`, `truncate`, `floor`, `ceil` | No decimal module appears in the audited i inventory. Exact decimal coefficient/scale, parsing and explicit rounding are a real gap for money and data exchange. Build on Int. |
 
 Effect BigDecimal supplies an exact decimal representation and explicit rounding
@@ -737,8 +737,8 @@ upgrades; its comments delimit which features work with HTTP/2. Source:
 i already has an incremental HTTP parser/serializer, headers, queries, routes,
 client and transport services, native TCP/TLS and fetch clients, redirect
 handling, idle connection reuse, body decoders, timeout and server loops.
-Sources: `std/src/http.i`, `std/src/uri.i`, `lib/i/fetch.i`,
-`lib/i/net.i`, `lib/i/tls.i`. `std/test/http_network_test.i` contains network,
+Sources: `std/src/http.i`, `std/src/uri.i`, `stdlib/src/fetch.i`,
+`stdlib/src/net.i`, `stdlib/src/tls.i`. `std/test/http_network_test.i` contains network,
 redirect and timeout cases. `examples/http-get/src/main.i` and
 `examples/http-server/src/main.i` show actual application use.
 
@@ -785,7 +785,7 @@ The Node adapter delegates to the shared Node backend. Source:
 
 i already has file handles, modes, open/read/write/flush/close, remove, rename,
 mkdir, listing, metadata, temp directory, whole-file helpers and line reading.
-Source: `lib/i/fs.i`. `examples/io-fs/src/main.i` demonstrates filesystem use.
+Source: `stdlib/src/fs.i`. `examples/io-fs/src/main.i` demonstrates filesystem use.
 Gaps include seeking, richer metadata/permissions/links, scoped temporary
 resources, copying, watching and shared stream/sink adapters. Some require
 new host operations; the combinators and cleanup should remain ordinary i.
@@ -818,7 +818,7 @@ The concrete Node entry re-exports its shared implementation. Source:
 
 i has explicit process/argument/environment/cwd/entropy services, spawning,
 piped stdio, environment and directory choices, wait, terminate and close.
-Source: `lib/i/process.i`. `examples/io-process/src/main.i` and
+Source: `stdlib/src/process.i`. `examples/io-process/src/main.i` and
 `examples/io-process/test/process_test.i` show process use.
 The gap is reusable immutable command descriptions and scoped pipeline
 composition, output collection and streaming adapters. Drain stdout and stderr
@@ -832,7 +832,7 @@ Sources: `effect/packages/effect/src/Terminal.ts`,
 These solve interactive sizing, key events and line input.
 
 i has byte stdin/stdout/stderr with flush and text helpers, plus a CLI parser.
-Sources: `lib/i/stdio.i`, `lib/i/io.i`, `std/src/cli.i`.
+Sources: `stdlib/src/stdio.i`, `stdlib/src/io.i`, `std/src/cli.i`.
 It lacks terminal size/events, raw input and interactive line editing.
 Those need an optional terminal host service and scoped restoration of terminal
 mode. Keep byte stdio available on targets with no terminal.
@@ -847,7 +847,7 @@ Sources: `effect/packages/effect/src/persistence/KeyValueStore.ts`,
 The browser file supplies local-storage, session-storage and IndexedDB layers.
 
 i has dictionaries, files and schemas but no common durable key/value service.
-Sources: `std/src/dict.i`, `lib/i/fs.i`, `std/src/schema.i` and the audited
+Sources: `std/src/dict.i`, `stdlib/src/fs.i`, `std/src/schema.i` and the audited
 module inventory. Define an ordinary service with memory and file providers,
 then typed schema views. Specify atomic update guarantees, missing keys,
 serialization errors and persistence boundaries. A file backend's atomicity
@@ -868,7 +868,7 @@ The Node global-WebSocket adapter documents buffering limits and this concern.
 Sources: those Socket and NodeSocket files.
 
 i already has TCP, UDP, DNS and TLS, with shutdown and byte-stream adapters.
-Sources: `lib/i/net.i`, `lib/i/tls.i`;
+Sources: `stdlib/src/net.i`, `stdlib/src/tls.i`;
 `examples/io-net/src/main.i`, `examples/io-udp/src/main.i`,
 `examples/io-tls/src/main.i`.
 Main gaps are common scoped stream adapters, WebSocket framing/upgrades and
@@ -887,7 +887,7 @@ They bridge host worker/message protocols and bind cleanup to scope.
 
 i already schedules portable tasks across host-selected workers. Worker count
 is deliberately unobservable; no task API selects a worker. Sources:
-`docs/spec.md` §§9.9, 11.9; `lib/i/task.i`.
+`docs/spec.md` §§9.9, 11.9; `stdlib/src/task.i`.
 Do not add Worker as a competing concurrency model. Host worker or process
 interop, if needed, should be an explicit scoped transport service with schemas
 and structured ownership. It is not required for ordinary parallel i code.
@@ -915,11 +915,11 @@ their named files. Do not assume their whole surface is a settled standard.
 
 i already has library macros `test`, `skip`, `only`, `fails`, `suite` and
 `each` in `std/src/test.is`. They register collected items rather than giving
-test syntax privileged compiler semantics. `lib/i/assertion.i` catches test
+test syntax privileged compiler semantics. `stdlib/src/assertion.i` catches test
 assertion failures. `std/src/property.i` has pure generators, lazy shrink
 trees, deterministic seeds, budgets, reports and replay.
 `std/test/property_test.i` exercises generator and shrinking behavior.
-`lib/i/task.i` has seeded/scripted scheduling through `task.test`.
+`stdlib/src/task.i` has seeded/scripted scheduling through `task.test`.
 
 Extend these tools with shared scoped fixtures, output/metric/span recorders,
 schema-derived generators and reusable round-trip assertions. The key missing

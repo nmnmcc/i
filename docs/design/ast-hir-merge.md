@@ -13,7 +13,7 @@ There are three trees today, not two:
 | tree | definition | lines |
 |---|---|---:|
 | old AST | `crates/ilang-syntax/src/ast.rs` | 762 (of which 266 are the iterative `Drop`, lines 497-762) |
-| syntax-three tree | `crates/ilang-syntax/src/syn3/ast.rs` | 427 |
+| syntax-three tree | `crates/ilang-syntax/src/ast.rs` | 427 |
 | HIR node types | `crates/ilang-check/src/hir.rs` lines 264-635 (types, expressions, patterns) | 372 |
 
 and three converters between them:
@@ -342,7 +342,7 @@ targets: 3505 lines of converters, plus the old parser, printer, formatter, Lisp
 Move the leaf vocabulary that all three trees share out of `ast.rs`, so that deleting
 `ast.rs` later does not touch the HIR or its consumers.
 
-- New file `crates/ilang-syntax/src/leaf.rs` (or `common.rs`), registered as `pub mod leaf;` in `lib.rs`.
+- New file `leaf.rs` (or `common.rs`), registered as `pub mod leaf;` in `lib.rs`.
 - Move from `crates/ilang-syntax/src/ast.rs`:
   - `UnOp` (lines 162-166);
   - `BinOp` and its `impl` with `level` and `text` (168-239);

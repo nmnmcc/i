@@ -713,7 +713,7 @@ A `.f` on a record is a binary search with `ref.eq` and string compares: slower 
 
 ## 10. The module `i/record`
 
-`lib/i/record.i`, registered in `crates/ilang-package/src/library.rs` (the list at :12), like `i/core`:
+`stdlib/src/core.i`, registered in `crates/ilang-package/src/library.rs` (the list at :12), like `i/core`:
 
 ```i
 //// Records (§4.9): reading and setting fields by a key that is one known string.
@@ -993,7 +993,7 @@ Line numbers are at 1865366.
 - `src/commands/package.rs`, the interface check of `i package publish` (`compare_with` :891, `Diff::new` :919, `canonical_type` :1263, `TypeShow` :1282). `canonical_type` renames the type variables of each scheme to `'0`, `'1`, …, so that renaming a type variable is no change. It renames the `Param` labels of a `ShownType::Record` the same way, in the order of the label parameters of the scheme, to `'k0`, `'k1`, …, so that renaming a label parameter is no change either. `TypeShow::ty` (:1429), an exhaustive match on `hir::TypeKind`, gets a `TypeKind::Record` arm that prints the text of 4.7 (fields sorted, labels that are not names quoted, `..B` and `-l` parts), with each `UpName` label renamed as above in the canonical form. Under U6, an exported alias `Person = ( name : String )` and a constructor field retain exact graphs; canonical text is only the small inline encoding. Graph bytes are not semantic equality. Tests in 15.6.
 
 **Library, package, docs**
-- `lib/i/record.i` (new); `crates/ilang-package/src/library.rs` (:12); the library tests.
+- `stdlib/src/core.i` (new); `crates/ilang-package/src/library.rs` (:12); the library tests.
 - `docs/spec.md` (part 12), `docs/design/syntax.md` and `docs/design/meta.md` (part 13), `docs/performance.md` (9.7).
 
 **Ownership and merge order (a change to the plan, for the coordinator).** Some of these files are owned by other tracks, or have a merge order that leaves T3 out. The plan's table gives T3 only the record syntax, `field()`, the `&` of fields in `solve.rs`/`display.rs`, the run time, `i/record` and some spec sections. This design also needs:
@@ -1175,7 +1175,7 @@ In order, after A1 and T1 have landed, T2 has merged, and S3 is approved.
 8. **HIR and resolve.** Labels, label parameters (L1, counting every type written in the binding), key parameters, E0540, E0543 (the places of L2, a key parameter named in a value type or an alias pattern by L2a, and the recursive groups of L6 in `order.rs`), and E0542 (L5: every use of such a name that is not a callee, also inside its own value and in a value type or an alias pattern). Write these checks as one function over the HIR of a binding, so that M4 can run it on expanded code (5.10). The E0225 message of `env_type` (part 12, §9.2).
 9. **Inference.** Literals and spreads (with their known and expected types), `field()` in three rules, `has_no_effect`, `check_places` and `walk_variance` (part 8.2), the place check on the shown type of each binding (part 4.5), then label parameters in `call()`: the name rule and the one-string rule of L4, the known function type built with the label map (L4 step 3), `Typed.key_labels` filled in `call()` (9.3), E0541, L6, L9 in `entry_point` (E0320), and L8 in `level_of` and `extrude` (E0545), with the raised level kept in each `LabelParamId`. Then the occurs check with `Rec` fields and `Without` bases inside a type constructor (part 4.2), and E0512 for `FailKind::NoField`. Then accept the changed outputs with `UPDATE=1` and read each change. They come from rule 13b: the E0506 "`.name` needs a known type" expectations in `crates/ilang-check/tests/types/` (`errors`, `expected_types/expected`, `fields_union`, `known_general_vars`, `known_partial_schemes`, `known_pipe_left`, `known_types`, `labels`) become types, or E0501 or E0512 at another place. For each one, check that the new verdict is the one part 6 gives; for example `through_id = users |> map(id) |> map((v) { v.age })` in `known_general_vars.i`.
 10. **Run time.** Tag 14, `record.rs`, the inspect branch, IR, lowering, emit, `external_op`, the label globals in constant form, with the `FIXED_MAX` fallbacks for long labels and large literals, and the key arguments lowered to them from `key_labels` (part 9.3); `Stmt::Unreachable` for an empty `Access::Field` list in `Lowerer::field` (part 6). Gate: `scripts/wat-diff` shows no change in the generated code of programs with no records.
-11. **Library and packages.** `lib/i/record.i`, its registration, and the library tests (names, labels). The interface check of `package.rs` (`canonical_type` and `TypeShow::ty`, part 14), with the tests of 15.6.
+11. **Library and packages.** `stdlib/src/core.i`, its registration, and the library tests (names, labels). The interface check of `package.rs` (`canonical_type` and `TypeShow::ty`, part 14), with the tests of 15.6.
 12. **Tests.** 15.1 to 15.6 at `-O0` and `-O2`, the spec test suite, and the full checks.
 13. **Docs.** `docs/performance.md` (9.7, with the micro-benchmark), syntax.md and meta.md (part 13), and `query.rs` hover and completion.
 
@@ -1769,7 +1769,7 @@ implemented compiler behavior.
 | `types/value_types.rs:715–799,991–1040,1441` | finish_reads takes a snapshot for completion; complete_ready_reads publishes ready reads; check_value_places handles expanded value types. Finish pending U3 checks before snapshot/publication and after any completion constraints affecting them. Preserve T2's one-batch fixation and closed foreign-read rules. Resource failure publishes no alias. |
 | `types/pattern.rs:470–501,595–655,871–927`; `types/coverage.rs:277–330`; `types/shown.rs:10–33` | Pattern/narrowing, coverage and shown forms consume types. Visit shared alternatives on demand; one Record/All runtime test still represents all record alternatives. Extend shown types with exact graph output. |
 | `crates/ilang-cli/src/commands/package.rs:1263–1280,1366–1429`; `crates/ilang-check/src/query.rs:1300,1414–1421` | Canonical text, completed aliases and written types feed interfaces; query records constructor field access. Add versioned exact graph encoding/decoding and Label access. Byte inequality is not semantic inequality. |
-| `crates/ilang-syntax/src/parser.rs:1175–1181,1784–1818` | Record shapes remain reserved. Future record programs below have not been compiler-run. T3 must replace the reservation, then run them as compiler gates. |
+| `crates/ilang-syntax/src/parse.rs:1175–1181,1784–1818` | Record shapes remain reserved. Future record programs below have not been compiler-run. T3 must replace the reservation, then run them as compiler gates. |
 
 The left-intersection loop at `types/solve.rs:389–415` truncates failures but
 does not roll back successful bounds. It cannot implement U3 by speculative

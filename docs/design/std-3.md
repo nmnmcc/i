@@ -26,7 +26,7 @@ Controlling sources, in order:
 | `docs/spec.md:591–598`, `:836–908`, `:957–997` | Strict calls, ordinary effects, and replaceable Assert; assertion.catch already supplies the required test boundary. |
 | `docs/spec.md:1014–1087`, `:1124–1145`, `:1218–1250` | SplitMix, exact integers, binary64, equality, bit conversions and UTF-8 primitives. |
 | `docs/design/syntax.md:99–200`, `:223–253`, `:372–386` | Import/export groups, declared type parameters and clause functions. |
-| `docs/design/runtime.md:199–283`; `lib/i/random.i:76–86`, `:126–170`, `:217–223` | Landed pure generators, rejection sampling, split and path derivation. No entropy service needed. |
+| `docs/design/runtime.md:199–283`; `stdlib/src/random.i:76–86`, `:126–170`, `:217–223` | Landed pure generators, rejection sampling, split and path derivation. No entropy service needed. |
 | `docs/design/std-1.md:886–984` | Ordinary module contracts belong in module docs; do not add redundant spec rules. Explicit interfaces, tests and honest costs. |
 | Plan `twinkling-swinging-perlis.md:30–56`, `:79`, `:520–550`, `:583–590` | Standalone language; Std-3 owns these modules after R1; string indexes count codepoints; STR owns interpolation. |
 | Ledger, entries “R1 landed” and “FP landed” | R1 and general field privacy are available. No std-specific compiler or runner extension. |
@@ -48,7 +48,7 @@ Facts checked by reading code:
 | `std/src/string.i:179–207`, `:330–389`, `:418–455` | Pattern_White_Space, simple casing, padding and conversions already exist. |
 | `crates/ilang-wasm/src/runtime/values/strings.rs:151–162`, `:170–198`, `:200–238` | Slices copy bytes; search compares at successive offsets; codepoints builds a whole list. No O(1) character indexing primitive. |
 | `std/test/string_test.i:2060–2103`, `:2115–2160`, `:2240–2247` | Empty pieces, trailing lines, negative slices, Unicode and invalid scalar conversion have tests to retain. |
-| `lib/i/assertion.i:13–22`; `crates/ilang-host/src/lib.rs:805–834`; `crates/ilang-cli/src/main.rs:250–302` | Catching Assert cancels its continuation; runner handles ordinary stops and prints their text. Report one AssertionFailure without a discovery hook. |
+| `stdlib/src/assertion.i:13–22`; `crates/ilang-host/src/lib.rs:805–834`; `crates/ilang-cli/src/main.rs:250–302` | Catching Assert cancels its continuation; runner handles ordinary stops and prints their text. Report one AssertionFailure without a discovery hook. |
 | `crates/ilang-check/src/types/infer.rs:232–255`, `:292–325` | Recursive groups are monomorphic internally. Use uniform recursive trees. |
 | `std/src/stream.i:43–55` | Effectful streams require invariant environments. This design stores only pure callbacks. |
 
@@ -242,7 +242,7 @@ outer branches without searching their descendants.
 **P4 Built-in generators.** Exact allocation/order is replay behavior for a
 package version. Size is ignored except by sized/list/string. random.int and
 random.at_path raise RandomError, rather than returning Result
-(`lib/i/random.i:128–135`, `:219–223`). Private wrappers use fail.catch and
+(`stdlib/src/random.i:128–135`, `:219–223`). Private wrappers use fail.catch and
 translate Error to None; they must not leak an error effect into Gen. A None
 derivation discards that attempt/element, or returns None from replay. All paths
 and bounds constructed below are valid, so this fallback is unreachable under
@@ -1144,7 +1144,7 @@ lane, except that the quiet-window and heavy wrappers go before that prefix.
 | `target/release/i test --project std --opt 0` | 1,799 passed, 0 failed after the final source amendments were merged and lazy pi was installed. Includes 331 MPFR cases, 14 property tests, five string-addition tests and all existing tests. |
 | `target/release/i test --project std --opt 2` | 1,799 passed, 0 failed on the same sources. |
 | `target/release/i fmt --check std` | Exit 0. Generated vectors were formatted by their generator, not edited. |
-| `./scripts/old-syntax-check` | Exit 0: 1,194 extracted snippets, exact diagnostics, 19 future-track entries. No Std-3 exception was added or removed. The script sends its cargo build through the heavy wrapper. |
+| `old-syntax-check` | Exit 0: 1,194 extracted snippets, exact diagnostics, 19 future-track entries. No Std-3 exception was added or removed. The script sends its cargo build through the heavy wrapper. |
 | `python3 std/test/std3_interfaces.py` | 49/49 signatures match the corrected note exactly. |
 | `UPDATE=1 /tmp/review-std3/venv/bin/python std/test/float_oracle.py` | Generated 331 bit expectations with MPFR 4.2.2; the same command without UPDATE independently regenerated and compared equal. No Python math output is used as a transcendental oracle. |
 | `python3 std/test/float_hosts.py` | All 331 cases passed on native Wasmtime, Node v24.21.0 and WASI (Wasmtime CLI 49.0.2), at O0 and O2. The native compiler embeds Wasmtime 50. No browser run is claimed. |
@@ -1276,7 +1276,7 @@ Checking after withholding float (all through the dev shell):
 | `target/release/i test --project std --opt 0` | 1,465 passed, 0 failed. |
 | `target/release/i test --project std --opt 2` | 1,465 passed, 0 failed. |
 | `target/release/i fmt --check std` | Exit 0. |
-| `./scripts/old-syntax-check` | Exit 0: 1,193 snippets, 19 existing future entries. |
+| `old-syntax-check` | Exit 0: 1,193 snippets, 19 existing future entries. |
 | `python3 std/test/std3_interfaces.py` | 35/35 signatures match the property/string inventories. |
 | `python3 std/test/property_failures.py` | Harness exit 0: exactly one intentional ordinary property failure at each optimization level. |
 | `git diff --quiet refs/heads/redesign -- std/src/float.i std/test/float_test.i` | Exit 0: both files equal redesign. |

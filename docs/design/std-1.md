@@ -41,7 +41,7 @@ Facts checked by reading code:
 | `std/src/dict.i:24–60`, `:136–143`, `:237–244` | A public type hides private recursive nodes; updates return new values. Follow this encapsulation. |
 | `std/src/string.i:4–6`, `:70–94`, `:110–139`, `:254–308`, `:428–455` | String indexes are codepoints; byte size is separate; concat takes fragments; slice/pop_codepoint convert codepoint lists. Do not repeatedly pop a string in a linear parser. |
 | `std/src/option.i:1–6`, `:27–31`, `:54–59`; `std/src/result.i:1–5`, `:244–252` | Absence and failure are distinct; `Result` and error effects have explicit bridges. |
-| `lib/i/fail.i:10–31` | Raise/catch already exist. Stream error adapters need no new primitive. |
+| `stdlib/src/fail.i:10–31` | Raise/catch already exist. Stream error adapters need no new primitive. |
 | `std/test/list_test.i:1847–1853`, `:1973–1985`, `:2073–2139` | Existing tests cover bounds, error callbacks, labels, known nominal fields, services and control callbacks. Preserve all of these cases for new containers. |
 | `std/test/dict_test.i:420–428`, `:857–1014` | Tests keep old versions and use a deterministic list model. Use that method for sequences. |
 | `std/test/string_test.i:2060–2095`, `:2240–2247`; `std/test/option_test.i:255–280`; `std/test/result_test.i:319–342`, `:372–382` | Empty pieces, Unicode, known fields, deferred callbacks, long walks, and union errors have concrete precedents. |

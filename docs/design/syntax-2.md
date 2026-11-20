@@ -724,7 +724,7 @@ the prototype parser is
 `4679973f535248de7d3739bca4ab745f39c6f9ed5cd6ec39af51c1e5ded31e2a`.
 The production source files were never edited.
 
-The extraction used `scripts/old-syntax-check`'s `snippets()`
+The extraction used `old-syntax-check`'s `snippets()`
 (:105–125), including every tracked `.i`, fenced Markdown and candidate Rust/JS
 literal. I did not apply its fixture substitutions/expectation policy or run
 its full acceptance command. Hence the 352 baseline failures must not be
@@ -838,9 +838,9 @@ The ten affected files with real empty tuples are:
 
 - `crates/ilang-check/tests/projects/attr_entry/src/main.i` (two values).
 - `crates/ilang-check/tests/types/basics.i` (one value).
-- `crates/ilang-syntax/tests/golden/fn_vs_tuple.i` (one value).
-- `crates/ilang-syntax/tests/golden/patterns.i` (one pattern).
-- `crates/ilang-syntax/tests/golden/types.i` (one type).
+- `fn_vs_tuple.i` (one value).
+- `patterns.i` (one pattern).
+- `types.i` (one type).
 - `std/test/string_test.i` and its review-corpus copy under
   `tests/review/cases/review-k4s/std/test/string_test.i` (one value each).
 - `tests/spec/11/text_form.i:83` and `tests/spec/6/data.i:42` (one value each).
@@ -890,7 +890,7 @@ reuse of `Case`, not just parse acceptance.
 ### T3: avoid doing syntax twice
 
 At the observed `lane/a` head `31444065`, the diff against this lane contains
-only the record kernel under `crates/ilang-check/src/types/records/` and its
+only the record kernel under `crates/ilang-check/src/types/shape.rs` and its
 module wiring. `bdd.rs:7–56` defines handles, operations and the demand budget;
 `graph.rs:14–18,53–62` has record-domain identity and record/union/intersection
 nodes. There is no syntax-crate diff. This is a read of a branch snapshot,
@@ -920,7 +920,7 @@ record formatter must land together with T3's syntax consumers.
 | `ilang-syntax/tests/{lex,parse,golden,format,spec}.rs` and fixture directories | New boundary matrix; reparse/canonical-tree and idempotence properties; reviewed new diagnostic goldens. Current properties are in `tests/format.rs:1–9` and `tests/spec.rs:29–54`. |
 | `crates/ilang-check/src/hir.rs:221–260`, `resolve.rs:810,1418,1795,2514`; `types/display.rs:1357` and T3's shown types | Normal `Record` name, no empty tuple surface, record display, preserved single-clause lowering, and scoped pipe/or diagnostic. Use T3's existing structural type representation. |
 | `crates/ilang-wasm/src/lower.rs:1562–1580,2289,2342`; T3 runtime record inspector | Check tuple arity removal at the source boundary; retain existing Case lowering; print record delimiters. Existing nominal `Record` names are unrelated. |
-| `scripts/old-syntax-check : 105–125,143–185`, its JSON, tests and docs; the removed `a2-meaning` finder; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
+| `old-syntax-check`, its JSON, tests and docs; the removed `a2-meaning` finder; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
 | `docs/spec.md`, `docs/design/{syntax,records,meta}.md` | Apply §5 together. Do not leave two accepted contradictory grammars. |
 | `editors/vscode`, package templates, Rust/JS embedded sources, all changed `.i`, comments and text/type expectations | Inventory by source role; update highlighting for caret, bar and match dot; preserve CR/CRLF and layout-sensitive tests. |
 
@@ -992,7 +992,7 @@ I attacked soundness, implementability and source agreement separately.
 1. `{ x | f }` was a clause block under the unchanged probe. Fixed the
    prototype's probe and P3. No comma workaround was introduced.
 2. Blindly grouping every old match subject broke the existing fixture
-   `crates/ilang-syntax/tests/golden/case_head.i`, where the subject begins
+   `case_head.i`, where the subject begins
    with a typed anonymous function. The resulting brace group was read as
    clauses. Fixed migration to group binary, unary and numeric subjects only;
    postfix-safe subjects stay ungrouped. That file now has the same AST.

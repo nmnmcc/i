@@ -103,7 +103,7 @@ Every row below is a shared region. “No addition” means preserve the earlier
 | File and read region | One final responsibility; contributions in T1 → T2 → T3 order |
 |---|---|
 | `crates/ilang-syntax/src/ast.rs:371–406` | On A1's nodes, T1 adds literal leaves and simplifies TypeArg → T2 preserves ValueOf/pattern classification → T3 adds Record/base/parts. Keep attribute/item macro nodes from A1. |
-| `crates/ilang-syntax/src/parser.rs:452–531,1150–1291` | One type-primary dispatch: literals/negative groups → lowercase value reads and syntactic alias-pattern classification → records versus groups. Preserve TypeCall and the complete §5 lookahead contract. |
+| `crates/ilang-syntax/src/parse.rs:452–531,1150–1291` | One type-primary dispatch: literals/negative groups → lowercase value reads and syntactic alias-pattern classification → records versus groups. Preserve TypeCall and the complete §5 lookahead contract. |
 | `crates/ilang-syntax/src/print.rs:528–629`, `format.rs:1472–1552` | Literal/negative type text → Of and alias-pattern text → record parts. All use the same precedence and exact-tree rules. Here `format.rs` is in the same syntax directory. |
 | `hir.rs:167–192,273–296,349–365` | Lit → Of/pattern metadata → Record/labels. Keep aliases as aliases. |
 | `resolve.rs:1329–1467,1568–1660,2630–2697` | Dispatch/visitors above; directional literal ABI checks → Of readiness/context and deferred exports → labels/record rejection at service and host boundaries. No catch-all that hides a new type. |

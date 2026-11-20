@@ -33,10 +33,10 @@ Code read, and its consequences:
 
 | Code region | Checked fact |
 |---|---|
-| `lib/i/clock.i:1`, `lib/i/process.i:1`, `lib/i/stdio.i:1`; `crates/ilang-package/src/library.rs:7–24` | The three IO modules contain reservation comments and export no API. They are embedded by the compiler. Do not add imports of their future names in phase one. |
-| `std/src/option.i:1–6`, `:28–31`; `std/src/result.i:1–5`; `lib/i/fail.i:10–33` | Absence uses Option, fallible pure operations use Result, and fail.from_result/catch bridge to error effects. Follow this style. |
+| `stdlib/src/clock.i:1`, `stdlib/src/process.i:1`, `stdlib/src/stdio.i:1`; `crates/ilang-package/src/library.rs:7–24` | The three IO modules contain reservation comments and export no API. They are embedded by the compiler. Do not add imports of their future names in phase one. |
+| `std/src/option.i:1–6`, `:28–31`; `std/src/result.i:1–5`; `stdlib/src/fail.i:10–33` | Absence uses Option, fallible pure operations use Result, and fail.from_result/catch bridge to error effects. Follow this style. |
 | `std/src/int.i:60–110`, `:355–411` | Integer parsing has an explicit grammar. `/` and remainder helpers differ from floor division/modulo. Negative epoch conversion needs floor division. |
-| `std/src/string.i:70–94`, `:299–308`; `lib/i/core.i:91–117` | Codepoint traversal and fragment concatenation exist. Repeated pop_codepoint reconstructs the remainder; scan one codepoint list or byte array instead. |
+| `std/src/string.i:70–94`, `:299–308`; `stdlib/src/core.i:91–117` | Codepoint traversal and fragment concatenation exist. Repeated pop_codepoint reconstructs the remainder; scan one codepoint list or byte array instead. |
 | `std/src/order.i:21–27`; `std/src/stream.i:43–73`, `:93–109` | Order is Less/Equal/Greater; a stored service row uses an ordinary negative marker to keep it invariant. Reuse that technique for sinks. |
 | `std/src/dict.i:24–60`; `std/src/list.i:493–512` | Nominal storage and left-to-right Result folds are ordinary source; they suffice for descriptor metadata and validation; no typed heterogeneous runtime dictionary is needed. |
 | `crates/ilang-check/src/types/infer.rs:231–247`, `:2127–2156`, `:2256–2285`, `:2340–2348` | Recursive groups start monomorphic; generalization and variance traverse ordinary types, including function effects. Do not propose polymorphic recursive parser trees. |
@@ -867,7 +867,7 @@ for later authorized implementation, not permission to modify other lanes.
 | New `std/src/log.i`, entire file | L1–L6 plus §7 gate; later append stderr and IO imports. No @host declaration. |
 | New `std/test/{time,calendar,cli,log}_test.i`, entire files | All tables above; laws, error ordering and boundary cases. Keep IO-fake cases in the matching second phase. |
 | `crates/ilang-check/src/types/solve.rs:688–714`, `:801–870`, `:950–999`; `infer.rs:2127–2156`; type-checker regression tests | Compiler owner investigates §7. These are starting regions, not a claim that all need edits. Exported generic wrappers and closed client calls need paired regression tests. |
-| `lib/i/{clock,process,stdio}.i:1`, request module and registration `crates/ilang-package/src/library.rs:7–24` | IO/runtime owners replace reservations and add the accepted request APIs. Std-2 edits none of these. |
+| `stdlib/src/{clock,process,stdio}.i:1`, request module and registration `crates/ilang-package/src/library.rs:7–24` | IO/runtime owners replace reservations and add the accepted request APIs. Std-2 edits none of these. |
 | `std/i.toml : 1`; `docs/spec.md` | No manifest or language-spec change required. All new imports are std or accepted i library modules. |
 
 1. Implement pure time first, then calendar. CLI is independent. Log needs
@@ -1201,7 +1201,7 @@ All commands below run from this lane through
 | `./scripts/checks i` | Passed: formatting of lib/std/bench/examples; std 1446 passed at both optimization levels; hello 2 and bench 12 passed at each level; WASI smoke passed. |
 | `target/release/i test --project std --opt 0` and `--opt 2`, as invoked by checks | Both passed, 1446 tests each. These are the runtime acceptance checks. |
 | `target/release/i fmt --check std` | Passed. |
-| `./scripts/old-syntax-check` | Passed: 1181 snippets, exact expected diagnostics, 19 unchanged future-track entries. |
+| `old-syntax-check` | Passed: 1181 snippets, exact expected diagnostics, 19 unchanged future-track entries. |
 | `target/release/i check --project std --types` | Passed; all 55 measured interfaces are listed above. |
 | Executable checker harnesses in time_test.i and calendar_test.i | Required nominal separation E0501 and hidden-constructor/update E0204 cases rejected. Each harness first requires a passing baseline and restores its file in finally. |
 | Executable internal CLI decoder harness in cli_test.i | One internal test passed at each optimization level; test file restored. |

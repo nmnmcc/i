@@ -5,7 +5,7 @@ Source baseline: `68b720e9ebc0d643a3a7831a32a1b97c7ab3c915`.
 
 ## Scope and evidence
 
-This report inventories every module in `lib/i/*.i` and `std/src/*.i`.
+This report inventories every module in `stdlib/src/*.i` and `std/src/*.i`.
 That is 22 `i/` modules and 27 `std/` modules. It also includes
 `std/src/test.is`, the Lisp-surface test module. The report changes no code.
 No build, test, formatter, compiler type query or benchmark was run.
@@ -149,7 +149,7 @@ unstable even though the package version is stable.
 
 ### i/assertion
 
-Source: `lib/i/assertion.i`. Turns assertion failures into ordinary result data.
+Source: `stdlib/src/assertion.i`. Turns assertion failures into ordinary result data.
 
 Exported types: none.
 
@@ -167,7 +167,7 @@ catch : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Assert) -> Result(A, Assert
 
 ### i/big
 
-Source: `lib/i/big.i`. Implements large Int arithmetic and radix printing in i.
+Source: `stdlib/src/big.i`. Implements large Int arithmetic and radix printing in i.
 
 Exported types: none.
 
@@ -191,7 +191,7 @@ to_text : (Int, Int) -> String
 
 ### i/bits
 
-Source: `lib/i/bits.i`. Reads and writes integer bit segments wider than the runtime small-segment path.
+Source: `stdlib/src/bits.i`. Reads and writes integer bit segments wider than the runtime small-segment path.
 
 Exported types: none.
 
@@ -210,7 +210,7 @@ from_int : (Int, Int, Bool) -> BitArray
 
 ### i/clock
 
-Source: `lib/i/clock.i`. Reads monotonic and Unix nanoseconds and waits through a replaceable clock service.
+Source: `stdlib/src/clock.i`. Reads monotonic and Unix nanoseconds and waits through a replaceable clock service.
 
 Export visibility: `Clock(..)`, `ClockError(..)`. Hidden representations below are descriptive only.
 
@@ -237,7 +237,7 @@ sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> N
 
 ### i/control
 
-Source: `lib/i/control.i`. Provides boundaries, escape, suspension, resumption, cancellation and environment capture.
+Source: `stdlib/src/control.i`. Provides boundaries, escape, suspension, resumption, cancellation and environment capture.
 
 Exported types: none.
 
@@ -260,7 +260,7 @@ keep_env : ((A) <- (Fail(E), ..N) -> B) <- N -> (A) <- (Fail(E)) -> B
 
 ### i/core
 
-Source: `lib/i/core.i`. Exposes the small primitive operations that cannot be written in i.
+Source: `stdlib/src/core.i`. Exposes the small primitive operations that cannot be written in i.
 
 Exported types: none.
 
@@ -307,7 +307,7 @@ portable : (A) -> Bool
 
 ### i/fail
 
-Source: `lib/i/fail.i`. Raises, catches and translates typed errors through Fail(E).
+Source: `stdlib/src/fail.i`. Raises, catches and translates typed errors through Fail(E).
 
 Exported types: none.
 
@@ -328,7 +328,7 @@ map_error : (() <- (Fail(E), ..N) -> A, (E) <- N -> B) <- (Fail(B), ..N) -> A
 
 ### i/failure
 
-Source: `lib/i/failure.i`. Implements raise and catch with ordinary service values and control boundaries.
+Source: `stdlib/src/fail.i`. Implements raise and catch with ordinary service values and control boundaries.
 
 Exported types: none.
 
@@ -347,7 +347,7 @@ catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
 
 ### i/fetch
 
-Source: `lib/i/fetch.i`. Adapts a host HTTP fetch capability to typed request operations.
+Source: `stdlib/src/fetch.i`. Adapts a host HTTP fetch capability to typed request operations.
 
 Export visibility: `Fetch`, `Response`. Hidden representations below are descriptive only.
 
@@ -376,7 +376,7 @@ close : (Response) <- (Fetch, request.Await, request.Owner) -> Nil
 
 ### i/float_text
 
-Source: `lib/i/float_text.i`. Prints the shortest round-tripping decimal form of a finite Float.
+Source: `stdlib/src/float_text.i`. Prints the shortest round-tripping decimal form of a finite Float.
 
 Exported types: none.
 
@@ -394,7 +394,7 @@ to_string : (Float) -> String
 
 ### i/fs
 
-Source: `lib/i/fs.i`. Adapts a filesystem service and provides whole-file helpers.
+Source: `stdlib/src/fs.i`. Adapts a filesystem service and provides whole-file helpers.
 
 Export visibility: `Fs`, `File`, `FsError(..)`, `OpenMode(..)`, `Metadata(..)`. Hidden representations below are descriptive only.
 
@@ -439,7 +439,7 @@ read_lines : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Li
 
 ### i/io
 
-Source: `lib/i/io.i`. Defines the simple host text-printing service Io.
+Source: `stdlib/src/io.i`. Defines the simple host text-printing service Io.
 
 Export visibility: `Io(..)`. Hidden representations below are descriptive only.
 
@@ -459,7 +459,7 @@ Exported functions: none.
 
 ### i/key
 
-Source: `lib/i/key.i`. Creates typed identity keys and safely opens heterogeneous keyed values.
+Source: `stdlib/src/key.i`. Creates typed identity keys and safely opens heterogeneous keyed values.
 
 Export visibility: `Lookup(..)`. Hidden representations below are descriptive only.
 
@@ -487,7 +487,7 @@ unwrap : (Key(A), Keyed) -> Lookup(A)
 
 ### i/net
 
-Source: `lib/i/net.i`. Adapts TCP, DNS and UDP operations through a network service.
+Source: `stdlib/src/net.i`. Adapts TCP, DNS and UDP operations through a network service.
 
 Export visibility: `Net`, `Listener`, `Stream`, `Datagram`, `NetError(..)`. Hidden representations below are descriptive only.
 
@@ -531,7 +531,7 @@ byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> 
 
 ### i/process
 
-Source: `lib/i/process.i`. Separates arguments, environment, working directory, entropy and child-process capabilities.
+Source: `stdlib/src/process.i`. Separates arguments, environment, working directory, entropy and child-process capabilities.
 
 Export visibility: `Arguments(..)`, `Environment(..)`, `WorkingDirectory(..)`, `Entropy(..)`, `Process`, `Child`, `Stdio(..)`, `EnvironmentMode(..)`, `Directory(..)`, `ProcessError(..)`. Hidden representations below are descriptive only.
 
@@ -584,7 +584,7 @@ close : (Child) <- (Process, request.Await, request.Owner) -> Nil
 
 ### i/random
 
-Source: `lib/i/random.i`. Implements immutable splittable pseudo-random generators with reproducible paths.
+Source: `stdlib/src/random.i`. Implements immutable splittable pseudo-random generators with reproducible paths.
 
 Export visibility: `Generator`, `RandomError(..)`. Hidden representations below are descriptive only.
 
@@ -616,7 +616,7 @@ at_path : (Generator, List(Int)) <- (Fail(RandomError)) -> Generator
 
 ### i/request
 
-Source: `lib/i/request.i`. Tracks typed host work, cancellation ownership and replaceable waits.
+Source: `stdlib/src/request.i`. Tracks typed host work, cancellation ownership and replaceable waits.
 
 Export visibility: `Await(..)`, `Root(..)`, `Owner(..)`, `RequestState(..)`. Hidden representations below are descriptive only.
 
@@ -669,7 +669,7 @@ poll : () -> Nil
 
 ### i/resource
 
-Source: `lib/i/resource.i`. Runs guaranteed cleanup around computations and acquired values.
+Source: `stdlib/src/resource.i`. Runs guaranteed cleanup around computations and acquired values.
 
 Exported types: none.
 
@@ -688,7 +688,7 @@ acquire : (() <- (Fail(E), ..N) -> A, (A) <- N -> Nil, (A) <- (Fail(E), ..N) -> 
 
 ### i/stdio
 
-Source: `lib/i/stdio.i`. Reads and writes standard IO with typed errors and owned requests.
+Source: `stdlib/src/stdio.i`. Reads and writes standard IO with typed errors and owned requests.
 
 Export visibility: `Stdio(..)`, `StdioError(..)`. Hidden representations below are descriptive only.
 
@@ -719,7 +719,7 @@ print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner
 
 ### i/syntax
 
-Source: `lib/i/syntax.i`. Exposes source syntax and compiler query services to macro programs.
+Source: `stdlib/src/syntax.i`. Exposes source syntax and compiler query services to macro programs.
 
 Export visibility: `Syntax`, `Node(..)`, `TypeHandle`, `Position(..)`, `SyntaxError(..)`, `Definitions(..)`, `Items(..)`, `Diagnostics(..)`, `Types(..)`, `Truth(..)`. Hidden representations below are descriptive only.
 
@@ -796,7 +796,7 @@ members : (Syntax) <- (Fail(SyntaxError), Types) -> List(Syntax)
 
 ### i/task
 
-Source: `lib/i/task.i`. Implements structured tasks, task groups, events, rendezvous channels and scheduler-owned state.
+Source: `stdlib/src/task.i`. Implements structured tasks, task groups, events, rendezvous channels and scheduler-owned state.
 
 Export visibility: `Scheduler`, `DetachedScheduler`, `Runner`, `DetachedRunner`, `Scope`, `Task`, `Channel`, `Event`, `Shared`, `Ref`, `ScheduleError(..)`. Hidden representations below are descriptive only.
 
@@ -862,7 +862,7 @@ map_concurrently : (List(A), (A) <- (Fail(E), ..N) -> B) <- (Fail(E), N - reques
 
 ### i/tls
 
-Source: `lib/i/tls.i`. Upgrades connected network streams to TLS and exposes their byte operations.
+Source: `stdlib/src/tls.i`. Upgrades connected network streams to TLS and exposes their byte operations.
 
 Export visibility: `Tls`, `Stream`, `TlsError(..)`. Hidden representations below are descriptive only.
 
@@ -2288,15 +2288,15 @@ rule explicit.
 
 | Source | Observed conflict or migration residue |
 |---|---|
-| `lib/i/task.i` | Runner and Scheduler are each first declared as labelled data and later redeclared as unions containing the same name. |
-| `lib/i/process.i` | Directory is first `(String)` and later `InheritDirectory \| Directory`. |
+| `stdlib/src/task.i` | Runner and Scheduler are each first declared as labelled data and later redeclared as unions containing the same name. |
+| `stdlib/src/process.i` | Directory is first `(String)` and later `InheritDirectory \| Directory`. |
 | `std/src/http.i` | Headers is first `(List((String,String)))` and later `Headers \| RawHeaders`. Public client returns source alias ClientFunctions, absent from its export list. |
-| `lib/i/syntax.i` | Int/Float wrapper constructors and the old Node/Position definitions remain, against syntax-3.md §§2.8 and 6.8. |
-| `lib/i/fail.i`, `lib/i/failure.i` | Intrinsic error entry points and ordinary-service entry points coexist. E3 is the stated consolidation point. |
-| `lib/i/assertion.i`, `std/src/list.i`, `std/src/log.i`, `std/src/test.is` | Old ^/!/?, old type declarations or quoted environment statements survive in comments/macros. Comments can mislead even where executable source has moved. |
+| `stdlib/src/syntax.i` | Int/Float wrapper constructors and the old Node/Position definitions remain, against syntax-3.md §§2.8 and 6.8. |
+| `stdlib/src/fail.i` | Intrinsic error entry points and ordinary-service entry points coexist. E3 is the stated consolidation point. |
+| `stdlib/src/assertion.i`, `std/src/list.i`, `std/src/log.i`, `std/src/test.is` | Old ^/!/?, old type declarations or quoted environment statements survive in comments/macros. Comments can mislead even where executable source has moved. |
 | `std/test/property_failures.py` | The embedded probe uses positional `property.Config(42,1,0,0,0)` although Config has labelled fields. This probe needs the same syntax migration as ordinary .i tests. |
 | `std/test/std3_interfaces.py` | This script compares 35 property/string type strings against `docs/design/std-3.md`. It is not an all-std public-interface snapshot, and its expected strings need review when E4 changes APIs. |
-| `lib/i/big.i`, `lib/i/bits.i`, `lib/i/float_text.i` | Comments state runtime call hooks for library algorithms. Distinguish a necessary primitive ABI from compiler recognition of library names; the owner forbids library privilege. This audit does not change those hooks. |
+| `stdlib/src/big.i`, `stdlib/src/bits.i`, `stdlib/src/float_text.i` | Comments state runtime call hooks for library algorithms. Distinguish a necessary primitive ABI from compiler recognition of library names; the owner forbids library privilege. This audit does not change those hooks. |
 
 Some hidden exported type representations also mention private implementation
 types, such as Dict's Node, Sequence's Tree and Task's info types. Review this

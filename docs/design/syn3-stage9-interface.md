@@ -18,7 +18,7 @@ both functions of two parameters.
 
 ## 2. A chain with several shape groups
 
-The syntax-three front (`crates/ilang-syntax/src/syn3/lower.rs`) partitions
+The syntax-three front (`crates/ilang-syntax/src/parse.rs`) partitions
 the branches of a chain by shape. A chain is a **multi chain** when it has
 more than one group or when its one group has a label.
 

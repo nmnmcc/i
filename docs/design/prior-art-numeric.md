@@ -993,7 +993,7 @@ No full repository test run is appropriate for this note-only change. The
 native experiment is in §6.6. Source claims were checked against the pinned
 files. All six i code fences parsed without diagnostics using the existing
 `/home/agent/Programming/i/.rd/integ/target/debug/examples/parse-snippets`
-(length-prefixed UTF-8 input, as in `scripts/old-syntax-check : 130–136`);
+(length-prefixed UTF-8 input, as in `old-syntax-check`);
 this checks syntax, not inference or execution. Final staged diff checks also
 passed. The counterexample results above are reasoned from
 the specification, not reported as executions of future lowering.
