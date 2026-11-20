@@ -191,7 +191,7 @@ fn check_reports_missing_blank_lines_after_header_groups() {
 
 #[test]
 fn constructor_values_and_patterns_are_written_as_calls() {
-    let old = "f = (b : Bool) -> Int { b |> (True) { 1 } & (False) { 0 } }\ng = () { f(True) }\n";
+    let old = "f = (b : Bool) -> Int { b |> (True) { 1 } & (False) { 0 } }\ng = () { f(True) }\nh = (a = Int) -> Int { a |> (Int) { a } }\n";
     let called = "g = () { True() }\n";
     let dir = package(&[("src/old.i", old), ("src/called.i", called)]);
     let out = fmt(&[], dir.path());
@@ -206,9 +206,19 @@ fn constructor_values_and_patterns_are_written_as_calls() {
         "{new}"
     );
     assert!(!new.contains("()()"), "{new}");
+    assert!(
+        new.contains("(a = Int)") && new.contains("(Int)") && !new.contains("Int()"),
+        "a builtin type name is not a constructor: {new}"
+    );
     let called_new = read(dir.path(), "src/called.i");
-    assert!(called_new.contains("True()") && !called_new.contains("()()"), "{called_new}");
-    assert!(fmt(&["--check"], dir.path()).status.success(), "a second format changes nothing");
+    assert!(
+        called_new.contains("True()") && !called_new.contains("()()"),
+        "{called_new}"
+    );
+    assert!(
+        fmt(&["--check"], dir.path()).status.success(),
+        "a second format changes nothing"
+    );
     assert!(fmt(&[], dir.path()).status.success());
     assert_eq!(read(dir.path(), "src/old.i"), new);
     assert_eq!(read(dir.path(), "src/called.i"), called_new);
@@ -216,7 +226,8 @@ fn constructor_values_and_patterns_are_written_as_calls() {
 
 #[test]
 fn conversion_to_lisp_writes_constructor_values_as_calls() {
-    let source = "x = True\ny = Some(1)\nf = (b : Bool) -> Int { b |> (True) { 1 } & (False) { 0 } }\n";
+    let source =
+        "x = True\ny = Some(1)\nf = (b : Bool) -> Int { b |> (True) { 1 } & (False) { 0 } }\n";
     let dir = package(&[("src/main.i", source)]);
     let out = fmt(&["--to", "is"], dir.path());
     assert!(
@@ -226,7 +237,43 @@ fn conversion_to_lisp_writes_constructor_values_as_calls() {
     );
     let converted = read(dir.path(), "src/main.is");
     assert!(converted.contains("(= x (True))"), "{converted}");
-    assert!(converted.contains("(Some 1)") && !converted.contains("((Some)"), "{converted}");
-    assert!(converted.contains("(True)") && converted.contains("(False)"), "{converted}");
+    assert!(
+        converted.contains("(Some 1)") && !converted.contains("((Some)"),
+        "{converted}"
+    );
+    assert!(
+        converted.contains("(True)") && converted.contains("(False)"),
+        "{converted}"
+    );
+    assert!(fmt(&["--check"], dir.path()).status.success());
+}
+
+#[test]
+fn lisp_constructor_values_are_written_as_calls() {
+    let source = "(= First (,))\n\n(= f (-> (, (= a Int) (: b Bool)) Bool {(= x True) (= y (True x)) (= z (. m Some)) (|> a (& (-> (, Int) _ False) (-> (, True) _ True)))}))\n";
+    let pretty = ilang_syntax::lisp::format(source).unwrap();
+    assert!(pretty.contains("(= First (,))"), "{pretty}");
+    assert!(pretty.contains("(= x (True))"), "{pretty}");
+    assert!(
+        pretty.contains("(True x)") && !pretty.contains("((True)"),
+        "{pretty}"
+    );
+    assert!(pretty.contains("((. m Some))"), "{pretty}");
+    assert!(
+        pretty.contains("(= a Int)") && !pretty.contains("(Int)"),
+        "{pretty}"
+    );
+    assert!(
+        pretty.contains("(: b Bool)) Bool"),
+        "a type is not a constructor: {pretty}"
+    );
+    assert!(
+        pretty.contains("(-> (, Int) _ (False))") && pretty.contains("(-> (, (True)) _ (True))"),
+        "{pretty}"
+    );
+    assert_eq!(ilang_syntax::lisp::format(&pretty).unwrap(), pretty);
+    let dir = package(&[("src/main.is", source)]);
+    assert!(fmt(&[], dir.path()).status.success());
+    assert_eq!(read(dir.path(), "src/main.is"), pretty);
     assert!(fmt(&["--check"], dir.path()).status.success());
 }

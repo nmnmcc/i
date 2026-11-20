@@ -159,7 +159,9 @@ fn apply(head: Datum, span: Span, parts: impl IntoIterator<Item = Datum>) -> Dat
     list(span, std::iter::once(head).chain(parts).collect())
 }
 
-/// A constructor name: its first character is upper case.
+use crate::print::is_constructor;
+
+/// An UpName: its first character is upper case.
 fn is_upper(name: &str) -> bool {
     name.chars().next().is_some_and(char::is_uppercase)
 }
@@ -540,7 +542,7 @@ fn expr(e: &Expr) -> Datum {
                 .unwrap_or_else(|| string("", Span::new(span.start, span.start)));
             it.fold(first, |acc, x| form("<>", span, [acc, x]))
         }
-        ExprKind::Name { module, name } if is_upper(&name.name) => {
+        ExprKind::Name { module, name } if is_constructor(&name.name) => {
             list(span, vec![qualified(module, name, span)])
         }
         ExprKind::Name { module, name } => qualified(module, name, span),
@@ -691,7 +693,8 @@ fn pattern(p: &Pattern) -> Datum {
         } => {
             let head = qualified(module, n, n.span.0);
             match args {
-                None => apply(head, span, std::iter::empty()),
+                None if is_constructor(&n.name) => apply(head, span, std::iter::empty()),
+                None => head,
                 Some(args) => apply(head, span, dpitems(args, span)),
             }
         }

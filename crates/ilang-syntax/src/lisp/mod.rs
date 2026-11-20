@@ -257,11 +257,11 @@ pub fn parse_source(source: &str) -> (crate::ast::Module, Vec<Diagnostic>) {
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {
     // The rows are checked by the source reader; the layout is the
     // source-preserving one of the Lisp convention, which keeps comments.
-    let (_, diagnostics) = crate::rows::from_lisp(source);
+    let (mut module, diagnostics) = crate::rows::from_lisp(source);
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
-    format::format(source)
+    format::format(source, &format::constructors(&mut module))
 }
 
 struct Parser<'a> {

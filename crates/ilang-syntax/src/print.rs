@@ -351,9 +351,34 @@ fn float(x: f64) -> String {
     }
 }
 
-/// A constructor name: its first character is upper case.
+/// An UpName: its first character is upper case.
 fn is_upper(name: &str) -> bool {
     name.chars().next().is_some_and(char::is_uppercase)
+}
+
+/// The builtin type names that are valid as type-test patterns (`(Int)`,
+/// `a = Int`). Written bare they are the type, so the formatter does not add
+/// the `()` of a constructor call to them.
+pub(crate) const BUILTIN_TYPES: [&str; 13] = [
+    "Int",
+    "Float",
+    "String",
+    "List",
+    "BitArray",
+    "UtfCodepoint",
+    "Never",
+    "Boundary",
+    "Continuation",
+    "Key",
+    "Keyed",
+    "Request",
+    "Ticket",
+];
+
+/// A name the formatter writes with its call (`True()`): an UpName that is
+/// not a builtin type name.
+pub(crate) fn is_constructor(name: &str) -> bool {
+    is_upper(name) && !BUILTIN_TYPES.contains(&name)
 }
 
 fn qualified(module: &Option<Ident>, name: &Ident) -> String {
@@ -950,7 +975,7 @@ impl Printer<'_> {
                 s.push('"');
                 t(s)
             }
-            ExprKind::Name { module, name } if is_upper(&name.name) => {
+            ExprKind::Name { module, name } if is_constructor(&name.name) => {
                 cat(vec![t(qualified(module, name)), t("()")])
             }
             ExprKind::Name { module, name } => t(qualified(module, name)),
@@ -1175,7 +1200,11 @@ impl Printer<'_> {
             }
             PatternKind::Ctor { module, name, args } => {
                 let mut out = vec![t(qualified(module, name))];
-                out.push(self.data_pattern(args.as_deref().unwrap_or(&[])));
+                match args {
+                    Some(args) => out.push(self.data_pattern(args)),
+                    None if is_constructor(&name.name) => out.push(self.data_pattern(&[])),
+                    None => {}
+                }
                 cat(out)
             }
             PatternKind::Data(items) => self.data_pattern(items),
