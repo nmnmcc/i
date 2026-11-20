@@ -59,11 +59,12 @@ fn constructor_call_passes() {
     assert!(stdout.contains("app/main.x : True"), "{stdout}");
 }
 
-/// A function whose parameter is the empty data ignores its argument, so a
-/// bare zero-payload constructor goes where a function with parameters is
-/// expected.
+/// A constructor is a function of the data it declares. A function whose
+/// parameter is `()` takes no argument, so a bare zero-payload constructor is
+/// not a function with parameters, and a call passes exactly the declared
+/// data.
 #[test]
-fn zero_parameter_function_ignores_its_argument() {
+fn a_zero_parameter_constructor_is_not_a_function_with_parameters() {
     let out = check(
         "Bool = True | False\n\
          apply = (f : (Int) -> Bool, n : Int) -> Bool { f(n) }\n\
@@ -73,16 +74,12 @@ fn zero_parameter_function_ignores_its_argument() {
          c = True(1)\n",
         true,
     );
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(out.status.success(), "stdout: {stdout}\nstderr: {stderr}");
-    assert!(stdout.contains("app/main.a : Bool"), "{stdout}");
-    assert!(stdout.contains("app/main.b : Bool"), "{stdout}");
-    assert!(stdout.contains("app/main.c : True"), "{stdout}");
+    assert!(!out.status.success());
+    let err = String::from_utf8(out.stderr).unwrap();
+    assert!(err.contains("error[E0501]"), "{err}");
 }
 
-/// Only the zero-parameter side ignores data: a function that needs an
-/// argument is not a function of no arguments.
+/// A function that needs an argument is not a function of no arguments.
 #[test]
 fn function_with_parameters_is_not_a_zero_parameter_function() {
     let out = check(

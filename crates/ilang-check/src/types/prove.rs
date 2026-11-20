@@ -266,8 +266,7 @@ impl Prover<'_> {
                 }
                 Ok(true)
             }
-            (Ty::Fn(f), Ty::Fn(g)) => Ok((f.parts() == Some(&[])
-                || self.sub(&g.param, &f.param, Mode::Value)?)
+            (Ty::Fn(f), Ty::Fn(g)) => Ok(self.sub(&g.param, &f.param, Mode::Value)?
                 && self.sub(&f.ret, &g.ret, Mode::Value)?
                 && self.sub(&f.env, &g.env, Mode::Env)?),
             _ => Ok(false),

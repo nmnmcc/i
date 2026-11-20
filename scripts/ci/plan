@@ -117,6 +117,40 @@ def shard_tool(*args):
     return done.stdout
 
 
+REGISTERED_TARGET_SETS = (
+    ('ilang-cli', 'ilang-cli-tests'),
+    ('ilang-check', 'ilang-check-tests'),
+)
+# `spec` is planned by the spec job, not from a test set.
+UNPLANNED_TARGETS = frozenset({'spec'})
+
+
+def assert_test_targets_registered(table, path):
+    """Every test target of the two crates must have a key in its set.
+
+    The shards are planned from the key lists, so a target without a key never
+    runs: the gate stays green while a test is dead. When this fails, run
+    `scripts/ci/refresh-costs --sync-keys` and commit the table.
+    """
+    sets = table.get('sets', {})
+    missing = []
+    for crate, set_name in REGISTERED_TARGET_SETS:
+        keys = {
+            k[5:]
+            for k in sets.get(set_name, {}).get('keys', [])
+            if k.startswith('test:')
+        }
+        real = {p.stem for p in (ROOT / 'crates' / crate / 'tests').glob('*.rs')}
+        for name in sorted(real - keys - UNPLANNED_TARGETS):
+            missing.append(f'{set_name}: crates/{crate}/tests/{name}.rs')
+    if missing:
+        sys.exit(
+            f'plan: {path}: test target(s) are never planned; run '
+            'scripts/ci/refresh-costs --sync-keys and commit it:\n  '
+            + '\n  '.join(missing)
+        )
+
+
 def costs_without_value_types(costs, out):
     """The cost table with ilang-check's value_types left out of
     ilang-check-tests: it is a job of its own (set value-type-recovery-cases)."""
@@ -172,6 +206,7 @@ def main():
 
     a.out.mkdir(parents=True, exist_ok=True)
     costs = (ROOT / a.costs) if not a.costs.is_absolute() else a.costs
+    assert_test_targets_registered(json.loads(costs.read_text()), costs)
     planned_costs = costs_without_value_types(costs, a.out)
 
     outputs = {'max_parallel': str(MAX_PARALLEL), 'changed': json.dumps(changed, separators=(',', ':'))}

@@ -8,9 +8,9 @@ use ilang_check::code;
 use ilang_package::Diagnostic;
 
 const BARE: &str =
-    "r = (x : Bool) -> Int { x |> (True) { 1 } & (False) { 0 } }\nmain = () { r(True) }\n";
+    "r = (x : Bool) -> Int { x |> (True) { 1 } & (False) { 0 } }\nmain = () { r(True()) }\n";
 const CALLED: &str =
-    "r = (x : Bool) -> Int { x |> (True()) { 1 } & (False()) { 0 } }\nmain = () { r(True) }\n";
+    "r = (x : Bool) -> Int { x |> (True()) { 1 } & (False()) { 0 } }\nmain = () { r(True()) }\n";
 
 #[test]
 fn bare_constructor_pattern_reports() {
