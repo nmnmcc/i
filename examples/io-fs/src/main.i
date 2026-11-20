@@ -4,6 +4,7 @@
 	i/fail
 	i/clock
 	i/core
+	i/resource
 )
 
 // Program entry.
@@ -23,11 +24,14 @@ main = () {
 	fs.remove(moved)
 	fs.remove(dir)
 	assert(
-		fail.catch(() { fs.open(moved, fs.ReadOnly) }) ==
+		fail.catch(() {
+			resource.scoped(() { fs.open(moved, fs.ReadOnly) })
+		}) ==
 			Error(
 				fs.FsError(
 					operation = "open",
 					path = moved,
+					reason = fs.NotFound,
 					code = "not_found",
 				),
 			),
