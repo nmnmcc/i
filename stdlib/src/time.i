@@ -179,7 +179,10 @@ max_timeout = (9223372036854775807)
 
 /// What the race below gives: the body's value, the deadline, or a clock
 /// that could not install the timer.
-Outcome(A) = Ran(A) | Expired | ClockFailed(clock.ClockError)
+Ran(A) = (A)
+Expired = ()
+ClockFailed = (clock.ClockError)
+Outcome(A) = Ran(A) | Expired | ClockFailed
 
 /// Runs `body` and gives its value, or raises `Timeout(after = after)` when
 /// `after` passes first. A zero or negative `after` raises at once and does
