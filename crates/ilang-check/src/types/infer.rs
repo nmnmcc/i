@@ -1676,7 +1676,7 @@ impl<'a> Checker<'a> {
         let text = &self.sources.get(self.p.module(self.module).source).text;
         let source = text.get(e.span.start as usize..e.span.end as usize)?;
         Some(format!(
-            " `{source}` is a constructor function; call it: `{source}()`"
+            ". `{source}` is a constructor function; call it: `{source}()`"
         ))
     }
 
@@ -1712,7 +1712,7 @@ impl<'a> Checker<'a> {
             return None;
         }
         Some(format!(
-            " `{source}` is a constructor function; call it: `{source}()`"
+            ". `{source}` is a constructor function; call it: `{source}()`"
         ))
     }
 

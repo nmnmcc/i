@@ -11,8 +11,8 @@
 settle = () <- (own : task.Scheduler) -> () {
 	go = (n : Int) {
 		{ n == 0 } |>
-			(True) { () }
-			& (False) {
+			(True()) { () }
+			& (False()) {
 				task.yield()
 				go(n - 1)
 			}
@@ -107,8 +107,8 @@ enter = (r : task.Ref(Entry)) <- (own : task.Scheduler) -> () {
 	task.update(r, (e : Entry) {
 		now = e.now + 1
 		{ e.peak > now } |>
-			(True) { (Entry(now = now, peak = e.peak), ()) }
-			& (False) { (Entry(now = now, peak = now), ()) }
+			(True()) { (Entry(now = now, peak = e.peak), ()) }
+			& (False()) { (Entry(now = now, peak = now), ()) }
 	})
 }
 

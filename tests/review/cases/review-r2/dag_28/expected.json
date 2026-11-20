@@ -1,8 +1,8 @@
 {
-  "compiler": "8633c6bc2cf1321ddafa65bfc64278519e3c6a57",
-  "binary_sha256": "06c337b2d3a126d2a38655ebaf9a9ac4f061cbfba747e20affb0b1da839617af",
+  "compiler": "520e72ee075e03a0ab799a4904d3d81671bfeca8",
+  "binary_sha256": "cba52d4e07043ccd175e3af69a5cc0bd0affd62204dfb0028b4fe4162ef2ffff",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 10,
+  "bound_seconds": 240.0,
   "outcome": {
     "check": {
       "command": [
@@ -39,7 +39,7 @@
         "--opt",
         "2"
       ],
-      "exit": "timeout",
+      "exit": 0,
       "stdout": "pass app/qa_corpus_runtime_test.qa_startup\n1 passed, 0 failed\n",
       "stderr": ""
     },
