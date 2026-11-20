@@ -136,6 +136,39 @@ jobs:
           ./result-i/bin/i test --project stdlib --opt 0
           echo "stdlib tests (--opt 0): $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # The same package as a native executable, default target: the host
+      # architecture, no cross compilation. Run it once in its project and
+      # once from a clean directory with an empty environment, so a path to
+      # the compiler, the project or the build tree would fail.
+      - name: Build and run the native executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/home"
+          mkdir -p "$HOME"
+          # The generated package depends on the stdlib package at its tag;
+          # point it at this checkout's stdlib, as `i new` did.
+          ILANG_GIT_URLS=$("$GITHUB_WORKSPACE/scripts/dev-library-repo" "$GITHUB_WORKSPACE/stdlib" "$RUNNER_TEMP/git-native")
+          export ILANG_GIT_URLS
+          cd "$RUNNER_TEMP"
+          i="$GITHUB_WORKSPACE/result-i/bin/i"
+          start=$(date +%s)
+          "$i" build --project demo
+          echo "native build: $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
+          native="$RUNNER_TEMP/demo/build/demo"
+          test -x "$native"
+          out=$("$native")
+          test "$out" = "Hello, demo!"
+          echo "native run: $out"
+          clean="$RUNNER_TEMP/native-clean"
+          rm -rf "$clean"
+          mkdir -p "$clean"
+          cp "$native" "$clean/demo"
+          chmod +x "$clean/demo"
+          out=$(cd "$clean" && env -i ./demo)
+          test "$out" = "Hello, demo!"
+          echo "native run from a clean directory: $out"
+
       # `i-bin` needs an archive. This run has no published release, so build
       # the archive the release workflow would upload for this platform, pin
       # it in nix/release.nix, and then build `.#i-bin` through the real
