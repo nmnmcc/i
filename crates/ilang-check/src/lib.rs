@@ -121,6 +121,7 @@ pub mod code {
     pub const BIT_PATTERN: &str = "E0519";
     // E0520 became warning W0503: disjoint equality is well defined.
     pub const ENTRY_TYPE: &str = "E0521";
+    pub const CONSTRUCTOR_AS_PATTERN: &str = "E0522";
     // Shape groups.
     pub const NO_SHAPE_GROUP: &str = "E0550";
     pub const NO_BRANCH_SELECTED: &str = "E0552";
