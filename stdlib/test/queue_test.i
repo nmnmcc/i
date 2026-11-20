@@ -218,6 +218,25 @@ test("queue_end_wakes_waiting_taker_test", () {
 	()
 })
 
+test("queue_poll_after_fail_keeps_the_waiting_takers_value_test", () {
+	got = in_queue_scope((s) {
+		q : queue.Queue(Int, String) = queue.unbounded()
+		taker = task.go(s, () { fail.catch(() { take_soon(q) }) })
+		task.yield()
+		task.yield()
+		must(() { queue.offer(q, 1) })
+		queue.fail(q, "boom")
+		// The taker is still first in line, so the failure is not reported
+		// to the poll before the value is drained.
+		before = fail.catch(() { queue.poll(q) })
+		taken = task.join(taker)
+		after = fail.catch(() { queue.poll(q) })
+		(before, taken, after)
+	})
+	assert(got == (Ok(None), Ok(Some(1)), Error("boom")))
+	()
+})
+
 test("queue_fail_drains_then_raises_test", () {
 	got = in_queue_scope((s) {
 		q : queue.Queue(Int, String) = queue.unbounded()

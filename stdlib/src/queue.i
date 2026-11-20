@@ -556,9 +556,14 @@ poll = <A, E>(q : Queue(A, E)) <- (
 	error : Fail(E),
 ) -> Option(A) {
 	step = task.update(q.state, (state : QueueState(A, E)) {
-		// A waiting taker is first in line; a poll never takes its value.
+		// A waiting taker is first in line: a poll never takes its value,
+		// and a drained failure is only reported once nothing is left.
 		{ state.takers != [] } |>
-			(True) { nothing_to_take(state) }
+			(True) {
+				{ sequence.is_empty(state.buffer) } |>
+					(True) { nothing_to_take(state) }
+					& (False) { (state, TakeDone(None)) }
+			}
 			& (False) {
 				sequence.pop_front(state.buffer) |>
 					(Some((value, rest))) {
