@@ -1377,8 +1377,11 @@ impl Solver {
             }
             (Ty::Fn(f), Ty::Fn(g)) => {
                 // One data parameter; a call of another
-                // shape is a mismatch of the parameter data.
-                self.constrain(&g.param, &f.param);
+                // shape is a mismatch of the parameter data. A function
+                // whose parameter is the empty data ignores its argument.
+                if f.parts() != Some(&[]) {
+                    self.constrain(&g.param, &f.param);
+                }
                 self.constrain(&f.ret, &g.ret);
                 self.constrain_env(&f.env, &g.env);
             }

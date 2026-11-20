@@ -1633,6 +1633,11 @@ impl<'a> Checker<'a> {
         {
             message.push_str(&hint);
         }
+        if matches!(f.kind, FailKind::Mismatch | FailKind::Values)
+            && let Some(hint) = self.constructor_call_hint(&f.lhs, span)
+        {
+            message.push_str(&hint);
+        }
         if let Some(fixed) = self.fix_notes.iter().find_map(|v| self.reads.fixed.get(v)) {
             message.push_str(&format!(
                 " (this type was fixed here: {})",
@@ -1641,6 +1646,42 @@ impl<'a> Checker<'a> {
         }
         self.fix_notes.clear();
         self.error(code, span, message);
+    }
+
+    /// A bare zero-field constructor written where its result is expected:
+    /// the value is the constructor function, so offer the call.
+    fn constructor_call_hint(&self, lhs: &Ty, span: Span) -> Option<String> {
+        let Ty::Fn(ft) = lhs else {
+            return None;
+        };
+        if ft.parts() != Some(&[]) || ft.env != Ty::Never {
+            return None;
+        }
+        let Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) = &ft.ret else {
+            return None;
+        };
+        let TypeBody::Custom(ctors) = &self.p.ty(*id).body else {
+            return None;
+        };
+        let [ctor] = ctors.as_slice() else {
+            return None;
+        };
+        if !ctor.fields.is_empty() {
+            return None;
+        }
+        let text = &self.sources.get(self.p.module(self.module).source).text;
+        let source = text.get(span.start as usize..span.end as usize)?;
+        let segments: Vec<&str> = source.split('.').collect();
+        let word = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_');
+        if segments.len() > 2 || !segments.iter().all(|s| word(s)) {
+            return None;
+        }
+        if segments.last() != Some(&ctor.name.as_str()) {
+            return None;
+        }
+        Some(format!(
+            " `{source}` is a constructor function; call it: `{source}()`"
+        ))
     }
 
     /// Only offer a grouping repair for written, one-position data at the
@@ -1944,9 +1985,6 @@ impl<'a> Checker<'a> {
         let targs = self.fresh_args(c.ty);
         let fields = self.ctor_fields(c, &targs);
         let t = Ty::named(TypeRef::Custom(c.ty), targs);
-        if fields.is_empty() {
-            return t;
-        }
         Ty::Fn(Box::new(FnTy::new(fields, t, Ty::Never)))
     }
 
@@ -2572,9 +2610,12 @@ impl<'a> Checker<'a> {
             }
             Ty::Fn(ft) => {
                 // The argument data of another shape is a
-                // mismatch of the parameter.
-                let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
-                self.sub2(&data, &ft.param, span, callee.span);
+                // mismatch of the parameter, except that a function whose
+                // parameter is the empty data ignores its argument.
+                if ft.parts() != Some(&[]) {
+                    let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
+                    self.sub2(&data, &ft.param, span, callee.span);
+                }
                 self.add_env(ft.env.clone());
                 ft.ret.clone()
             }
