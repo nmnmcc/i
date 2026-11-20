@@ -1,4 +1,4 @@
 name="time"
 
 [dependencies]
-i = { path = "../../../../../../stdlib" }
+i = "github.com/nmnmcc/i//stdlib@0.1.0"
