@@ -119,7 +119,8 @@ main = () {
 			"sh",
 			[
 				"-c",
-				"ps -C sleep -o ppid=,args= | grep -Eq \"^ *$PPID +sleep 30$\"; test $? -eq 1",
+				// `ps -A` must work, or the check would pass without looking.
+				"ps -A >/dev/null 2>&1 || exit 2; ps -A -o ppid=,args= | grep -Eq \"^ *$PPID +sleep 30$\" && exit 1; exit 0",
 			],
 			process.Null,
 			process.Null,

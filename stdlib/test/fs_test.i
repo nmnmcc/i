@@ -7,6 +7,8 @@
 	i/core
 	i/string
 	i/list
+	i/task
+	option = (Some, None) = i/option
 )
 
 // A path under the temporary directory that no other test or run uses.
@@ -204,18 +206,20 @@ test("fs_whole_file_test", () {
 
 // The body fails while the scope owns an open file. The release (`close`)
 // needs no `Fail`, so it runs after the error has left the body, and the run
-// goes on.
+// goes on. The handle is kept in a ref so the test can see that it is closed.
 test("fs_scope_error_releases_handle_test", () {
-	path = fresh("cancel")
+	path = fresh("error")
 	boom = fs.FsError(
 		operation = "test",
 		path = path,
 		reason = fs.Other,
 		code = "boom",
 	)
+	slot : task.Ref(Option(fs.File)) = task.ref(None)
 	r = fail.catch(() {
 		resource.scoped(() {
 			f = fs.open(path, fs.WriteTruncate)
+			task.set(slot, Some(f))
 			fs.write(f, <<"partial":utf8>>)
 			fs.flush(f)
 			{ fs.metadata(path).size == 7 } |>
@@ -224,7 +228,94 @@ test("fs_scope_error_releases_handle_test", () {
 		})
 	})
 	assert(r == Error(boom))
+	task.get(slot) |>
+		(Some(f)) {
+			assert(
+				fail.catch(() { fs.read(f, 1) }) ==
+					Error(
+						fs.FsError(
+							operation = "read",
+							path = path,
+							reason = fs.Closed,
+							code = "closed",
+						),
+					),
+			)
+		}
+		& (None) { panic("fs_test: the handle was not kept") }
 	assert(fs.read_file(path) == <<"partial":utf8>>)
+	fs.remove(path)
+	()
+})
+
+// A cancelled task closes the file its own scope owns: the losing race branch
+// is cancelled while it waits, and the handle it sent out is closed.
+test("fs_cancel_releases_handle_test", () {
+	path = fresh("cancel")
+	fs.write_file(path, <<"x":utf8>>)
+	got = task.run(() {
+		task.scope((_) {
+			ready : task.Channel(fs.File) = task.channel()
+			task.race(
+				() {
+					resource.scoped(() {
+						f = fs.open(path, fs.ReadOnly)
+						task.send(ready, f)
+						task.sync(task.never())
+					})
+				},
+				() { task.receive(ready) },
+			)
+		})
+	})
+	assert(
+		fail.catch(() { fs.read(got, 1) }) ==
+			Error(
+				fs.FsError(
+					operation = "read",
+					path = path,
+					reason = fs.Closed,
+					code = "closed",
+				),
+			),
+	)
+	fs.remove(path)
+	()
+})
+
+test("fs_copy_same_path_test", () {
+	path = fresh("copy-same")
+	fs.write_file(path, <<"keep":utf8>>)
+	assert(
+		fail.catch(() { fs.copy(path, path) }) ==
+			Error(
+				fs.FsError(
+					operation = "copy",
+					path = path,
+					reason = fs.Invalid,
+					code = "same",
+				),
+			),
+	)
+	assert(fs.read_file(path) == <<"keep":utf8>>)
+	fs.remove(path)
+	()
+})
+
+test("fs_read_lines_invalid_utf8_test", () {
+	path = fresh("lines")
+	fs.write_file(path, <<255, 254>>)
+	assert(
+		fail.catch(() { fs.read_lines(path) }) ==
+			Error(
+				fs.FsError(
+					operation = "read_lines",
+					path = path,
+					reason = fs.Invalid,
+					code = "invalid",
+				),
+			),
+	)
 	fs.remove(path)
 	()
 })

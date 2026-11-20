@@ -7,7 +7,9 @@
 ////
 //// Every operation that can fail raises an `FsError` through `Fail(FsError)`.
 //// Its `reason` is an `FsProblem` made from the host's error code once, in
-//// one place; `code` keeps the host's string for diagnostics.
+//// one place; `code` keeps the host's string for diagnostics. Two codes come
+//// from this module rather than the host: `"depth"` for a path below
+//// `walk`'s limit and `"same"` for `copy` onto the same path.
 ////
 //// A `File` is owned by a `resource.Scope`: `open` attaches the file's
 //// `close` to the current scope before it gives the `File`, so the handle is
@@ -414,7 +416,8 @@ copy_chunks = (source : File, target : File, total : Int) {
 /// Copies the bytes of the file `from` into the file `to`, which is made or
 /// truncated, and gives the number of bytes copied. The copy goes by chunks
 /// of 65536 bytes; each chunk is written before the next is read. Both files
-/// are open only during the call.
+/// are open only during the call. `from` and `to` must differ: the same path
+/// raises `Invalid` with code `"same"` instead of truncating the source.
 ///
 /// Needs `Fs`. Raises `FsError` of `open`, `read` or `write`.
 ///
@@ -422,6 +425,9 @@ copy_chunks = (source : File, target : File, total : Int) {
 /// fs.copy("/tmp/a.txt", "/tmp/b.txt")  // 5
 /// ```
 copy = (from : String, to : String) {
+	{ from == to } |>
+		(True) { failure_with("copy", from, Invalid, "same") }
+		& (False) { () }
 	resource.scoped(() {
 		source = open(from, ReadOnly)
 		target = open(to, WriteTruncate)
@@ -475,7 +481,10 @@ failure_with = (
 /// The walk goes at most 32 levels below `root`. A deeper path raises
 /// `FsError(operation = "walk", path = <that path>, reason = Invalid,
 /// code = "depth")`. `metadata` follows symbolic links, so a link to a
-/// directory above it is a cycle; this cap is what makes such a walk end.
+/// directory above it is a cycle: the depth cap ends the walk, but the
+/// number of paths it visits before that grows with the tree's branching
+/// factor, so a cycle with two entries per level is not finished in
+/// practice. Do not walk a tree that can contain a directory link back up.
 ///
 /// Needs `Fs`. Raises `FsError` of `list` or `metadata`, or the depth error.
 ///
