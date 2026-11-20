@@ -238,3 +238,5 @@ i is distributed under the [Apache-2.0 license](LICENSE). The lexer is adapted f
 - [A prettier printer](https://homepages.inf.ed.ac.uk/wadler/papers/prettier/prettier.pdf) by Philip Wadler — the document algebra of `i fmt`.
 - [Unicode](https://www.unicode.org) and [Rust regex](https://github.com/rust-lang/regex) — the character data in the standard library.
 - [Nix](https://nixos.org), [devenv](https://devenv.sh) and [Playwright](https://playwright.dev) — the reproducible development shell and the browser tests.
+
+<!-- merge up-to-date check -->
