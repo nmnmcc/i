@@ -59,6 +59,7 @@
 	Exponential(..)
 	Pattern(..)
 	Delay(..)
+	delay_at
 	retry
 	repeat
 )
@@ -124,8 +125,17 @@ _offset_ns = (spread_ns : Int, seed : Int, attempt : Int) -> Int {
 		}
 }
 
-// The exact sleep before attempt `attempt` (0-based: the sleep after the
-// first failure is attempt 0).
+/// The exact sleep before attempt `attempt`: the sleep after the first
+/// failure is attempt 0. Gives the base delay of the pattern for that
+/// attempt, capped, plus the jitter of that attempt, and never below zero.
+/// Use it to see a schedule's delay vector without running it.
+///
+/// ```i
+/// schedule.delay_at(schedule.Delay(
+///   pattern = schedule.Fixed(delay = time.milliseconds(50)),
+///   spread = time.nanoseconds(0), seed = 0,
+/// ), 2)  // time.milliseconds(50)
+/// ```
 delay_at = (delay : Delay, attempt : Int) -> time.Duration {
 	base = _base_ns(delay.pattern, attempt)
 	offset = _offset_ns(time.to_nanoseconds(delay.spread), delay.seed, attempt)

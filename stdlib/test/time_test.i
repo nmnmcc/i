@@ -7,6 +7,7 @@
 	i/resource
 	i/clock
 	i/request
+	i/core
 	(Less, Equal, Greater) = i/order
 )
 
@@ -213,66 +214,50 @@ test("time_huge_counts", () {
 })
 // Duration and Instant stay nominally distinct, with private constructors.
 
-// A clock whose sleep never completes; it records each requested duration.
-recording_never_clock = (log : task.Ref(List(Int))) -> clock.Clock {
-	clock.Clock(
-		monotonic_ns = () { request.ready(Ok(0)) },
-		unix_ns = () { request.ready(Ok(0)) },
-		sleep_ns = (n) {
-			task.update(log, (xs : List(Int)) { (list.append(xs, [n]), ()) })
-			task.sync(task.never())
-			request.ready(Ok(()))
-		},
-	)
-}
+// A clock that fails if anything sleeps on it: the tests that must not sleep
+// use it to prove that no sleep happened.
+unused_clock : clock.Clock = clock.Clock(
+	monotonic_ns = () { request.ready(Ok(0)) },
+	unix_ns = () { request.ready(Ok(0)) },
+	sleep_ns = (n) { request.ready(Error("unused")) },
+)
 
-// A clock whose sleep returns at once; it records each requested duration.
-ready_clock = (log : task.Ref(List(Int))) -> clock.Clock {
-	clock.Clock(
-		monotonic_ns = () { request.ready(Ok(0)) },
-		unix_ns = () { request.ready(Ok(0)) },
-		sleep_ns = (n) {
-			task.update(log, (xs : List(Int)) { (list.append(xs, [n]), ()) })
-			request.ready(Ok(()))
-		},
-	)
-}
+// A clock whose sleep fails with the exact nanosecond count in its code, so a
+// test can see the duration that reached the clock without recording state.
+exact_clock : clock.Clock = clock.Clock(
+	monotonic_ns = () { request.ready(Ok(0)) },
+	unix_ns = () { request.ready(Ok(0)) },
+	sleep_ns = (n) { request.ready(Error(core.inspect(n))) },
+)
+
+late = () { task.sync(task.never()) }
 
 test("timeout_body_wins_test", () {
-	log = task.ref([])
-	{
-		value = time.timeout(time.milliseconds(5), () {
-			task.yield()
-			7
-		})
-		assert(value == 7)
-		assert(task.get(log) == [5000000])
-		()
-	} <- (recording_never_clock(log))
+	// The timer is a real hour away and is cancelled when the body returns.
+	value = time.timeout(time.hours(1), () {
+		task.yield()
+		7
+	})
+	assert(value == 7)
+	()
 })
 
+// The timer fires while the body is stuck. The body's `ensure` final sets a
+// flag, and the flag must be set by the time `timeout` returns: that is R5's
+// "return only after their finals end", observed.
 test("timeout_timer_wins_test", () {
-	log = task.ref([])
 	released = task.ref(False)
-	{
-		r = fail.catch(() {
-			time.timeout(time.milliseconds(5), () {
-				resource.ensure(
-					() { task.sync(task.never()) },
-					() { task.set(released, True) },
-				)
-			})
+	r = fail.catch(() {
+		time.timeout(time.milliseconds(2), () {
+			resource.ensure(() { late() }, () { task.set(released, True) })
 		})
-		assert(r == Error(time.Timeout(after = time.milliseconds(5))))
-		// The loser's cleanup finished before timeout returned.
-		assert(task.get(released))
-		assert(task.get(log) == [5000000])
-		()
-	} <- (ready_clock(log))
+	})
+	assert(r == Error(time.Timeout(after = time.milliseconds(2))))
+	assert(task.get(released))
+	()
 })
 
 test("timeout_expired_test", () {
-	log = task.ref([])
 	ran = task.ref(False)
 	{
 		zero = fail.catch(() {
@@ -289,19 +274,34 @@ test("timeout_expired_test", () {
 			})
 		})
 		assert(negative == Error(time.Timeout(after = time.nanoseconds(-5))))
+		// A zero or negative duration never starts the body and never sleeps.
 		assert(task.get(ran) == False)
-		assert(task.get(log) == [])
 		()
-	} <- (ready_clock(log))
+	} <- (unused_clock)
 })
 
 test("timeout_body_error_test", () {
-	log = task.ref([])
 	{
 		r = fail.catch(() {
-			time.timeout(time.seconds(1), () { fail.raise("boom") })
+			time.timeout(time.seconds(1), () {
+				task.yield()
+				fail.raise("boom")
+			})
 		})
 		assert(r == Error("boom"))
 		()
-	} <- (recording_never_clock(log))
+	} <- (unused_clock)
+})
+
+test("timeout_duration_is_exact_test", () {
+	{
+		r = fail.catch(() { time.timeout(time.milliseconds(5), () { late() }) })
+		assert(
+			r ==
+				Error(
+					clock.ClockError(operation = "sleep_ns", code = "5000000"),
+				),
+		)
+		()
+	} <- (exact_clock)
 })
