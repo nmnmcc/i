@@ -351,6 +351,11 @@ fn float(x: f64) -> String {
     }
 }
 
+/// A constructor name: its first character is upper case.
+fn is_upper(name: &str) -> bool {
+    name.chars().next().is_some_and(char::is_uppercase)
+}
+
 fn qualified(module: &Option<Ident>, name: &Ident) -> String {
     match module {
         Some(m) => format!("{}.{}", m.name, name.name),
@@ -760,6 +765,15 @@ impl Printer<'_> {
         self.expr(e, POSTFIX)
     }
 
+    /// The callee of a call: a constructor name is printed without the `()`
+    /// it has in a value position, since the call supplies it.
+    fn callee(&mut self, e: &Expr) -> Doc {
+        match &e.kind {
+            ExprKind::Name { module, name } if is_upper(&name.name) => t(qualified(module, name)),
+            _ => self.target(e),
+        }
+    }
+
     fn data_item(&mut self, item: &DItem) -> Part {
         let (start, end, doc_of): (u32, u32, _) = match item {
             DItem::Pos(e) => (e.span.0.start, e.span.0.end, None),
@@ -936,6 +950,9 @@ impl Printer<'_> {
                 s.push('"');
                 t(s)
             }
+            ExprKind::Name { module, name } if is_upper(&name.name) => {
+                cat(vec![t(qualified(module, name)), t("()")])
+            }
             ExprKind::Name { module, name } => t(qualified(module, name)),
             ExprKind::Data(items) => self.data(items, false),
             ExprKind::List { items, rest } => {
@@ -1063,7 +1080,7 @@ impl Printer<'_> {
     /// [`MAX_CALL_DEPTH`] is never on one line: its arguments go one per line
     /// (the layout of a call that does not fit the width).
     fn call(&mut self, e: &Expr, callee: &Expr, args: &[DItem]) -> Doc {
-        let callee = self.target(callee);
+        let callee = self.callee(callee);
         if call_depth(e) <= MAX_CALL_DEPTH || args.is_empty() {
             return cat(vec![callee, self.data(args, true)]);
         }
@@ -1158,9 +1175,7 @@ impl Printer<'_> {
             }
             PatternKind::Ctor { module, name, args } => {
                 let mut out = vec![t(qualified(module, name))];
-                if let Some(args) = args {
-                    out.push(self.data_pattern(args));
-                }
+                out.push(self.data_pattern(args.as_deref().unwrap_or(&[])));
                 cat(out)
             }
             PatternKind::Data(items) => self.data_pattern(items),

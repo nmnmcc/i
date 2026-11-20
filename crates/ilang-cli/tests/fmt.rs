@@ -188,3 +188,45 @@ fn check_reports_missing_blank_lines_after_header_groups() {
     );
     assert!(fmt(&["--check"], dir.path()).status.success());
 }
+
+#[test]
+fn constructor_values_and_patterns_are_written_as_calls() {
+    let old = "f = (b : Bool) -> Int { b |> (True) { 1 } & (False) { 0 } }\ng = () { f(True) }\n";
+    let called = "g = () { True() }\n";
+    let dir = package(&[("src/old.i", old), ("src/called.i", called)]);
+    let out = fmt(&[], dir.path());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let new = read(dir.path(), "src/old.i");
+    assert!(
+        new.contains("(True())") && new.contains("(False())") && new.contains("f(True())"),
+        "{new}"
+    );
+    assert!(!new.contains("()()"), "{new}");
+    let called_new = read(dir.path(), "src/called.i");
+    assert!(called_new.contains("True()") && !called_new.contains("()()"), "{called_new}");
+    assert!(fmt(&["--check"], dir.path()).status.success(), "a second format changes nothing");
+    assert!(fmt(&[], dir.path()).status.success());
+    assert_eq!(read(dir.path(), "src/old.i"), new);
+    assert_eq!(read(dir.path(), "src/called.i"), called_new);
+}
+
+#[test]
+fn conversion_to_lisp_writes_constructor_values_as_calls() {
+    let source = "x = True\ny = Some(1)\nf = (b : Bool) -> Int { b |> (True) { 1 } & (False) { 0 } }\n";
+    let dir = package(&[("src/main.i", source)]);
+    let out = fmt(&["--to", "is"], dir.path());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let converted = read(dir.path(), "src/main.is");
+    assert!(converted.contains("(= x (True))"), "{converted}");
+    assert!(converted.contains("(Some 1)") && !converted.contains("((Some)"), "{converted}");
+    assert!(converted.contains("(True)") && converted.contains("(False)"), "{converted}");
+    assert!(fmt(&["--check"], dir.path()).status.success());
+}
