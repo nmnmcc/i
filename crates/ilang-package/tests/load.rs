@@ -246,6 +246,7 @@ fn standard_library_modules() {
             "i/core",
             "i/crypto",
             "i/csv",
+            "i/deferred",
             "i/dict",
             "i/fail",
             "i/fetch",
@@ -266,12 +267,14 @@ fn standard_library_modules() {
             "i/path",
             "i/process",
             "i/property",
+            "i/queue",
             "i/random",
             "i/regex",
             "i/request",
             "i/resource",
             "i/result",
             "i/schema",
+            "i/semaphore",
             "i/sequence",
             "i/set",
             "i/stdio",
@@ -285,7 +288,7 @@ fn standard_library_modules() {
             "i/uri",
         ]
     );
-    assert_eq!(paths.len(), 49);
+    assert_eq!(paths.len(), 52);
     // The runtime modules are among them.
     for path in ilang_package::library::RUNTIME {
         assert!(graph.standard_library_module(path).is_some(), "{path}");
@@ -315,7 +318,7 @@ fn the_standard_library_compiled_as_the_root() {
         .iter()
         .filter(|m| m.kind == ModuleKind::Src)
         .count();
-    assert_eq!(src, 49);
+    assert_eq!(src, 52);
 }
 
 // E5 removes dependency defaults: only the root's explicit entry is selected.

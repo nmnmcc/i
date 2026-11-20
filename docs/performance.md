@@ -1363,6 +1363,24 @@ run on one runner, five alternating rounds (seven for the dict repeat), and
 `--opt 2` unless stated. Different items ran on different runner models, so
 only the deltas within a row are comparable.
 
+**Cumulative.** One job on a Xeon 6975P-C, five rounds in rotating order, each
+tree compiled by its own compiler: the tree before the inlining change ran
+`list_sort` in 1.990 s and the current tree in 0.860 s, **-56.8%**; the tree
+before the comparison-frame reuse ran `equality` in 0.260 s and the current
+tree in 0.090 s, **-65.4%**. Over the same span the compiler got 1.2% slower
+and the generated module 0.09% larger, with corpus output unchanged. Load
+stayed between 0.8 and 2.6 on the 16-core runner.
+
+Those two chain numbers are one measurement of three trees on one machine
+(`fb81d62ee`, `12930cd64`, `d1a099c63`), so they carry no cross-machine
+estimate. The per-item rows below were taken on several runner models; the
+1.966 s and 0.367 s starting points quoted in earlier records sit on different
+machines, which is why the chain restates both ends. The before-inlining tree
+reproduced at 1.990 s against the recorded 1.966 s, and the equality chain
+starts at 0.260 s rather than 0.367 s because 0.367 s is the 8573C measurement
+of that same tree; on this runner the frame-reuse record's own Xeon column was
+0.255 s.
+
 | Item | Machine | Change | Result |
 |---|---|---|---|
 | always-inline 40 | Xeon 6975P-C | `list_sort` 1.966 -> 1.615 s; `list_build` -19.0% | -17.9%; no benchmark slower |
