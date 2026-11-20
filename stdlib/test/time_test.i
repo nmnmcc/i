@@ -3,6 +3,10 @@
 	testlib = (test) = i/test
 	i/time
 	i/list
+	i/task
+	i/resource
+	i/clock
+	i/request
 	(Less, Equal, Greater) = i/order
 )
 
@@ -208,3 +212,96 @@ test("time_huge_counts", () {
 	()
 })
 // Duration and Instant stay nominally distinct, with private constructors.
+
+// A clock whose sleep never completes; it records each requested duration.
+recording_never_clock = (log : task.Ref(List(Int))) -> clock.Clock {
+	clock.Clock(
+		monotonic_ns = () { request.ready(Ok(0)) },
+		unix_ns = () { request.ready(Ok(0)) },
+		sleep_ns = (n) {
+			task.update(log, (xs : List(Int)) { (list.append(xs, [n]), ()) })
+			task.sync(task.never())
+			request.ready(Ok(()))
+		},
+	)
+}
+
+// A clock whose sleep returns at once; it records each requested duration.
+ready_clock = (log : task.Ref(List(Int))) -> clock.Clock {
+	clock.Clock(
+		monotonic_ns = () { request.ready(Ok(0)) },
+		unix_ns = () { request.ready(Ok(0)) },
+		sleep_ns = (n) {
+			task.update(log, (xs : List(Int)) { (list.append(xs, [n]), ()) })
+			request.ready(Ok(()))
+		},
+	)
+}
+
+test("timeout_body_wins_test", () {
+	log = task.ref([])
+	{
+		value = time.timeout(time.milliseconds(5), () {
+			task.yield()
+			7
+		})
+		assert(value == 7)
+		assert(task.get(log) == [5000000])
+		()
+	} <- (recording_never_clock(log))
+})
+
+test("timeout_timer_wins_test", () {
+	log = task.ref([])
+	released = task.ref(False)
+	{
+		r = fail.catch(() {
+			time.timeout(time.milliseconds(5), () {
+				resource.ensure(
+					() { task.sync(task.never()) },
+					() { task.set(released, True) },
+				)
+			})
+		})
+		assert(r == Error(time.Timeout(after = time.milliseconds(5))))
+		// The loser's cleanup finished before timeout returned.
+		assert(task.get(released))
+		assert(task.get(log) == [5000000])
+		()
+	} <- (ready_clock(log))
+})
+
+test("timeout_expired_test", () {
+	log = task.ref([])
+	ran = task.ref(False)
+	{
+		zero = fail.catch(() {
+			time.timeout(time.nanoseconds(0), () {
+				task.set(ran, True)
+				1
+			})
+		})
+		assert(zero == Error(time.Timeout(after = time.nanoseconds(0))))
+		negative = fail.catch(() {
+			time.timeout(time.nanoseconds(-5), () {
+				task.set(ran, True)
+				1
+			})
+		})
+		assert(negative == Error(time.Timeout(after = time.nanoseconds(-5))))
+		assert(task.get(ran) == False)
+		assert(task.get(log) == [])
+		()
+	} <- (ready_clock(log))
+})
+
+test("timeout_body_error_test", () {
+	log = task.ref([])
+	{
+		r = fail.catch(() {
+			time.timeout(time.seconds(1), () { fail.raise("boom") })
+		})
+		assert(r == Error("boom"))
+		()
+	} <- (recording_never_clock(log))
+})

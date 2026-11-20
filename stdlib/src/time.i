@@ -27,6 +27,10 @@
 //// Laws: to_nanoseconds(nanoseconds(n)) = n; shift(a,between(a,b)) = b;
 //// between(a,shift(a,d)) = d; add(d,subtract(e,d)) = e. Truncating divide
 //// can lose a remainder: scaling its result back need not give the input.
+//// timeout(after, body) runs body and gives its value, or raises
+//// Timeout(after) when the deadline passes first (a zero or negative after
+//// raises at once without running body).
+////
 //// Calendar days, months and years are not duration units. hours(24) is a
 //// fixed 86,400 seconds. Operations use O(1) integer operations; bit costs
 //// depend on integer size. Observation functions use i/clock.
@@ -34,6 +38,7 @@
 	i/fail
 	i/clock
 	i/int
+	i/task
 	(Order) = i/order
 )
 
@@ -60,6 +65,8 @@
 	now
 	sleep
 	measure
+	Timeout(..)
+	timeout
 )
 
 Duration = (Int)
@@ -155,4 +162,43 @@ measure = (body) {
 /// Reports failure through `Fail(TimeError)`.
 divide = (duration : Duration, by : Int) -> Duration {
 	fail.from_result(_divide_result(duration, by))
+}
+
+/// The deadline passed before the body ended. `after` is the duration
+/// `timeout` was given, so the timeout is distinguishable from the body's
+/// own errors.
+Timeout = (after = Duration)
+
+/// Runs `body` and gives its value, or raises `Timeout(after = after)` when
+/// `after` passes first. A zero or negative `after` raises at once and does
+/// not start the body.
+///
+/// The body runs in a task of its own and is cancelled when the deadline
+/// passes; `timeout` returns only after that task has finished its cleanup,
+/// so a body must be safe to cancel. A body error comes back unchanged.
+///
+/// Needs `Scheduler`, `Runner` and `clock.Clock`.
+/// Errors: the body's own `E`, `Timeout(after = after)`, and
+/// `clock.ClockError` when the clock fails.
+///
+/// ```i
+/// task.run(() {
+///   fail.catch(() { time.timeout(time.seconds(1), () { work() }) }) |>
+///     (Ok(value)) { value }
+///     & (Error(time.Timeout(_))) { fallback }
+/// })
+/// ```
+timeout = (after : Duration, body) {
+	Duration(nanoseconds) = after
+	{ nanoseconds <= 0 } |>
+		(True) { fail.raise(Timeout(after = after)) }
+		& (False) {
+			task.race(
+				() { body() },
+				() {
+					clock.sleep_ns(nanoseconds)
+					fail.raise(Timeout(after = after))
+				},
+			)
+		}
 }
