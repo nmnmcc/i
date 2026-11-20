@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Check that paths the documentation calls source exist.
+
+Only paths are checked: a path under crates/, stdlib/, lib/, scripts/ or
+examples/ that a page shows as a real source file must exist. Identifiers are
+left alone because a check on them is easy to make wrong.
+
+Generated directories and the target tree are not roots here; a relative path
+such as `src/main.i` is not checked either.
+"""
+import argparse
+import glob
+import re
+import sys
+from pathlib import Path
+
+ROOTS = ('crates', 'stdlib', 'lib', 'scripts', 'examples', 'docs')
+DOCS = ('README.md', 'docs/**/*.md', 'docs/**/*.mdx')
+# A path is a word starting with a root dir, or a `./` form. A match inside a
+# URL is skipped: there the character before the root is a plain slash and
+# the two before it are not `./`.
+TOKEN = re.compile(
+    r'(?:(?<![\w/.-])|(?<=\./))(' + '|'.join(ROOTS) + r')/[A-Za-z0-9_./{},*<>-]+'
+)
+SKIP_LINE = re.compile(r'^\s*(?:import|export|use|mod)\b')
+
+
+def normalize(token):
+    """Strip what belongs to the citation, not the path."""
+    token = token.split(' ')[0]
+    token = token.split('::')[0]
+    token = re.split(r':\d', token)[0]
+    return token.rstrip('.,;:)]')
+
+
+def expand(token):
+    """The candidate paths for a token: brace sets and globs, or itself."""
+    if '<' in token or '…' in token:
+        return []
+    if '{' in token:
+        head, _, rest = token.partition('{')
+        inside, _, tail = rest.partition('}')
+        return [head + part + tail for part in inside.split(',')]
+    return [token]
+
+
+def check_file(root, path):
+    errors = []
+    text = path.read_text(errors='replace')
+    for number, line in enumerate(text.splitlines(), 1):
+        if SKIP_LINE.match(line):
+            continue
+        for match in TOKEN.finditer(line):
+            token = normalize(match.group(0))
+            candidates = expand(token)
+            if not candidates:
+                continue
+            found = False
+            for candidate in candidates:
+                if '*' in candidate:
+                    if glob.glob(str(root / candidate)):
+                        found = True
+                elif (root / candidate).exists():
+                    found = True
+                if found:
+                    break
+            if not found:
+                errors.append(f'{path.relative_to(root)}:{number}: {token}')
+    return errors
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    args = parser.parse_args()
+    root = args.root.resolve()
+    files = []
+    for pattern in DOCS:
+        files.extend(sorted(root.glob(pattern)))
+    errors = []
+    for path in files:
+        if path.is_file():
+            errors.extend(check_file(root, path))
+    if errors:
+        print('\n'.join(errors), file=sys.stderr)
+        print(f'{len(errors)} documented source paths do not exist.', file=sys.stderr)
+        return 1
+    print(f'Documented source paths checked in {len(files)} files.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

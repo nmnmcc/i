@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Counterexamples for scripts/check-doc-paths."""
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+CHECK = Path(__file__).resolve().with_name('check-doc-paths')
+
+
+def run(root):
+    return subprocess.run(
+        [sys.executable, '-I', str(CHECK), '--root', str(root)],
+        capture_output=True,
+        text=True,
+    )
+
+
+def write(root, body):
+    path = root / 'docs' / 'page.mdx'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body)
+    return path
+
+
+def main():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / 'crates' / 'one' / 'src').mkdir(parents=True)
+        (root / 'crates' / 'one' / 'src' / 'lib.rs').write_text('')
+
+        write(root, 'See `crates/one/src/lib.rs` and [it](../../crates/one/src/lib.rs).\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+        assert '1 files' in result.stdout, result.stdout
+
+        # A citation suffix is not part of the path.
+        write(root, 'See `crates/one/src/lib.rs:12` and `crates/one/src/{lib,other}.rs`.\n')
+        (root / 'crates' / 'one' / 'src' / 'other.rs').write_text('')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        # A path inside a GitHub URL is not a repository path here.
+        write(root, '[x](https://github.com/nmnmcc/i/blob/main/no/such/file.rs)\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        # The mistake this exists for: a path that no longer exists fails,
+        # and names the file and the path.
+        write(root, 'Moved: `crates/gone/src/lib.rs`.\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+        assert 'docs/page.mdx:1: crates/gone/src/lib.rs' in result.stderr, result.stderr
+
+        # A missing glob member fails.
+        write(root, 'Set: `crates/one/src/*.rs` and `crates/one/src/*.i`.\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+
+        # `./` paths are still checked.
+        write(root, 'Run `./scripts/missing`.\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+        assert 'scripts/missing' in result.stderr, result.stderr
+
+    print('check-doc-paths counterexamples pass.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
