@@ -232,7 +232,7 @@ requirements intersect their admissible providers. A principality proof
 must account for this separate sort and its row tails, rather than apply
 the value lattice theorem to the surface `&` notation unchanged.
 
-For a contravariant service `Emit(A) = (emit = (A) -> Nil)`, the meet of
+For a contravariant service `Emit(A) = (emit = (A) -> ())`, the meet of
 `Emit(Int)` and `Emit(String)` is `Emit(Int | String)`. A provider must handle
 both. For covariant `Read(A) = (read = () -> A)`, the meet of `Read(Int)`
 and `Read(String)` is `Read(Never)`. Under Owner Decision 1 and §4.1,
@@ -287,7 +287,7 @@ Candidate probes:
 
 ```i
 // 02-needs
-Emit(A) = (emit = (A) -> Nil)
+Emit(A) = (emit = (A) -> ())
 need_int = () <- (e : Emit(Int)) { e.emit(1) }
 need_string = () <- (e : Emit(String)) { e.emit("s") }
 both = () {
@@ -334,7 +334,7 @@ caught = () { fail.catch(body) }
 The last candidate tries the erroneous split described in syntax three's
 rule B: hiding the String error in the residual row instead of returning it.
 Observed: `02-needs` checks with
-`both : () <- (Emit(Int | String)) -> Nil`; `02-empty` rejects with E0515,
+`both : () <- (Emit(Int | String)) -> ()`; `02-empty` rejects with E0515,
 explicitly naming `Read(Int)` and `Read(String)` at that historical revision.
 Decision 1 now accepts this method-only `02-empty` probe, as explained above;
 only its required-value-field variant is empty. `02-rows` checks with
@@ -1149,10 +1149,10 @@ either diagnostic line or any expectation. This follows §4.7's recursive-type
 paragraph and retains §9.2's independent provider check.
 
 The remaining `alias_kind_error` requirement asks for E0515 on a program
-whose alias is `Row(N) = () <- (Fail(N)) -> Nil` and whose ordinary values
-have types `Svc(Int)` and `Svc(Nil)`, with covariant `Svc(A) = (() -> A)`.
+whose alias is `Row(N) = () <- (Fail(N)) -> ()` and whose ordinary values
+have types `Svc(Int)` and `Svc(())`, with covariant `Svc(A) = (() -> A)`.
 Here `N` is an error-payload type. §9.3 says “An error may be a value of any
-type”; §4.4 merges these value types as `Svc(Int | Nil)`. It is not an opaque
+type”; §4.4 merges these value types as `Svc(Int | ())`. It is not an opaque
 service row, and its payload constructors are not service keys under `<-`.
 The old rejection criterion needs review against those paragraphs; it has
 not been weakened or rewritten to claim a green corpus.

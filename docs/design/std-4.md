@@ -184,7 +184,7 @@ p = Path("target/std4/probe")
 (p / "i.toml").write_text('name = "std4_probe"\n')
 (p / "src/main.i").write_text(
     '(main)\nvalues = [' + ','.join(f'({n},[{n+1}])' for n in range(3000))
-    + ']\nmain = () { assert(values != [])\n Nil }\n')
+    + ']\nmain = () { assert(values != [])\n () }\n')
 ```
 
 Then `target/release/i check --project target/std4/probe`. The isolated probe

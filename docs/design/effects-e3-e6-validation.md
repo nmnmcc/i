@@ -172,7 +172,7 @@ Workspace/all-targets clippy passes with -D warnings. Direct snippets pass:
 5,158 extracted blocks/literals, 4 existing future-track entries; Lisp check
 covers 48 .is files and 101 macro fragments. Release rebuild and shipped std
 check pass. The vendored check initially failed 15 cascading errors from its
-stale callback-shaped Sink marker; restoring the specified ordinary (N)->Nil
+stale callback-shaped Sink marker; restoring the specified ordinary (N)->()
 marker makes the second check pass without a test change. ABI regeneration
 and complete JS rerun follow; the full corpus has not run yet.
 

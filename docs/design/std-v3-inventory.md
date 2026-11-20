@@ -215,14 +215,14 @@ Source: `stdlib/src/clock.i`. Reads monotonic and Unix nanoseconds and waits thr
 Export visibility: `Clock(..)`, `ClockError(..)`. Hidden representations below are descriptive only.
 
 ```text
-Clock = ( monotonic_ns = () -> Request(Result(Int, String)), unix_ns = () -> Request(Result(Int, String)), sleep_ns = (Int) -> Request(Result(Nil, String)), )
+Clock = ( monotonic_ns = () -> Request(Result(Int, String)), unix_ns = () -> Request(Result(Int, String)), sleep_ns = (Int) -> Request(Result((), String)), )
 ClockError = (operation = String, code = String)
 ```
 
 ```text
 monotonic_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
 unix_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
-sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Nil
+sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> ()
 ```
 
 **Missing attached type/constructor docs.** `Clock`, `ClockError`. Module prose may still describe them.
@@ -246,7 +246,7 @@ boundary : ((Boundary(A, B, C)) <- (Fail(B), ..C) -> A) <- (Fail(B), ..C) -> A
 suspend : (Boundary(A, B, C), (Continuation(D, A, B, C)) <- (Fail(B), ..C) -> A) -> D
 escape : (Boundary(A, B, C), A) -> Never
 resume : (Continuation(A, B, C, D), A) <- (Fail(C), ..D) -> B
-cancel : (Continuation(A, B, C, D)) <- D -> Nil
+cancel : (Continuation(A, B, C, D)) <- D -> ()
 keep_env : ((A) <- (Fail(E), ..N) -> B) <- N -> (A) <- (Fail(E)) -> B
 ```
 
@@ -281,16 +281,16 @@ shift_left : (Int, Int) -> Int
 shift_right : (Int, Int) -> Int
 concat : (List(String)) -> String
 byte_size : (String) -> Int
-byte_slice : (String, Int, Int) -> Result(String, Nil)
+byte_slice : (String, Int, Int) -> Result(String, ())
 codepoints : (String) -> List(UtfCodepoint)
 from_codepoints : (List(UtfCodepoint)) -> String
 codepoint_to_int : (UtfCodepoint) -> Int
-int_to_codepoint : (Int) -> Result(UtfCodepoint, Nil)
+int_to_codepoint : (Int) -> Result(UtfCodepoint, ())
 to_upper : (String) -> String
 to_lower : (String) -> String
-index_of : (String, String, Int) -> Result(Int, Nil)
+index_of : (String, String, Int) -> Result(Int, ())
 bit_size : (BitArray) -> Int
-bit_array_to_string : (BitArray) -> Result(String, Nil)
+bit_array_to_string : (BitArray) -> Result(String, ())
 bit_array_concat : (List(BitArray)) -> BitArray
 inspect : (A) -> String
 hash : (A) -> Int
@@ -352,7 +352,7 @@ Source: `stdlib/src/fetch.i`. Adapts a host HTTP fetch capability to typed reque
 Export visibility: `Fetch`, `Response`. Hidden representations below are descriptive only.
 
 ```text
-Fetch = ( start = (String, String, String, BitArray) -> Request(Result(Int, String)), status = (Int) -> Request(Result(Int, String)), headers = (Int) -> Request(Result(String, String)), read = (Int, Int) -> Request(Result(BitArray, String)), close = (Int) -> Request(Nil), )
+Fetch = ( start = (String, String, String, BitArray) -> Request(Result(Int, String)), status = (Int) -> Request(Result(Int, String)), headers = (Int) -> Request(Result(String, String)), read = (Int, Int) -> Request(Result(BitArray, String)), close = (Int) -> Request(()), )
 Response = (Int)
 ```
 
@@ -361,7 +361,7 @@ open : (String, String, String, BitArray) <- (Fail(String), Fetch, request.Await
 status : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> Int
 headers : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> String
 read : (Response, Int) <- (Fail(String), Fetch, request.Await, request.Owner) -> BitArray
-close : (Response) <- (Fetch, request.Await, request.Owner) -> Nil
+close : (Response) <- (Fetch, request.Await, request.Owner) -> ()
 ```
 
 **Missing attached type/constructor docs.** `Fetch`, `Response`. Module prose may still describe them.
@@ -399,7 +399,7 @@ Source: `stdlib/src/fs.i`. Adapts a filesystem service and provides whole-file h
 Export visibility: `Fs`, `File`, `FsError(..)`, `OpenMode(..)`, `Metadata(..)`. Hidden representations below are descriptive only.
 
 ```text
-Fs = ( open = (String, String) -> Request(Result(Int, String)), read = (Int, Int) -> Request(Result(BitArray, String)), write = (Int, BitArray) -> Request(Result(Nil, String)), flush = (Int) -> Request(Result(Nil, String)), close = (Int) -> Request(Nil), remove = (String) -> Request(Result(Nil, String)), rename = (String, String) -> Request(Result(Nil, String)), mkdir = (String) -> Request(Result(Nil, String)), list = (String) -> Request(Result(String, String)), size = (String) -> Request(Result(Int, String)), kind = (String) -> Request(Result(String, String)), temp_dir = () -> Request(Result(String, String)), )
+Fs = ( open = (String, String) -> Request(Result(Int, String)), read = (Int, Int) -> Request(Result(BitArray, String)), write = (Int, BitArray) -> Request(Result((), String)), flush = (Int) -> Request(Result((), String)), close = (Int) -> Request(()), remove = (String) -> Request(Result((), String)), rename = (String, String) -> Request(Result((), String)), mkdir = (String) -> Request(Result((), String)), list = (String) -> Request(Result(String, String)), size = (String) -> Request(Result(Int, String)), kind = (String) -> Request(Result(String, String)), temp_dir = () -> Request(Result(String, String)), )
 File = (Int)
 FsError = (operation = String, path = String, code = String)
 OpenMode = ReadOnly | WriteTruncate | Append | ReadWrite
@@ -413,17 +413,17 @@ Metadata = (size = Int, kind = String)
 ```text
 open : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner) -> File
 read : (File, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-write : (File, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
-flush : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
-close : (File) <- (Fs, request.Await, request.Owner) -> Nil
-remove : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
-rename : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
-mkdir : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
+write : (File, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+flush : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+close : (File) <- (Fs, request.Await, request.Owner) -> ()
+remove : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+rename : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+mkdir : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
 list : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
 metadata : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Metadata
 temp_dir : () <- (Fail(FsError), Fs, request.Await, request.Owner) -> String
 read_file : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-write_file : (String, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Nil
+write_file : (String, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
 read_lines : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
 ```
 
@@ -444,7 +444,7 @@ Source: `stdlib/src/io.i`. Defines the simple host text-printing service Io.
 Export visibility: `Io(..)`. Hidden representations below are descriptive only.
 
 ```text
-Io = (print = (String) -> Nil)
+Io = (print = (String) -> ())
 ```
 
 Exported functions: none.
@@ -492,7 +492,7 @@ Source: `stdlib/src/net.i`. Adapts TCP, DNS and UDP operations through a network
 Export visibility: `Net`, `Listener`, `Stream`, `Datagram`, `NetError(..)`. Hidden representations below are descriptive only.
 
 ```text
-Net = ( bind = (String, Int) -> Request(Result(Int, String)), send_to = (Int, String, Int, BitArray) -> Request(Result(Nil, String)), receive_from = (Int, Int) -> Request(Result(BitArray, String)), local_address = (Int) -> Request(Result(String, String)), datagram_port = (Int) -> Request(Result(Int, String)), close_datagram = (Int) -> Request(Nil), listen = (String, Int) -> Request(Result(Int, String)), local_port = (Int) -> Request(Result(Int, String)), accept = (Int) -> Request(Result(Int, String)), connect = (String, Int) -> Request(Result(Int, String)), resolve = (String) -> Request(Result(String, String)), read = (Int, Int) -> Request(Result(BitArray, String)), write = (Int, BitArray) -> Request(Result(Nil, String)), shutdown_write = (Int) -> Request(Result(Nil, String)), close_stream = (Int) -> Request(Nil), close_listener = (Int) -> Request(Nil), )
+Net = ( bind = (String, Int) -> Request(Result(Int, String)), send_to = (Int, String, Int, BitArray) -> Request(Result((), String)), receive_from = (Int, Int) -> Request(Result(BitArray, String)), local_address = (Int) -> Request(Result(String, String)), datagram_port = (Int) -> Request(Result(Int, String)), close_datagram = (Int) -> Request(()), listen = (String, Int) -> Request(Result(Int, String)), local_port = (Int) -> Request(Result(Int, String)), accept = (Int) -> Request(Result(Int, String)), connect = (String, Int) -> Request(Result(Int, String)), resolve = (String) -> Request(Result(String, String)), read = (Int, Int) -> Request(Result(BitArray, String)), write = (Int, BitArray) -> Request(Result((), String)), shutdown_write = (Int) -> Request(Result((), String)), close_stream = (Int) -> Request(()), close_listener = (Int) -> Request(()), )
 Listener = (Int)
 Stream = (Int)
 Datagram = (Int)
@@ -501,22 +501,22 @@ NetError = (operation = String, endpoint = String, code = String)
 
 ```text
 bind : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Datagram
-send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil
+send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
 receive_from : (Datagram, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> (address = String, data = BitArray, port = Int)
 local_address : (Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> String
-close_datagram : (Datagram) <- (Net, request.Await, request.Owner) -> Nil
+close_datagram : (Datagram) <- (Net, request.Await, request.Owner) -> ()
 listen : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Listener
 local_port : (Listener | Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> Int
 accept : (Listener) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
 connect : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
 resolve : (String) <- (Fail(NetError), Net, request.Await, request.Owner) -> List(String)
 read : (Stream, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray
-write : (Stream, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil
-shutdown_write : (Stream) <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil
-close_stream : (Stream) <- (Net, request.Await, request.Owner) -> Nil
-close_listener : (Listener) <- (Net, request.Await, request.Owner) -> Nil
+write : (Stream, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
+shutdown_write : (Stream) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
+close_stream : (Stream) <- (Net, request.Await, request.Owner) -> ()
+close_listener : (Listener) <- (Net, request.Await, request.Owner) -> ()
 stream_number : (Stream) -> Int
-byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> Nil, read = (Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil, write = (BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> Nil)
+byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> (), read = (Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(NetError), Net, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ())
 ```
 
 **Missing attached type/constructor docs.** `Datagram`, `Listener`, `Net`, `NetError`, `Stream`. Module prose may still describe them.
@@ -540,7 +540,7 @@ Arguments = (args = () -> Request(Result(BitArray, String)))
 Environment = (env = (String) -> Request(Result(String, String)))
 WorkingDirectory = (cwd = () -> Request(Result(String, String)))
 Entropy = (entropy = (Int) -> Request(Result(BitArray, String)))
-Process = ( spawn_piped = (String, BitArray, String, String, String) -> Request( Result(Int, String), ), spawn_config = ( String, BitArray, String, String, String, String, BitArray, String, String, ) -> Request(Result(Int, String)), own = (Int) -> Request(Nil), read_stdout = (Int, Int) -> Request(Result(BitArray, String)), read_stderr = (Int, Int) -> Request(Result(BitArray, String)), write_stdin = (Int, BitArray) -> Request(Result(Nil, String)), close_stdin = (Int) -> Request(Result(Nil, String)), spawn = (String, BitArray) -> Request(Result(Int, String)), wait = (Int) -> Request(Result(Int, String)), terminate = (Int) -> Request(Result(Nil, String)), close = (Int) -> Request(Nil), )
+Process = ( spawn_piped = (String, BitArray, String, String, String) -> Request( Result(Int, String), ), spawn_config = ( String, BitArray, String, String, String, String, BitArray, String, String, ) -> Request(Result(Int, String)), own = (Int) -> Request(()), read_stdout = (Int, Int) -> Request(Result(BitArray, String)), read_stderr = (Int, Int) -> Request(Result(BitArray, String)), write_stdin = (Int, BitArray) -> Request(Result((), String)), close_stdin = (Int) -> Request(Result((), String)), spawn = (String, BitArray) -> Request(Result(Int, String)), wait = (Int) -> Request(Result(Int, String)), terminate = (Int) -> Request(Result((), String)), close = (Int) -> Request(()), )
 Child = (Int)
 Stdio = Inherit | Null | Piped
 Inherit = ()
@@ -560,16 +560,16 @@ spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError)
 spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, Directory) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
 read_stdout : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
 read_stderr : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Nil
-close_stdin : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Nil
+write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+close_stdin : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
 args : () <- (Arguments, Fail(ProcessError), request.Await, request.Owner) -> List(String)
 env : (String) <- (Environment, Fail(ProcessError), request.Await, request.Owner) -> String
 cwd : () <- (Fail(ProcessError), WorkingDirectory, request.Await, request.Owner) -> String
 entropy : (Int) <- (Entropy, Fail(ProcessError), request.Await, request.Owner) -> BitArray
 spawn : (String, List(String)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
 wait : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Int
-terminate : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Nil
-close : (Child) <- (Process, request.Await, request.Owner) -> Nil
+terminate : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+close : (Child) <- (Process, request.Await, request.Owner) -> ()
 ```
 
 **Missing attached type/constructor docs.** `Arguments`, `Child`, `Directory`, `Entropy`, `Environment`, `EnvironmentMode`, `Inherit`, `InheritDirectory`, `InheritEnvironment`, `Null`, `Piped`, `Process`, `ProcessError`, `ReplaceEnvironment`, `Stdio`, `WorkingDirectory`. Module prose may still describe them.
@@ -621,9 +621,9 @@ Source: `stdlib/src/request.i`. Tracks typed host work, cancellation ownership a
 Export visibility: `Await(..)`, `Root(..)`, `Owner(..)`, `RequestState(..)`. Hidden representations below are descriptive only.
 
 ```text
-Await = (wait = (Ticket) -> Nil)
-Root = (key = Key(Nil))
-Owner = (key = Key(Nil), root = Root)
+Await = (wait = (Ticket) -> ())
+Root = (key = Key(()))
+Owner = (key = Key(()), root = Root)
 RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 Waiting = ()
 Ready(A) = (A)
@@ -633,28 +633,28 @@ Taken = ()
 
 ```text
 open_root : () <- (Root) -> Root
-close_root : (Root) -> Nil
+close_root : (Root) -> ()
 open_owner : () <- (Root) -> Owner
-close_owner : (Owner) -> Nil
+close_owner : (Owner) -> ()
 count : (Owner) -> Int
 count_root : (Root) -> Int
 settled_owner : (Owner) -> Bool
 settled_root : (Root) -> Bool
-cancel_all : (Owner) -> Nil
-cancel_all_root : (Root) -> Nil
-wait_none : (Owner) <- (Await) -> Nil
-wait_none_root : (Root) <- (Await) -> Nil
+cancel_all : (Owner) -> ()
+cancel_all_root : (Root) -> ()
+wait_none : (Owner) <- (Await) -> ()
+wait_none_root : (Root) <- (Await) -> ()
 within : (() <- (Fail(E), ..N) -> A) <- (Fail(E), N - Owner, Root) -> A
 ready : (A) -> Request(A)
 ticket : (Request(A)) -> Ticket
 state : (Request(A)) -> RequestState(A)
 take : (Request(A)) -> A
 settled : (Ticket) -> Bool
-cancel : (Ticket) -> Nil
+cancel : (Ticket) -> ()
 await : (Request(A)) <- (Await) -> A
 await_owned : (Request(A)) <- (Await) -> A
-wait_any : (List(Ticket)) -> Nil
-poll : () -> Nil
+wait_any : (List(Ticket)) -> ()
+poll : () -> ()
 ```
 
 **Missing attached type/constructor docs.** `Await`, `Cancelled`, `Owner`, `Ready`, `RequestState`, `Root`, `Taken`, `Waiting`. Module prose may still describe them.
@@ -674,8 +674,8 @@ Source: `stdlib/src/resource.i`. Runs guaranteed cleanup around computations and
 Exported types: none.
 
 ```text
-ensure : (() <- (Fail(E), ..N) -> A, () <- N -> Nil) <- (Fail(E), ..N) -> A
-acquire : (() <- (Fail(E), ..N) -> A, (A) <- N -> Nil, (A) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B
+ensure : (() <- (Fail(E), ..N) -> A, () <- N -> ()) <- (Fail(E), ..N) -> A
+acquire : (() <- (Fail(E), ..N) -> A, (A) <- N -> (), (A) <- (Fail(E), ..N) -> B) <- (Fail(E), ..N) -> B
 ```
 
 **Language use.** Uses Fail/open need rows and an ensure primitive. acquire is a three-function bracket. Implement the planned Scope service, scoped and two-argument acquire in E4 (§2.10.9). Preserve ensure as the low-level unwind contract.
@@ -693,18 +693,18 @@ Source: `stdlib/src/stdio.i`. Reads and writes standard IO with typed errors and
 Export visibility: `Stdio(..)`, `StdioError(..)`. Hidden representations below are descriptive only.
 
 ```text
-Stdio = ( read = (Int) -> Request(Result(BitArray, String)), write = (BitArray) -> Request(Result(Nil, String)), write_error = (BitArray) -> Request(Result(Nil, String)), flush = () -> Request(Result(Nil, String)), flush_error = () -> Request(Result(Nil, String)), )
+Stdio = ( read = (Int) -> Request(Result(BitArray, String)), write = (BitArray) -> Request(Result((), String)), write_error = (BitArray) -> Request(Result((), String)), flush = () -> Request(Result((), String)), flush_error = () -> Request(Result((), String)), )
 StdioError = (operation = String, code = String)
 ```
 
 ```text
 read : (Int) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> BitArray
-write : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-write_error : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-flush : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-flush_error : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-print : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
-print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> Nil
+write : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+write_error : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+flush : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+flush_error : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+print : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
 ```
 
 **Missing attached type/constructor docs.** `Stdio`, `StdioError`. Module prose may still describe them.
@@ -762,8 +762,8 @@ Segment = ()
 Format = ()
 SyntaxError = (message = String, at = Syntax)
 Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
-Items = ( add = (Syntax, Syntax, List((String, String)), Syntax) <- ( Fail(SyntaxError), ) -> Nil, expose = (Syntax) <- (Fail(SyntaxError)) -> Nil, )
-Diagnostics = (note = (String) -> Nil)
+Items = ( add = (Syntax, Syntax, List((String, String)), Syntax) <- ( Fail(SyntaxError), ) -> (), expose = (Syntax) <- (Fail(SyntaxError)) -> (), )
+Diagnostics = (note = (String) -> ())
 Types = ( type_of = (Syntax) <- (Fail(SyntaxError)) -> Syntax, signature = () -> Syntax, subtype = (Syntax, Syntax) <- (Fail(SyntaxError)) -> Truth, members = (Syntax) <- (Fail(SyntaxError)) -> List(Syntax), )
 Truth = Yes | No | NotKnown
 Yes = ()
@@ -801,18 +801,18 @@ Source: `stdlib/src/task.i`. Implements structured tasks, task groups, events, r
 Export visibility: `Scheduler`, `DetachedScheduler`, `Runner`, `DetachedRunner`, `Scope`, `Task`, `Channel`, `Event`, `Shared`, `Ref`, `ScheduleError(..)`. Hidden representations below are descriptive only.
 
 ```text
-Scheduler = ( run = Key(Nil), root = request.Root, path = Keyed, seed = () -> rng.Generator, witness = Witness, step = (Command) -> StepAnswer, runner = Runner, waiter = request.Await, )
+Scheduler = ( run = Key(()), root = request.Root, path = Keyed, seed = () -> rng.Generator, witness = Witness, step = (Command) -> StepAnswer, runner = Runner, waiter = request.Await, )
 Scheduler = DetachedScheduler | Scheduler
 DetachedScheduler = ()
-Runner = ( seed = rng.Generator, context = request.Root, policy = Policy, allocate = () -> List(Int), active = (Key(Nil), Active) -> RunControl, wait = (Key(Nil), request.Root, List(Ticket)) -> RunControl, poll = (Key(Nil), List(Ticket), Bool) -> RunControl, forget = (Key(Nil)) -> Nil, )
+Runner = ( seed = rng.Generator, context = request.Root, policy = Policy, allocate = () -> List(Int), active = (Key(()), Active) -> RunControl, wait = (Key(()), request.Root, List(Ticket)) -> RunControl, poll = (Key(()), List(Ticket), Bool) -> RunControl, forget = (Key(())) -> (), )
 Runner = DetachedRunner | Runner
 DetachedRunner = ()
 Scope(E) = (info = ScopeInfo, errors = Key(E))
 Task(A, E) = (info = TaskInfo, result = Key(Result(A, E)), owner = Scope(E))
 Channel(A) = (info = ChannelInfo, values = Key(A))
-Event(A, E, N) = (identity = Key(Nil), branches = List(Branch(A, E, N)))
-Shared(A) = (run = Key(Nil), owner = Keyed, id = Keyed, values = Key(A))
-Ref(A) = (run = Key(Nil), id = Keyed, values = Key(A))
+Event(A, E, N) = (identity = Key(()), branches = List(Branch(A, E, N)))
+Shared(A) = (run = Key(()), owner = Keyed, id = Keyed, values = Key(A))
+Ref(A) = (run = Key(()), id = Keyed, values = Key(A))
 ScheduleError = NotRunnable
 NotRunnable = (path = List(Int))
 ```
@@ -825,15 +825,15 @@ scope : ((Scope(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), N - request.Owner, Sche
 local_scope : ((Scope(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), N - request.Owner, Scheduler) -> B
 go : (Scope(A), () <- (Fail(A), ..N) -> B) <- (N - request.Await - Runner - Scheduler, Scheduler) -> Task(B, A)
 join : (Task(A, B)) <- (Fail(B), Scheduler) -> A
-yield : () <- (Scheduler) -> Nil
+yield : () <- (Scheduler) -> ()
 path : () <- (Scheduler) -> List(Int)
 random : () <- (Scheduler) -> rng.Generator
 keep : ((A) <- (Fail(E), ..N) -> B) <- (N - request.Await - Runner - Scheduler, Scheduler) -> (A) <- (Fail(E), Scheduler) -> B
 channel : () <- (Scheduler) -> Channel(A)
 local_channel : () <- (Scheduler) -> Channel(A)
-send : (Channel(A), A) <- (Scheduler) -> Nil
+send : (Channel(A), A) <- (Scheduler) -> ()
 receive : (Channel(A)) <- (Scheduler) -> A
-send_event : (Channel(A), A) -> Event(Nil, Never, Never)
+send_event : (Channel(A), A) -> Event((), Never, Never)
 receive_event : (Channel(A)) -> Event(A, Never, Never)
 join_event : (Task(A, B)) -> Event(A, B, Never)
 always : (A) -> Event(A, Never, Never)
@@ -867,7 +867,7 @@ Source: `stdlib/src/tls.i`. Upgrades connected network streams to TLS and expose
 Export visibility: `Tls`, `Stream`, `TlsError(..)`. Hidden representations below are descriptive only.
 
 ```text
-Tls = ( connect = (Int, String, String, BitArray, BitArray, BitArray) -> Request( Result(Int, String), ), accept = (Int, BitArray, BitArray, String) -> Request(Result(Int, String)), alpn = (Int) -> Request(Result(String, String)), read = (Int, Int) -> Request(Result(BitArray, String)), write = (Int, BitArray) -> Request(Result(Nil, String)), shutdown_write = (Int) -> Request(Result(Nil, String)), close = (Int) -> Request(Nil), )
+Tls = ( connect = (Int, String, String, BitArray, BitArray, BitArray) -> Request( Result(Int, String), ), accept = (Int, BitArray, BitArray, String) -> Request(Result(Int, String)), alpn = (Int) -> Request(Result(String, String)), read = (Int, Int) -> Request(Result(BitArray, String)), write = (Int, BitArray) -> Request(Result((), String)), shutdown_write = (Int) -> Request(Result((), String)), close = (Int) -> Request(()), )
 Stream = (Int)
 TlsError = (stage = String, reason = String)
 ```
@@ -880,10 +880,10 @@ accept : (net.Stream, (cert = BitArray, key = BitArray), (alpn = List(String), c
 dial : (String, Int, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError | net.NetError), Tls, net.Net, request.Await, request.Owner) -> Stream
 alpn : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> String
 read : (Stream, Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray
-write : (Stream, BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil
-shutdown_write : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil
-close : (Stream) <- (Tls, request.Await, request.Owner) -> Nil
-byte_stream : (Stream) -> (close = () <- (Tls, request.Await, request.Owner) -> Nil, read = (Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil, write = (BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Nil)
+write : (Stream, BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ()
+shutdown_write : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ()
+close : (Stream) <- (Tls, request.Await, request.Owner) -> ()
+byte_stream : (Stream) -> (close = () <- (Tls, request.Await, request.Owner) -> (), read = (Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(TlsError), Tls, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ())
 ```
 
 **Missing attached type/constructor docs.** `Stream`, `Tls`, `TlsError`. Module prose may still describe them.
@@ -904,23 +904,23 @@ Exported types: none.
 
 ```text
 from_string : (String) -> BitArray
-to_string : (BitArray) -> Result(String, Nil)
+to_string : (BitArray) -> Result(String, ())
 is_utf8 : (BitArray) -> Bool
 bit_size : (BitArray) -> Int
 byte_size : (BitArray) -> Int
 append : (BitArray, BitArray) -> BitArray
 concat : (List(BitArray)) -> BitArray
-slice : (BitArray, Int, Int) -> Result(BitArray, Nil)
+slice : (BitArray, Int, Int) -> Result(BitArray, ())
 starts_with : (BitArray, BitArray) -> Bool
 pad_to_bytes : (BitArray) -> BitArray
 compare : (BitArray, BitArray) -> Order
 inspect : (BitArray) -> String
 base16_encode : (BitArray) -> String
-base16_decode : (String) -> Result(BitArray, Nil)
+base16_decode : (String) -> Result(BitArray, ())
 base64_encode : (BitArray, Bool) -> String
-base64_decode : (String) -> Result(BitArray, Nil)
+base64_decode : (String) -> Result(BitArray, ())
 base64_url_encode : (BitArray, Bool) -> String
-base64_url_decode : (String) -> Result(BitArray, Nil)
+base64_url_decode : (String) -> Result(BitArray, ())
 ```
 
 **Language use.** Uses bit patterns, ordinary matching, Order and Result data; no explicit service reads. E4 should move invalid encodings, UTF-8 conversion and checked slices to Fail. Pure encoders need no services. Padding defaults could use shape groups.
@@ -1059,7 +1059,7 @@ map : <A, B>(Parser(A), (A) -> B) -> Parser(B)
 map2 : <A, B, C>( Parser(A), Parser(B), (A, B) -> C ) -> Parser(C)
 parse : <A>(Parser(A), List(String)) -> Result(A, CliError)
 read : <A>(Parser(A)) <- (process.Arguments, Fail(process.ProcessError), request.Await, request.Owner) -> Result(A, CliError)
-run : <A, N>(Parser(A), String, (A) <- N -> Nil) <- (process.Arguments, stdio.Stdio, Fail(CliError | process.ProcessError | stdio.StdioError), request.Await, request.Owner, ..N) -> Nil
+run : <A, N>(Parser(A), String, (A) <- N -> ()) <- (process.Arguments, stdio.Stdio, Fail(CliError | process.ProcessError | stdio.StdioError), request.Await, request.Owner, ..N) -> ()
 help : <A>(Parser(A), String) -> Result( String, DefinitionError, )
 text : (String) -> Result(String, String)
 integer : (String) -> Result(Int, String)
@@ -1173,7 +1173,7 @@ to_list : <K, V>(Dict(K, V)) -> List((K, V))
 keys : <K, V>(Dict(K, V)) -> List(K)
 values : <K, V>(Dict(K, V)) -> List(V)
 fold : <K, V, Acc, N>( Dict(K, V), Acc, (Acc, K, V) <- N -> Acc ) <- N -> Acc
-each : <K, V, A, N>(Dict(K, V), (K, V) <- N -> A) <- N -> Nil
+each : <K, V, A, N>(Dict(K, V), (K, V) <- N -> A) <- N -> ()
 map_values : <K, V, W, N>(Dict(K, V), (K, V) <- N -> W) <- N -> Dict( K, W, )
 filter : <K, V, N>(Dict(K, V), (K, V) <- N -> Bool) <- N -> Dict(K, V)
 take : <K, V>(Dict(K, V), List(K)) -> Dict(K, V)
@@ -1198,7 +1198,7 @@ Source: `stdlib/src/float.i`. Parses finite binary64 floats and supplies arithme
 Exported types: none.
 
 ```text
-parse : (String) -> Result(Float, Nil)
+parse : (String) -> Result(Float, ())
 to_string : (Float) -> String
 compare : (Float, Float) -> Order
 loosely_compare : (Float, Float, Float) -> Order
@@ -1213,15 +1213,15 @@ floor : (Float) -> Float
 round : (Float) -> Int
 truncate : (Float) -> Int
 to_precision : (Float, Int) -> Float
-power : (Float, Int) -> Result(Float, Nil)
-real_power : (Float, Float) -> Result(Float, Nil)
-exponential : (Float) -> Result(Float, Nil)
-logarithm : (Float) -> Result(Float, Nil)
-square_root : (Float) -> Result(Float, Nil)
+power : (Float, Int) -> Result(Float, ())
+real_power : (Float, Float) -> Result(Float, ())
+exponential : (Float) -> Result(Float, ())
+logarithm : (Float) -> Result(Float, ())
+square_root : (Float) -> Result(Float, ())
 sum : (List(Float)) -> Float
 product : (List(Float)) -> Float
-divide : (Float, Float) -> Result(Float, Nil)
-modulo : (Float, Float) -> Result(Float, Nil)
+divide : (Float, Float) -> Result(Float, ())
+modulo : (Float, Float) -> Result(Float, ())
 add : (Float, Float) -> Float
 subtract : (Float, Float) -> Float
 multiply : (Float, Float) -> Float
@@ -1232,19 +1232,19 @@ pi : Float
 tau : Float
 sin : (Float) -> Float
 cos : (Float) -> Float
-tan : (Float) -> Result(Float, Nil)
+tan : (Float) -> Result(Float, ())
 sign_bit : (Float) -> Bool
 copy_sign : (Float, Float) -> Float
-asin : (Float) -> Result(Float, Nil)
-acos : (Float) -> Result(Float, Nil)
+asin : (Float) -> Result(Float, ())
+acos : (Float) -> Result(Float, ())
 atan : (Float) -> Float
 atan2 : (Float, Float) -> Float
-hypot : (Float, Float) -> Result(Float, Nil)
+hypot : (Float, Float) -> Result(Float, ())
 radians : (Float) -> Float
-degrees : (Float) -> Result(Float, Nil)
+degrees : (Float) -> Result(Float, ())
 ```
 
-**Language use.** Uses core primitives, exact Int helpers, pattern matching, Order and Result for domain/overflow errors. E4 should use Fail for domain checks and parsing; use meaningful errors rather than Nil where callers need a distinction. Keep pure successful arithmetic ordinary.
+**Language use.** Uses core primitives, exact Int helpers, pattern matching, Order and Result for domain/overflow errors. E4 should use Fail for domain checks and parsing; use meaningful errors rather than () where callers need a distinction. Keep pure successful arithmetic ordinary.
 
 **Old style, overlap and thin surface.** Several functions rename core or operators. to_string delegates to core.inspect. The elementary algorithms are substantial. max_finite/min_positive/pi/tau are values, not functions. The header still says errors are Result.
 
@@ -1260,8 +1260,8 @@ Export visibility: `Client(..)`, `Transport(..)`, `ResponseStream`, `Method(..)`
 
 ```text
 Client = ( make = () <- ( requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> Transport, )
-Transport = ( stream = (Request) <- ( Fail(HttpError), requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> ResponseStream, send = (Request) <- ( Fail(HttpError), requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> Response, close = () <- ( requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> Nil, )
-ResponseStream = { ( head = Response, read = (Int) <- ( Fail(HttpError), requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> BitArray, close = () <- ( requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> Nil, ) }
+Transport = ( stream = (Request) <- ( Fail(HttpError), requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> ResponseStream, send = (Request) <- ( Fail(HttpError), requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> Response, close = () <- ( requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> (), )
+ResponseStream = { ( head = Response, read = (Int) <- ( Fail(HttpError), requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> BitArray, close = () <- ( requests.Await, requests.Owner, task.Scheduler, task.Runner, ) -> (), ) }
 Method = (String)
 Status = (Int)
 Headers = (List((String, String)))
@@ -1313,7 +1313,7 @@ get : (String) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task
 post : (String, BitArray) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Scheduler, task.Runner) -> Response
 send : (Request) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Scheduler, task.Runner) -> Response
 client : () <- (Client, requests.Await, requests.Owner, task.Scheduler, task.Runner) -> ClientFunctions
-body_text : (Response) -> Result(String, Nil)
+body_text : (Response) -> Result(String, ())
 body_json : (Response) -> Result(json.Json, BodyError)
 body_decode : <A>( Response, schema.Schema(A, schema.SchemaError) ) -> Result(A, BodyError)
 send_with : <N>((Request) <- N -> Response, Request) <- N -> Response
@@ -1344,9 +1344,9 @@ Exported types: none.
 
 ```text
 to_string : (Int) -> String
-parse : (String) -> Result(Int, Nil)
-parse_base : (String, Int) -> Result(Int, Nil)
-to_base : (Int, Int) -> Result(String, Nil)
+parse : (String) -> Result(Int, ())
+parse_base : (String, Int) -> Result(Int, ())
+to_base : (Int, Int) -> Result(String, ())
 to_base2 : (Int) -> String
 to_base8 : (Int) -> String
 to_base16 : (Int) -> String
@@ -1360,16 +1360,16 @@ clamp : (Int, Int, Int) -> Int
 compare : (Int, Int) -> Order
 is_even : (Int) -> Bool
 is_odd : (Int) -> Bool
-power : (Int, Int) -> Result(Int, Nil)
-square_root : (Int) -> Result(Float, Nil)
+power : (Int, Int) -> Result(Int, ())
+square_root : (Int) -> Result(Float, ())
 sum : (List(Int)) -> Int
 product : (List(Int)) -> Int
-digits : (Int, Int) -> Result(List(Int), Nil)
-undigits : (List(Int), Int) -> Result(Int, Nil)
-divide : (Int, Int) -> Result(Int, Nil)
-remainder : (Int, Int) -> Result(Int, Nil)
-modulo : (Int, Int) -> Result(Int, Nil)
-floor_divide : (Int, Int) -> Result(Int, Nil)
+digits : (Int, Int) -> Result(List(Int), ())
+undigits : (List(Int), Int) -> Result(Int, ())
+divide : (Int, Int) -> Result(Int, ())
+remainder : (Int, Int) -> Result(Int, ())
+modulo : (Int, Int) -> Result(Int, ())
+floor_divide : (Int, Int) -> Result(Int, ())
 add : (Int, Int) -> Int
 subtract : (Int, Int) -> Int
 multiply : (Int, Int) -> Int
@@ -1481,7 +1481,7 @@ find_map : <A, B, N>(List(A), (A) <- N -> Option(B)) <- N -> Option(B)
 all : <A, N>(List(A), (A) <- N -> Bool) <- N -> Bool
 any : <A, N>(List(A), (A) <- N -> Bool) <- N -> Bool
 zip : <A, B>(List(A), List(B)) -> List((A, B))
-strict_zip : <A, B>(List(A), List(B)) -> Result(List((A, B)), Nil)
+strict_zip : <A, B>(List(A), List(B)) -> Result(List((A, B)), ())
 unzip : <A, B>(List((A, B))) -> (List(A), List(B))
 intersperse : <A>(List(A), A) -> List(A)
 unique : <A>(List(A)) -> List(A)
@@ -1494,8 +1494,8 @@ key_find : <K, V>(List((K, V)), K) -> Option(V)
 key_filter : <K, V>(List((K, V)), K) -> List(V)
 key_pop : <K, V>(List((K, V)), K) -> Option((V, List((K, V))))
 key_set : <K, V>(List((K, V)), K, V) -> List((K, V))
-each : <A, B, N>(List(A), (A) <- N -> B) <- N -> Nil
-try_each : <A, B, F, N>( List(A), (A) <- N -> Result(B, F) ) <- N -> Result(Nil, F)
+each : <A, B, N>(List(A), (A) <- N -> B) <- N -> ()
+try_each : <A, B, F, N>( List(A), (A) <- N -> Result(B, F) ) <- N -> Result((), F)
 partition : <A, N>(List(A), (A) <- N -> Bool) <- N -> ( List(A), List(A), )
 permutations : <A>(List(A)) -> List(List(A))
 window : <A>(List(A), Int) -> List(List(A))
@@ -1537,17 +1537,17 @@ Info = ()
 Warning = ()
 Failure = ()
 Entry = ( level = Level, message = String, fields = List((String, String)), at = Option(time.Instant), )
-Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> (), (N) -> ())
 ```
 
 ```text
-make : <E, N>( (Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil ) -> Sink(E, N)
+make : <E, N>( (Level) -> Bool, (Entry) <- (Fail(E), ..N) -> () ) -> Sink(E, N)
 silent : <N>() -> Sink(Never, N)
 filter : <E, N>(Sink(E, N), (Level) -> Bool) -> Sink(E, N)
 minimum : <E, N>(Sink(E, N), Level) -> Sink(E, N)
 enabled : <E, N>(Level) <- (Sink(E, N)) -> Bool
-write : <E, N>(Entry) <- (Sink(E, N), Fail(E), ..N) -> Nil
-lazy : <E, N>(Level, () <- N -> String) <- (Sink(E, N), Fail(E), ..N) -> Nil
+write : <E, N>(Entry) <- (Sink(E, N), Fail(E), ..N) -> ()
+lazy : <E, N>(Level, () <- N -> String) <- (Sink(E, N), Fail(E), ..N) -> ()
 format : (Entry) -> String
 stderr : () -> Sink(stdio.StdioError, stdio.Stdio | request.Await | request.Owner)
 stdout : () -> Sink(stdio.StdioError, stdio.Stdio | request.Await | request.Owner)
@@ -1559,7 +1559,7 @@ timestamped : (Entry) <- (clock.Clock, Fail(clock.ClockError), request.Await, re
 
 **Language use.** Uses labelled Entry/Level, a hidden Sink, need-polymorphic callbacks, Fail, lazy filtering and optional clock timestamps. File output uses resource.acquire. This is already a useful ordinary service. Capture downstream services with the language rules. Prefer one documented logging failure policy and Scope lifetime over an independent environment abstraction.
 
-**Old style, overlap and thin surface.** Sink keeps an unused (N)->Nil variance marker. Old header types use ?/! and obsolete labelled declarations. stdout/file/timestamped are useful adapters but have little direct dedicated coverage. Failure is a log level name, not Fail.
+**Old style, overlap and thin surface.** Sink keeps an unused (N)->() variance marker. Old header types use ?/! and obsolete labelled declarations. stdout/file/timestamped are useful adapters but have little direct dedicated coverage. Failure is a log level name, not Fail.
 
 **Tests.** 11 named tests: `stdlib/test/log_test.i` (11). 11 named tests cover delivery, laziness, filters, errors, formatting and generic service gates. clock_test covers timestamped; cli_log.rs has 2 integration cases using stderr. stdout and file have no direct log_test.i calls. File-open/write/flush cleanup failures need isolated cases.
 
@@ -1746,7 +1746,7 @@ string : (Int) -> Result(Gen(String), BuildError)
 check : <A>(Gen(A), Config, (A) -> Verdict) -> Report( A, )
 replay : <A>( Gen(A), Int, Int, Int, List(Int) ) -> Option(A)
 format : <A>(Report(A), (A) -> String) -> String
-test : <A>( Gen(A), Config, (A) <- (Assert) -> Nil, (A) -> String ) <- (Assert) -> Nil
+test : <A>( Gen(A), Config, (A) <- (Assert) -> (), (A) -> String ) <- (Assert) -> ()
 ```
 
 **Missing attached type/constructor docs.** `BuildError`, `Config`, `Discard`, `EmptyChoice`, `Fail`, `Failure`, `Falsified`, `GaveUp`, `Gen`, `InvalidConfig`, `InvalidLength`, `InvalidRange`, `Pass`, `Passed`, `Report`, `Tree`, `Verdict`. Module prose may still describe them.
@@ -1921,7 +1921,7 @@ drop : <A>(Sequence(A), Int) -> Sequence(A)
 reverse : <A>(Sequence(A)) -> Sequence(A)
 map : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> Sequence(B)
 fold : <A, Acc, N>( Sequence(A), Acc, (Acc, A) <- N -> Acc ) <- N -> Acc
-each : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> Nil
+each : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> ()
 equal : <A>(Sequence(A), Sequence(A)) -> Bool
 ```
 
@@ -1940,7 +1940,7 @@ Source: `stdlib/src/set.i`. Implements immutable mathematical set operations ove
 Export visibility: `Set`. Hidden representations below are descriptive only.
 
 ```text
-Set(A) = (Dict(A, Nil))
+Set(A) = (Dict(A, ()))
 ```
 
 ```text
@@ -1953,7 +1953,7 @@ contains : <A>(Set(A), A) -> Bool
 to_list : <A>(Set(A)) -> List(A)
 from_list : <A>(List(A)) -> Set(A)
 fold : <A, Acc, N>(Set(A), Acc, (Acc, A) <- N -> Acc) <- N -> Acc
-each : <A, B, N>(Set(A), (A) <- N -> B) <- N -> Nil
+each : <A, B, N>(Set(A), (A) <- N -> B) <- N -> ()
 map : <A, B, N>(Set(A), (A) <- N -> B) <- N -> Set(B)
 filter : <A, N>(Set(A), (A) <- N -> Bool) <- N -> Set(A)
 take : <A>(Set(A), List(A)) -> Set(A)
@@ -1981,7 +1981,7 @@ Source: `stdlib/src/stream.i`. Represents replayable lazy sequences whose pull f
 Export visibility: `Stream`, `Step(..)`. Hidden representations below are descriptive only.
 
 ```text
-Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> Nil)
+Stream(A, E, N) = (() <- (Fail(E), ..N) -> Step(A, E, N), (N) -> ())
 Step(A, E, N) = Done | Next(A, E, N)
 Done = ()
 Next(A, E, N) = (A, Stream(A, E, N))
@@ -2006,7 +2006,7 @@ drop : <A, E, N>(Stream(A, E, N), Int) -> Stream(A, E, N)
 take_while : <A, E, F, N>( Stream(A, E, N), (A) <- (Fail(F), ..N) -> Bool ) -> Stream(A, E | F, N)
 fold : <A, Acc, E, N>( Stream(A, E, N), Acc, (Acc, A) <- N -> Acc ) <- (Fail(E), ..N) -> Acc
 fold_until : <A, Acc, E, N>( Stream(A, E, N), Acc, (Acc, A) <- N -> list.ContinueOrStop(Acc) ) <- (Fail(E), ..N) -> Acc
-each : <A, B, E, N>(Stream(A, E, N), (A) <- N -> B) <- (Fail(E), ..N) -> Nil
+each : <A, B, E, N>(Stream(A, E, N), (A) <- N -> B) <- (Fail(E), ..N) -> ()
 to_list : <A, E, N>(Stream(A, E, N)) <- (Fail(E), ..N) -> List(A)
 from_results : <A, E, N>(List(Result(A, E))) -> Stream(A, E, N)
 attempt : <A, E, N>(Stream(A, E, N)) -> Stream(Result(A, E), Never, N)
@@ -2017,7 +2017,7 @@ map_environment : <A, E, N, M>( Stream(A, E, N), (() <- (Fail(E), ..N) -> Step(A
 
 **Language use.** Uses hidden Stream, Done/Next union, ordinary deferred functions with Fail/open needs and Result only at attempt/from_results boundaries. A stream is repeated production, not a second representation of a single effect. Add resource-safe IO sources, bounded concurrency and timing through existing task/Scope services. Whole-need-row simplification needs care rather than a cosmetic copy of Effect types.
 
-**Old style, overlap and thin surface.** The phantom (N)->Nil marker forces invariant N. map_environment is a stream-specific callback runner; ordinary <- already provides services. There is no public file/socket source, buffer, merge or timeout. Core sequential transforms are substantial and demand-aware.
+**Old style, overlap and thin surface.** The phantom (N)->() marker forces invariant N. map_environment is a stream-specific callback runner; ordinary <- already provides services. There is no public file/socket source, buffer, merge or timeout. Core sequential transforms are substantial and demand-aware.
 
 **Tests.** 13 named tests: `stdlib/test/stream_test.i` (13). 13 named tests reference all exports and cover algebraic laws, demand, replay, call-time services, error positions, callback order, resource scope and factories. Buffered, concurrent and scheduled sources have no public tests because the APIs do not exist.
 
@@ -2065,7 +2065,7 @@ pad_right : (String, Int, String) -> String
 to_codepoints : (String) -> List(UtfCodepoint)
 from_codepoints : (List(UtfCodepoint)) -> String
 to_codepoint_strings : (String) -> List(String)
-utf_codepoint : (Int) -> Result(UtfCodepoint, Nil)
+utf_codepoint : (Int) -> Result(UtfCodepoint, ())
 utf_codepoint_to_int : (UtfCodepoint) -> Int
 compare : (String, String) -> Order
 inspect : <A>(A) -> String
@@ -2124,7 +2124,7 @@ shift : (Instant, Duration) -> Instant
 between : (Instant, Instant) -> Duration
 compare_instants : (Instant, Instant) -> Order
 now : () <- (clock.Clock, Fail(clock.ClockError), request.Await, request.Owner) -> Instant
-sleep : (Duration) <- (clock.Clock, Fail(clock.ClockError), request.Await, request.Owner) -> Nil
+sleep : (Duration) <- (clock.Clock, Fail(clock.ClockError), request.Await, request.Owner) -> ()
 measure : <A, E, N>(() <- (Fail(E), ..N) -> A) <- (clock.Clock, Fail(E | clock.ClockError), request.Await, request.Owner, ..N) -> (A, Duration)
 ```
 
@@ -2208,7 +2208,7 @@ build_query : (List((String, String))) -> String
 Source: `stdlib/src/test.is`. It registers tests by expanding syntax into items.
 This module is included even though the requested glob is `.i`.
 
-Exported types: none. `tests : Nil` is the item-group anchor.
+Exported types: none. `tests : ()` is the item-group anchor.
 The six exported macros have syntax-transformer types, not runtime callback
 execution types:
 
@@ -2255,7 +2255,7 @@ The following groups identify the actual migration decisions in this tree.
 
 | Group | Current public surface | Audit judgement |
 |---|---|---|
-| Numeric failures | int parse/parse_base/to_base/power/square_root/digits/undigits/divide/remainder/modulo/floor_divide; float parse/power/real_power/exponential/logarithm/square_root/divide/modulo/tan/asin/acos/hypot/degrees | E4 Fail candidates. Nil errors hide useful distinctions among bad text, invalid radix, domain and overflow. |
+| Numeric failures | int parse/parse_base/to_base/power/square_root/digits/undigits/divide/remainder/modulo/floor_divide; float parse/power/real_power/exponential/logarithm/square_root/divide/modulo/tan/asin/acos/hypot/degrees | E4 Fail candidates. () errors hide useful distinctions among bad text, invalid radix, domain and overflow. |
 | Binary/text failures | bit_array to_string/slice/base16_decode/base64_decode/base64_url_decode; string.utf_codepoint | E4 Fail candidates. Keep is_utf8 and other predicates total. Decide whether raw core Result APIs remain private ABI helpers. |
 | Parsing and validation | calendar date/time_of_day/offset/days_in_month/parse; cli parse/help/text/integer; csv options/parse/parse_with/parse_header/decode; json.parse; path.relative; property int/element/list/string; regex.compile; schema decode/parse; uri parse/build/resolve/encode_bytes/decode_component/decode_bytes/parse_query | These are computations that fail. Use Fail. Preserve validation reports and ordinary absence as data where that is the requested result. |
 | Cryptographic preconditions | hmac_sha256/512, hkdf_sha256/512, hkdf_extract_sha256/512, hkdf_expand_sha256/512, pbkdf2_sha256, random_bytes | Use Fail for invalid length, alignment and iteration count. random_bytes already raises ProcessError separately; merge the error needs. |
@@ -2272,7 +2272,7 @@ control contracts from `docs/design/syntax-3.md` §2.10.7 are:
 boundary : <R, N>((Boundary(R, N)) <- N -> R) <- N -> R
 suspend  : <A, R, N>(Boundary(R, N), (Continuation(A, R, N)) <- N -> R) -> A
 resume   : <A, R, N>(Continuation(A, R, N), A) <- N -> R
-cancel   : <A, R, N>(Continuation(A, R, N)) <- N -> Nil
+cancel   : <A, R, N>(Continuation(A, R, N)) <- N -> ()
 escape   : <R, N>(Boundary(R, N), R) -> Never
 ```
 
@@ -2406,7 +2406,7 @@ public contract rather than an explicit service binder.
 | i/io.Io.print; i/stdio.print | Both print text with LF, but failure and host contracts differ. | Document or consolidate the compatibility boundary. |
 | i/clock sleep_ns/unix_ns; i/time.sleep/now; i/calendar.now/format_now | Raw versus domain-typed clock operations. | Useful layering, not duplicate algorithms. Keep one clock service and explicit units. |
 | i/list, i/sequence, i/stream | Eager linked lists, persistent indexed deques and lazy effectful pulls. | Keep distinct semantics and shared naming; these are not interchangeable duplicate containers. |
-| i/dict, i/set | Set is Dict(A,Nil) with set semantics. | Useful abstraction; no independent hashing implementation. |
+| i/dict, i/set | Set is Dict(A,()) with set semantics. | Useful abstraction; no independent hashing implementation. |
 | Private list reversals in i/bits, i/float_text, i/task, i/syntax, i/option, i/result, i/dict | Repeated elementary traversal, often to avoid lib→std dependency or std import cycles. | Audit dependency direction before deduplicating. The foundation cannot import i/list. |
 | i/path splitting; i/uri path normalization; i/http route splitting | Similar text operations with different escaping/validation semantics. | Share only primitives whose units and escaping rules match. |
 | i/stream.map_environment; control.keep_env; task.keep | All adapt deferred environments but have different lifetime/return contracts. | Use ordinary provision as the base; preserve stream-tail rebuilding and scheduler ownership where required. |

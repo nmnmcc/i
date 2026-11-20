@@ -82,7 +82,7 @@ Kinds 0 and 1 are the **code records**; they are the only ones with a slot. The 
 
 **D14. `$shadow_insert` makes room for all its slots at once.** It counts the n slots it puts in, and if `$sp + n` is more than the length of `$shadow`, it makes one new array of length max(2 × length, `$sp + n`), as `$control_unpend` makes one of length `$sp + n` (section 5.6). *Reason (review):* `$shadow_enter` grows the array by one doubling, which is enough for one push. Under lazy re-entry the array only grows to the depth that was really entered (`d` plus the frames entered since the resume), but the pending list can hold any number of code records, because each re-suspend splices the old pending records after the new ones. So n can be many times the length of the array, and one doubling would leave `array.copy` out of bounds, which traps. Eager pushed the same slots one at a time with `$shadow_enter`, which doubles as often as needed.
 
-**D15. A trace that the spec does not state is checked in `control_lazy.rs`, not in `tests/spec`.** The only place where the shadow stack is seen after an error or a cancel has left a trampoline is a full-trace stop reached by a `$cancel` that nobody takes: a resumed part of a cancel unwind (a final function that suspended during `cancel(k)` and was resumed after `cancel(k)` was captured away) throws `$cancel k` again, it goes out of `resume`, and `$entry_*` stops with `control: boundary is not active` and the full trace. That is what the compiler does at `dcb19df`, but the spec does not say it: §11.7 gives that reason only for "`control.suspend` with a boundary that is not active", and §9.4 rules 3 and 4 do not say what such a cancel does when it reaches its boundary. A case in `tests/spec` would make that output a rule that another compiler must follow. So the checks of D13 and P4 are run tests 12, 13 and 15 of 13.2, with the output of eager at the bench commit written into the test. The same holds for a cancel unwind whose final function suspends to an inner boundary and whose value then goes on into the cancelled code (run test 16): eager does that at `dcb19df`, but §9.4 rule 4 says only that `cancel(k)` unwinds and gives Nil. *Reason (review):* D12 (no spec change); the conformance suite checks only rules that the spec states. Open question 5 asks whether the spec should state these cases.
+**D15. A trace that the spec does not state is checked in `control_lazy.rs`, not in `tests/spec`.** The only place where the shadow stack is seen after an error or a cancel has left a trampoline is a full-trace stop reached by a `$cancel` that nobody takes: a resumed part of a cancel unwind (a final function that suspended during `cancel(k)` and was resumed after `cancel(k)` was captured away) throws `$cancel k` again, it goes out of `resume`, and `$entry_*` stops with `control: boundary is not active` and the full trace. That is what the compiler does at `dcb19df`, but the spec does not say it: §11.7 gives that reason only for "`control.suspend` with a boundary that is not active", and §9.4 rules 3 and 4 do not say what such a cancel does when it reaches its boundary. A case in `tests/spec` would make that output a rule that another compiler must follow. So the checks of D13 and P4 are run tests 12, 13 and 15 of 13.2, with the output of eager at the bench commit written into the test. The same holds for a cancel unwind whose final function suspends to an inner boundary and whose value then goes on into the cancelled code (run test 16): eager does that at `dcb19df`, but §9.4 rule 4 says only that `cancel(k)` unwinds and gives (). *Reason (review):* D12 (no spec change); the conformance suite checks only rules that the spec states. Open question 5 asks whether the spec should state these cases.
 
 **D16. Environment statements before a tail call stay as eager has them.** §11.6 says an environment statement does not change tail positions. So when a function runs `! S = v` and then makes a tail call, its frame is gone, and no record carries that statement. The record of the callee has `point.env = Env::Param`, so at resume it is given the environment of the place of `resume`, not one with `S = v`. §9.4 rule 3 asks for `S = v` there. Eager at `dcb19df` gives the same wrong value (section 7a). B keeps it, because B changes no behaviour, and run test 14 checks that lazy gives what eager gives. *Reason (review):* a fix changes what programs compute, so it is a separate change with its own spec case. Section 7a says how it fits the record layout of B, and open question 6 asks for it.
 
@@ -640,13 +640,13 @@ This uses the new syntax, so it is committed after A1+A2 land.
 rounds = 100_000
 
 Done = (Int)
-More = (Int, Continuation(Nil, Step, Never, Never))
+More = (Int, Continuation((), Step, Never, Never))
 // What the paused computation gives: each number, and at the end the
 // number of frames it went back through.
 Step = Done | More
 
-check = (ok : Bool, what : String) -> Nil {
-	ok |> (True) { Nil } | (False) { panic(what) }
+check = (ok : Bool, what : String) -> () {
+	ok |> (True) { () } | (False) { panic(what) }
 }
 
 // Suspends once for each number from `n` down to 1. The call after the
@@ -676,7 +676,7 @@ sum = (step, acc, depth) {
 			check(d == depth, "a frame was lost or ran twice")
 			acc
 		}
-		| (More(v, k)) { sum(control.resume(k, Nil), acc + v, depth) }
+		| (More(v, k)) { sum(control.resume(k, ()), acc + v, depth) }
 }
 
 run = (depth) {
@@ -691,7 +691,7 @@ test("resume_depth_100", () { run(100) })
 test("resume_depth_1000", () { run(1000) })
 ```
 
-Before it is committed, it must check under A1+A2: the imports group, the `|>` clause blocks, ordinary `test` macro calls, a top-level clause block (`deeper`), and `b`, `k` and `step` with no type. `tests/spec/9/control.i` (line 205) has a similar `Step`, `Step { Done  More(Int, Continuation(Nil, Step, Never, Never)) }`. Only its `More` matches: its `Done` has no field, and the bench's `Done` has an `Int`. So the bench's type is checked on its own, not taken from that file. `Continuation(Nil, Step, Never, Never)` is written the same in the new syntax: syntax.md renames only type variables, and `Nil`, `Step` and `Never` are types (syntax.md §3: an `UpName` is a type variable only when a type variable with that name is declared where the type is written). If `deeper` were inlined, the frames would still stay, because it does work after `down` returns.
+Before it is committed, it must check under A1+A2: the imports group, the `|>` clause blocks, ordinary `test` macro calls, a top-level clause block (`deeper`), and `b`, `k` and `step` with no type. `tests/spec/9/control.i` (line 205) has a similar `Step`, `Step { Done  More(Int, Continuation((), Step, Never, Never)) }`. Only its `More` matches: its `Done` has no field, and the bench's `Done` has an `Int`. So the bench's type is checked on its own, not taken from that file. `Continuation((), Step, Never, Never)` is written the same in the new syntax: syntax.md renames only type variables, and `()`, `Step` and `Never` are types (syntax.md §3: an `UpName` is a type variable only when a type variable with that name is declared where the type is written). If `deeper` were inlined, the frames would still stay, because it does work after `down` returns.
 
 ### 13.2 `crates/ilang-wasm/tests/control_lazy.rs`
 
@@ -737,9 +737,9 @@ The test prints S and the native stack it used.
     )
 
     // Hands k2 out of the cancel, to the boundary `b0` around it.
-    Out { Out(put: (k2: Inner) -> Nil) }
-    Inner { Inner(Continuation(Nil, Int, Never, Out)) }
-    Outer { Paused(Continuation(Nil, Outer, Never, Out))  Done }
+    Out { Out(put: (k2: Inner) -> ()) }
+    Inner { Inner(Continuation((), Int, Never, Out)) }
+    Outer { Paused(Continuation((), Outer, Never, Out))  Done }
     Handed { Handed(Inner)  Lost }
 
     put = (k2, o ! Out) { o.put(k2) }
@@ -765,7 +765,7 @@ The test prints S and the native stack it used.
       // The paused computation needs `Out` where it starts and where k2 is
       // resumed (§10.2). This one is never called: the cancel runs under the
       // `Out` given in `b0` (§9.4 rule 4).
-      ! Out = Out((k2) { Nil })
+      ! Out = Out((k2) { () })
       k = control.boundary((b) {
         control.boundary((b2) { g(b, b2) })
         Done
@@ -779,24 +779,24 @@ The test prints S and the native stack it used.
         Lost
       })
       handed |> {
-        Handed(Inner(k2)) -> control.resume(k2, Nil)
+        Handed(Inner(k2)) -> control.resume(k2, ())
         Lost -> panic("k2 was not handed out")
       }
-      Nil
+      ()
     }
     ```
 
-    Every computation that `put` runs in needs `Out` (§9.4: `b2` is a `Boundary(Int, _, Out)`, so `k2` has `Out` as its last argument, and so do `b` and `k`). §10.2 lets an entry point need only host services and `Assert`, so `main` gives a placeholder `Out` first; without it the program does not compile (E0522). `b0` gives the `Out` that hands `k2` out, and the cancel runs under it. `cancel(k)` re-enters `b2` by descent and runs the final function in mode 2. It suspends to `b2`, so `k2` holds [the rest of the final function, the final record of `k` (kind 5, mode 2), g's record]. `put` suspends to `b0`, which gives `Handed(k2)`; the continuation `rest` is never used, so its final functions are not run (§9.4 rule 6). `resume(k2, Nil)` then runs the final record, which throws `$cancel k`; nothing in k2 takes it, the trampoline skips g's record and inserts its slot at `d` with `$sp == d`, and the entry stops. The trace lists g's site, then the resume site in main, as eager prints it. A second part puts a `fail.catch` around the `resource.ensure` in `g` (`x = fail.catch(() { … })`, then a match on `x`), so a pending kind-4 record lies between the final record and g's record and the cancel skips it; this is why the imports have `i/fail`. A check of the old-syntax form of this program on the eager compiler (with the placeholder `Out`) stops with `control: boundary is not active` and two sites, one in `g` and the resume in main, as expected.
-13. `cancel_out_two_trampolines` (D13, P4): the same `$cancel k`, but `resume(k2, Nil)` is called from frames that a lazy resume of a third continuation `k3` re-entered, while `k3` still has a pending outer frame. So `$shadow[d .. top)` is not empty when the second trampoline inserts, and two trampolines insert in turn. To the source of test 12 it adds:
+    Every computation that `put` runs in needs `Out` (§9.4: `b2` is a `Boundary(Int, _, Out)`, so `k2` has `Out` as its last argument, and so do `b` and `k`). §10.2 lets an entry point need only host services and `Assert`, so `main` gives a placeholder `Out` first; without it the program does not compile (E0522). `b0` gives the `Out` that hands `k2` out, and the cancel runs under it. `cancel(k)` re-enters `b2` by descent and runs the final function in mode 2. It suspends to `b2`, so `k2` holds [the rest of the final function, the final record of `k` (kind 5, mode 2), g's record]. `put` suspends to `b0`, which gives `Handed(k2)`; the continuation `rest` is never used, so its final functions are not run (§9.4 rule 6). `resume(k2, ())` then runs the final record, which throws `$cancel k`; nothing in k2 takes it, the trampoline skips g's record and inserts its slot at `d` with `$sp == d`, and the entry stops. The trace lists g's site, then the resume site in main, as eager prints it. A second part puts a `fail.catch` around the `resource.ensure` in `g` (`x = fail.catch(() { … })`, then a match on `x`), so a pending kind-4 record lies between the final record and g's record and the cancel skips it; this is why the imports have `i/fail`. A check of the old-syntax form of this program on the eager compiler (with the placeholder `Out`) stops with `control: boundary is not active` and two sites, one in `g` and the resume in main, as expected.
+13. `cancel_out_two_trampolines` (D13, P4): the same `$cancel k`, but `resume(k2, ())` is called from frames that a lazy resume of a third continuation `k3` re-entered, while `k3` still has a pending outer frame. So `$shadow[d .. top)` is not empty when the second trampoline inserts, and two trampolines insert in turn. To the source of test 12 it adds:
 
     ```i
     // `h` resumes k2, which needs `Out`, so k3 needs it too.
-    Third { Third(Continuation(Nil, Third, Never, Out))  Over }
+    Third { Third(Continuation((), Third, Never, Out))  Over }
 
     keep = { Over -> Over  t -> t }
 
     // Not in tail position, so the frame waits.
-    inner = (k2) { control.resume(k2, Nil) + 1 }
+    inner = (k2) { control.resume(k2, ()) + 1 }
 
     h = (b3, k2) {
       control.suspend(b3, (k3) { Third(k3) })
@@ -808,26 +808,26 @@ The test prints S and the native stack it used.
     o1 = (b3, k2) { keep(h(b3, k2)) }
     ```
 
-    and main, after it has `k2`, does the following, under the placeholder `Out` of test 12, which `resume(k3, Nil)` needs:
+    and main, after it has `k2`, does the following, under the placeholder `Out` of test 12, which `resume(k3, ())` needs:
 
     ```i
       k3 = control.boundary((b3) { o1(b3, k2) }) |> {
         Third(k3) -> k3
         Over -> panic("not paused")
       }
-      control.resume(k3, Nil)
+      control.resume(k3, ())
     ```
 
     The resume of `k3` re-enters only `h`; `o1` stays pending in T(k3). `h` calls `inner`, which resumes `k2`. The `$cancel k` leaves T(k2) after it inserts g's slot at d2, goes through the frames of `inner` and `h` (which have no handler, so their slots stay), and T(k3) catches it with `top = $sp > d3` and `from` at o1's record. At the end of its list, T(k3) inserts the slots of its pending code records (o1's, and the one of the body of `b3` if that call is not a tail call) at d3, under the slots of `h`, `inner` and g. Eager prints g, inner, h, o1, then main's sites, in that order. An implementation that puts the slots at `$sp` instead of at `d` prints o1 before g and fails this test, and test 12 alone would not see it (there `$sp == d`).
 14. `env_tail_call_as_eager` (D16, section 7a): the program of section 7a as the entry, resumed where `Name` is "resumer", which panics with the name `g` sees. It compares the stop text with eager's, which names "resumer". A second part does the same on `cancel`, with a `resource.ensure` in `g` whose final function panics with the name. These values break §9.4 rules 3 and 4, so they are not spec cases; the test only checks that B changes nothing. When the gap of section 7a is fixed, the expected texts change to "in", and the two parts become spec cases.
 15. `cancel_out_restores_before_mode2` (D13, P3): the restore of `d` just before a call in mode 2. Test 13 with `o1 = (b3, k2) { keep(resource.ensure(() { h(b3, k2) }, () { panic("final") })) }`: the ensure record of `k3` is pending outside `h`. The `$cancel k` that leaves T(k2) reaches T(k3) with `$sp` above `d3` (the slots of `h`, `inner` and g). T(k3) skips any code record before the ensure record (the call of `h` in the ensure's body is a tail call, so there may be none), restores `d3` and calls the ensure record in mode 2, and the final function stops. Eager's `$ensure_run` restored its depth, so its trace has no line of `h`, `inner` or `g`. An implementation that leaves out `$shadow_restore(d)` before the call prints those three stale lines. The stop text is compared with eager's.
-16. `cancel_suspends_to_inner_boundary` (D15): moved here from the spec case `control_lazy_cancel_inner_boundary`. During `cancel(k)`, a final function suspends to `inner`, a boundary that was paused inside `k`. It must succeed, so `inner` is active during the unwind (eager re-entered it). Its `f(k')` gives a value as the value of the `control.boundary` call of `inner`, and the code after it in the body of `outer` runs on inside the cancel; `$cancel_core` then drops the value it ends with and `cancel(k)` gives Nil. That is what eager does at `dcb19df`, but §9.4 rule 4 does not say that a cancel may go back to ordinary code, or what happens to its value, so it is checked here with eager's output, not in `tests/spec` (open question 5). The program records what runs in a text that it prints, and the test compares it with eager's.
+16. `cancel_suspends_to_inner_boundary` (D15): moved here from the spec case `control_lazy_cancel_inner_boundary`. During `cancel(k)`, a final function suspends to `inner`, a boundary that was paused inside `k`. It must succeed, so `inner` is active during the unwind (eager re-entered it). Its `f(k')` gives a value as the value of the `control.boundary` call of `inner`, and the code after it in the body of `outer` runs on inside the cancel; `$cancel_core` then drops the value it ends with and `cancel(k)` gives (). That is what eager does at `dcb19df`, but §9.4 rule 4 does not say that a cancel may go back to ordinary code, or what happens to its value, so it is checked here with eager's output, not in `tests/spec` (open question 5). The program records what runs in a text that it prints, and the test compares it with eager's.
 
 ### 13.3 New spec cases
 
 These use the new syntax and are added after A1+A2. Each runs at O0 and O2.
 
-Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `show`, and `Name` with `name = (n ! Name) { n.text }` where a case needs a service. i has no `log`. What runs is recorded in the value that the case checks, as `cancel_runs_final_functions` in `control.i` does: a final function reads what it needs first, then suspends to a boundary further out, whose `f(k)` puts that text in front of the value of `resume(k, Nil)`. Statements are separated by new lines or by spaces (syntax.md §1.7), never by `;`. Every case below is a sketch until it is written and type-checked at step 2 of section 14; its expected value is the one eager gives at the bench commit.
+Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `show`, and `Name` with `name = (n ! Name) { n.text }` where a case needs a service. i has no `log`. What runs is recorded in the value that the case checks, as `cancel_runs_final_functions` in `control.i` does: a final function reads what it needs first, then suspends to a boundary further out, whose `f(k)` puts that text in front of the value of `resume(k, ())`. Statements are separated by new lines or by spaces (syntax.md §1.7), never by `;`. Every case below is a sketch until it is written and type-checked at step 2 of section 14; its expected value is the one eager gives at the bench commit.
 
 - `tests/spec/9/control_lazy_error.i`: after a resume at depth 50, the innermost frame raises an error, and a pending `fail.catch` near the boundary catches it.
 - `tests/spec/9/control_lazy_ensure.i`: ensures at 3 depths; an error after a resume, and a cancel, run the finals innermost first.
@@ -854,7 +854,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
       },
       () {
         seen = name()
-        control.suspend(outer, (k) { seen <> ", " <> control.resume(k, Nil) })
+        control.suspend(outer, (k) { seen <> ", " <> control.resume(k, ()) })
       },
     )
   }
@@ -881,7 +881,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
               "c"
             })
           },
-          () { control.suspend(top, (k) { "final, " <> control.resume(k, Nil) }) },
+          () { control.suspend(top, (k) { "final, " <> control.resume(k, ()) }) },
         )
       })
     })
@@ -895,7 +895,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
   ```i
   (testlib = (test) = i/test)
 
-  Gen { More(Continuation(Nil, Gen, Never, Never))  End }
+  Gen { More(Continuation((), Gen, Never, Never))  End }
 
   // One new frame per round: the call is not in tail position.
   g = (b, i) {
@@ -906,17 +906,17 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 
   drive = (step, n) {
     step |> {
-      End -> Nil
+      End -> ()
       More(k) -> n |> {
         0 -> control.cancel(k)
-        _ -> drive(control.resume(k, Nil), n - 1)
+        _ -> drive(control.resume(k, ()), n - 1)
       }
     }
   }
 
 
   test("cancel_long_pending", () {
-    check(show(drive(control.boundary((b) { g(b, 0) }), 10_000)), "Nil")
+    check(show(drive(control.boundary((b) { g(b, 0) }), 10_000)), "()")
   })
   ```
 
@@ -929,10 +929,10 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
       fail.catch(() {
         resource.ensure(
           () {
-            control.suspend(b, (k) { control.resume(k, Nil) })
+            control.suspend(b, (k) { control.resume(k, ()) })
             fail.raise(1)
           },
-          () { control.suspend(outer, (k2) { control.resume(k2, Nil) }) },
+          () { control.suspend(outer, (k2) { control.resume(k2, ()) }) },
         )
       })
     })
@@ -947,7 +947,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
   ```i
   (testlib = (test) = i/test)
 
-  Paused { Paused(Continuation(Nil, Paused, Never, Never)) }
+  Paused { Paused(Continuation((), Paused, Never, Never)) }
 
   inner = (b) {
     control.suspend(b, (k) { Paused(k) })
@@ -968,7 +968,7 @@ Each case defines its own helpers, as `tests/spec/9/control.i` does: `check`, `s
 
   test("stop_after_catch", () {
     control.boundary((b) { outer(b) }) |> {
-      Paused(k) -> control.resume(k, Nil)
+      Paused(k) -> control.resume(k, ())
     }
   })
   ```

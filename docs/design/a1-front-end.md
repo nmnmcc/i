@@ -473,7 +473,7 @@ Not changed: the lexer, `infer.rs`, `lower.rs`, `coverage.rs`, `order.rs`, hir.
   - (v) The cache gives the same tree as a run with no cache.
 - `tests/golden_old/` (new): frozen copies of the 48 golden inputs of base and their 48 `.out` files. `golden.rs` renders each `golden_old/*.i` with `parse_module_old` and compares with its `golden_old/*.out`, which pins Old mode byte for byte (claim D (a)). It never reads `golden/`, so A2 can rewrite `golden/*.i` and new inputs such as `header_groups.i` have no Old-mode render. `golden/` is rendered in Both mode only.
 - Golden `.out` files that change at stage 1, checked against the real parser at stage 1; any other changed `.out` fails the stage:
-  - `err_attribute_line`: the errors become exactly one error (rule 2 of §3.4 skips the group, so `recover()` does not report it again), `E0115 @2:1 a group in ( ) with an attribute before it is not a binding, because no = follows it; the imports and the exports have no attribute before them` (finding 14); the tree is `main = () { Nil }`.
+  - `err_attribute_line`: the errors become exactly one error (rule 2 of §3.4 skips the group, so `recover()` does not report it again), `E0115 @2:1 a group in ( ) with an attribute before it is not a binding, because no = follows it; the imports and the exports have no attribute before them` (finding 14); the tree is `main = () { () }`.
   - `err_block_end`: the third error goes; line 3 prints `h = {}`.
   - `err_toplevel`: no parse errors; the tree prints `f(x)`, `Some(x) = y`, and `@external("m", "f")` with `g = 1` (the checker reports E0234 and E0303).
   - `err_trailing`: `E0101 @1:3 expected a type, found ,` (was "a name"); the error at 4:7 goes, and `@custom()` with `x = 1` prints (the checker reports E0301).

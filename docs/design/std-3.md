@@ -83,7 +83,7 @@ approximation.
    dependent generation regenerates dependent trees on outer shrinks. Budgets
    count checks, not arbitrary computation (strict calls, spec §6.2).
 4. **Float remains finite.** Nonfinite values have no cases in the domain.
-   Domain/rounded-overflow errors use Error(Nil), as square_root/real_power do;
+   Domain/rounded-overflow errors use Error(()), as square_root/real_power do;
    signed zeros use bits (spec §4.2/§11.3; `float.i:510–515`, `:613–618`).
 5. **Correct rounding for new math.** Certified Float and fixed-point enclosures refine until
    both endpoints round to identical bits. Existing Int and bit conversions
@@ -177,7 +177,7 @@ string: (max_length: Int) -> Result(Gen(String), BuildError)
 check(A): (gen: Gen(A), config: Config, property: (A) -> Verdict) -> Report(A)
 replay(A): (gen: Gen(A), seed: Int, attempt: Int, size: Int, path: List(Int)) -> Option(A)
 format(A): (report: Report(A), show: (A) -> String) -> String
-test(A): (gen: Gen(A), config: Config, property: (A) -> Nil ! Assert, show: (A) -> String) -> Nil ! Assert
+test(A): (gen: Gen(A), config: Config, property: (A) -> () ! Assert, show: (A) -> String) -> () ! Assert
 ```
 
 All factories are functions rather than shared weak polymorphic values. A is
@@ -350,8 +350,8 @@ Store reports with the lock file. Report protocol is `i/property v1`; changes
 to built-in sampling/shrink order require an explicit protocol version change.
 
 **P9 Assert adapter.** test calls check with a predicate which wraps each
-property invocation in assertion.catch. Ok(Nil) gives Pass; Error(failure)
-gives Fail(failure.message). Afterwards Passed returns Nil; other reports call
+property invocation in assertion.catch. Ok(()) gives Pass; Error(failure)
+gives Fail(failure.message). Afterwards Passed returns (); other reports call
 *the caller's* Assert.fail(AssertionFailure(format(report,show))). The final
 fail is outside the per-case catch. Runner sees one ordinary failed test.
 AssertionFailure carries a message, not the original stack: the final stop site
@@ -429,14 +429,14 @@ pi: Float
 tau: Float
 sin: (x: Float) -> Float
 cos: (x: Float) -> Float
-tan: (x: Float) -> Result(Float, Nil)
-asin: (x: Float) -> Result(Float, Nil)
-acos: (x: Float) -> Result(Float, Nil)
+tan: (x: Float) -> Result(Float, ())
+asin: (x: Float) -> Result(Float, ())
+acos: (x: Float) -> Result(Float, ())
 atan: (x: Float) -> Float
 atan2: (y: Float, x: Float) -> Float
-hypot: (x: Float, y: Float) -> Result(Float, Nil)
+hypot: (x: Float, y: Float) -> Result(Float, ())
 radians: (degrees: Float) -> Float
-degrees: (radians: Float) -> Result(Float, Nil)
+degrees: (radians: Float) -> Result(Float, ())
 sign_bit: (x: Float) -> Bool
 copy_sign: (magnitude: Float, sign: Float) -> Float
 ```
@@ -459,7 +459,7 @@ nonzero underflow preserves the real result's sign.
 
 Let M=(2-2^-52)*2^1023, the largest finite value, and T=M+2^970. At magnitude T,
 ties-to-even overflows to the conceptual next value 2^1024. Checked functions
-return Error(Nil) iff the rounded result would be nonfinite or the real domain
+return Error(()) iff the rounded result would be nonfinite or the real domain
 excludes the inputs. Results strictly between M and T round to M and succeed.
 Never construct a nonfinite Float, including an intermediate. No host math
 import, platform-dependent approximation or flush-to-zero mode.
@@ -470,7 +470,7 @@ pi during reduction or unit conversion. sign_bit tests bit 63; copy_sign clears
 that bit in magnitude and copies it from sign, preserving every other bit.
 
 NaN, +infinity and -infinity are outside Float. Parsing those spellings already
-returns Error(Nil); constructing their bits or computing nonfinite core
+returns Error(()); constructing their bits or computing nonfinite core
 arithmetic stops *before* a library call (spec §11.3/§13;
 `crates/ilang-wasm/src/runtime/values.rs:45–50`). There is no NaN propagation
 rule or infinity branch to implement. This note neither catches that stop nor extends Float.
@@ -843,12 +843,12 @@ CLI failure count, report text and exit status.
 | sign_bit(-.0.0); copy_sign(2.0,-.0.0) | True; -2.0 by bits (F2). |
 | sin/atan(-.0.0); tan/asin(-.0.0) | Negative-zero bits; last two wrapped in Ok (F3). |
 | cos(-.0.0); acos(1.0); acos(-.1.0) | 1.0; Ok(+0); Ok(pi) (F3). |
-| asin(1.0000000000000002); acos(-.2.0) | Error(Nil), before sqrt (F3/F8). |
+| asin(1.0000000000000002); acos(-.2.0) | Error(()), before sqrt (F3/F8). |
 | atan2(+0,-0); atan2(-0,-0); atan2(-0,+0) | +pi; -pi; -0 (F4; signs are mathematical table notation). |
 | atan2(min_positive,min_positive) | Rounded pi/4 without intermediate underflow (F4/F8). |
 | hypot(3.0,4.0); hypot(-0,+0) | Ok(5.0); Ok(+0) via exact squares (F8). |
-| hypot(max_finite,0.0); hypot(max_finite,max_finite) | Ok(max_finite); Error(Nil), no intermediate overflow (F1/F8). |
-| radians(180.0); degrees(0.0); degrees(max_finite) | pi; Ok(+0); Error(Nil) (F1/F9). |
+| hypot(max_finite,0.0); hypot(max_finite,max_finite) | Ok(max_finite); Error(()), no intermediate overflow (F1/F8). |
+| radians(180.0); degrees(0.0); degrees(max_finite) | pi; Ok(+0); Error(()) (F1/F9). |
 | sin/cos/tan at 1e300 and max_finite | Independent exact oracle bits, never reduction by rounded tau (F5–F9). |
 | core.float_from_bits(0x7ff0000000000000) | Existing stop before library call; separate negative fixture (F2). |
 | at("aé😀",1), at(...,-1), at(...,-4), at("",0) | Some("é"), Some("😀"), None, None (S1). |
@@ -951,12 +951,12 @@ functions or polymorphic recursion.
 
 test("nonfinite_bits", () {
 	core.float_from_bits(0x7ff0000000000000)
-	Nil
+	()
 })
 
 test("overflow_before_result", () {
 	float.max_finite *. float.max_finite
-	Nil
+	()
 })
 ```
 

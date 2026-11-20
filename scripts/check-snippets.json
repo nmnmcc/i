@@ -2605,13 +2605,6 @@
   "crates/ilang-syntax/examples/chain-separators.rs:ea1f211d0ac03d55": {
     "not_source": "Rust output format string of the tool, not i source"
   },
-  "docs/design/js.md:665c21615b495cab": {
-    "track": true,
-    "diagnostics": [
-      "E0101: `|` no longer joins function values: join the branches with `&`"
-    ],
-    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
-  },
   "docs/design/numeric-lowering.md:e9173e9abb618857": {
     "track": true,
     "diagnostics": [
@@ -2666,13 +2659,6 @@
     "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
   },
   "docs/design/principality.md:17ba919991b145e1": {
-    "track": true,
-    "diagnostics": [
-      "E0101: `|` no longer joins function values: join the branches with `&`"
-    ],
-    "reason": "Design-note example still written with the pre-`&` chain separator; retained as written by the migration plan and recorded with the current parser diagnostic."
-  },
-  "docs/design/std-1.md:80bcff5d19f9b443": {
     "track": true,
     "diagnostics": [
       "E0101: `|` no longer joins function values: join the branches with `&`"
@@ -3140,16 +3126,6 @@
   "crates/ilang-cli/tests/package_commands.rs:d92dd0c53b457bb6": {
     "not_source": "test source fragment"
   },
-  "docs/design/lazy-reentry.md:6e11e0cedb692b6d": {
-    "reason": "Design example in the syntax before three; kept as written",
-    "diagnostics": [
-      "E0101: `|` no longer joins function values: join the branches with `&`",
-      "E0101: `|` no longer joins function values: join the branches with `&`",
-      "E0101: `|` no longer joins function values: join the branches with `&`",
-      "E0101: `|` no longer joins function values: join the branches with `&`",
-      "E0101: `|` no longer joins function values: join the branches with `&`"
-    ]
-  },
   "docs/design/std-v3-style.md:6bc603ef5edd6874": {
     "reason": "Design example in the syntax before three; kept as written",
     "diagnostics": [
@@ -3169,6 +3145,28 @@
     ]
   },
   "docs/design/std-v3.md:8d16bb446d4826ce": {
+    "reason": "Design example in the syntax before three; kept as written",
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ]
+  },
+  "docs/design/js.md:d96086dedc265f60": {
+    "reason": "Design example in the syntax before three; kept as written",
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ]
+  },
+  "docs/design/lazy-reentry.md:4fae955df97e2d53": {
+    "reason": "Design example in the syntax before three; kept as written",
+    "diagnostics": [
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`",
+      "E0101: `|` no longer joins function values: join the branches with `&`"
+    ]
+  },
+  "docs/design/std-1.md:0c0f36f35882023c": {
     "reason": "Design example in the syntax before three; kept as written",
     "diagnostics": [
       "E0101: `|` no longer joins function values: join the branches with `&`"

@@ -261,7 +261,7 @@ These are not mechanical, and each changes what a macro sees.
    For `T = C1 | C2` over `C1 = (…)`, `C2 = (…)` the old rows answer one
    item with a constructor list. In the §6.8 rows the answer is
    `(= T (| C1 C2))`, and `C1` is a type of its own with the answer
-   `(= C1 (, …))`. The built-in definitions (`definitions.rs`: `Bool`, `Nil`,
+   `(= C1 (, …))`. The built-in definitions (`definitions.rs`: `Bool`, `()`,
    `Result`, `AssertionFailure`, `Assert`) need the same split, and
    `expanded_definition`, `freshen_parameters` and `freshen_duplicate_heads`
    read the head of an item by its old position.

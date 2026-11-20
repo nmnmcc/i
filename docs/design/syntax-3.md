@@ -125,7 +125,7 @@ Further author rules the owner did not object to but did not confirm:
 - Alternatives are inside the parameter group: `(Sat | Sun) { … }`; `|` is
   tighter than `,` there (draft §8.6, answers 3d).
 - Exports keep `User` (type only) and `User(..)` (draft §8.5).
-- `Nil` is a prelude definition `Nil = ()`; `()` is a second, structural unit
+- `()` is a prelude definition `() = ()`; `()` is a second, structural unit
   (draft §8.2, answers 8.2).
 - Refutable constructor bindings stay legal (B3/D4): carried over from today's
   language; not discussed with the owner.
@@ -188,7 +188,7 @@ look of the language.
 | Answers 1a against answers B1 | Effective domain = pattern type minus earlier pattern types | B1: subtract only what is "taken" (spec §4.8 rule 12). |
 | Answers 1f | The author recommended option 乙 (shape must be chosen) | The owner chose 甲 (run-time support), O18. |
 | Draft §6 against the evaluation §6 | "Function types are untouched", "`e \|> branches` already compiles in place", "delete far more than change" | The evaluation's corrections, accepted by the author. |
-| Draft §8.2 against answers 8.2 | `Nil` "defined by the standard library" | Prelude (`lib/prelude.i`), because `stdlib/src` cannot import `std`. |
+| Draft §8.2 against answers 8.2 | `()` "defined by the standard library" | Prelude (`lib/prelude.i`), because `stdlib/src` cannot import `std`. |
 | Evaluation grammar against the rest | `ParamItem` admits `..rest` at the top of a parameter group | No rest at the top of a group, because shape groups must be syntactic (§2.4, [R4] Q7). |
 | Answers B1 claim against this note's analysis | "Checking against the selected domains is sound whether or not known types are reliable" | Not true in general; see §2.6.6. The choice stands; the guarantee is restated and the invariant "known types are facts" is added ([R4] Q9). |
 | Third round against fourth round on Q13 | The third round records `Node = (…)` "pending confirmation against the plain union name `Node = Name \| Int \| …`" | The fourth round settles it: with the outer parentheses, a labelled type. |
@@ -267,7 +267,7 @@ one  = (pair)                    // shape: 1 position; one is not pair
   is only `{ x }`.
 - **Unit.** `()` is the empty data: the map with no keys. Data is the one
   kind of thing written with `( )`, and `()` is that thing wherever it is
-  written. It is not `Nil`, which is the prelude's labelled type `Nil = ()`.
+  written. It is not `()`, which is the prelude's labelled type `() = ()`.
 - **Access.** `d.k` (a decimal) reads position `k`; `d.f` reads label `f`.
   Both need a known type (spec §4.8) whose members are all data types, or
   labelled types whose data is visible (§2.8), each with that key. The result
@@ -677,7 +677,7 @@ order:
    is a new nominal type and its one constructor, with the same name.
 4. **Name.** Anything else: `Meters = Int`, `Wrapper(A) = A`,
    `Option(A) = Some(A) | None`, `Handler = (Request) -> Response`,
-   `Point = { (Int, Int) }`, `Wrap = (Int) | Nil`. A name is a transparent
+   `Point = { (Int, Int) }`, `Wrap = (Int) | ()`. A name is a transparent
    alias, as today.
 
 For kinds 2 to 4 the head is a list of distinct unqualified `UpName`s with no
@@ -691,7 +691,7 @@ the data by the simultaneous variance rule of spec §4.5.
 - **Constructors.** A labelled type with data `D` has the constructor
   function `{ D } -> T(…)` (spec §4.6): `Some : (A) -> Some(A)`,
   `User : (name = String, age = Int) -> User`. When `D` is `()`, the
-  constructor is a value: `None`, `Nil`, `True` (D5); `None()` is a compile
+  constructor is a value: `None`, `()`, `True` (D5); `None()` is a compile
   error, in expressions and in patterns.
 - **Sums are unions.** `Option(A) = Some(A) | None` is a name for the union.
   `Option(A) <: Maybe(A)` follows from set inclusion when both name the same
@@ -814,7 +814,7 @@ make = (node: Node, like: Syntax) -> Syntax {
   exporting `Option` alone requires `Some` and `None` to be exported at least
   as types.
 - **The prelude.** `True = ()`, `False = ()`, `Bool = True | False`,
-  `Nil = ()`, `Ok(A) = (A)`, `Error(E) = (E)`, `Result(A, E) = Ok(A) | Error(E)`,
+  `() = ()`, `Ok(A) = (A)`, `Error(E) = (E)`, `Result(A, E) = Ok(A) | Error(E)`,
   `AssertionFailure = (message = String)`,
   `Assert = (fail = (AssertionFailure) -> Never)`,
   `Fail(E) = (raise = (E) -> Never)` (§2.10.6).
@@ -1043,7 +1043,7 @@ catch = <A, E, N>(body: () <- (..N, Fail(E)) -> A) -> Result(A, E) {
 | `control.boundary` | `<R, N>((Boundary(R, N)) <- N -> R) <- N -> R` |
 | `control.suspend` | `<A, R, N>(Boundary(R, N), (Continuation(A, R, N)) <- N -> R) -> A` |
 | `control.resume` | `<A, R, N>(Continuation(A, R, N), A) <- N -> R` |
-| `control.cancel` | `<A, R, N>(Continuation(A, R, N)) <- N -> Nil` |
+| `control.cancel` | `<A, R, N>(Continuation(A, R, N)) <- N -> ()` |
 | `control.escape` | `<R, N>(Boundary(R, N), R) -> Never` |
 | `control.keep_env` | `<S, A, E, N>((S) <- (..N, Fail(E)) -> A) <- N -> (S) <- (Fail(E)) -> A` |
 
@@ -1115,7 +1115,7 @@ keep = <S, A, E, N>(f: (S) <- (..N, Fail(E)) -> A) <- (..env: N) -> (S) <- (Fail
   releases in reverse order when `body` ends, also by an error, an escape or a
   cancel. `resource.ensure` is unchanged. Scope lifecycle and acquisition
   checks follow spec §9.5. The platform gives every entry a `Scope` (§2.10.11).
-- `resource.acquire : <A, N>(() <- N -> A, (A) -> Nil) <- (..N, Scope) -> A`.
+- `resource.acquire : <A, N>(() <- N -> A, (A) -> ()) <- (..N, Scope) -> A`.
   A release that needs services is made with `keep` (§2.10.8). This is a std
   API break: today `acquire` takes three arguments with a `use` function.
 - **Name (this note).** `task.Scope(E)` (`stdlib/src/task.i`:76) is renamed
@@ -1223,7 +1223,7 @@ test = () { app() <- (..live(), fake_db) }
 - Literal patterns keep their rule (fitted literals have the whole `Int` or
   `String`, spec §4.8).
 - A data pattern fitted to a union of shapes stays a compile error: with
-  `v : { (Int, Int) | Nil }`, `(a, b) = v` is an error, as today; write a match.
+  `v : { (Int, Int) | () }`, `(a, b) = v` is an error, as today; write a match.
 - A group with two or more branches or a guard must cover (spec §7.4) and
   never reports to `Assert` for failing to match.
 
@@ -1249,7 +1249,7 @@ function `core.never : (Never) -> A` (D9; the name [R4]) is the match on
   need or exactly `<- (Fail(E))` with a host-passable `E` (§2.10.12).
 - An entry's need, after what it provides itself, is within the platform
   services of the target (§2.10.11).
-- Types the host can take (spec §10.3): `Nil`, `Bool` (the prelude name for
+- Types the host can take (spec §10.3): `()`, `Bool` (the prelude name for
   `True | False`), `Int`, `Float`, `String`, `BitArray`, and `Opaque` types.
   Data, labelled types with data, and functions do not cross.
 - `@js("…") name : T` needs `T` to expand to one `Opaque` type.
@@ -1301,7 +1301,7 @@ first = <A>(xs: List(A)) -> Option(A) { … }
 - **Polymorphic types are rigid.** A written function type with
   `TypeParams` in a parameter, a field, a type definition or an annotation is
   a polymorphic type: `Layer = <N>() <- N -> (Config, Log)`,
-  `Show = (write = <A>(A) -> Nil)`. Rigid checking, subtyping, variance and
+  `Show = (write = <A>(A) -> ())`. Rigid checking, subtyping, variance and
   quantified joins and meets follow spec §4.6; each use instantiates afresh.
   Inference never guesses a polymorphic type: a parameter gets one only from
   a written type,
@@ -1630,7 +1630,7 @@ onward are new.
 | G14 | `(port = p : Int)` | Key `port`, pattern `p : Int`; the type ends at `,`, `?` or `)` (P8). |
 | G15 | `(name : String)` in a type against a parameter | Gone: `:` in a type is an error (P10, O10). `(name : String)` is only a pattern (position 0), `(name = String)` only a type. |
 | G16 | `T = (A)` against `T = { (A) }` | §2.8: nominal against name. `Pair(A, B) = (A, B)` is an alias today and nominal after (2 in std, 130 in tests); the migrator writes `{ (A, B) }` (§7.3). |
-| G17 | `Wrap = (Int)` against `Wrap = (Int) \| Nil` | The first is a labelled type; the second a name for a union of a data type and `Nil`. Deterministic by the outermost form. |
+| G17 | `Wrap = (Int)` against `Wrap = (Int) \| ()` | The first is a labelled type; the second a name for a union of a data type and `()`. Deterministic by the outermost form. |
 | G18 | `User(name = "ada")` as a statement | P6(d): a pattern not followed by `=`, so an expression (a call). |
 | G19 | `db ! Db` | The read statement is removed (§2.10); `!` alone is a lexer error (P0). Today `db ! Db = make()` is silently two statements; the migrator rewrites every read into a head pattern (§7.3). |
 | G20 | `(Sat \| Sun, x)` | `\|` is tighter than `,` in a `PItem`. |
@@ -1935,7 +1935,7 @@ absurd = (x: Never) { x |> {} }            absurd = (x: Never) { core.never(x) }
 | §2.4.1 | "Environment parameters do not count as value parameters" is removed. |
 | §3 | Grammar replaced (§3.1); bullets replaced (§5.2.2). `Record`, record labels, `(..R, f : T)`, `(..R, -f)`, label parameters are removed. |
 | §4.1 | "Records are values of one type constructor" becomes "data of one shape is one type constructor"; "Tuples with different numbers of parts are different" becomes "data of different shapes is different". |
-| §4.2 | `Record` removed from the table; the `Bool`, `Nil`, `Result` definitions become §2.8's prelude lines. |
+| §4.2 | `Record` removed from the table; the `Bool`, `()`, `Result` definitions become §2.8's prelude lines. |
 | §4.3 | Replaced (§5.2.3). |
 | §4.4 | Bullets replaced (§5.2.4); the record exceptions, the arity failure and the label rule are removed. |
 | §4.5 | Rules 4, 5 and 9 replaced (§5.2.4). |
@@ -1964,8 +1964,8 @@ absurd = (x: Never) { x |> {} }            absurd = (x: Never) { core.never(x) }
 | §11.6 | "the expression of a clause of a clause block that is called as a function" becomes "the body of a branch of a chain that is called"; "a clause of a match" becomes "a branch of a match". |
 | §11.8 | Rows as §2.15. |
 | §10.2 | Entries: the platform services and the one check of §2.10.11; the top-level `Fail`. |
-| §12 | `Record` and `i/record` removed; `Bool`, `Result` are names, `True`, `False`, `Nil`, `Ok`, `Error`, `AssertionFailure`, `Assert`, `Fail` labelled types; `assert : (Bool) <- (Assert) -> Nil`, `panic : (String) -> Never`. |
-| §13 | Labels removed from the types (`index_of : (String, String, Int) -> Result(Int, Nil)`, `byte_slice : (String, Int, Int) -> …`, `portable : (A) -> Bool`); add `never : (Never) -> A`. |
+| §12 | `Record` and `i/record` removed; `Bool`, `Result` are names, `True`, `False`, `()`, `Ok`, `Error`, `AssertionFailure`, `Assert`, `Fail` labelled types; `assert : (Bool) <- (Assert) -> ()`, `panic : (String) -> Never`. |
+| §13 | Labels removed from the types (`index_of : (String, String, Int) -> Result(Int, ())`, `byte_slice : (String, Int, Int) -> …`, `portable : (A) -> Bool`); add `never : (Never) -> A`. |
 | §14 | Removed. |
 | App. B.2 | "A custom type with no constructors" becomes "An `Opaque` type". |
 
@@ -2379,7 +2379,7 @@ pub(crate) struct FnTy { pub param: Ty, pub ret: Ty, pub env: Ty }
   (stage 1). The cause is not diagnosed.
 - **`Bool`.** `infer.rs`:254 finds the type `Bool` by name for `==` and
   guards; it becomes the expansion of the prelude name `True | False`.
-  `resolve.rs`:2423-2424 maps the prelude types `Nil` and `Bool` to host types;
+  `resolve.rs`:2423-2424 maps the prelude types `()` and `Bool` to host types;
   `Bool` becomes "a type equal to `True | False`".
 
 ### 6.4 Run time
@@ -2462,8 +2462,8 @@ run time (`$record_get`, tag 14, runtime/values/record.rs) is deleted.
 **Labelled values** keep today's custom-type representation (tag 5,
 constructor id, fields): the fields are the data's parts in canonical order.
 The special representations chosen by name for the prelude (lower.rs:905-940:
-`Bool`, `Nil`, `Result`, `AssertionFailure`, `Assert`) move from the old type
-names to the new labelled types (`True`, `False`, `Nil`, `Ok`, `Error`,
+`Bool`, `()`, `Result`, `AssertionFailure`, `Assert`) move from the old type
+names to the new labelled types (`True`, `False`, `()`, `Ok`, `Error`,
 `AssertionFailure`, `Assert`).
 
 **Numeric lowering.** Every function used as a value keeps its ordinary

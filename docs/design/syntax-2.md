@@ -388,7 +388,7 @@ that pattern; it is not a record field.
 | Block's first expression `(a : b)` | Record if no function suffix follows. No brace-record scan needed. |
 | `(n) { (name: n) }` | Function returning a record; function bodies remain blocks. |
 | `()` as call argument, tuple/list part, RHS, guard or clause body | Empty record, except where a following function suffix or a pattern context decides otherwise. A record guard subsequently fails Bool checking. |
-| `() { ... }`, `() -> Nil { ... }`, `() -> Nil` in a type | Empty parameter lists. |
+| `() { ... }`, `() -> () { ... }`, `() -> ()` in a type | Empty parameter lists. |
 | `List((a : Int))`, `List((a : Int) -> T)` | Record argument type versus function argument type. |
 | `x : (a : Int) -> 1` in a clause | The type parser takes the arrow; no clause arrow remains. Error. Use `x : { (a : Int) } -> 1`. This is the old tuple/function-type boundary applied to records. |
 | `(f : (x) -> Int { x })` | One-field record, with no extra comma. |
@@ -847,7 +847,7 @@ The ten affected files with real empty tuples are:
 - `tests/spec/7/patterns.i:153–154` (one value and one nested pattern).
 
 These need reviewed expectation/meaning changes, not blind substitution of
-`Record` for every `()` and not a regex replacement by `Nil`.
+`Record` for every `()` and not a regex replacement by `()`.
 
 ### Focused parser tests
 
@@ -876,7 +876,7 @@ prototype:
 | `() == ()` | `True`; existing structural record equality, N1. |
 | Function taking `(a : Int)` called with `()` | Type error: record top does not guarantee field `a`, N1. |
 | A record field containing a function, with no trailing comma | Parses as a record; calling its field gives that function's result, D2. |
-| `() -> Nil` as annotation and `() { Nil }` as value | Both accepted; zero function parameters are not empty tuples, D2/D3. |
+| `() -> ()` as annotation and `() { () }` as value | Both accepted; zero function parameters are not empty tuples, D2/D3. |
 | Empty tuple pattern | Syntax error, N2. |
 | Mixed positional and labelled datum in either order | Syntax error, D4. |
 | Typed record clause against a union of differently shaped records | Do not add field-shape runtime discrimination; enforce existing head-test coverage obligation, records §7. |
@@ -1027,8 +1027,8 @@ I attacked soundness, implementability and source agreement separately.
 - A one-clause match on a failing constructor pattern still reports Assert;
   adding a guard or another clause still invokes coverage. Reusing `Case`
   keeps these differences; rewriting to a new generic call node might not.
-- Converting an old empty tuple value blindly to `Nil` changes equality against
-  existing `Nil` values. Converting its exact type to `Record` broadens the set.
+- Converting an old empty tuple value blindly to `()` changes equality against
+  existing `()` values. Converting its exact type to `Record` broadens the set.
   Neither is a semantics-preserving universal migration.
 
 After those corrections, two further passes found nothing serious:

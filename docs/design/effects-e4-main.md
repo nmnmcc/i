@@ -105,7 +105,7 @@ final record. Both O0 and O2 copies retain the exact `Error(7)` output, empty
 stderr and zero-exit assertions; no expected output changes.
 
 Spec §9.4: `control.cancel` has type
-`<A, R, N>(Continuation(A, R, N)) <- N -> Nil`.
+`<A, R, N>(Continuation(A, R, N)) <- N -> ()`.
 Spec §9.2: “A service value can be captured. Providing the service later
 changes calls that take it from their caller, not the captured value.”
 Spec §9.3: “An error goes out through the calls to the `catch` that provided

@@ -1056,7 +1056,7 @@ h = (b, x : Float) -> Float {
 
 main = () {
 	control.boundary((b) { h(b, 1.0e308) })
-	Nil
+	()
 }
 ```
 

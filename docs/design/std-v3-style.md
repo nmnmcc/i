@@ -116,9 +116,9 @@ There are exceptions to subject-first order. `dict.group(key, list)` in
 first. Do not copy an exception as the general convention.
 
 `gleam-stdlib/src/gleam/option.gleam` explicitly reserves Option for optional
-arguments and stored data. It says fallible functions return Result, with Nil
+arguments and stored data. It says fallible functions return Result, with ()
 when no diagnostic exists. Thus `list.first`, `dict.get`, and string lookups
-return `Result(_, Nil)` in `gleam-stdlib/src/gleam/list.gleam`,
+return `Result(_, ())` in `gleam-stdlib/src/gleam/list.gleam`,
 `gleam-stdlib/src/gleam/dict.gleam`, and
 `gleam-stdlib/src/gleam/string.gleam`. This differs from i's existing Option
 lookups. `result.try` and `result.try_recover` compose Result values in
@@ -147,8 +147,8 @@ It is too small a coverage target for the owner's standalone i distribution.
 | `stdlib/src/list.i`, `stdlib/src/dict.i`, `stdlib/src/set.i`, `stdlib/src/pair.i`, `stdlib/src/order.i` | The small type-focused modules, short verbs, subject-first order and comparator callbacks fit i. Keep them. |
 | `stdlib/src/list.i`, `stdlib/src/option.i`, `stdlib/src/result.i` | Callbacks already have an open need `N`. Ordinary map and fold can propagate `Fail(E)` through that row. Make this the main composition path. |
 | `stdlib/src/list.i`: `try_map`, `try_fold`, `try_each` | These traverse explicit Result data and stop at the first Error. They are not necessary to call functions that raise through Fail. Keep only where Result data traversal is useful; document that distinction and implement any retained helper through the canonical traversal. |
-| `stdlib/src/list.i`, `stdlib/src/dict.i`, `stdlib/src/string.i`, `stdlib/src/option.i` | Option-returning lookups and Option-based filter/find mapping are good adaptations. Do not restore Gleam's Result-with-Nil lookup convention. |
-| `stdlib/src/int.i`, `stdlib/src/float.i`, `stdlib/src/bit_array.i` | Parsing and decoding often still return `Result(_, Nil)`. Diagnostics are lost. Introduce domain errors before stability and use Fail for the ordinary validating operation (§4.3). |
+| `stdlib/src/list.i`, `stdlib/src/dict.i`, `stdlib/src/string.i`, `stdlib/src/option.i` | Option-returning lookups and Option-based filter/find mapping are good adaptations. Do not restore Gleam's Result-with-() lookup convention. |
+| `stdlib/src/int.i`, `stdlib/src/float.i`, `stdlib/src/bit_array.i` | Parsing and decoding often still return `Result(_, ())`. Diagnostics are lost. Introduce domain errors before stability and use Fail for the ordinary validating operation (§4.3). |
 | `stdlib/src/crypto.i`: `random_bytes` | Invalid length is Result data, while `process.entropy` can raise a ProcessError. A Result return alone does not mean the call has no Fail need. Normalize the public boundary and document the complete inferred contract. |
 | `stdlib/src/result.i`, `stdlib/src/fail.i` | `to_error`/`catch` wrappers and two failure modules create competing entry points. E3 should leave `i/fail` as the canonical error bridge; keep Result operations about stored data. |
 | `stdlib/src/list.i`, `stdlib/src/option.i`, `stdlib/src/result.i` | Private reversal loops recur. Gleam's `gleam-stdlib/src/gleam/option.gleam` explains its own copy by import cycles. i should use an acyclic internal collection foundation, without new compiler privilege. |
@@ -194,7 +194,7 @@ The immutable translation must settle three things before code is written:
 | Ownership | A reader value does not own a resource lifetime by itself. Consumption remains inside a resource scope; early return, error and task cancellation run cleanup. Pure buffered cursors return the next cursor. A host handle's external progress must be documented. |
 
 These are proposals, motivated by `go/src/io/io.go`. Existing i wrappers often
-return Nil for writes and use empty bytes for EOF (`stdlib/src/fs.i`,
+return () for writes and use empty bytes for EOF (`stdlib/src/fs.i`,
 `stdlib/src/net.i`, `stdlib/src/stdio.i`). They do not expose Go's partial-count contract.
 Do not promise an adapter can preserve information that its host API omits.
 
@@ -211,7 +211,7 @@ mechanism conflicts with i, but its user need still matters.
 | bufio: `go/src/bufio/bufio.go`, `go/src/bufio/scan.go` | Buffering, lookahead, delimiter reads, configurable token scanning. | `stdlib/src/fs.i` reads whole files for `read_lines`; `stdlib/src/csv.i` has its own incremental cursor. | A: reusable immutable cursors, bounded tokens, incremental UTF-8 and line scanning. Reuse the reader contract. |
 | bytes: `go/src/bytes/bytes.go`, `go/src/bytes/buffer.go`, `go/src/bytes/reader.go` | Byte search and manipulation; buffers and readers. | `stdlib/src/bit_array.i` has concatenation, slicing, comparison and codecs; `stdlib/src/sequence.i` is a persistent indexed collection. | A: byte search/split/replace and cheap chunk assembly. Distinguish bytes from arbitrary bits. Adapt buffers as immutable builders/cursors. |
 | strings: `go/src/strings/strings.go`, `go/src/strings/builder.go`, `go/src/strings/reader.go` | Text search, splitting, transformations, assembly and reading. | `stdlib/src/string.i` already has a broad scalar-based API, including bounded replacement, words, map/filter/fold. | A: chunk assembly and reader adapters. Document scalar versus byte indexes at each boundary. Avoid needless copies. |
-| strconv: `go/src/strconv/doc.go` | Numeric and Boolean parsing/formatting, bases, precision, quoting. | `stdlib/src/int.i`, `stdlib/src/float.i`, `stdlib/src/bool.i`, `stdlib/src/float_text.i` cover much of conversion; int and float parse errors are Nil. | A: diagnostic parse errors and explicit formatting options. B: quoting/unquoting APIs. Keep conversions with their type rather than add a second central conversion family. |
+| strconv: `go/src/strconv/doc.go` | Numeric and Boolean parsing/formatting, bases, precision, quoting. | `stdlib/src/int.i`, `stdlib/src/float.i`, `stdlib/src/bool.i`, `stdlib/src/float_text.i` cover much of conversion; int and float parse errors are (). | A: diagnostic parse errors and explicit formatting options. B: quoting/unquoting APIs. Keep conversions with their type rather than add a second central conversion family. |
 | unicode: `go/src/unicode/letter.go`, `go/src/unicode/utf8/utf8.go`, `go/src/unicode/utf16/utf16.go` | Codepoint properties, casing and UTF-8/UTF-16 codecs. | `stdlib/src/core.i` supplies scalar conversion and simple casing. `stdlib/src/string.i` has an internal whitespace test. `stdlib/src/regex.i` has private Unicode 16 property and fold tables. | A: expose a shared Unicode foundation and table version; reuse existing data instead of adding a second set. Add incremental UTF-8. B: UTF-16 and separately specified grapheme support. Preserve scalar indexes. |
 | sort: `go/src/sort/sort.go` | Collection sorting through Len/Less/Swap, stable and unstable contracts. | `stdlib/src/list.i` provides stable comparator merge sort; `stdlib/src/order.i` supplies comparator tools. | Mostly covered. State comparator laws. Adapt to immutable outputs; no public Swap protocol. |
 | slices: `go/src/slices/slices.go`, `go/src/slices/sort.go` | Generic collection edits, equality, sort checks and binary search. | `stdlib/src/list.i` is rich; `stdlib/src/sequence.i` has persistent indexing, splitting and end edits. | B: sortedness and binary search for indexed sequences, and comparison helpers where useful. No need for mutable slices or clones of immutable values. |

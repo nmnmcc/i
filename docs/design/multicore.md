@@ -107,7 +107,7 @@ the inner function does not use `unused` or `b`, so it has no captures, and `por
 
 - **H (home).** A value that is not portable is only ever reachable from the worker that made it.
 - **I1 (meaning).** `==` depends only on the content of a value and on function and key ids. `hash` and the text form depend only on the content: **only `==` reads ids**. Ids carry the worker index and the state of that worker's counter (part 3.4), so a text form or a hash that showed one would show placement. The text form of a function stays `//fn(a, b) { ... }` (only the arity, as `$inspect_function`, `inspect.rs:262`, writes it today), that of a key is `//key`, and that of a `Keyed` is `//keyed`; none of them shows an id or what a key marks. None of the three depends on addresses, instance globals, or which worker holds the value.
-- **I2 (fast paths).** `ref.eq` is only a fast path (for `True`, `False`, `Nil`, `[]`, labels, constant functions, identity values). Every answer it gives, the slow path gives too.
+- **I2 (fast paths).** `ref.eq` is only a fast path (for `True`, `False`, `()`, `[]`, labels, constant functions, identity values). Every answer it gives, the slow path gives too.
 - **I3 (sharing).** A copy keeps sharing and cycles exactly (D9).
 - **I4 (owner writes).** Only the worker that owns a GC object reads it to encode it. The receiver decodes into its own heap. No worker touches another worker's GC objects.
 
@@ -318,7 +318,7 @@ The format is MC's to design. It must:
 - be a tag-directed walk with an explicit stack (no Wasm recursion, so lists of 10^6 elements are fine), covering every `$obj` tag, `$cons`, records (tag 14) and `Keyed`;
 - keep sharing and cycles exactly (I3) with back-references, found by a mark or a `ref.eq` table (D9); a closure in a cycle is decoded with an empty captures array that is filled after;
 - write Ints as i31 or limbs, Floats as bits, Strings and bit arrays as bytes, custom values with their constructor and type ids (fixed per module), closures as in part 3.4;
-- write `True`, `False`, `Nil` and `[]` as markers that decode to the receiver's globals, and record labels as label indexes or bytes that the receiver interns again into its `$label_N`;
+- write `True`, `False`, `()` and `[]` as markers that decode to the receiver's globals, and record labels as label indexes or bytes that the receiver interns again into its `$label_N`;
 - stop the encode at tags 10, 11 and 12 and at a host request (P1). Because of P3, a portable path never gets that far.
 
 ## 10. Hosts
@@ -593,7 +593,7 @@ The `hash` row: "Which number is not fixed." becomes:
 ## 17. Open questions
 
 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : ()) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 5. Which general typed byte-state transaction interface implements part 7 without running i code under a lock? Recommended: ordinary request-mode services; require the MC-D prototype before MC-I.

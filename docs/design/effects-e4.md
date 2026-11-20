@@ -57,11 +57,11 @@ error, and §2.10.6 puts both library and service failures through Fail.
 
 | Function | Old type | New type | Callers adapted (module-local calls retain private helpers) |
 |---|---|---|---|
-| `bit_array.to_string` | `(bits: BitArray) -> Result(String, Nil)` | `(bits: BitArray) <- (Fail(Nil)) -> String` | `examples/http-server/src/main.i`, `stdlib/src/http.i`, `stdlib/src/json.i`, `stdlib/src/uri.i`, `stdlib/test/bit_array_test.i` |
-| `bit_array.slice` | `(from: BitArray, at: Int, take: Int) -> Result(BitArray, Nil)` | `(from: BitArray, at: Int, take: Int) <- (Fail(Nil)) -> BitArray` | `stdlib/test/bit_array_test.i` |
-| `bit_array.base16_decode` | `(input: String) -> Result(BitArray, Nil)` | `(input: String) <- (Fail(Nil)) -> BitArray` | `stdlib/src/regex.i`, `stdlib/test/bit_array_test.i`, `stdlib/test/crypto_test.i` |
-| `bit_array.base64_decode` | `(encoded: String) -> Result(BitArray, Nil)` | `(encoded: String) <- (Fail(Nil)) -> BitArray` | `stdlib/test/bit_array_test.i` |
-| `bit_array.base64_url_decode` | `(encoded: String) -> Result(BitArray, Nil)` | `(encoded: String) <- (Fail(Nil)) -> BitArray` | `stdlib/test/bit_array_test.i` |
+| `bit_array.to_string` | `(bits: BitArray) -> Result(String, ())` | `(bits: BitArray) <- (Fail(())) -> String` | `examples/http-server/src/main.i`, `stdlib/src/http.i`, `stdlib/src/json.i`, `stdlib/src/uri.i`, `stdlib/test/bit_array_test.i` |
+| `bit_array.slice` | `(from: BitArray, at: Int, take: Int) -> Result(BitArray, ())` | `(from: BitArray, at: Int, take: Int) <- (Fail(())) -> BitArray` | `stdlib/test/bit_array_test.i` |
+| `bit_array.base16_decode` | `(input: String) -> Result(BitArray, ())` | `(input: String) <- (Fail(())) -> BitArray` | `stdlib/src/regex.i`, `stdlib/test/bit_array_test.i`, `stdlib/test/crypto_test.i` |
+| `bit_array.base64_decode` | `(encoded: String) -> Result(BitArray, ())` | `(encoded: String) <- (Fail(())) -> BitArray` | `stdlib/test/bit_array_test.i` |
+| `bit_array.base64_url_decode` | `(encoded: String) -> Result(BitArray, ())` | `(encoded: String) <- (Fail(())) -> BitArray` | `stdlib/test/bit_array_test.i` |
 | `calendar.days_in_month` | `(year: Int, month: Int) -> Result(Int, CalendarError)` | `(year: Int, month: Int) <- (Fail(CalendarError)) -> Int` | `stdlib/test/calendar_test.i` |
 | `calendar.date` | `(year: Int, month: Int, day: Int) -> Result(Date, CalendarError)` | `(year: Int, month: Int, day: Int) <- (Fail(CalendarError)) -> Date` | `stdlib/test/calendar_test.i` |
 | `calendar.time_of_day` | `(hour: Int, minute: Int, second: Int, nanosecond: Int) -> Result(TimeOfDay, CalendarError)` | `(hour: Int, minute: Int, second: Int, nanosecond: Int) <- (Fail(CalendarError)) -> TimeOfDay` | `stdlib/test/calendar_test.i` |
@@ -85,36 +85,36 @@ error, and §2.10.6 puts both library and service failures through Fail.
 | `csv.parse_with` | `(input: String, config: Options) -> Result(List(List(String)), CsvError)` | `(input: String, config: Options) <- (Fail(CsvError)) -> List(List(String))` | `stdlib/test/csv_test.i` |
 | `csv.parse_header` | `(input: String, config: Options) -> Result(List(dict.Dict(String, String)), CsvError)` | `(input: String, config: Options) <- (Fail(CsvError)) -> List(dict.Dict(String, String))` | `stdlib/test/csv_test.i` |
 | `csv.decode` | `<A, E>( codec: schema.Schema(A, E), row: dict.Dict(String, String) ) -> Result(A, E)` | `<A, E>( codec: schema.Schema(A, E), row: dict.Dict(String, String) ) <- (Fail(E)) -> A` | `stdlib/test/csv_test.i` |
-| `float.parse` | `(text: String) -> Result(Float, Nil)` | `(text: String) <- (Fail(Nil)) -> Float` | `stdlib/src/json.i`, `stdlib/test/float_test.i` |
-| `float.power` | `(base: Float, of: Int) -> Result(Float, Nil)` | `(base: Float, of: Int) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.square_root` | `(x: Float) -> Result(Float, Nil)` | `(x: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.divide` | `(a: Float, by: Float) -> Result(Float, Nil)` | `(a: Float, by: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.modulo` | `(a: Float, by: Float) -> Result(Float, Nil)` | `(a: Float, by: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.exponential` | `(x: Float) -> Result(Float, Nil)` | `(x: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.logarithm` | `(x: Float) -> Result(Float, Nil)` | `(x: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.real_power` | `(base: Float, of: Float) -> Result(Float, Nil)` | `(base: Float, of: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.asin` | `(x: Float) -> Result(Float, Nil)` | `(x: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.acos` | `(x: Float) -> Result(Float, Nil)` | `(x: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.degrees` | `(radians: Float) -> Result(Float, Nil)` | `(radians: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.hypot` | `(x: Float, y: Float) -> Result(Float, Nil)` | `(x: Float, y: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
-| `float.tan` | `(x: Float) -> Result(Float, Nil)` | `(x: Float) <- (Fail(Nil)) -> Float` | `stdlib/test/float_test.i` |
+| `float.parse` | `(text: String) -> Result(Float, ())` | `(text: String) <- (Fail(())) -> Float` | `stdlib/src/json.i`, `stdlib/test/float_test.i` |
+| `float.power` | `(base: Float, of: Int) -> Result(Float, ())` | `(base: Float, of: Int) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.square_root` | `(x: Float) -> Result(Float, ())` | `(x: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.divide` | `(a: Float, by: Float) -> Result(Float, ())` | `(a: Float, by: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.modulo` | `(a: Float, by: Float) -> Result(Float, ())` | `(a: Float, by: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.exponential` | `(x: Float) -> Result(Float, ())` | `(x: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.logarithm` | `(x: Float) -> Result(Float, ())` | `(x: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.real_power` | `(base: Float, of: Float) -> Result(Float, ())` | `(base: Float, of: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.asin` | `(x: Float) -> Result(Float, ())` | `(x: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.acos` | `(x: Float) -> Result(Float, ())` | `(x: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.degrees` | `(radians: Float) -> Result(Float, ())` | `(radians: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.hypot` | `(x: Float, y: Float) -> Result(Float, ())` | `(x: Float, y: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
+| `float.tan` | `(x: Float) -> Result(Float, ())` | `(x: Float) <- (Fail(())) -> Float` | `stdlib/test/float_test.i` |
 | `http.parse_query` | `(query: String) -> Result(List((String, String)), uri.CodecError)` | `(query: String) <- (Fail(uri.CodecError)) -> List((String, String))` | `stdlib/test/http_test.i` |
-| `http.body_text` | `(res: Response) -> Result(String, Nil)` | `(res: Response) <- (Fail(Nil)) -> String` | `examples/http-get/src/main.i`, `tests/browser/fixtures/http-fetch/src/main.i`, `bindings/javascript/test/fetch.test.mjs` |
+| `http.body_text` | `(res: Response) -> Result(String, ())` | `(res: Response) <- (Fail(())) -> String` | `examples/http-get/src/main.i`, `tests/browser/fixtures/http-fetch/src/main.i`, `bindings/javascript/test/fetch.test.mjs` |
 | `http.body_json` | `(res: Response) -> Result(json.Json, BodyError)` | `(res: Response) <- (Fail(BodyError)) -> json.Json` | No external i/example callers |
 | `http.body_decode` | `<A>( res: Response, codec: schema.Schema(A, schema.SchemaError) ) -> Result(A, BodyError)` | `<A>( res: Response, codec: schema.Schema(A, schema.SchemaError) ) <- (Fail(BodyError)) -> A` | No external i/example callers |
-| `int.parse` | `(text: String) -> Result(Int, Nil)` | `(text: String) <- (Fail(Nil)) -> Int` | `stdlib/src/cli.i`, `stdlib/src/http.i`, `stdlib/src/json.i`, `stdlib/src/regex.i`, `stdlib/test/int_test.i` |
-| `int.parse_base` | `(text: String, base: Int) -> Result(Int, Nil)` | `(text: String, base: Int) <- (Fail(Nil)) -> Int` | `stdlib/test/int_test.i` |
-| `int.to_base` | `(x: Int, base: Int) -> Result(String, Nil)` | `(x: Int, base: Int) <- (Fail(Nil)) -> String` | `stdlib/test/int_test.i` |
-| `int.power` | `(base: Int, of: Int) -> Result(Int, Nil)` | `(base: Int, of: Int) <- (Fail(Nil)) -> Int` | `stdlib/test/calendar_test.i`, `stdlib/test/int_test.i` |
-| `int.square_root` | `(x: Int) -> Result(Float, Nil)` | `(x: Int) <- (Fail(Nil)) -> Float` | `stdlib/test/int_test.i` |
-| `int.digits` | `(x: Int, base: Int) -> Result(List(Int), Nil)` | `(x: Int, base: Int) <- (Fail(Nil)) -> List(Int)` | `stdlib/test/int_test.i` |
-| `int.undigits` | `(numbers: List(Int), base: Int) -> Result(Int, Nil)` | `(numbers: List(Int), base: Int) <- (Fail(Nil)) -> Int` | `stdlib/test/int_test.i` |
-| `int.divide` | `(a: Int, by: Int) -> Result(Int, Nil)` | `(a: Int, by: Int) <- (Fail(Nil)) -> Int` | `stdlib/test/int_test.i` |
-| `int.remainder` | `(a: Int, by: Int) -> Result(Int, Nil)` | `(a: Int, by: Int) <- (Fail(Nil)) -> Int` | `stdlib/test/int_test.i` |
-| `int.modulo` | `(a: Int, by: Int) -> Result(Int, Nil)` | `(a: Int, by: Int) <- (Fail(Nil)) -> Int` | `stdlib/test/int_test.i` |
-| `int.floor_divide` | `(a: Int, by: Int) -> Result(Int, Nil)` | `(a: Int, by: Int) <- (Fail(Nil)) -> Int` | `stdlib/test/int_test.i` |
+| `int.parse` | `(text: String) -> Result(Int, ())` | `(text: String) <- (Fail(())) -> Int` | `stdlib/src/cli.i`, `stdlib/src/http.i`, `stdlib/src/json.i`, `stdlib/src/regex.i`, `stdlib/test/int_test.i` |
+| `int.parse_base` | `(text: String, base: Int) -> Result(Int, ())` | `(text: String, base: Int) <- (Fail(())) -> Int` | `stdlib/test/int_test.i` |
+| `int.to_base` | `(x: Int, base: Int) -> Result(String, ())` | `(x: Int, base: Int) <- (Fail(())) -> String` | `stdlib/test/int_test.i` |
+| `int.power` | `(base: Int, of: Int) -> Result(Int, ())` | `(base: Int, of: Int) <- (Fail(())) -> Int` | `stdlib/test/calendar_test.i`, `stdlib/test/int_test.i` |
+| `int.square_root` | `(x: Int) -> Result(Float, ())` | `(x: Int) <- (Fail(())) -> Float` | `stdlib/test/int_test.i` |
+| `int.digits` | `(x: Int, base: Int) -> Result(List(Int), ())` | `(x: Int, base: Int) <- (Fail(())) -> List(Int)` | `stdlib/test/int_test.i` |
+| `int.undigits` | `(numbers: List(Int), base: Int) -> Result(Int, ())` | `(numbers: List(Int), base: Int) <- (Fail(())) -> Int` | `stdlib/test/int_test.i` |
+| `int.divide` | `(a: Int, by: Int) -> Result(Int, ())` | `(a: Int, by: Int) <- (Fail(())) -> Int` | `stdlib/test/int_test.i` |
+| `int.remainder` | `(a: Int, by: Int) -> Result(Int, ())` | `(a: Int, by: Int) <- (Fail(())) -> Int` | `stdlib/test/int_test.i` |
+| `int.modulo` | `(a: Int, by: Int) -> Result(Int, ())` | `(a: Int, by: Int) <- (Fail(())) -> Int` | `stdlib/test/int_test.i` |
+| `int.floor_divide` | `(a: Int, by: Int) -> Result(Int, ())` | `(a: Int, by: Int) <- (Fail(())) -> Int` | `stdlib/test/int_test.i` |
 | `json.parse` | `(text: String) -> Result(Json, JsonError)` | `(text: String) <- (Fail(JsonError)) -> Json` | `stdlib/src/http.i`, `stdlib/src/schema.i`, `stdlib/test/json_test.i` |
-| `list.strict_zip` | `<A, B>(list: List(A), with: List(B)) -> Result(List((A, B)), Nil)` | `<A, B>(list: List(A), with: List(B)) <- (Fail(Nil)) -> List((A, B))` | `stdlib/test/list_test.i` |
+| `list.strict_zip` | `<A, B>(list: List(A), with: List(B)) -> Result(List((A, B)), ())` | `<A, B>(list: List(A), with: List(B)) <- (Fail(())) -> List((A, B))` | `stdlib/test/list_test.i` |
 | `path.relative` | `(from: String, to: String) -> Result(String, RelativeError)` | `(from: String, to: String) <- (Fail(RelativeError)) -> String` | `stdlib/test/path_test.i` |
 | `property.int` | `(min: Int, max: Int) -> Result(Gen(Int), BuildError)` | `(min: Int, max: Int) <- (Fail(BuildError)) -> Gen(Int)` | `stdlib/test/float_test.i`, `stdlib/test/property_test.i` |
 | `property.element` | `<A>(choices: List(A)) -> Result(Gen(A), BuildError)` | `<A>(choices: List(A)) <- (Fail(BuildError)) -> Gen(A)` | `stdlib/test/property_test.i` |
@@ -123,7 +123,7 @@ error, and §2.10.6 puts both library and service failures through Fail.
 | `regex.compile` | `(pattern: String) -> Result(Regex, RegexError)` | `(pattern: String) <- (Fail(RegexError)) -> Regex` | `i/bench/std4/src/main.i`, `stdlib/test/regex_test.i` |
 | `schema.decode` | `<A, E>(schema: Schema(A, E), value: json.Json) -> Result(A, E)` | `<A, E>(schema: Schema(A, E), value: json.Json) <- (Fail(E)) -> A` | `stdlib/src/csv.i`, `stdlib/src/http.i`, `stdlib/test/schema_test.i` |
 | `schema.parse` | `<A>(schema: Schema(A, SchemaError), text: String) -> Result(A, ParseError)` | `<A>(schema: Schema(A, SchemaError), text: String) <- (Fail(ParseError)) -> A` | `examples/http-server/src/main.i`, `stdlib/test/schema_test.i` |
-| `string.utf_codepoint` | `(value: Int) -> Result(UtfCodepoint, Nil)` | `(value: Int) <- (Fail(Nil)) -> UtfCodepoint` | `stdlib/test/string_test.i`, `stdlib/test/uri_test.i` |
+| `string.utf_codepoint` | `(value: Int) -> Result(UtfCodepoint, ())` | `(value: Int) <- (Fail(())) -> UtfCodepoint` | `stdlib/test/string_test.i`, `stdlib/test/uri_test.i` |
 | `time.divide` | `(duration: Duration, by: Int) -> Result(Duration, TimeError)` | `(duration: Duration, by: Int) <- (Fail(TimeError)) -> Duration` | `stdlib/test/time_test.i` |
 | `uri.parse` | `(text: String) -> Result(Uri, UriError)` | `(text: String) <- (Fail(UriError)) -> Uri` | `stdlib/src/http.i`, `stdlib/test/uri_test.i` |
 | `uri.build` | `(parts: Parts) -> Result(Uri, UriError)` | `(parts: Parts) <- (Fail(UriError)) -> Uri` | `stdlib/test/uri_test.i` |
@@ -158,7 +158,7 @@ Follow-up changes and their basis:
   `Result(User, schema.ParseError)` before matching. Spec §4.8 says: "The value
   of a binding whose pattern has `x: T` at its top has `T`." The existing
   `.path` projection therefore retains its known schema error type.
-- `_body_text_result` explicitly retains `Result(String, Nil)`, its original
+- `_body_text_result` explicitly retains `Result(String, ())`, its original
   inferred data contract; the migration script now produces that annotation.
 
 Checking checkpoints (2026-11-13):

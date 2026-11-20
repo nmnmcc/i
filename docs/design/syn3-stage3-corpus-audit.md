@@ -371,7 +371,7 @@ Both witnesses are uncovered values of the original subject type; each case
 still has exactly one E0516 at the same location. `coverage.rs::show_pat`
 prints the single constructor of a labelled type, so the now independent
 `True` type supplies a concrete witness. Syntax-three §2.8 says, “When `D`
-is `()`, the constructor is a value: `None`, `Nil`, `True`”. These changes
+is `()`, the constructor is a value: `None`, `()`, `True`”. These changes
 do not change coverage or the errors reported.
 
 The classification is **three shown type, two message only, zero outcome**;

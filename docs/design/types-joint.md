@@ -523,8 +523,8 @@ Both calls are accepted with distinct instances. `nested` keeps a general variab
 **T-G: completion fixes constraints, not display (J4).**
 
 ```i
-Cell(A) = (get = () -> A, set = (A) -> Nil)
-make_cell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { Nil }) }
+Cell(A) = (get = () -> A, set = (A) -> ())
+make_cell = <A>(x : A) { Cell(get = () { x }, set = (y : A) { () }) }
 r = make_cell(1)
 Read = r
 later = () { r.set(2) }

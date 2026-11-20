@@ -7,7 +7,7 @@ references below mean that commit, unless another revision is named. The spec
 in this checkout already has the syntax migration; all examples use that syntax.
 Signature inventories describe bindings with bodies, not bodyless declarations.
 `Option`, `Some`, `None` come from `i/option`; `Order` from `i/order`.
-`Result`, `Ok`, `Error`, `List`, and `Nil` are built-in names.
+`Result`, `Ok`, `Error`, `List`, and `()` are built-in names.
 
 ## 1. Problem, evidence, and boundaries
 
@@ -148,7 +148,7 @@ Phase two adds exactly these IO wrappers (clock = i/clock, request = i/request):
 
 ```text
 now: () -> Instant ? clock.ClockError ! clock.Clock | request.Await | request.Owner
-sleep: (duration: Duration) -> Nil ? clock.ClockError ! clock.Clock | request.Await | request.Owner
+sleep: (duration: Duration) -> () ? clock.ClockError ! clock.Clock | request.Await | request.Owner
 measure(A, E, N): (body: () -> A ^ E ! N) -> (A, Duration) ^ E | clock.ClockError ! N | clock.Clock | request.Await | request.Owner
 ```
 
@@ -633,17 +633,17 @@ Entry = (
 	fields = List((String, String)),
 	at = Option(time.Instant),
 )
-Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> (), (N) -> ())
 ```
 
 ```text
-make(E, N): (accept: (Level) -> Bool, send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)
+make(E, N): (accept: (Level) -> Bool, send: (Entry) -> () ^ E ! N) -> Sink(E, N)
 silent(N): () -> Sink(Never, N)
 filter(E, N): (sink: Sink(E, N), accept: (Level) -> Bool) -> Sink(E, N)
 minimum(E, N): (sink: Sink(E, N), level: Level) -> Sink(E, N)
 enabled(E, N): (level: Level) -> Bool ! Sink(E, N)
-write(E, N): (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
-lazy(E, F, N): (level: Level, message: () -> String ^ F ! N) -> Nil ^ E | F ! N | Sink(E, N)
+write(E, N): (entry: Entry) -> () ^ E ! N | Sink(E, N)
+lazy(E, F, N): (level: Level, message: () -> String ^ F ! N) -> () ^ E | F ! N | Sink(E, N)
 format: (entry: Entry) -> String
 ```
 
@@ -664,7 +664,7 @@ stderr: () -> Sink(stdio.StdioError, stdio.Stdio | request.Await | request.Owner
 - **L2 Delivery.** make stores callbacks without calling them. enabled calls
   the current Sink’s accept exactly once. write obtains the current service,
   calls its accept once and, only on True, calls send exactly once with the
-  original Entry. False returns Nil. No retry, buffering, task spawn, flush,
+  original Entry. False returns (). No retry, buffering, task spawn, flush,
   deduplication, or failure suppression occurs in the core. An error from send
   is the original E. Cancellation and cleanup follow ordinary call rules.
 - **L3 Laziness.** lazy checks accept once; False calls neither message nor
@@ -677,7 +677,7 @@ stderr: () -> Sink(stdio.StdioError, stdio.Stdio | request.Await | request.Owner
   accept is always False. All these factories are pure. Calling enabled then
   write performs two checks; enabled gives a query result, not a reservation.
 - **L5 Services and errors.** E is covariant; N is invariant through the unused
-  `(N)->Nil` marker, made as `(_ : N) { Nil }` and never called. Composition uses
+  `(N)->()` marker, made as `(_ : N) { () }` and never called. Composition uses
   one chosen N, not an invariant union of free row variables. Different Sink
   instances in an environment must have equal arguments, per spec §9.2;
   there is no automatic union of two sinks’ error/environment parameters.
@@ -717,7 +717,7 @@ or avoid recursively calling itself.
 | Write Entry(Info,"hello",[],None) to capture sink | One identical entry, no clock; L1/L2 |
 | Replace sink inside a block, call a previously made producer | Replacement sees entry; spec §9.2/L2 |
 | minimum at Warning, write Debug then Failure | Only Failure delivered; L1/L4 |
-| False accept and lazy message that raises | Nil, message not called; L3 |
+| False accept and lazy message that raises | (), message not called; L3 |
 | True accept and lazy message that raises "bad" | Original "bad", no send; L3 |
 | Send raises custom error | Same error in fail.catch, no retry; L2/L5 |
 | Format Entry(Info,"a\nb",[("k","v"),("k","")],None) | `info "a\nb" "k"="v" "k"=""` with escaped LF, no actual LF; L6 |
@@ -752,24 +752,24 @@ same failure was reproduced with the complete four-field Entry of §6.
 )
 
 Entry = (message = String)
-Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> (), (N) -> ())
 
-make = <E, N>(send : (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
-	Sink(send, (_ : N) { Nil })
+make = <E, N>(send : (Entry) <- (Fail(E), ..N) -> ()) -> Sink(E, N) {
+	Sink(send, (_ : N) { () })
 }
 
 write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(send, _) = sink
 	send(entry)
 }
-// Shown: (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
+// Shown: (entry: Entry) -> () ^ E ! N | Sink(E, N)
 example = () {
 	fail.catch(() { write(Entry(message = "seen")) }) <- (
 		make((entry) { fail.raise(entry.message) }),
 	)
 }
 // Current compiler: E0505 at example; expected Ok/Error value has type
-// Result(Nil, String), with Error("seen") at run time.
+// Result((), String), with Error("seen") at run time.
 ```
 
 A finite instantiation E=String, N=Never satisfies the intended call; no
@@ -784,7 +784,7 @@ checker, though it is still not a build of this exact baseline.
 An explicit closed instantiation works with the inferred implementation:
 
 ```i
-send : (Entry) <- (Fail(String), Sink(String, Never)) -> Nil = write
+send : (Entry) <- (Fail(String), Sink(String, Never)) -> () = write
 
 working = () {
 	fail.catch(() { send(Entry("seen")) }) <- (
@@ -812,7 +812,7 @@ this fix. The eventual positive regression must keep the unsafe-row negative
 case rejected:
 
 ```i
-Consumer(A) = { ((A) -> Nil) }
+Consumer(A) = { ((A) -> ()) }
 
 bad = (s : Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }
 // Must reject: stored environments preserve exact service arguments.
@@ -1086,7 +1086,7 @@ These checks establish the requirements independently of generated expectations:
 | CLI token ownership and error precedence | A3: “This arity rule is independent of the read callback”; A6: “First definition validation ... then token scanning errors ... then extra positionals ... then missing/value conversion errors in descriptor order.” Tests include every pure §5.5/review-table case, stopping later callbacks, heterogeneous composition and help bytes from A8. |
 | Internal CLI bucket consumption | §5.4: “Each leaf consumes exactly one bucket; pure consumes none.” The executable test harness compiles the implementation as a temporary test module and checks empty supplied buckets, the exact unused suffix and full public parse consumption. |
 | Call-time logging and lazy suppression | L2: “write obtains the current service ... original Entry”; L3: “False calls neither message nor send.” Closed clients record entry order, replacement of an already-created producer, eager argument evaluation, lazy suppression and unchanged custom errors with exactly one delivery attempt. |
-| Sink row and generic gate | L5: “E is covariant; N is invariant through the unused `(N)->Nil` marker”; §7: “The implementation can use inferred function bodies and explicitly typed closed client calls in the meantime.” No marker, error or service parameter was removed. Both negative cases and all five waiting positive probes are executable in log_test.i. Successful generic clients must then pass runtime assertions at both optimization levels. |
+| Sink row and generic gate | L5: “E is covariant; N is invariant through the unused `(N)->()` marker”; §7: “The implementation can use inferred function bodies and explicitly typed closed client calls in the meantime.” No marker, error or service parameter was removed. Both negative cases and all five waiting positive probes are executable in log_test.i. Successful generic clients must then pass runtime assertions at both optimization levels. |
 | Log text bytes | L6: “Other U+0000..001F and U+007F..009F, plus U+2028/U+2029, become `\u{h}` with minimal lowercase hex digits.” Fixed expectations cover quote/backslash, LF/CR/tab, NUL, ESC, C1 boundaries, separators, Unicode, duplicate/empty fields and signed timestamps. |
 | Future tests stay deferred | §9: “Keep IO-fake cases in the matching second phase.” T4/T5, cli.read and L7 require the unavailable IO services. Their absence does not change any pure signature. |
 
@@ -1156,13 +1156,13 @@ i/cli.integer : (text: String) -> Result(Int, String)
 i/cli.parse : (parser: Parser(A), args: List(String)) -> Result(A, CliError)
 i/cli.help : (parser: Parser(A), program: String) -> Result(String, DefinitionError)
 
-i/log.make : (accept: (Level) -> Bool, send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)
+i/log.make : (accept: (Level) -> Bool, send: (Entry) -> () ^ E ! N) -> Sink(E, N)
 i/log.silent : () -> Sink(Never, A)
 i/log.filter : (sink: Sink(A, B), accept: (Level) -> Bool) -> Sink(A, B)
 i/log.minimum : (sink: Sink(A, B), level: Level) -> Sink(A, B)
 i/log.enabled : (level: Level) -> Bool ! Sink(A, B)
-i/log.write : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
-i/log.lazy : (level: Level, message: () -> String ^ E ! N) -> Nil ^ E | E2 ! N | Sink(E2, N)
+i/log.write : (entry: Entry) -> () ^ E ! N | Sink(E, N)
+i/log.lazy : (level: Level, message: () -> String ^ E ! N) -> () ^ E | E2 ! N | Sink(E2, N)
 i/log.format : (entry: Entry) -> String
 ```
 
@@ -1180,8 +1180,8 @@ still gives E0501; incompatible installed Sink error arguments give E0515.
 The smallest rejection needs no logging library:
 
 ```i
-S(N) = (() <- N -> Nil)
-use = <N>() <- (s : S(N)) -> Nil {
+S(N) = (() <- N -> ())
+use = <N>() <- (s : S(N)) -> () {
 	S(f) = s
 	f()
 }
