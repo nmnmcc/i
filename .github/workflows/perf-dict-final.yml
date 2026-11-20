@@ -1,0 +1,71 @@
+# Repeat of dict_insert only, before and after the list.sort cell change,
+# reusing the final artifact, to resolve the 7% question.
+name: Perf dict final
+
+on:
+  push:
+    branches: [ci/perf-baseline]
+    paths: [.github/workflows/perf-dict-final.yml]
+
+permissions:
+  contents: read
+
+env:
+  BEFORE: "193ba0adcf51c0c216b974a704745b89da2bf4a3"
+  AFTER: "d1a099c63eb7649ea46a66981c3f68d11b7e3bd3"
+  ARTIFACT_RUN: "44675171021"
+  RAYON_NUM_THREADS: 1
+
+jobs:
+  dict:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BEFORE }}
+          path: src-before
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.AFTER }}
+          path: src-after
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-final
+          path: bin
+          run-id: ${{ env.ARTIFACT_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of i
+        run: |
+          chmod +x bin/i
+          xargs nix-store --realise < bin/i.nix-paths > /dev/null
+          mkdir -p out
+          { uname -a; nproc; lscpu; free -g; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+      - name: Alternate dict only
+        run: |
+          set -x
+          for opt in 2 0; do
+            rounds=5
+            if [ "$opt" = 2 ]; then rounds=7; fi
+            for r in $(seq 1 "$rounds"); do
+              cat /proc/loadavg > "out/load-$opt-$r.txt"
+              if [ $((r % 2)) -eq 1 ]; then order="before after"; else order="after before"; fi
+              for c in $order; do
+                ( cd "src-$c" && ../bin/i test --project bench --opt "$opt" --time dict_insert ) \
+                  > "out/run-$opt-$r-$c.log" 2> "out/stderr-$opt-$r-$c.log"
+                grep -hE "^pass bench/bench_test.dict_insert" "out/run-$opt-$r-$c.log"
+              done
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: perf-dict-final-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
