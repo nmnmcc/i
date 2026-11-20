@@ -1,0 +1,21 @@
+// A constructor is a function: `True` is a value of the function type and
+// `True()` is the value it makes. Formatting is layout, so it keeps them
+// apart, and it never decides that a name should have been a call.
+f = True
+g = True()
+
+// A call of a payload constructor is a call already; the constructor itself
+// is a function value.
+s = Some
+t = Some(1)
+
+p = (b : Bool) -> Int { b |> (True()) { 1 } & (False()) { 0 } }
+
+// A `(` that begins a line begins a statement, and a `(` on the same line as
+// the expression before it is a call. The formatter must not join these two
+// lines: the trees differ though the tokens do not.
+q = () {
+	a = f
+	(1)
+	()
+}
