@@ -14,7 +14,9 @@
 //!
 //! The helper also lists the zero-field types of the source, `T = ()` (also
 //! with a head, `X(A) = ()`), whose constructors are the ones the migration
-//! rewrites.
+//! rewrites. `CTOR` lines list every type defined with data (`T = (items)`)
+//! with its field count, zero included, so a caller can also tell a payload
+//! constructor from a zero-field one.
 //!
 //! Protocol, on stdin. Two kinds of request, one per line:
 //!
@@ -27,8 +29,10 @@
 //!
 //! ```text
 //! FILE <path>                         (or SNIPPET <index> for a text request)
+//! IMPORT <hex alias> <hex path>       one per import; the alias is the written
+//!                                     one or the last part of the path
 //! ZERO <name>                         one per type defined as `()`
-//! IMPORT <hex alias> <hex path>       one per import, in source order
+//! CTOR <name> <fields>                one per type defined with data, `T = (…)`
 //! SITE value <start> <end> <hex>      a constructor used as a value
 //! SITE pattern <start> <end> <hex>    a constructor matched without brackets
 //! DIAG <code> <hex>                   one line per parse diagnostic
@@ -36,13 +40,10 @@
 //! ```
 //!
 //! Offsets are byte offsets into the UTF-8 source, end exclusive, and cover
-//! the constructor's own name, without a module part. `<hex>` is the name as
-//! written, `m.Name` when a module is written, else `Name`, its UTF-8 bytes
+//! the written name; a name written with a module is reported as `m.Name` and
+//! its offsets cover the whole written form (`m.Name`, or `(. m Name)` in the
+//! Lisp surface); `<hex>` is that name's UTF-8 bytes
 //! hex-encoded, as is a diagnostic message. `SITE` lines are ascending.
-//!
-//! An import's alias is the written alias, else the last segment of its
-//! path; the path is its segments joined with `/` (`i/request`). They let the
-//! caller resolve `m.Name` through the source's own imports.
 //!
 //! `FAIL <path> <message>` replaces the group when the request itself is
 //! wrong. Exit status 0 unless a request line is malformed.
@@ -53,7 +54,7 @@
 use std::io::{self, BufRead, Read, Write};
 
 use ilang_syntax::ast::{
-    Binding, Block, DItem, Ident, DPItem, Expr, ExprKind, Format, Function, InterpPart, ItemKind,
+    Binding, Block, DItem, DPItem, Expr, ExprKind, Format, Function, InterpPart, ItemKind,
     Module, Pattern, PatternKind, Stmt, TypeRhs,
 };
 use ilang_syntax::lisp::{Datum, DatumKind};
@@ -83,14 +84,6 @@ impl Kind {
 #[derive(Default)]
 struct Sites {
     sites: Vec<(u32, u32, Kind, String)>,
-}
-
-/// The name as written: `m.Name` when a module is written, else `Name`.
-fn written(module: &Option<Ident>, name: &Ident) -> String {
-    match module {
-        Some(m) => format!("{}.{}", m.name, name.name),
-        None => name.name.clone(),
-    }
 }
 
 fn is_upper(name: &str) -> bool {
@@ -160,7 +153,15 @@ impl Sites {
         match &e.kind {
             ExprKind::Name { module, name } => {
                 if !is_callee && is_upper(&name.name) {
-                    self.push(Kind::Value, name.span.0, &written(module, name));
+                    match module {
+                        // The whole written form: `m.Name`, or `(. m Name)`.
+                        Some(m) => self.push(
+                            Kind::Value,
+                            e.span.0,
+                            &format!("{}.{}", m.name, name.name),
+                        ),
+                        None => self.push(Kind::Value, name.span.0, &name.name),
+                    }
                 }
             }
             ExprKind::Quote(q) => self.datum(&q.0, Kind::Pattern),
@@ -230,7 +231,14 @@ impl Sites {
                 }
             }
             PatternKind::Ctor { module, name, args } => match args {
-                None => self.push(Kind::Pattern, name.span.0, &written(module, name)),
+                None => match module {
+                    Some(m) => self.push(
+                        Kind::Pattern,
+                        p.span.0,
+                        &format!("{}.{}", m.name, name.name),
+                    ),
+                    None => self.push(Kind::Pattern, name.span.0, &name.name),
+                },
                 Some(args) => self.dpitems(args),
             },
             PatternKind::Data(items) => self.dpitems(items),
@@ -290,24 +298,6 @@ impl Sites {
     }
 }
 
-/// `(alias, path)` of each import: the written alias, else the last path
-/// segment; the path joined with `/`.
-fn imports(module: &Module) -> Vec<(String, String)> {
-    module
-        .imports
-        .iter()
-        .map(|i| {
-            let alias = match (&i.alias, i.path.last()) {
-                (Some(a), _) => a.name.clone(),
-                (None, Some(last)) => last.name.clone(),
-                (None, None) => String::new(),
-            };
-            let path: Vec<&str> = i.path.iter().map(|s| s.name.as_str()).collect();
-            (alias, path.join("/"))
-        })
-        .collect()
-}
-
 /// The types of the module written as `T = ()`.
 fn zero_types(module: &Module) -> Vec<String> {
     module
@@ -322,9 +312,39 @@ fn zero_types(module: &Module) -> Vec<String> {
         .collect()
 }
 
+/// Every type of the module written as `T = (items)`, with `items.len()`.
+fn data_types(module: &Module) -> Vec<(String, usize)> {
+    module
+        .items
+        .iter()
+        .filter_map(|item| match &item.kind {
+            ItemKind::TypeDef(t) => match &t.rhs {
+                TypeRhs::Data(items) => Some((t.name.name.clone(), items.len())),
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+/// `(alias, path)` of every import; the alias is the written one or the
+/// last path part, as the checker reads it.
+fn imports(module: &Module) -> Vec<(String, String)> {
+    module
+        .imports
+        .iter()
+        .filter_map(|i| {
+            let alias = i.alias.as_ref().or(i.path.last())?;
+            let path: Vec<&str> = i.path.iter().map(|p| p.name.as_str()).collect();
+            Some((alias.name.clone(), path.join("/")))
+        })
+        .collect()
+}
+
 struct Report {
-    zero: Vec<String>,
     imports: Vec<(String, String)>,
+    zero: Vec<String>,
+    ctors: Vec<(String, usize)>,
     sites: Vec<(u32, u32, Kind, String)>,
     diags: Vec<(String, String)>,
 }
@@ -340,8 +360,9 @@ fn run(surface: Surface, source: &str) -> Report {
     sites.sort();
     sites.dedup();
     Report {
-        zero: zero_types(&module),
         imports: imports(&module),
+        zero: zero_types(&module),
+        ctors: data_types(&module),
         sites,
         diags: diags
             .into_iter()
@@ -356,17 +377,21 @@ fn hex(text: &str) -> String {
 
 fn report(output: &mut impl Write, name: &str, source: &str, surface: Surface) {
     let Report {
-        zero,
         imports,
+        zero,
+        ctors,
         sites,
         diags,
     } = run(surface, source);
     writeln!(output, "{name}").unwrap();
+    for (alias, path) in imports {
+        writeln!(output, "IMPORT {} {}", hex(&alias), hex(&path)).unwrap();
+    }
     for name in zero {
         writeln!(output, "ZERO {name}").unwrap();
     }
-    for (alias, path) in imports {
-        writeln!(output, "IMPORT {} {}", hex(&alias), hex(&path)).unwrap();
+    for (name, fields) in ctors {
+        writeln!(output, "CTOR {name} {fields}").unwrap();
     }
     for (start, end, kind, name) in sites {
         writeln!(output, "SITE {} {start} {end} {}", kind.text(), hex(&name)).unwrap();
