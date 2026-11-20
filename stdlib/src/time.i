@@ -226,6 +226,10 @@ timeout = (after : Duration, body) {
 			outcome = task.race(
 				() { Ran(body()) },
 				() {
+					// Let the body take its first step first: a timer that
+					// completes before the body has started would have the
+					// race cancel a child that never ran.
+					task.yield()
 					fail.catch(() { clock.sleep_ns(nanoseconds) }) |>
 						(Ok(_)) { Expired }
 						& (Error(error)) { ClockFailed(error) }

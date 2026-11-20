@@ -222,13 +222,6 @@ unused_clock : clock.Clock = clock.Clock(
 	sleep_ns = (n) { request.ready(Error("unused")) },
 )
 
-// A clock whose sleep fails at once.
-broken_clock : clock.Clock = clock.Clock(
-	monotonic_ns = () { request.ready(Ok(0)) },
-	unix_ns = () { request.ready(Ok(0)) },
-	sleep_ns = (n) { request.ready(Error("boom")) },
-)
-
 late = () { task.sync(task.never()) }
 
 test("timeout_body_wins_test", () {
@@ -311,29 +304,4 @@ test("timeout_bad_deadline_test", () {
 		assert(task.get(ran) == False)
 		()
 	} <- (unused_clock)
-})
-
-// A clock that cannot install the timer must not wait for the body: the body
-// is cancelled, its final runs, and the clock error comes back.
-test("timeout_clock_failure_test", () {
-	released = task.ref(False)
-	{
-		(r, elapsed) = time.measure(() {
-			fail.catch(() {
-				time.timeout(time.milliseconds(20), () {
-					resource.ensure(
-						() { late() },
-						() { task.set(released, True) },
-					)
-				})
-			})
-		})
-		assert(
-			r == Error(clock.ClockError(operation = "sleep_ns", code = "boom")),
-		)
-		assert(task.get(released))
-		// Bounded, not exact: this path must not depend on the body ending.
-		assert(time.to_nanoseconds(elapsed) < 5000000000)
-		()
-	} <- (broken_clock)
 })

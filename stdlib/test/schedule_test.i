@@ -163,8 +163,8 @@ test("schedule_error_stops_repeat_test", () {
 
 // A retry cancelled during its sleep does not run the step again.
 test("schedule_cancel_during_sleep_stops_retry_test", () {
-	runs = task.ref(0)
 	task.run(() {
+		runs = task.ref(0)
 		task.scope((_) {
 			task.race(
 				() {
@@ -184,15 +184,16 @@ test("schedule_cancel_during_sleep_stops_retry_test", () {
 			)
 			()
 		})
+		assert(task.get(runs) == 1)
+		()
 	})
-	assert(task.get(runs) == 1)
 	()
 })
 
 // A step cancelled while it runs is not retried.
 test("schedule_cancelled_step_is_not_retried_test", () {
-	runs = task.ref(0)
 	task.run(() {
+		runs = task.ref(0)
 		task.scope((_) {
 			task.race(
 				() {
@@ -210,7 +211,8 @@ test("schedule_cancelled_step_is_not_retried_test", () {
 			)
 			()
 		})
+		assert(task.get(runs) == 1)
+		()
 	})
-	assert(task.get(runs) == 1)
 	()
 })
