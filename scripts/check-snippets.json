@@ -2976,9 +2976,6 @@
   "crates/ilang-cli/tests/package_commands.rs:d28586a4b8bd1ba5": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/package_commands.rs:d926f10e96be524b": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/r2_fixtures.rs:5d769bbd6d7d1b29": {
     "not_source": "test source fragment or expectation"
   },
@@ -3214,5 +3211,8 @@
       "E0102: expected the function body, a `{` on the same line, found `?`",
       "E0001: `!` is not a symbol of i: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`"
     ]
+  },
+  "crates/ilang-cli/tests/package_commands.rs:d92dd0c53b457bb6": {
+    "not_source": "test source fragment"
   }
 }
