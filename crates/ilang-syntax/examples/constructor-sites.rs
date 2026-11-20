@@ -28,6 +28,7 @@
 //! ```text
 //! FILE <path>                         (or SNIPPET <index> for a text request)
 //! ZERO <name>                         one per type defined as `()`
+//! IMPORT <hex alias> <hex path>       one per import, in source order
 //! SITE value <start> <end> <hex>      a constructor used as a value
 //! SITE pattern <start> <end> <hex>    a constructor matched without brackets
 //! DIAG <code> <hex>                   one line per parse diagnostic
@@ -35,8 +36,13 @@
 //! ```
 //!
 //! Offsets are byte offsets into the UTF-8 source, end exclusive, and cover
-//! the written name without a module part; `<hex>` is that name's UTF-8 bytes
+//! the constructor's own name, without a module part. `<hex>` is the name as
+//! written, `m.Name` when a module is written, else `Name`, its UTF-8 bytes
 //! hex-encoded, as is a diagnostic message. `SITE` lines are ascending.
+//!
+//! An import's alias is the written alias, else the last segment of its
+//! path; the path is its segments joined with `/` (`i/request`). They let the
+//! caller resolve `m.Name` through the source's own imports.
 //!
 //! `FAIL <path> <message>` replaces the group when the request itself is
 //! wrong. Exit status 0 unless a request line is malformed.
@@ -47,7 +53,7 @@
 use std::io::{self, BufRead, Read, Write};
 
 use ilang_syntax::ast::{
-    Binding, Block, DItem, DPItem, Expr, ExprKind, Format, Function, InterpPart, ItemKind,
+    Binding, Block, DItem, Ident, DPItem, Expr, ExprKind, Format, Function, InterpPart, ItemKind,
     Module, Pattern, PatternKind, Stmt, TypeRhs,
 };
 use ilang_syntax::lisp::{Datum, DatumKind};
@@ -77,6 +83,14 @@ impl Kind {
 #[derive(Default)]
 struct Sites {
     sites: Vec<(u32, u32, Kind, String)>,
+}
+
+/// The name as written: `m.Name` when a module is written, else `Name`.
+fn written(module: &Option<Ident>, name: &Ident) -> String {
+    match module {
+        Some(m) => format!("{}.{}", m.name, name.name),
+        None => name.name.clone(),
+    }
 }
 
 fn is_upper(name: &str) -> bool {
@@ -144,9 +158,9 @@ impl Sites {
 
     fn expr(&mut self, e: &Expr, is_callee: bool) {
         match &e.kind {
-            ExprKind::Name { name, .. } => {
+            ExprKind::Name { module, name } => {
                 if !is_callee && is_upper(&name.name) {
-                    self.push(Kind::Value, name.span.0, &name.name);
+                    self.push(Kind::Value, name.span.0, &written(module, name));
                 }
             }
             ExprKind::Quote(q) => self.datum(&q.0, Kind::Pattern),
@@ -215,8 +229,8 @@ impl Sites {
                     self.pattern(capture);
                 }
             }
-            PatternKind::Ctor { name, args, .. } => match args {
-                None => self.push(Kind::Pattern, name.span.0, &name.name),
+            PatternKind::Ctor { module, name, args } => match args {
+                None => self.push(Kind::Pattern, name.span.0, &written(module, name)),
                 Some(args) => self.dpitems(args),
             },
             PatternKind::Data(items) => self.dpitems(items),
@@ -276,6 +290,24 @@ impl Sites {
     }
 }
 
+/// `(alias, path)` of each import: the written alias, else the last path
+/// segment; the path joined with `/`.
+fn imports(module: &Module) -> Vec<(String, String)> {
+    module
+        .imports
+        .iter()
+        .map(|i| {
+            let alias = match (&i.alias, i.path.last()) {
+                (Some(a), _) => a.name.clone(),
+                (None, Some(last)) => last.name.clone(),
+                (None, None) => String::new(),
+            };
+            let path: Vec<&str> = i.path.iter().map(|s| s.name.as_str()).collect();
+            (alias, path.join("/"))
+        })
+        .collect()
+}
+
 /// The types of the module written as `T = ()`.
 fn zero_types(module: &Module) -> Vec<String> {
     module
@@ -292,6 +324,7 @@ fn zero_types(module: &Module) -> Vec<String> {
 
 struct Report {
     zero: Vec<String>,
+    imports: Vec<(String, String)>,
     sites: Vec<(u32, u32, Kind, String)>,
     diags: Vec<(String, String)>,
 }
@@ -308,6 +341,7 @@ fn run(surface: Surface, source: &str) -> Report {
     sites.dedup();
     Report {
         zero: zero_types(&module),
+        imports: imports(&module),
         sites,
         diags: diags
             .into_iter()
@@ -321,10 +355,18 @@ fn hex(text: &str) -> String {
 }
 
 fn report(output: &mut impl Write, name: &str, source: &str, surface: Surface) {
-    let Report { zero, sites, diags } = run(surface, source);
+    let Report {
+        zero,
+        imports,
+        sites,
+        diags,
+    } = run(surface, source);
     writeln!(output, "{name}").unwrap();
     for name in zero {
         writeln!(output, "ZERO {name}").unwrap();
+    }
+    for (alias, path) in imports {
+        writeln!(output, "IMPORT {} {}", hex(&alias), hex(&path)).unwrap();
     }
     for (start, end, kind, name) in sites {
         writeln!(output, "SITE {} {start} {end} {}", kind.text(), hex(&name)).unwrap();
