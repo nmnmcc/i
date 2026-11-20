@@ -1,0 +1,135 @@
+# Same-run cumulative pair for the stage: the tree before the always-inline
+# change, the tree before the comparison-frame reuse, and the current tree,
+# each with its own compiler, on one runner. Started by a push to this file.
+name: Perf close chain
+
+on:
+  push:
+    branches: [ci/perf-baseline]
+    paths: [.github/workflows/perf-close.yml]
+
+permissions:
+  contents: read
+
+env:
+  BEFORE_INLINE: "fb81d62ee1b0edd0286e6a9502e01ab6a4bec0c4"
+  BEFORE_FRAMES: "12930cd64184d2f82c255b650b7d191279714f0e"
+  CURRENT: "d1a099c63eb7649ea46a66981c3f68d11b7e3bd3"
+  CURRENT_BIN_RUN: "44675171021"
+  RAYON_NUM_THREADS: 1
+  REPEATS: "5"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        tree: [a, b]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
+            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
+            /usr/local/share/chromium /usr/lib/jvm
+          df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.tree == 'a' && env.BEFORE_INLINE || env.BEFORE_FRAMES }}
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - name: Build the release i
+        run: devenv shell -- cargo build --release --locked -p ilang-cli
+      - name: List the Nix store paths that i loads
+        run: |
+          devenv shell -- ldd target/release/i \
+            | grep -o '/nix/store/[a-z0-9]\{32\}-[^/ ]*' | sort -u > target/release/i.nix-paths
+          test -s target/release/i.nix-paths
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: i-close-${{ matrix.tree }}
+          path: |
+            target/release/i
+            target/release/i.nix-paths
+          if-no-files-found: error
+          retention-days: 7
+
+  measure:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BEFORE_INLINE }}
+          path: src-a
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BEFORE_FRAMES }}
+          path: src-b
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CURRENT }}
+          path: src-c
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf:
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-close-a
+          path: bin-a
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-close-b
+          path: bin-b
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-final
+          path: bin-c
+          run-id: ${{ env.CURRENT_BIN_RUN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch the libraries of each i
+        run: |
+          mkdir -p out
+          { uname -a; nproc; lscpu; free -g; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+          for t in a b c; do
+            chmod +x bin-$t/i
+            xargs nix-store --realise < bin-$t/i.nix-paths > /dev/null
+            bin-$t/i --version
+          done
+      - name: Three trees, five rounds, rotating order
+        run: |
+          set -x
+          for r in $(seq 1 "$REPEATS"); do
+            case $((r % 3)) in
+              1) order="a b c" ;;
+              2) order="c b a" ;;
+              0) order="b c a" ;;
+            esac
+            for t in $order; do
+              cat /proc/loadavg > "out/load-$r-$t.txt"
+              for test in list_sort equality; do
+                ( cd "src-$t" && "$GITHUB_WORKSPACE/bin-$t/i" test --project bench \
+                    --opt 2 --time "$test" ) \
+                  > "out/run-$r-$t-$test.log" 2> "out/stderr-$r-$t-$test.log"
+                grep -hE "^(pass|FAIL) bench/bench_test\." "out/run-$r-$t-$test.log"
+                printf '%s %s %s %s\n' "$r" "$t" "$test" "$(cat /proc/loadavg)" >> out/load.log
+              done
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: perf-close-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
