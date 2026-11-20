@@ -260,7 +260,7 @@ timeout = (after : Duration, body) {
 			)
 			outcome |>
 				(Ran(value)) { value }
-				& (Expired) { fail.raise(Timeout(after = after)) }
+				& (Expired()) { fail.raise(Timeout(after = after)) }
 				& (ClockFailed(error)) { fail.raise(error) }
 		}
 }
