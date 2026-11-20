@@ -100,6 +100,48 @@ test("acquire_waits_until_release_test", () {
 	()
 })
 
+Entry = (now = Int, peak = Int)
+
+// Counts the bodies inside the semaphore and remembers the most at once.
+enter = (r : task.Ref(Entry)) <- (own : task.Scheduler) -> () {
+	task.update(r, (e : Entry) {
+		now = e.now + 1
+		{ e.peak > now } |>
+			(True) { (Entry(now = now, peak = e.peak), ()) }
+			& (False) { (Entry(now = now, peak = now), ()) }
+	})
+}
+
+leave = (r : task.Ref(Entry)) <- (own : task.Scheduler) -> () {
+	task.update(r, (e : Entry) { (Entry(..e, now = e.now - 1), ()) })
+}
+
+test("capacity_holds_under_contention_test", () {
+	got = task.run(() {
+		resource.scoped(() {
+			s = semaphore.new(2)
+			r = task.ref(Entry(now = 0, peak = 0))
+			body = () {
+				enter(r)
+				settle()
+				leave(r)
+			}
+			task.scope((g) {
+				a = task.go(g, () { semaphore.with_permit(s, body) })
+				b = task.go(g, () { semaphore.with_permit(s, body) })
+				c = task.go(g, () { semaphore.with_permit(s, body) })
+				task.join(a)
+				task.join(b)
+				task.join(c)
+			})
+			e = task.get(r)
+			(e.now, e.peak, semaphore.available(s))
+		})
+	})
+	assert(got == (0, 2, 2))
+	()
+})
+
 test("waiters_are_admitted_in_ticket_order_test", () {
 	task.run(() {
 		resource.scoped(() {

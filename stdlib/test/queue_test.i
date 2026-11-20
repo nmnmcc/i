@@ -126,13 +126,38 @@ test("queue_waiting_takers_are_served_in_order_test", () {
 		task.yield()
 		b = task.go(s, () { queue.take(q) })
 		task.yield()
+		c = task.go(s, () { queue.take(q) })
+		task.yield()
+		// Two values for three waiting takers: the first two in line get
+		// them, in the order they joined, and the third keeps waiting.
 		must(() {
 			queue.offer(q, "first")
 			queue.offer(q, "second")
 		})
-		(task.join(a), task.join(b))
+		first = task.join(a)
+		second = task.join(b)
+		waiting = queue.size(q)
+		must(() { queue.offer(q, "third") })
+		(first, second, waiting, task.join(c), queue.size(q))
 	})
-	assert(got == (Some("first"), Some("second")))
+	assert(got == (Some("first"), Some("second"), 0, Some("third"), 0))
+	()
+})
+
+test("queue_poll_does_not_overtake_a_waiting_taker_test", () {
+	got = in_queue_scope((s) {
+		q : queue.Queue(Int, Never) = queue.unbounded()
+		// The taker gives up after a few turns, so a poll that stole its
+		// value fails the assertion instead of hanging the run.
+		taker = task.go(s, () { take_soon(q) })
+		task.yield()
+		task.yield()
+		must(() { queue.offer(q, 4) })
+		// The value is buffered, but the waiting taker is first in line.
+		stolen = queue.poll(q)
+		(stolen, task.join(taker), queue.size(q))
+	})
+	assert(got == (None, Some(4), 0))
 	()
 })
 

@@ -43,10 +43,11 @@
 //// Order. Waiting takes and waiting offers each hold a ticket, given out in
 //// call order. Only the first ticket of its line may act, and its check and
 //// its change happen in one atomic update, so values leave in the order they
-//// arrived and waiting takers are served in the order they came. A waiter
-//// checks once per scheduler turn and yields with `task.yield()` between
-//// checks. Only `bounded` makes an `offer` wait; `dropping`, `sliding` and
-//// `unbounded` offers never wait.
+//// arrived and waiting takers are served in the order they came. `poll`
+//// respects that line too: while a taker waits it gives `None` and leaves
+//// the value for the taker. A waiter checks once per scheduler turn and
+//// yields with `task.yield()` between checks. Only `bounded` makes an
+//// `offer` wait; `dropping`, `sliding` and `unbounded` offers never wait.
 ////
 //// Terminal state. A queue is open until `end`, `fail` or `shutdown`. `end`
 //// and `fail` act only on an open queue, so the first of them wins. Both
@@ -544,8 +545,9 @@ take = <A, E>(q : Queue(A, E)) <- (
 }
 
 /// Removes and gives the oldest value when there is one, without waiting.
-/// Gives `None` when the queue is empty and open, ended or shut down.
-/// Takes at most one value.
+/// Gives `None` when the queue is empty and open, ended or shut down, and
+/// when a taker is already waiting: the poll does not overtake it, and the
+/// value stays for that taker. Takes at most one value.
 /// Needs: the task scheduler.
 /// Errors: the queue's error `E` when a failed queue is drained.
 /// Example: queue.poll(q) == None for a new queue.
@@ -554,17 +556,32 @@ poll = <A, E>(q : Queue(A, E)) <- (
 	error : Fail(E),
 ) -> Option(A) {
 	step = task.update(q.state, (state : QueueState(A, E)) {
-		sequence.pop_front(state.buffer) |>
-			(Some((value, rest))) {
-				(QueueState(..state, buffer = rest), TakeDone(Some(value)))
-			}
-			& (None) {
-				state.terminal |>
-					(Failed(e)) { (state, TakeFailed(e)) }
-					& (_) { (state, TakeDone(None)) }
+		// A waiting taker is first in line; a poll never takes its value.
+		{ state.takers != [] } |>
+			(True) { nothing_to_take(state) }
+			& (False) {
+				sequence.pop_front(state.buffer) |>
+					(Some((value, rest))) {
+						(
+							QueueState(..state, buffer = rest),
+							TakeDone(Some(value)),
+						)
+					}
+					& (None) { nothing_to_take(state) }
 			}
 	})
 	finish_take(step)
+}
+
+// The answer when nothing can be taken now: raise on a drained failure,
+// otherwise give `None`.
+nothing_to_take = <A, E>(state : QueueState(A, E)) -> (
+	QueueState(A, E),
+	TakeStep(A, E),
+) {
+	state.terminal |>
+		(Failed(e)) { (state, TakeFailed(e)) }
+		& (_) { (state, TakeDone(None)) }
 }
 
 /// The number of buffered values. For observation only: another task may

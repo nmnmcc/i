@@ -130,6 +130,19 @@ test("cancelled_waiter_leaves_producer_and_readers_test", () {
 				deferred.new()
 			})
 			survivor = task.go(outer, () { deferred.await(d) })
+			// The producer is already running when the other group is
+			// cancelled, and it has not finished yet.
+			producer = task.go(outer, () {
+				task.yield()
+				task.yield()
+				task.yield()
+				task.yield()
+				task.yield()
+				task.yield()
+				task.yield()
+				deferred.complete(d, Ok(11))
+			})
+			task.yield()
 			// Two waiters in a group that is cancelled while they wait.
 			cancelled = fail.catch(() {
 				task.scope((doomed) {
@@ -139,20 +152,18 @@ test("cancelled_waiter_leaves_producer_and_readers_test", () {
 					fail.raise("cancel")
 				})
 			})
-			// The producer runs outside the cancelled group.
-			producer = task.go(outer, () {
-				task.yield()
-				deferred.complete(d, Ok(11))
-			})
+			// The cancel did not take the outcome away from the producer
+			// or the surviving reader.
 			(
 				cancelled,
+				deferred.is_done(d),
 				task.join(producer),
 				task.join(survivor),
 				deferred.poll(d),
 			)
 		})
 	})
-	assert(v == (Error("cancel"), True, 11, Some(Ok(11))))
+	assert(v == (Error("cancel"), False, True, 11, Some(Ok(11))))
 	()
 })
 
