@@ -208,7 +208,7 @@ Outcome(A) = Ran(A) | Expired | ClockFailed
 ///
 /// ```i
 /// test = () {
-///   broken : i/clock.Clock = i/clock.Clock(
+///   broken = clock.Clock(
 ///     monotonic_ns = () { request.ready(Ok(0)) },
 ///     unix_ns = () { request.ready(Ok(0)) },
 ///     sleep_ns = (n) { request.ready(Error("boom")) },
