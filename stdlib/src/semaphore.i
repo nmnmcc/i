@@ -40,7 +40,6 @@
 
 (
 	Semaphore
-	SemaphoreState
 	SemaphoreError(..)
 	new
 	with_permits
@@ -61,14 +60,12 @@ SemaphoreState = (
 	next = Int,
 )
 
-/// `new` was given a count below 1.
+/// `new` was given a count below 1, or `with_permits` asked for fewer than
+/// 0 or more than `capacity` permits. `wanted` is the count it was given.
 InvalidPermits = (wanted = Int)
 
-/// `with_permits` asked for fewer than 0 or more than `capacity` permits.
-TooMany = (wanted = Int)
-
 /// The input errors of `new` and `with_permits`.
-SemaphoreError = InvalidPermits | TooMany
+SemaphoreError = InvalidPermits
 
 /// A semaphore with `permits` permits, all free. It belongs to the current
 /// task scope.
@@ -109,7 +106,7 @@ new = (permits : Int) <- (
 /// value. `n == 0` runs `body` at once and takes nothing. Cancelling a call
 /// that is still waiting removes it from the queue without taking a permit.
 /// Needs: `body`'s needs and `task.Scheduler`.
-/// Errors: `Fail(TooMany(wanted = n))` when `n < 0` or `n > capacity`, before
+/// Errors: `Fail(InvalidPermits(wanted = n))` when `n < 0` or `n > capacity`, before
 /// waiting; otherwise `body`'s errors, after the permits are back.
 ///
 /// ```i
@@ -129,7 +126,7 @@ with_permits = <A, N>(s : Semaphore, n : Int, body : () <- N -> A) <- (
 ) -> A {
 	capacity = task.get(s.state).capacity
 	{ n < 0 || n > capacity } |>
-		(True) { fail.raise(TooMany(wanted = n)) }
+		(True) { fail.raise(InvalidPermits(wanted = n)) }
 		& (False) { () }
 	{ n == 0 } |> (True) { body() } & (False) { hold(s, n, body) }
 }

@@ -348,6 +348,21 @@ test("queue_cancelled_offer_leaves_the_line_test", () {
 	()
 })
 
+test("queue_losing_race_take_consumes_nothing_test", () {
+	got = in_queue_scope((_) {
+		q : queue.Queue(Int, Never) = queue.unbounded()
+		// The take branch of the race is cancelled while it waits: it must
+		// not hold a ticket, and it must not consume the next value.
+		lost = take_soon(q)
+		lost_then = take_soon(q)
+		must(() { queue.offer(q, 9) })
+		after = queue.take(q)
+		(lost, lost_then, after, queue.size(q))
+	})
+	assert(got == (None, None, Some(9), 0))
+	()
+})
+
 test("queue_poll_takes_at_most_one_test", () {
 	got = in_queue_scope((_) {
 		q : queue.Queue(Int, Never) = queue.unbounded()

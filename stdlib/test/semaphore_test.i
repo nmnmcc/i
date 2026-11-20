@@ -245,11 +245,11 @@ test("invalid_counts_raise_test", () {
 			over = fail.catch(() {
 				semaphore.with_permits(s, 2, () { note(ran, 1) })
 			})
-			assert(over == Error(semaphore.TooMany(wanted = 2)))
+			assert(over == Error(semaphore.InvalidPermits(wanted = 2)))
 			under = fail.catch(() {
 				semaphore.with_permits(s, -1, () { note(ran, 1) })
 			})
-			assert(under == Error(semaphore.TooMany(wanted = -1)))
+			assert(under == Error(semaphore.InvalidPermits(wanted = -1)))
 			assert(task.get(ran) == [])
 			assert(semaphore.available(s) == 1)
 		})
