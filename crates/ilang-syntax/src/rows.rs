@@ -159,7 +159,6 @@ fn apply(head: Datum, span: Span, parts: impl IntoIterator<Item = Datum>) -> Dat
     list(span, std::iter::once(head).chain(parts).collect())
 }
 
-
 /// An UpName: its first character is upper case.
 fn is_upper(name: &str) -> bool {
     name.chars().next().is_some_and(char::is_uppercase)

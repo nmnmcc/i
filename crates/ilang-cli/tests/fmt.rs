@@ -320,4 +320,3 @@ fn lisp_constructor_values_are_printed_as_written() {
     assert_eq!(read(dir.path(), "src/main.is"), pretty);
     assert!(fmt(&["--check"], dir.path()).status.success());
 }
-
