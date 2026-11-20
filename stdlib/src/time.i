@@ -27,6 +27,10 @@
 //// Laws: to_nanoseconds(nanoseconds(n)) = n; shift(a,between(a,b)) = b;
 //// between(a,shift(a,d)) = d; add(d,subtract(e,d)) = e. Truncating divide
 //// can lose a remainder: scaling its result back need not give the input.
+//// timeout(after, body) runs body and gives its value, or raises
+//// Timeout(after) when the deadline passes first (a zero or negative after
+//// raises at once without running body).
+////
 //// Calendar days, months and years are not duration units. hours(24) is a
 //// fixed 86,400 seconds. Operations use O(1) integer operations; bit costs
 //// depend on integer size. Observation functions use i/clock.
@@ -34,6 +38,7 @@
 	i/fail
 	i/clock
 	i/int
+	i/task
 	(Order) = i/order
 )
 
@@ -60,6 +65,9 @@
 	now
 	sleep
 	measure
+	Timeout(..)
+	BadDeadline(..)
+	timeout
 )
 
 Duration = (Int)
@@ -155,4 +163,104 @@ measure = (body) {
 /// Reports failure through `Fail(TimeError)`.
 divide = (duration : Duration, by : Int) -> Duration {
 	fail.from_result(_divide_result(duration, by))
+}
+
+/// The deadline passed before the body ended. `after` is the duration
+/// `timeout` was given, so the timeout is distinguishable from the body's
+/// own errors.
+Timeout = (after = Duration)
+
+/// `timeout` was given a deadline the clock cannot hold: more than
+/// `max_timeout` of about 292 years. The body is not started.
+BadDeadline = (after = Duration)
+
+/// The largest deadline `timeout` accepts, in nanoseconds: 2^63 - 1.
+max_timeout = 9223372036854775807
+
+/// What the race below gives: the body's value, the deadline, or a clock
+/// that could not install the timer.
+Ran(A) = (A)
+Expired = ()
+ClockFailed = (clock.ClockError)
+Outcome(A) = Ran(A) | Expired | ClockFailed
+
+/// Runs `body` and gives its value, or raises `Timeout(after = after)` when
+/// `after` passes first. A zero or negative `after` raises at once and does
+/// not start the body.
+///
+/// The deadline must fit the clock: an `after` above `max_timeout` (2^63 - 1
+/// nanoseconds, about 292 years) raises `BadDeadline(after = after)` before
+/// the body starts, rather than failing later inside the timer.
+///
+/// The body runs in a task of its own and is cancelled when the deadline
+/// passes; `timeout` returns only after that task has finished its cleanup,
+/// so a body must be safe to cancel. A body error comes back unchanged.
+///
+/// If the clock cannot install the timer, `timeout` cancels the body and
+/// raises the clock's error once the body has unwound; it never waits for a
+/// blocked body to finish on its own.
+///
+/// That path has no deterministic test yet. The only way to make a clock
+/// fail on demand is a fake service whose `sleep_ns` gives
+/// `request.ready(Error(...))`, and awaiting such an already-failed fake
+/// request inside a child task hangs the runtime (a real host request error
+/// in a child task returns normally). The hang, without this module:
+///
+/// ```i
+/// test = () {
+///   broken = clock.Clock(
+///     monotonic_ns = () { request.ready(Ok(0)) },
+///     unix_ns = () { request.ready(Ok(0)) },
+///     sleep_ns = (n) { request.ready(Error("boom")) },
+///   )
+///   { task.scope((g) {
+///     t = task.go(g, () {
+///       _ = fail.catch(() { clock.sleep_ns(20) })
+///       ()
+///     })
+///     task.join(t)
+///   }) } <- (broken,)
+/// }
+/// ```
+///
+/// Needs `Scheduler`, `Runner` and `clock.Clock`.
+/// Errors: the body's own `E`, `Timeout(after = after)`,
+/// `BadDeadline(after = after)`, and `clock.ClockError`.
+///
+/// ```i
+/// task.run(() {
+///   fail.catch(() { time.timeout(time.seconds(1), () { work() }) }) |>
+///     (Ok(value)) { value }
+///     & (Error(time.Timeout(_))) { fallback }
+/// })
+/// ```
+timeout = (after : Duration, body) {
+	Duration(nanoseconds) = after
+	{ nanoseconds > max_timeout } |>
+		(True) { fail.raise(BadDeadline(after = after)) }
+		& (False) { () }
+	{ nanoseconds <= 0 } |>
+		(True) { fail.raise(Timeout(after = after)) }
+		& (False) {
+			// The timer reports a clock failure as a value, not as a child
+			// failure: a failure would let the race wait for the body (R2),
+			// which may never end. As a value it commits the race, cancels
+			// the body and returns after the body's finals.
+			outcome = task.race(
+				() { Ran(body()) },
+				() {
+					// Let the body take its first step first: a timer that
+					// completes before the body has started would have the
+					// race cancel a child that never ran.
+					task.yield()
+					fail.catch(() { clock.sleep_ns(nanoseconds) }) |>
+						(Ok(_)) { Expired }
+						& (Error(error)) { ClockFailed(error) }
+				},
+			)
+			outcome |>
+				(Ran(value)) { value }
+				& (Expired) { fail.raise(Timeout(after = after)) }
+				& (ClockFailed(error)) { fail.raise(error) }
+		}
 }
