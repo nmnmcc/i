@@ -4,8 +4,8 @@ Status: first version for approval. Branch `design/host-boundary`, base
 `a21eae769`, 2026-11-21. Size evidence:
 [`host-boundary-inventory.md`](host-boundary-inventory.md).
 
-No code is changed by this document. Sections marked **Approval** have a
-product-level choice; everything else is a decision with its reason.
+No code is changed by this document. The product choices were decided on
+2026-11-21; §9.1 records the verdicts and the binding additions.
 
 ## 0. Summary
 
@@ -45,11 +45,21 @@ product = "library"   # optional; "program" is the default
 ```
 
 `product = "program"` is accepted too. A missing key means a program, and the
-program rules then give a clear error when they do not fit: no entry is
-`E0617` ("add `main`, or set `product = \"library\"`") and an `@export` is
-`E0330`. The default is safe because both mistakes name the fix; only a
-library has to write the key. This keeps the 2 209 fixture manifests mostly
-untouched.
+program rules then give a clear error when they do not fit. A program with no
+entry is `E0617`, and the message must say both why and the fix:
+
+```
+error[E0617]: package `app` has no program entry: `src/main.i` has no `main`,
+               and `[entries]` is empty
+  --> i.toml
+   = if this package is a library, set `product = "library"` in i.toml;
+     otherwise add `main` or an `[entries]` target
+```
+
+an `@export` in a program is `E0330`, whose message likewise names
+`product = "library"`. The default is safe because both mistakes name the fix;
+only a library has to write the key. This keeps the 2 209 fixture manifests
+mostly untouched.
 
 `product` changes entry checking, artifacts and dependency rules, so it is
 explicit where it differs. It is not a name rule: an absent or misspelled
@@ -184,7 +194,8 @@ Modes:
 - `@import("ns", "label", mode)` — one standalone imported function, `mode`
   written. Tests use it; a service's fields do not need it.
 - `@import("js", "expression")` on a declaration of an opaque type — a JS
-  value getter (the `@js` replacement, §4.3).
+  value getter. This is **post-0.2.0**; 0.2.0 retires `@js` and ships without
+  value declarations (§4.3).
 
 `ilang:` namespaces belong to `@runtime`, not `@import` (`E0306`). `i:` names
 are ordinary and may be declared by any package, but must not repeat a
@@ -406,18 +417,22 @@ work: `std` (source and tests) and `examples/cli-log`,
 `hostcall = true`; `std/src/http.i` and `std/src/log.i`
 lose the `Await`/`Owner` rows in their exported signatures (inventory §4).
 
-### 4.3 `@js`
+### 4.3 `@js` (retired in 0.2.0, replacement after)
 
-`@import("js", "globalThis.document.body") body : Element` on a declaration
-whose type expands to one opaque type. `js` is a reserved pseudo-namespace and
-cannot be a service namespace. All §10.1.1 rules stay: required annotation,
-one opaque type, one retained initialization in `ilang_start`, loader parse
-error before startup, compile error on a target without JS, distinct objects
-for two declarations. `@js` was never implemented (E0301; spec-known-gaps
-DOC3), so this phase also removes its "kept for macros" state.
+`@js("expression")` is deleted in phase C and is not replaced in 0.2.0. The
+later replacement is `@import("js", "globalThis.document.body") body : Element`
+on a declaration whose type expands to one opaque type; `js` is a reserved
+pseudo-namespace. All §10.1.1 rules travel with it: required annotation, one
+opaque type, one retained initialization in `ilang_start`, loader parse error
+before startup, compile error on a target without JS, distinct objects for two
+declarations.
 
-The `i/js` target module defines `Js` when it lands; `Value` stays an ordinary
-opaque alias there.
+0.2.0 therefore loses JS value declarations. This is honest: `@js` never worked
+(E0301; spec-known-gaps DOC3), so nothing that built before stops building.
+`@import("js", …)` gets its own phase after 0.2.0, with the JS loader work.
+
+The `i/js` target module defines `Js` when that lands; `Value` stays an
+ordinary opaque alias there.
 
 ### 4.4 Spec edits
 
@@ -430,11 +445,11 @@ opaque alias there.
 | §2.5 | declaration rule |
 | §2.6 | add `product`, `hostcall`; delete the `[wasm]` block; dependency kinds |
 | §2.6.1, §2.6.2 | entries by product; `@export("sync")` classification; no `wasm.synchronous` |
-| §4.3 | opaque from `@import("js", …)` |
+| §4.3 | `@js` deleted in 0.2.0; `@import("js", …)` is the post-0.2.0 form |
 | §4.7 | annotation required on imports |
 | §9.7 | "imported services"; no mode strings; no `Request` in fields |
 | §9.11 | `Await`/`Owner`/`Root` are implicit; new §10.4 for `i/hostcall` |
-| §10.1 | imports: service, raw function, JS; §10.1.1 JS; §10.1.2 foreign linking unchanged except the import-field edge |
+| §10.1 | imports: service, raw function; §10.1.1 JS moves to the post-0.2.0 phase; §10.1.2 gains the import-field edge |
 | §10.2 | "Products and entries": program vs library, export marking, platform services implicit, async from the link pass |
 | §10.3 | examples use `@import`; the rule is unchanged |
 | §10.4 (new) | `hostcall` switch, `i/hostcall`, groups/waits/calls, the misuse table, no-leak rules |
@@ -457,13 +472,31 @@ source tree also migrate: `scripts/check-snippets.json`,
 one-line banner at the top: "boundary syntax predates 0.2.0; see
 `host-boundary.md`".
 
-### 4.5 Alternatives
+### 4.6 Consistency-audit cross-reference
+
+IDs are from `docs/design/consistency-audit.md` at `d5751b225` (branch
+`docs/consistency-audit`, not yet on main). If a row is renumbered there,
+update this table in the same PR.
+
+| Audit ID | Relation |
+|---|---|
+| A3 | §2.6's key list: this design adds `product` and `hostcall` and deletes the `[wasm]` block, so A3's `wasm.synchronous` clause is closed here; `[test]`/`[entries]` stay A3's |
+| A5 | the platform list is rewritten in §10.2 and §2.6.1 points at it rather than repeating it |
+| A6 | the two async definitions collapse into one per-entry link-pass rule (§3.2) |
+| B4 | `i check` still must run the entry-need check; this design does not change B4 |
+| B20 | the built-in attribute list becomes `@import`/`@export`/`@runtime`/`@deprecated`; E0301/E0308 name them, closing B20's message mismatch |
+| B21 | attribute arguments are positional strings; `@external(module : …)` is retired with the name, closing B21 |
+| KH3 | a bare declaration now requires `@import` or `@runtime`; the diagnostic names both |
+
+Rows outside this surface (B1, B30, B1a/B1b, etc.) are unaffected.
+
+### 4.7 Alternatives
 
 | Option | Cost | Why not |
 |---|---|---|
 | Delete all three (chosen) | 509 attribute occurrences + 22 manifests + spec | required by the decision; no compatibility |
 | Keep `@external` for runtime intrinsics only | 147 fewer edits | it is visible in `lib/i` and keeps the bad name; `@runtime` cleanly separates "compiler op" from "host call" |
-| Keep `@js` | 17 occurrences, no implementation | the owner said it disappears; one attribute is the rule |
+| Keep `@js` | 17 occurrences, no implementation | it never worked; one uniform import attribute is the rule, and 0.2.0 can retire it without a replacement |
 
 **Approval P4**: `@runtime` as the library-only marker. Alternative: reuse
 `@import` with a `"runtime"` mode (fewer names, but runtime ops are not
@@ -535,7 +568,7 @@ ordinary record exported with its constructor, so a dispatcher can write one:
 `Wait(wait = (ticket) { … })`. A `Call(A)` is the existing request cell plus
 its group provenance in the type. `CallGroup` is the existing group key with a
 worker/root stamp. `Wait` is the existing `Await` shape under its own name, so
-the platform default and a custom value are distinguishable; `waiting` wraps
+the platform default and a custom value are distinguishable; `with_wait` wraps
 the bare function into the ambient `Await`.
 
 ### 5.3 Surface
@@ -548,8 +581,8 @@ close : (CallGroup) -> Nil         // idempotent; cancels outstanding
 closed : (CallGroup) -> Bool
 
 // scopes: the main capability, per-call group without signature changes
-under : <A>(CallGroup, () -> A) -> A
-waiting : <A>(Wait, () -> A) -> A
+in_group : <A>(CallGroup, () -> A) -> A
+with_wait : <A>(Wait, () -> A) -> A
 
 // unwaited starts
 call : <A>(() -> A) -> Call(A)              // ambient group; one direct imported field call
@@ -577,11 +610,11 @@ cancels its Waiting members, lets Ready cells belong to their handles, and
 forbids later starts. A `Call` keeps its group id for cancel/retire, but a
 settled Call no longer counts.
 
-`under(g) { body }` makes `g` the group of every start in `body`, including
-starts inside library wrappers. `waiting(w) { body }` makes `w` the wait of
+`in_group(g) { body }` makes `g` the group of every start in `body`, including
+starts inside library wrappers. `with_wait(w) { body }` makes `w` the wait of
 every await in `body`. Both nest; the innermost wins; both restore on normal
 return, error, panic and task cancellation, like `resource.ensure` finals.
-Inside a task, `waiting` changes how this continuation waits; it does not
+Inside a task, `with_wait` changes how this continuation waits; it does not
 replace the task scheduler, so a blocking custom wait starves that run's
 siblings until it returns. On WASI there is no hand-off; `poll` and a wait
 that must hand off follow the existing "no active entry" rule.
@@ -591,7 +624,7 @@ no-wait mode and returns the start instead of awaiting it; `call` uses the
 ambient group. `op` must be **one direct field call of an `@import` service
 type** at its top level (`E0335`; e.g. `() -> logger.log("x")`). It does not
 accept a library wrapper, because a wrapper awaits and maps its own errors; for
-a wrapper, use `under(g) { … }`, which lets it await normally under the chosen
+a wrapper, use `in_group(g) { … }`, which lets it await normally under the chosen
 group. A `"now"` field is called immediately: its error raises at `call`, and a
 successful result is wrapped as a ready Call.
 
@@ -611,7 +644,7 @@ same as a `"now"` field; no Call is made.
 | 2 | write `Call`/`CallGroup`/`Wait` without importing `i/hostcall` | name error `E0201` | — |
 | 3 | export or module-export a function signature naming `Call`, `CallGroup`, `Wait`, `Request`, `Ticket` | compile `E0324` | — |
 | 4 | call `call` on a non-field closure | compile `E0335` | — |
-| 5 | `call_in`/`under` a closed group, or `group_at` a closed Root | runtime | panic `hostcall: group closed` / `hostcall: root closed` |
+| 5 | `call_in`/`in_group` a closed group, or `group_at` a closed Root | runtime | panic `hostcall: group closed` / `hostcall: root closed` |
 | 6 | use a group from another worker | runtime | panic `hostcall: foreign group` |
 | 7 | `call` under a closed ambient Root | runtime | panic `hostcall: root closed` |
 | 8 | `await`/`take` a terminal Call | runtime | panic `hostcall: taken` / `hostcall: cancelled` |
@@ -622,7 +655,7 @@ same as a `"now"` field; no Call is made.
 | 13 | `root()`/`poll()` with no active async entry | runtime | panic `hostcall: no active entry` (existing text family) |
 | 14 | close the group of a Call whose await is in flight | runtime | the start is cancelled; the await panics `hostcall: cancelled`; no leak |
 | 15 | `cancel` a terminal Call | runtime | idempotent; no panic |
-| 16 | `close` inside its own `under` | allowed | later starts in the body panic; the scope restores |
+| 16 | `close` inside its own `in_group` | allowed | later starts in the body panic; the scope restores |
 | 17 | `close_root` the ambient Root inside a body | allowed | later starts panic; settled Calls are unaffected |
 | 18 | `adopt` a Request already owned by another group | allowed | the Call's group becomes the ambient one; either group's close cancels the shared ticket (idempotent) |
 | 19 | use a value whose type is a hostcall type, imported through an inferred signature | allowed; the caller can pass it on without naming it | — |
@@ -707,10 +740,10 @@ it.
 | Root consent key that dependencies must satisfy | explicit grants | the owner said "no consent needed"; it also breaks a library that adds the capability in a minor version |
 | `Call`/`CallGroup`/`Wait` as ordinary library-only types | no flag | the three capabilities are then always visible; the owner required default-off |
 
-**Approval P5**: the misuse split (compile vs runtime panic) and the ambient
-names `under`/`waiting`. Alternative names: `in_group`/`with_wait`; compile
-the closed-group impossibility by making `close` consume a linear `CallGroup`
-(cost: a linearity feature; it catches #5 statically but not #10–#13).
+**Approval P5 (accepted)**: the misuse split stays; the names are
+`in_group`/`with_wait`, checked by reading them beside
+`Call`/`CallGroup`/`Wait`. A linear `CallGroup` remains the alternative
+(new feature; catches #5 statically but not #10–#13).
 
 ## 6. Transparent runtime
 
@@ -778,22 +811,32 @@ affected test group, not a full clean build.
 | A | choose a group per call, replace the wait, write a dispatcher, with no `Await`/`Owner` in any signature | implicit services, hostcall module/types/lowering, library conversion, `deps`/build output, 88-signature corpus | 7 | 3 cycles ≈ 120 min |
 | B | build a library a host can call, exports marked where written | product rules, `@export`, `[wasm]` deletion, export stubs + Rust/JS/WASI export bindings, CLI errors | 6 | 2 cycles ≈ 80 min |
 | C | call a host function from user code and embed it with typed stubs | user `@import` host stubs for Rust/JS/WASI, `@js` retirement, old-attribute deletion, corpus | 6 | 3 cycles ≈ 120 min |
-| D | use JS globals | `@js`→`@import("js",…)`, JS value goldens | 4 | 2 cycles ≈ 80 min |
 | E | — | spec/design/docs/corpus, full verify, review, release gate | 4 | 2 cycles + review ≈ 120 min |
 
-Critical path: 0 → A → B → C → D → E ≈ **9 h 20 min**. Allowing one
-failed-review rework (+60 min) gives **~10 h 20 min** to a 0.2.0 candidate.
-Measured here: a cold `cargo build -p ilang-cli` took **31 min 39 s**, the
-`ilang-check --test projects` group **86 s** on a warm target, and the spec
-suite **over 20 min** (still running when measured). The 40-minute cycle is
-a warm rebuild of the touched crates plus an affected test group; it is not a
-clean build and not the full suite. B and C share the binding generators and
-metadata encoder, so they merge B then C; D needs B's export generator.
+Critical path: 0 → A → B → C → E ≈ **8 h**. Allowing one failed-review rework
+(+60 min) gives **~9 h** to a 0.2.0 candidate. A cold full build took
+**31 min 39 s**, `ilang-check --test projects` 86 s warm, and the spec suite
+**35 min 12 s** (measured, exit 0); a 40-minute cycle is a warm rebuild of the
+touched crates plus an affected test group, not a clean build and not the full
+suite. B and C share the binding generators and metadata encoder, so they merge
+B then C. Phase A cannot shrink below two cycles because its checker change and
+its corpus change must both compile before the goldens can be re-blessed.
+
+Starting condition: **A does not start until main is green (#55) and B1,
+B30 and the checker holes have landed.** Scope-2 follows the whole host
+boundary because parse/resolve/infer overlap most.
+
+If A, B and C run in parallel worktrees despite the shared files, the path is
+0 + max(120, 80, 120) + E(120) = **4 h 40 min** (5 h 40 min with a failed
+review), plus merge cost.
+
+JS value declarations (`@import("js", …)`) are **not** in this path; they
+follow 0.2.0 with the JS loader work.
 
 The phases can be cut for scope only by dropping a product decision, not by
-leaving two syntaxes: A+B+C are the minimum for the owner's decision; D can
-ship after 0.2.0 only if 0.2.0 is allowed without JS values and non-Rust
-bindings (would need an explicit waiver).
+leaving two syntaxes: A+B+C are the minimum for the owner's decision. JS value
+declarations are the one feature explicitly outside 0.2.0; the JS *host
+bindings* are inside B/C.
 
 **Release gate**: 0.2.0 is tagged only after E, with:
 `cargo test --workspace`, `scripts/dev-verify` and the review corpus green;
@@ -809,7 +852,9 @@ under `tests/spec/10/` (syntax/product), `tests/spec/10.1/` (imports),
 project-level errors. Names are fixed here so the tests can be written in
 parallel with the implementation.
 
-1. **Product**: missing entry E0617; bad `product` value E0613; program+`@export` E0330; library+`[entries]`
+1. **Product**: missing entry E0617 with the literal "if this package is a
+   library, set `product = "library"`" sentence; bad `product` value E0613;
+   program+`@export` E0330 naming `product = "library"`; library+`[entries]`
    E0614; program dependency E0615; `i run` a library E0331; native build of a
    library E0332.
 2. **No name rule**: a library with `main` in `src/main.i` builds as a
@@ -843,7 +888,8 @@ parallel with the implementation.
    field by field. A JS twin runs the host side in Node. A WASI twin runs
    under wasmtime with a C shim.
 9. **Retired syntax**: `@external`, `@host`, `@js`, `[wasm]` each give E0337/
-   E0612 with the replacement; `git grep -F` proves none in `lib std examples
+   E0612 with the replacement (for `@js`: the post-0.2.0 `@import("js", …)`);
+   `git grep -F` proves none in `lib std examples
    tests crates bindings scripts docs/spec.md docs/content`. Historical design docs
    keep the old names under a one-line "predates 0.2.0" banner and are checked
    only for the banner.
@@ -857,13 +903,36 @@ parallel with the implementation.
 | P3 | same-module `make_<Type>` accessor | a separate `src/gen/` module (editors see a file, but its own module calling it makes a cycle); `impl_<Type>` name (shorter) | §3/§7 change |
 | P3 name collisions | E0208 (existing duplicate definition) | a new code (one more message) | trivial |
 | P4 | library-only `@runtime` for compiler ops | reuse `@import` with `"runtime"` mode (one name fewer, no registration) | §4.2 changes 147 lines differently |
-| P5 | compile vs panic split of §5.4; `under`/`waiting` names | linear `CallGroup` (new feature); `in_group`/`with_wait` names | §5 tests change |
+| P5 | compile vs panic split of §5.4; `in_group`/`with_wait` names | linear `CallGroup` (new feature) | §5 tests change |
 | P6 | one phase for implicit services + hostcall | two phases (106 signatures twice, +1 cycle ≈ 40 min) | §6/§7 |
 | P7 | implicit services may not be written at all (E0325) | allow writing them (source stays dirty; no lint against drift; display hides them anyway) | §5.5/§6 |
 
 No approval is needed for: deleting all old syntax, `i/hostcall` import
 error, the misuse outcomes, the synthesized accessor, the retired-name
 errors, the release gate.
+
+### 9.1 Verdicts (2026-11-21)
+
+All seven are accepted as proposed, with the owner's additions:
+
+- **P1 accepted.** `product` stays optional with program default. `E0617` must
+  carry the literal sentence "if this package is a library, set
+  `product = \"library\"`"; `E0330` names the same fix. §1.1 and §8 case 1 pin
+  the exact text.
+- **P2 accepted.** `@export` is function-only; no whole-service export.
+- **P3 accepted.** The same-module `make_<Type>` accessor, no `src/gen/`
+  tree and no second module.
+- **P4 accepted.** `@runtime`, library `i` only.
+- **P5 accepted**, with the names re-read against
+  `Call`/`CallGroup`/`Wait`/`Ticket`/`Root`: `in_group(g) { … }` says what it
+  scopes, `with_wait(w) { … }` says what it replaces; `under` was too bare and
+  `waiting` was a state, not an action. `call_in` stays beside `call`. No
+  linear `CallGroup`.
+- **P6 accepted.** One phase for implicit services and hostcall.
+- **P7 accepted.** Implicit services are never written outside library `i`.
+- **D is out of 0.2.0.** `@js` is still deleted in C, but
+  `@import("js", …)` and JS value declarations are a post-0.2.0 phase. JS
+  *host* bindings stay in B/C; only the value-getter feature slips.
 
 ## 10. What is not changed
 
@@ -1011,7 +1080,7 @@ registration helper.
 | E0334 | native run/test with an unsupplied user import |
 | E0335 | `call` closure without exactly one imported field call |
 | E0336 | `@import` in the needs of a macro |
-| E0337 | retired attribute `@external`/`@host`/`@js` |
+| E0337 | retired attribute `@external`/`@host`/`@js` (message names the replacement; for `@js`, the post-0.2.0 form) |
 | E0338 | wrong `@export` place or argument |
 | E0339 | `"sync"` export that needs a later service or the scheduler |
 | E0612 | `[wasm]` table present |
@@ -1019,7 +1088,7 @@ registration helper.
 | E0614 | `[entries]` in a library |
 | E0615 | program dependency |
 | E0616 | non-boolean `hostcall` |
-| E0617 | a program has no entry |
+| E0617 | a program has no entry; the message names both fixes |
 
 **Existing codes.** Kept and retargeted: E0301 (unknown attribute; its message
 lists the four new built-ins), E0302, E0303, E0306, E0307, E0308, E0309, E0310,
