@@ -239,7 +239,7 @@ test("timeout_body_wins_test", () {
 // flag, and the flag must be set by the time `timeout` returns: that is R5's
 // "return only after their finals end", observed.
 test("timeout_timer_wins_test", () {
-	released = task.ref(False)
+	released = task.ref(False())
 	(r, elapsed) = time.measure(() {
 		fail.catch(() {
 			time.timeout(time.milliseconds(20), () {
@@ -255,7 +255,7 @@ test("timeout_timer_wins_test", () {
 })
 
 test("timeout_expired_test", () {
-	ran = task.ref(False)
+	ran = task.ref(False())
 	{
 		zero = fail.catch(() {
 			time.timeout(time.nanoseconds(0), () {
@@ -291,7 +291,7 @@ test("timeout_body_error_test", () {
 })
 
 test("timeout_bad_deadline_test", () {
-	ran = task.ref(False)
+	ran = task.ref(False())
 	too_big = time.nanoseconds(9223372036854775808)
 	{
 		r = fail.catch(() {

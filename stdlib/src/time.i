@@ -237,11 +237,11 @@ Outcome(A) = Ran(A) | Expired | ClockFailed
 timeout = (after : Duration, body) {
 	Duration(nanoseconds) = after
 	{ nanoseconds > max_timeout } |>
-		(True) { fail.raise(BadDeadline(after = after)) }
-		& (False) { () }
+		(True()) { fail.raise(BadDeadline(after = after)) }
+		& (False()) { () }
 	{ nanoseconds <= 0 } |>
-		(True) { fail.raise(Timeout(after = after)) }
-		& (False) {
+		(True()) { fail.raise(Timeout(after = after)) }
+		& (False()) {
 			// The timer reports a clock failure as a value, not as a child
 			// failure: a failure would let the race wait for the body (R2),
 			// which may never end. As a value it commits the race, cancels
