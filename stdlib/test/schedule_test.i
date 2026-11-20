@@ -100,7 +100,7 @@ test("schedule_retry_succeeds_on_second_attempt_test", () {
 	runs = task.ref(0)
 	value = schedule.retry(3, fixed(1), () {
 		n = bump(runs)
-		{ n == 1 } |> (True) { fail.raise("first") } & (False) { n }
+		{ n == 1 } |> (True()) { fail.raise("first") } & (False()) { n }
 	})
 	assert(value == 2)
 	assert(task.get(runs) == 2)
