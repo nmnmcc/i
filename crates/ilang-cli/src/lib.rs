@@ -161,7 +161,7 @@ pub fn diagnostic_lines(graph: &PackageGraph, diags: &[Diagnostic]) -> Vec<Strin
                 .as_ref()
                 .map(|l| format!("v{}", l.version))
                 .unwrap_or_else(|| "path dependency".into());
-            lines.push(format!("note: this version of `{}` (`{tag}`) is written in the syntax from before {} (A3); it cannot be used with this compiler; use a newer version of the package, or an older version of `i`", package.name, env!("CARGO_PKG_VERSION")));
+            lines.push(format!("note: this version of `{}` (`{tag}`) is not written in the syntax that `i` {} reads, so it cannot be used with this compiler; use a version of the package that is written in this syntax", package.name, env!("CARGO_PKG_VERSION")));
         }
     }
     lines

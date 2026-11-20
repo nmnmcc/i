@@ -320,11 +320,11 @@ fn old_forms_have_helpful_errors_without_reserving_names() {
     // Parse-error guidance must be conditional: valid new calls stay calls;
     // hints belong to errors only.
     for (source, hint) in [
-        ("export(x)", "header groups"),
-        ("export()", "old empty header, omit it"),
-        ("import()", "old empty header, omit it"),
+        ("export(x)", "a header is a group `(…)`"),
+        ("export()", "a header with nothing in it is omitted"),
+        ("import()", "a header with nothing in it is omitted"),
         ("x = case(1)", "e |>"),
-        ("import(i/core)", "header groups"),
+        ("import(i/core)", "a header is a group `(…)`"),
         (
             /* old-syntax-check: E0101 */ "x = case 1 { 0 -> 1  _ -> 2 }",
             "e |>",

@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:2:2: error[E0201]: `case` is not defined; if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\n1 error\n"
+      "stderr": "src/main.i:2:2: error[E0201]: `case` is not defined; a header is a group `(…)`, without `import` or `export`; a match is written `e |> (pattern) { value } & (_) { other }`, not `case e { … }`; a guard is written `? condition`, not `if condition`\n1 error\n"
     }
   }
 }

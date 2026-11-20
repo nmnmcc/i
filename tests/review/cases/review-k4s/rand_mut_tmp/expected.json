@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:17:13: error[E0101]: expected an expression, found `<-`\nsrc/main.i:23:3: error[E0101]: `|` no longer joins function values: join the branches with `&`\nsrc/main.i:33:3: error[E0101]: `|` no longer joins function values: join the branches with `&`\nsrc/main.i:38:3: error[E0101]: `|` no longer joins function values: join the branches with `&`\n4 errors\n"
+      "stderr": "src/main.i:17:13: error[E0101]: expected an expression, found `<-`\nsrc/main.i:23:3: error[E0101]: `|` joins members inside a type declaration, as in `Name = A | B`; this position needs a declaration or an expression; to join function branches, write `&`, as in `(a) { … } & (b) { … }`\nsrc/main.i:33:3: error[E0101]: `|` joins members inside a type declaration, as in `Name = A | B`; this position needs a declaration or an expression; to join function branches, write `&`, as in `(a) { … } & (b) { … }`\nsrc/main.i:38:3: error[E0101]: `|` joins members inside a type declaration, as in `Name = A | B`; this position needs a declaration or an expression; to join function branches, write `&`, as in `(a) { … } & (b) { … }`\n4 errors\n"
     }
   }
 }

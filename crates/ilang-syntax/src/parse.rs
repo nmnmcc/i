@@ -620,7 +620,7 @@ impl Parser<'_> {
             head = self.seq(T::RParen, false, Self::ty)?;
         }
         if self.at_joined(&T::LBrace) {
-            let msg = "a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`";
+            let msg = "a type definition is `Name = right side`: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`";
             return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
         }
         self.expect(&T::Eq)?;
@@ -742,7 +742,7 @@ impl Parser<'_> {
         let span = self.span_from(start);
         if !matches!(stmts.last(), Some(Stmt::Expr(_))) && self.diags.len() == errors {
             let msg = if stmts.is_empty() {
-                "a block has at least an expression; `{}` and the empty match are removed: use `core.never`"
+                "a block has at least an expression; for a value that never returns, write `core.never`"
             } else {
                 "a block ends with an expression"
             };
@@ -824,7 +824,7 @@ impl Parser<'_> {
             );
         }
         if self.at(&T::Pipe) {
-            let msg = "`|` no longer joins function values: join the branches with `&`";
+            let msg = "`|` joins members inside a type declaration, as in `Name = A | B`; this position needs a declaration or an expression; to join function branches, write `&`, as in `(a) { … } & (b) { … }`";
             return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
         }
         if self.at(&T::Amp) {
@@ -1047,7 +1047,7 @@ impl Parser<'_> {
             branches.push(self.function()?);
         }
         if self.at(&T::Pipe) {
-            let msg = "`|` no longer joins function values: join the branches with `&`";
+            let msg = "`|` joins members inside a type declaration, as in `Name = A | B`; this position needs a declaration or an expression; to join function branches, write `&`, as in `(a) { … } & (b) { … }`";
             return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
         }
         Ok(ExprKind::Chain(branches))
@@ -1712,7 +1712,7 @@ impl Parser<'_> {
                 TypeKind::Hole
             }
             T::Caret | T::Bang => {
-                let msg = "`^` and `!` are removed from function types: errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`";
+                let msg = "`^` and `!` do not begin a type: in a function type, errors and services are written after `<-`, as in `(String) <- (Db, Fail(NotFound)) -> User`";
                 return Err(Diagnostic::new(Code::Unexpected, self.tok().span, msg));
             }
             _ => return self.error("a type"),

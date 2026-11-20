@@ -1484,7 +1484,7 @@ fn expr_of(d: &Datum) -> R<Expr> {
                 Some("|") => {
                     return err(
                         d,
-                        "`|` no longer joins function values: join the branches with `&`, as `(& F1 F2 …)`",
+                        "`|` joins members inside a type declaration, as in `(| A B)`; to join function branches, write the chain `(& F1 F2 …)`",
                     );
                 }
                 Some("|>") => match rest {

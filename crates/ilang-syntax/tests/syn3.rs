@@ -208,7 +208,7 @@ fn type_definitions() {
     );
     bad(
         "Tree(A) { Leaf  Node(A) }",
-        "the constructor list `Name { … }` is removed",
+        "write each constructor as its own labelled type",
     );
 }
 
@@ -379,11 +379,16 @@ fn p4_branch_join() {
 
     bad("h = f & g", "`&` joins only function literals");
     bad("h = (a) { 1 } & g", "`&` joins only function literals");
-    // a value-level `|` is removed syntax, and the hint gives the new join;
-    // `&` is the join that replaces it.
-    bad("h = (a) { 1 } | (b) { 2 }", "join the branches with `&`");
-    bad("h = (a) { 1 }\n\t| (b) { 2 }", "join the branches with `&`");
-    bad("h = f | g", "join the branches with `&`");
+    // `|` does not join values; the hint names the `&` chain.
+    bad(
+        "h = (a) { 1 } | (b) { 2 }",
+        "to join function branches, write `&`",
+    );
+    bad(
+        "h = (a) { 1 }\n\t| (b) { 2 }",
+        "to join function branches, write `&`",
+    );
+    bad("h = f | g", "to join function branches, write `&`");
     assert_eq!(chain(&value("h = (a) { 1 } & (b) { 2 }")).len(), 2);
     // Overloading by shape.
     let show = value(
@@ -463,7 +468,10 @@ fn p6_statements() {
     assert!(matches!(&stmts[5], Stmt::Expr(e) if matches!(e.kind, ExprKind::Call { .. })));
     assert!(matches!(&stmts[6], Stmt::Expr(e) if matches!(e.kind, ExprKind::Data(_))));
     bad("f = () { x = 1 }", "a block ends with an expression");
-    bad("f = () {}", "`{}` and the empty match are removed");
+    bad(
+        "f = () {}",
+        "for a value that never returns, write `core.never`",
+    );
     // The removed environment statements.
     bad("f = () {\n\t! Db = make()\n\t1\n}\n", "expected");
 }

@@ -757,7 +757,7 @@ impl<'a, 't> NativeResolver<'a, 't> {
                     let message = if args.is_empty()
                         && matches!(name.name.as_str(), "import" | "export")
                     {
-                        "a call at the top level is kept for macros; if this was an old empty header, omit it"
+                        "a call at the top level is kept for macros; a header with nothing in it is omitted"
                     } else {
                         "a call at the top level is kept for macros"
                     };
