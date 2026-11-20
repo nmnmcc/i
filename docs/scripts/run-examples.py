@@ -182,9 +182,11 @@ def library_root():
     override = os.environ.get('LIBRARY_ROOT')
     if override:
         return Path(override)
-    tag = os.environ.get('LIBRARY_TAG') or subprocess.run(
+    tag = os.environ.get('LIBRARY_TAG') or (subprocess.run(
         ['git', '-C', str(ROOT), 'tag', '--list', 'stdlib-v*', '--sort=-v:refname'],
-        capture_output=True, text=True, check=True).stdout.split()[0]
+        capture_output=True, text=True, check=True).stdout.split() or [None])[0]
+    if not tag:
+        raise SystemExit('no stdlib-v* tag; fetch tags or set LIBRARY_TAG')
     directory = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag) / 'stdlib'
     if directory.is_dir():
         return directory
