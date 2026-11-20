@@ -81,6 +81,11 @@ pub(crate) struct VarState {
     /// hides the difference from the result type.
     pub difference: bool,
     pub handled: Vec<Ty>,
+    /// Services with one form (no type arguments) provided over this need
+    /// row. They carry no same-form obligation, but a written row that does
+    /// not state their key would hide that the provide replaces a service
+    /// that its caller passes in the row (§9.2, row variables).
+    pub shadowed: Vec<Ty>,
     /// A deferred need meet, with the service forms used for E0515.
     pub need_meet: Option<(Ty, Ty)>,
     pub lower: Vec<Ty>,
@@ -186,6 +191,8 @@ pub(crate) struct Solver {
     /// argument, tagged with a disjoint identity.
     pub(super) comparison_wrappers: HashSet<TypeId>,
     pub(super) has_handlers: bool,
+    /// Some need row has a one-form service provided over it (`shadowed`).
+    pub(super) has_shadows: bool,
     pub(super) has_need_meets: bool,
     pub row_params: StdHashMap<TypeId, Vec<Mode>>,
     pub failures: Vec<Failure>,
@@ -295,6 +302,7 @@ impl Solver {
         snapshot.vars = self.vars.clone();
         snapshot.row_params = self.row_params.clone();
         snapshot.has_handlers = self.has_handlers;
+        snapshot.has_shadows = self.has_shadows;
         snapshot.has_need_meets = self.has_need_meets;
         snapshot.comparison_wrappers = self.comparison_wrappers.clone();
         snapshot.alias_folds = self.alias_folds.clone();
@@ -435,6 +443,7 @@ impl Solver {
             comparison_wrappers: HashSet::default(),
             row_params: StdHashMap::new(),
             has_handlers: false,
+            has_shadows: false,
             has_need_meets: false,
             failures: Vec::new(),
             type_names,
@@ -512,6 +521,7 @@ impl Solver {
             row: Mode::Value,
             difference: false,
             handled: Vec::new(),
+            shadowed: Vec::new(),
             need_meet: None,
             lower: Vec::new(),
             upper: Vec::new(),
@@ -786,10 +796,21 @@ impl Solver {
         if self.var(v).row == Mode::Row && h.scalar().is_some() {
             return;
         }
-        // There is nothing to retain for a constructor with just one form.
+        // There is no same-form obligation for a constructor with just one
+        // form. Still remember that the row was provided over: a written row
+        // must state the key, or the provide silently replaces a service of
+        // the caller's row.
         if matches!(h, Ty::Con(_, values, args) if values.is_all() && args.is_empty())
             && h.scalar().is_none()
         {
+            if self.var(v).row == Mode::Env {
+                self.has_shadows = true;
+                for w in self.reach(vec![v], true).0 {
+                    if !self.var(w).shadowed.contains(h) {
+                        self.var_mut(w).shadowed.push(h.clone());
+                    }
+                }
+            }
             return;
         }
         if (v.0 as usize) < self.rigid_boundary && !self.var(v).handled.contains(h) {
@@ -939,6 +960,28 @@ impl Solver {
         if !self.has_handlers {
             return Vec::new();
         }
+        self.unstated(t, level, false)
+            .into_iter()
+            .map(|(_, h)| h)
+            .collect()
+    }
+
+    /// A written need row over which a one-form service was provided, and
+    /// whose shown scheme does not state that service's key: in
+    /// `(..N, C(…))`, `N` has no entry for `C`, so a rigid row variable that
+    /// reaches a provide of `C` without a stated `C` entry is a compile error
+    /// (§9.2). Each item is the row variable seen in the scheme and the key.
+    pub fn hidden_shadows(&self, t: &Ty, level: u32) -> Vec<(V, Ty)> {
+        if !self.has_shadows {
+            return Vec::new();
+        }
+        self.unstated(t, level, true)
+    }
+
+    /// The obligations installed on rows of `t` that `t` does not express:
+    /// the handlers with more than one form, or with `shadows` the one-form
+    /// services provided over a row.
+    fn unstated(&self, t: &Ty, level: u32, shadows: bool) -> Vec<(V, Ty)> {
         fn parts(t: &Ty, out: &mut Vec<Ty>, visible: &mut HashSet<V>, in_handler: bool) {
             out.push(t.clone());
             match t {
@@ -999,10 +1042,16 @@ impl Solver {
                 .collect();
             let is_var = |t: &Ty| matches!(t, Ty::Var(w) if aliases.contains(w));
             for w in &above {
-                for h in &self.var(*w).handled {
+                let installed = if shadows {
+                    &self.var(*w).shadowed
+                } else {
+                    &self.var(*w).handled
+                };
+                for h in installed {
                     // A non-scalar constructor with no parameters has only
                     // one form, so this obligation holds for every row.
-                    if matches!(h, Ty::Con(_, values, args) if values.is_all() && args.is_empty())
+                    if !shadows
+                        && matches!(h, Ty::Con(_, values, args) if values.is_all() && args.is_empty())
                         && h.scalar().is_none()
                     {
                         continue;
@@ -1045,8 +1094,17 @@ impl Solver {
                         }
                         _ => false,
                     });
-                    if !witnessed && !hidden.contains(h) {
-                        hidden.push(h.clone());
+                    if !witnessed && !hidden.iter().any(|(_, k)| k == h) {
+                        // Name the row as written, when some alias of it
+                        // keeps the name of an annotation.
+                        let named = aliases
+                            .iter()
+                            .chain(&below)
+                            .chain(&above)
+                            .find(|w| self.var(**w).name.is_some())
+                            .copied()
+                            .unwrap_or(v);
+                        hidden.push((named, h.clone()));
                     }
                 }
             }
