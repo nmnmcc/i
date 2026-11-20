@@ -2,7 +2,7 @@
 
 Status: adopted, revision 4 (2026-11-10). The ledger's “Native proposal ADOPTED” records
 the user's adoption of revision 2, including the four replacements in §8. This revision
-reconciles runtime.md and multicore.md and closes the lifetime, stop and forged-number
+reconciles runtime.md (removed; its installed task and IO rules are in the standard and in this note) and multicore.md and closes the lifetime, stop and forged-number
 gaps. Revision 4 applies coordinator rulings N-R1–N-R6 after the independent
 review of 60f37f2; §11.1 records the repairs and regression cases. It changes no implementation. Performance targets are acceptance goals, not
 measurements.
@@ -415,8 +415,8 @@ commit. Older code citations in runtime/multicore retain their stated base.
 | Futures drop outside the slot lock; drop_all clears all outstanding work | crates/ilang-host/src/requests.rs:174–191 |
 | Async abandonment marks instance unusable and drops requests; traps drop requests too | crates/ilang-host/src/lib.rs:1265–1285, :1372–1382 |
 | Host run shutdown does not join detached blocking work | crates/ilang-host/src/run.rs:15–24, :28–68 |
-| Current standard service only prints; resources here are still a design | crates/ilang-host/src/services.rs:44–70; lib/i/fs.i:1, lib/i/net.i:1, lib/i/process.i:1 |
-| fail.map_error accepts a thunk then mapper, used by explicit wrappers | lib/i/fail.i:27–32 |
+| Current standard service only prints; resources here are still a design | crates/ilang-host/src/services/mod.rs:44–70; stdlib/src/fs.i:1, stdlib/src/net.i:1, stdlib/src/process.i:1 |
+| fail.map_error accepts a thunk then mapper, used by explicit wrappers | stdlib/src/fail.i:27–32 |
 
 Wasmtime 50 source was also read in the local registry at
 `/home/agent/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-50.0.0/`:
@@ -511,8 +511,8 @@ Implementation work (assign to the named stages; no code is changed here):
 
 | Stage | Files and regions anchored in the base |
 |---|---|
-| IO before Fs | General nominal field-privacy enforcement in crates/ilang-check/src/types/infer.rs:1538–1634 and tests; new ResourceContext/allocator/binding-plan modules beside crates/ilang-host/src/services.rs:44–70; context-aware registration adapters at lib.rs:552–582, options/instantiation grants at :611–634/:708–747; entry/trap/WaitGuard lifecycle at :803–834/:1265–1285/:1372–1382; cancellation slots at requests.rs:174–191 |
-| IO i values | lib/i/{fs,net,process}.i:1 replaced by private nominal wrappers/raw Int services, wrapper guards and no number-injection exports; clock.i/stdio.i:1 and runtime §11's IO assignments |
+| IO before Fs | General nominal field-privacy enforcement in crates/ilang-check/src/types/infer.rs:1538–1634 and tests; new ResourceContext/allocator/binding-plan modules beside crates/ilang-host/src/services/mod.rs:44–70; context-aware registration adapters at lib.rs:552–582, options/instantiation grants at :611–634/:708–747; entry/trap/WaitGuard lifecycle at :803–834/:1265–1285/:1372–1382; cancellation slots at requests.rs:174–191 |
+| IO i values | stdlib/src/{fs,net,process}.i:1 replaced by private nominal wrappers/raw Int services, wrapper guards and no number-injection exports; clock.i/stdio.i:1 and runtime §11's IO assignments |
 | IO trust plumbing | Compiler resolved declaration sites in lower.rs:971–1001 and import/metadata construction at :2649–2686; create a separate trusted binding plan before import coalescing, not self-authenticating ABI fields; JS loader binding at bindings/javascript/ilang.mjs:784–849 and teardown at :496–556/:881–925; new standard factories/tests |
 | Native package | Factor host lib.rs:653–681 into compiler/runtime configurations; crates/ilang-host/Cargo.toml:17 feature split; crates/ilang-cli/src/lib.rs:89–115 build path and crates/ilang-cli/src/main.rs:44–51 target options; new runner/payload manifest and package tests |
 | R2/MC | runtime §11 and multicore §14 regions: keep one Scheduler boundary and complete records now; add shared byte services/codec/claims/one-lock transactions only in MC; no direct cross-Store GC access |
@@ -849,7 +849,7 @@ worker progress; MC extends that existing ownership seam to group operations.
 All observers and control Roots are bounded by structured waiter/driver lifetimes.
 No new detached task, library-name privilege, host wire type or inference rule
 is introduced. The helper uses existing resource.ensure (spec §9.5;
-lib/i/resource.i:8–13); current host cancellation drops work outside its slot lock
+stdlib/src/resource.i:8–13); current host cancellation drops work outside its slot lock
 (crates/ilang-host/src/requests.rs:161–184). That code supports the intended
 ownership seam but does not yet implement the proposed resource lease behavior.
 
@@ -2003,11 +2003,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Track | Files and regions to change |
 > |---|---|
-> | R1 | Replace `lib/i/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
-> | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
-> | R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. No edits to `ilang-host/src/requests.rs` are needed for many outstanding requests |
-> | R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-> | IO service phases | Replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser service factories and their tests under `bindings/javascript/` and `tests/browser/` |
+> | R1 | Replace `stdlib/src/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
+> | R2 prerequisites from S7 | New `stdlib/src/key.i`; `stdlib/src/control.i:3–28` keep_env; `stdlib/src/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
+> | R2 request layer | New `stdlib/src/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. No edits to `ilang-host/src/requests.rs` are needed for many outstanding requests |
+> | R2 scheduler and entry | Replace `stdlib/src/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
+> | IO service phases | Replace the five reserved `stdlib/src/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser service factories and their tests under `bindings/javascript/` and `tests/browser/` |
 > | Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 > | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
@@ -2019,11 +2019,11 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Track | Files and regions to change |
 > |---|---|
-> | R1 | Replace `lib/i/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
-> | R2 prerequisites from S7 | New `lib/i/key.i`; `lib/i/control.i:3–28` keep_env; `lib/i/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
-> | R2 request layer | New `lib/i/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
-> | R2 scheduler and entry | Replace `lib/i/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
-> | IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs:1538–1634` and its tests (spec §2.4); replace the five reserved `lib/i/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
+> | R1 | Replace `stdlib/src/random.i:1`; register no Rust primitive. Add R1 spec text and `tests/spec/9.10/` |
+> | R2 prerequisites from S7 | New `stdlib/src/key.i`; `stdlib/src/control.i:3–28` keep_env; `stdlib/src/core.i:3–33` portable; primitive type/variance/name tables in `crates/ilang-check/src/types/solve.rs:1285–1291` and `hir.rs:210–257`; closure flags/walk stamps and portable walk per S7 §3.6; keep_env re-entry per S7 §4 in emit/control.rs after B |
+> | R2 request layer | New `stdlib/src/request.i`; primitive Request/Ticket and operations in checker/runtime/IR; host declaration validation and expansion in `crates/ilang-check/src/resolve.rs:664–679`, `:1470–1555`, mode in `hir.rs:182–186`, and post-expansion interface display after syntax/T work; `crates/ilang-wasm/src/lower.rs:969–1054`, `:1140–1202`; replace the entire request/table/result region in `emit/host.rs:23–165`, `:172–246`, `:335–358`; add continue export. The existing host table already supports many outstanding requests; IO adds teardown-owner access independent of a Store borrow |
+> | R2 scheduler and entry | Replace `stdlib/src/task.i:1`; `infer.rs:376–429` resolved allowed-entry-service set and diagnostics; `lower.rs:828–938` entry wrappers/metadata; `emit/mod.rs:805–870` service setup and wrapper invocation. The wrapper calls ordinary i implementation definitions; it does not implement the queue in Rust |
+> | IO service phases | Before Fs, generic nominal field visibility in current `crates/ilang-check/src/types/infer.rs:1538–1634` and its tests (spec §2.4); replace the five reserved `stdlib/src/{clock,fs,net,process,stdio}.i`; new `crates/ilang-host/src/services/{clock,fs,net,process,stdio}.rs`; registration in `services.rs:44–70`; tokio features in `crates/ilang-host/Cargo.toml : 15`; CLI/default host imports at `crates/ilang-cli/src/lib.rs:151–152`; new JS Node/browser factories/tests under `bindings/javascript/` and `tests/browser/`; context-aware host registrations, shared ResourceContext/Int allocator and trusted binding grants before Fs (native §3.1/§10) |
 > | Shared registration | `crates/ilang-package/src/library.rs:7–26` adds request/key once; existing seven reserved entries become real without duplicate paths. Add Request/Ticket to compiler built-in type names, like Boundary/Continuation; their ordinary helper types are not prelude names. S7 Key/Keyed retains its assignment |
 > | Spec/test ownership | R1 §9.10; R2 §9.2, §9.4–9.5, §9.8–9.9, §9.11, §10.2 and request additions in §4/§10.3/§11/§B.5; IO §9.7, §B.7, §0/§2.1/§12 lists. Use the exact section splits in §10; one owner reconciles each shared paragraph |
 
@@ -2840,9 +2840,9 @@ The coverage check reconstructs every quoted changed block from this ledger.
 
 > - `docs/spec.md`: §2.5, §4.2, §4.5, §9.2, §9.4 (rules 3, 4 and 7), §9.7, new §9.8 (`i/key`, `Key`, `Keyed`), §10.1, §11.1, §11.4, §11.7, §11.8, new §11.9, §12, §13, §B.1, §B.4 (part 13).
 > - `docs/design/meta.md` §8: one sentence that a `Syntax` value is not portable (§11.9), whatever its form.
-> - `lib/i/core.i`: export `portable` as an `@external("ilang:core", …)` declaration, like `not` and `hash`.
-> - `lib/i/key.i` (new): `new`, `wrap` and `unwrap` as `@external("ilang:core", …)` declarations.
-> - `lib/i/control.i`: `keep_env`.
+> - `stdlib/src/core.i`: export `portable` as an `@external("ilang:core", …)` declaration, like `not` and `hash`.
+> - `stdlib/src/key.i` (new): `new`, `wrap` and `unwrap` as `@external("ilang:core", …)` declarations.
+> - `stdlib/src/control.i`: `keep_env`.
 > - `crates/ilang-wasm/src/lower.rs`: add `portable` and the key functions to the `CORE` and `CORE_FUNCS` name tables near `:120` and `:130`; the `keep_env` op, which keeps the `$env` array as it is (part 4); bit 0 of field 1 for closures with patched captures (part 3.6). `captures_of` (`:389`) is the definition of captures; it does not change, and a comment points at §11.9.
 > - `crates/ilang-wasm/src/emit/mod.rs`: `closure()` writes the patch flag in field 1 and gives a patched closure's captures array its last element, the walk stamp (part 3.6). The `$clo{n}` types do not change.
 > - `crates/ilang-wasm/src/emit/control.rs`: `$keep_reenter` and the frame record of a kept function (part 4).
@@ -2850,16 +2850,16 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - `crates/ilang-wasm/src/runtime/values.rs`: `$core_portable`, a walk with an explicit stack like `$value_compare_i32`, with the walk stamp of part 3.6 (one new token for each walk). It gives False at tags 10, 11 and 12 and at a host request, and walks field 5 of `$obj` (tuples, custom values, closure captures, records), `$cons` heads and tails, `Keyed` values, and kept services. The key functions.
 > - `crates/ilang-wasm/src/runtime/mod.rs`: the tag table (`:46`) gains a "portable" note, the patch flag, the key tag, and the planned `$clo` layout of part 3.4.
 > - `crates/ilang-check/tests/library.rs`: the core and control export lists.
-> - `lib/i/task.i`, `lib/i/random.i`: following part 18.
+> - `stdlib/src/task.i`, `stdlib/src/random.i`: following part 18.
 > - `docs/performance.md`: channel state kept until the channel's scope ends (part 7), the cost of `portable` checks (also on DAGs, part 3.6), pinned tasks under boundary services (part 4), the start-up conditions of part 3.5, and the one-core limit of servers whose handlers hold host references (part 12).
 
 - New sentence(s):
 
 > - `docs/spec.md`: §2.5, §4.2, §4.5, §9.2, §9.4 (rules 3, 4 and 7), §9.7, new §9.8 (`i/key`, `Key`, `Keyed`), §10.1, §11.1, §11.4, §11.7, §11.8, new §11.9, §12, §13, §B.1, §B.4 (part 13).
 > - `docs/design/meta.md` §8: one sentence that a `Syntax` value is not portable (§11.9), whatever its form.
-> - `lib/i/core.i`: export `portable` as an `@external("ilang:core", …)` declaration, like `not` and `hash`.
-> - `lib/i/key.i` (new): `new`, `wrap` and `unwrap` as `@external("ilang:core", …)` declarations.
-> - `lib/i/control.i`: `keep_env`.
+> - `stdlib/src/core.i`: export `portable` as an `@external("ilang:core", …)` declaration, like `not` and `hash`.
+> - `stdlib/src/key.i` (new): `new`, `wrap` and `unwrap` as `@external("ilang:core", …)` declarations.
+> - `stdlib/src/control.i`: `keep_env`.
 > - `crates/ilang-wasm/src/lower.rs`: add `portable` and the key functions to the `CORE` and `CORE_FUNCS` name tables near `:120` and `:130`; the `keep_env` op, which keeps the `$env` array as it is (part 4); bit 0 of field 1 for closures with patched captures (part 3.6). `captures_of` (`:389`) is the definition of captures; it does not change, and a comment points at §11.9.
 > - `crates/ilang-wasm/src/emit/mod.rs`: `closure()` writes the patch flag in field 1 and gives a patched closure's captures array its last element, the walk stamp (part 3.6). The `$clo{n}` types do not change.
 > - `crates/ilang-wasm/src/emit/control.rs`: `$keep_reenter` and the frame record of a kept function (part 4).
@@ -2867,7 +2867,7 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > - `crates/ilang-wasm/src/runtime/values.rs`: `$core_portable`, a walk with an explicit stack like `$value_compare_i32`, with the walk stamp of part 3.6 (one new token for each walk). It gives False at tags 10, 11 and 12 and at a host request, and walks field 5 of `$obj` (tuples, custom values, closure captures, records), `$cons` heads and tails, `Keyed` values, and kept services. The key functions.
 > - `crates/ilang-wasm/src/runtime/mod.rs`: the tag table (`:46`) gains a "portable" note, the patch flag, the key tag, and the planned `$clo` layout of part 3.4.
 > - `crates/ilang-check/tests/library.rs`: the core and control export lists.
-> - `lib/i/task.i`, `lib/i/random.i`: following part 18.
+> - `stdlib/src/task.i`, `stdlib/src/random.i`: following part 18.
 > - `docs/performance.md`: channel state kept until the channel's scope ends (part 7), the cost of `portable` checks (also on DAGs, part 3.6), pinned tasks under boundary services (part 4), the start-up conditions of part 3.5, and the distinction between portable IO wrappers and pinned arbitrary host references (part 12).
 
 - Reason: Adopt N9’s ordinary nominal Int wire values and explicit context, lease and cleanup ownership, preserving closed/busy and §10.3. Adopt N8’s one-lock backend while retaining the i scheduler, typed local storage and the accepted CML transaction semantics. Record adoption, concrete adversarial expectations and checking limits separately from implementation claims.
@@ -3634,8 +3634,8 @@ The coverage check reconstructs every quoted changed block from this ledger.
 > | Futures drop outside the slot lock; drop_all clears all outstanding work | crates/ilang-host/src/requests.rs:174–191 |
 > | Async abandonment marks instance unusable and drops requests; traps drop requests too | crates/ilang-host/src/lib.rs:1265–1285, :1372–1382 |
 > | Host run shutdown does not join detached blocking work | crates/ilang-host/src/run.rs:15–24, :28–68 |
-> | Current standard service only prints; resources here are still a design | crates/ilang-host/src/services.rs:44–70; lib/i/fs.i:1, lib/i/net.i:1, lib/i/process.i:1 |
-> | fail.map_error accepts a thunk then mapper, used by explicit wrappers | lib/i/fail.i:27–32 |
+> | Current standard service only prints; resources here are still a design | crates/ilang-host/src/services/mod.rs:44–70; stdlib/src/fs.i:1, stdlib/src/net.i:1, stdlib/src/process.i:1 |
+> | fail.map_error accepts a thunk then mapper, used by explicit wrappers | stdlib/src/fail.i:27–32 |
 >
 > Wasmtime 50 source was also read in the local registry at
 > `/home/agent/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wasmtime-50.0.0/`:
@@ -3730,8 +3730,8 @@ The coverage check reconstructs every quoted changed block from this ledger.
 >
 > | Stage | Files and regions anchored in the base |
 > |---|---|
-> | IO before Fs | General nominal field-privacy enforcement in crates/ilang-check/src/types/infer.rs:1538–1634 and tests; new ResourceContext/allocator/binding-plan modules beside crates/ilang-host/src/services.rs:44–70; context-aware registration adapters at lib.rs:552–582, options/instantiation grants at :611–634/:708–747; entry/trap/WaitGuard lifecycle at :803–834/:1265–1285/:1372–1382; cancellation slots at requests.rs:174–191 |
-> | IO i values | lib/i/{fs,net,process}.i:1 replaced by private nominal wrappers/raw Int services, wrapper guards and no number-injection exports; clock.i/stdio.i:1 and runtime §11's IO assignments |
+> | IO before Fs | General nominal field-privacy enforcement in crates/ilang-check/src/types/infer.rs:1538–1634 and tests; new ResourceContext/allocator/binding-plan modules beside crates/ilang-host/src/services/mod.rs:44–70; context-aware registration adapters at lib.rs:552–582, options/instantiation grants at :611–634/:708–747; entry/trap/WaitGuard lifecycle at :803–834/:1265–1285/:1372–1382; cancellation slots at requests.rs:174–191 |
+> | IO i values | stdlib/src/{fs,net,process}.i:1 replaced by private nominal wrappers/raw Int services, wrapper guards and no number-injection exports; clock.i/stdio.i:1 and runtime §11's IO assignments |
 > | IO trust plumbing | Compiler resolved declaration sites in lower.rs:971–1001 and import/metadata construction at :2649–2686; create a separate trusted binding plan before import coalescing, not self-authenticating ABI fields; JS loader binding at bindings/javascript/ilang.mjs:784–849 and teardown at :496–556/:881–925; new standard factories/tests |
 > | Native package | Factor host lib.rs:653–681 into compiler/runtime configurations; crates/ilang-host/Cargo.toml:17 feature split; crates/ilang-cli/src/lib.rs:89–115 build path and crates/ilang-cli/src/main.rs:44–51 target options; new runner/payload manifest and package tests |
 > | R2/MC | runtime §11 and multicore §14 regions: keep one Scheduler boundary and complete records now; add shared byte services/codec/claims/one-lock transactions only in MC; no direct cross-Store GC access |
@@ -5441,7 +5441,7 @@ New sentence(s)/block:
 > All observers and control Roots are bounded by structured waiter/driver lifetimes.
 > No new detached task, library-name privilege, host wire type or inference rule
 > is introduced. The helper uses existing resource.ensure (spec §9.5;
-> lib/i/resource.i:8–13); current host cancellation drops work outside its slot lock
+> stdlib/src/resource.i:8–13); current host cancellation drops work outside its slot lock
 > (crates/ilang-host/src/requests.rs:161–184). That code supports the intended
 > ownership seam but does not yet implement the proposed resource lease behavior.
 >
