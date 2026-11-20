@@ -127,7 +127,9 @@ values = <A>(options : List(Option(A))) -> List(A) {
 /// Keeps a `Some` only when its value passes the test.
 filter = <A, N>(option : Option(A), keeping : (A) <- N -> Bool) -> Option(A) {
 	option |>
-		(Some(value)) { keeping(value) |> (True()) { option } & (False()) { None() } }
+		(Some(value)) {
+			keeping(value) |> (True()) { option } & (False()) { None() }
+		}
 		& (None()) { None() }
 }
 

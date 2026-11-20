@@ -82,7 +82,9 @@ raw = <E, N>(cursor : Cursor(E, N)) -> (Option(Int), Cursor(E, N)) {
 		}
 		& ([]) {
 			stream.pull(source) |>
-				(stream.Done()) { (None(), Cursor([], stream.new(), line, column)) }
+				(stream.Done()) {
+					(None(), Cursor([], stream.new(), line, column))
+				}
 				& (stream.Next(chunk, tail)) {
 					raw(
 						Cursor(
@@ -321,13 +323,23 @@ row_stream = <E, N>(
 	width : Int
 ) -> stream.Stream(Result(ReadRow, CsvError), E, N) {
 	stream.make(() {
-		parsed = read_row(cursor, config, 0, [], [], False(), cursor_line(cursor))
+		parsed = read_row(
+			cursor,
+			config,
+			0,
+			[],
+			[],
+			False(),
+			cursor_line(cursor),
+		)
 		parsed |>
 			(Error(e)) { stream.Next(Error(e), stream.new()) }
 			& (Ok((None(), _))) { stream.Done() }
 			& (Ok((Some(ReadRow(row, startline)), tail))) {
 				n = list.length(row)
-				expected = { width == 0 } |> (True()) { n } & (False()) { width }
+				expected = { width == 0 } |>
+					(True()) { n }
+					& (False()) { width }
 				{ expected > 0 && n != expected } |>
 					(True()) {
 						stream.Next(

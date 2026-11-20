@@ -115,7 +115,9 @@ complete = <A, E>(d : Deferred(A, E), outcome : Result(A, E)) <- (
 poll = <A, E>(d : Deferred(A, E)) <- (own : task.Scheduler) -> Option(
 	Result(A, E),
 ) {
-	task.get(d.state) |> (Waiting()) { None() } & (Done(outcome)) { Some(outcome) }
+	task.get(d.state) |>
+		(Waiting()) { None() }
+		& (Done(outcome)) { Some(outcome) }
 }
 
 /// `True` once the deferred is completed. Needs `task.Scheduler`; raises

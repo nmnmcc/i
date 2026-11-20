@@ -578,7 +578,9 @@ portable = (value) {
 }
 
 contains = <A>(xs : List(A), value : A) -> Bool {
-	xs |> ([]) { False() } & ([x, ..rest]) { x == value || contains(rest, value) }
+	xs |>
+		([]) { False() }
+		& ([x, ..rest]) { x == value || contains(rest, value) }
 }
 
 append = <A>(xs : List(A), ys : List(A)) -> List(A) {
@@ -652,7 +654,9 @@ tree_balance = <A>(
 		}
 		& ((d, _, TaskNode(_, rid, rt, rl, rr)) ? d < -1) {
 			{ tree_height(rr) >= tree_height(rl) } |>
-				(True()) { tree_node(rid, rt, tree_node(id, task, left, rl), rr) }
+				(True()) {
+					tree_node(rid, rt, tree_node(id, task, left, rl), rr)
+				}
 				& (False()) {
 					rl |>
 						(TaskNode(_, mid, mt, ml, mr)) {
@@ -695,7 +699,13 @@ TaskPage(A) = (
 )
 
 empty_page = <A>() -> TaskPage(A) {
-	TaskPage(count = 0, p0 = Absent(), p1 = Absent(), p2 = Absent(), p3 = Absent())
+	TaskPage(
+		count = 0,
+		p0 = Absent(),
+		p1 = Absent(),
+		p2 = Absent(),
+		p3 = Absent(),
+	)
 }
 
 PageCache(A) = (id = Int, page = TaskPage(A), dirty = Bool)
@@ -1101,7 +1111,9 @@ record_task = (
 		(True()) { False() }
 		& (False()) {
 			previous.outcome |>
-				(Pending()) { t.outcome |> (Pending()) { False() } & (_) { True() } }
+				(Pending()) {
+					t.outcome |> (Pending()) { False() } & (_) { True() }
+				}
 				& (_) { False() }
 		}
 	next = State(
@@ -2923,7 +2935,10 @@ do_command = (
 				& (Failed(_, error)) {
 					scope.winner |>
 						(Absent()) {
-							(BodyError(), append(scope.errors, [(t.path, error)]))
+							(
+								BodyError(),
+								append(scope.errors, [(t.path, error)]),
+							)
 						}
 						& (Present(_)) { (BodyError(), scope.errors) }
 				}
@@ -3052,7 +3067,13 @@ do_command = (
 				),
 				ScopeState(..scope, owned_shares = [id, ..scope.owned_shares]),
 			)
-			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False())
+			reply(
+				next,
+				t.serial,
+				k,
+				Proceed(key.wrap(address_key, id)),
+				False(),
+			)
 		}
 		& (NewRef(value)) {
 			portable(value)
@@ -3078,7 +3099,13 @@ do_command = (
 						),
 					)
 				}
-			reply(next, t.serial, k, Proceed(key.wrap(address_key, id)), False())
+			reply(
+				next,
+				t.serial,
+				k,
+				Proceed(key.wrap(address_key, id)),
+				False(),
+			)
 		}
 		& (UpdateRef(_, id, change)) {
 			address = read(address_key, id)
@@ -4468,7 +4495,9 @@ deliver_deferred = (s : State, path : Int, command : Command) -> State {
 												), (row : Nest) {
 													row.active.abort |>
 														(Absent()) { True() }
-														& (Present(_)) { False() }
+														& (Present(_)) {
+															False()
+														}
 												})
 											} |>
 												(True()) { s }
@@ -4569,7 +4598,9 @@ empty_relay = (
 
 empty_active = Active(hops = [], abort = Absent(), relay = empty_relay)
 
-foreign_active = (t : TaskState) { t.foreign |> ([]) { False() } & (_) { True() } }
+foreign_active = (t : TaskState) {
+	t.foreign |> ([]) { False() } & (_) { True() }
+}
 
 frame_epoch = (frames : List(Frame)) -> Maybe(Cause) {
 	frames |> ([]) { Absent() } & ([f, .._]) { f.cause }
@@ -4612,7 +4643,9 @@ forward_response = (s : State, t : TaskState, notice : ForeignNotice) -> State {
 				_,
 			) | WaitingDrain(k)
 		) {
-			discard = t.driver |> (Absent()) { True() } & (Present(_)) { False() }
+			discard = t.driver |>
+				(Absent()) { True() }
+				& (Present(_)) { False() }
 			Runnable(k, ForwardStep(notice, unit(), discard, relay))
 		}
 		& (_) { t.status }
@@ -4680,7 +4713,10 @@ finish_scope = (
 			)
 			closed = ScopeState(..scope, mark = BodyCancelled())
 			cancel_scope(
-				set_scope(set_task(State(..s, current = Absent()), body), closed),
+				set_scope(
+					set_task(State(..s, current = Absent()), body),
+					closed,
+				),
 				id,
 			)
 		}

@@ -50,7 +50,9 @@ test("to_result_some_test", () {
 })
 
 test("to_result_none_test", () {
-	assert(option.to_result(None(), "possible_error") == Error("possible_error"))
+	assert(
+		option.to_result(None(), "possible_error") == Error("possible_error"),
+	)
 	()
 })
 

@@ -110,7 +110,9 @@ _days_in_month_result = (year : Int, month : Int) -> Result(
 	month |>
 		(1 | 3 | 5 | 7 | 8 | 10 | 12) { Ok(31) }
 		& (4 | 6 | 9 | 11) { Ok(30) }
-		& (2) { Ok({ is_leap_year(year) } |> (True()) { 29 } & (False()) { 28 }) }
+		& (2) {
+			Ok({ is_leap_year(year) } |> (True()) { 29 } & (False()) { 28 })
+		}
 		& (_) { Error(BadMonth()) }
 }
 
@@ -277,7 +279,9 @@ require_text = (valid : Bool) -> () {
 expect = (chars : List(Int), wanted : Int) -> List(Int) {
 	chars |>
 		([c, ..tail]) {
-			{ c == wanted } |> (True()) { tail } & (False()) { fail.raise(BadText()) }
+			{ c == wanted } |>
+				(True()) { tail }
+				& (False()) { fail.raise(BadText()) }
 		}
 		& ([]) { fail.raise(BadText()) }
 }
@@ -357,7 +361,9 @@ read_offset = (chars : List(Int)) -> Offset {
 			magnitude = h * 60 + m
 			require_text(sign != 45 || magnitude != 0)
 			Offset(
-				{ sign == 45 } |> (True()) { -magnitude } & (False()) { magnitude },
+				{ sign == 45 } |>
+					(True()) { -magnitude }
+					& (False()) { magnitude },
 			)
 		}
 		& ([]) { fail.raise(BadText()) }

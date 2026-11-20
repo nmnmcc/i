@@ -238,7 +238,9 @@ model = (
 							(
 								rest,
 								list.index_map(xs, (v, j) {
-									{ i == j } |> (True()) { x } & (False()) { v }
+									{ i == j } |>
+										(True()) { x }
+										& (False()) { v }
 								}),
 							)
 						}
@@ -489,7 +491,9 @@ test("sequence_independent_histories", () {
 		[(old, model), .._] = saved
 		(next, expected) = { x % 2 == 0 } |>
 			(True()) { (sequence.push_front(old, -x), [-x, ..model]) }
-			& (False()) { (sequence.push_back(old, x), list.append(model, [x])) }
+			& (False()) {
+				(sequence.push_back(old, x), list.append(model, [x]))
+			}
 		check(next, expected)
 		[(next, expected), ..saved]
 	})

@@ -131,7 +131,8 @@ test("lazy_break_tie_eq_eq_test", () {
 
 test("lazy_break_tie_gt_lazy_test", () {
 	assert(
-		order.lazy_break_tie(Greater(), () { panic("unreachable") }) == Greater(),
+		order.lazy_break_tie(Greater(), () { panic("unreachable") }) ==
+			Greater(),
 	)
 	()
 })

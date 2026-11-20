@@ -610,7 +610,11 @@ test("uri_rfc_resolution", () {
 test("uri_resolution_validation", () {
 	base = parse_good("x:a")
 	bad = Error(
-		uri.UriError(part = uri.PathPart(), offset = 0, problem = uri.BadPath()),
+		uri.UriError(
+			part = uri.PathPart(),
+			offset = 0,
+			problem = uri.BadPath(),
+		),
 	)
 	list.each(["/.//h", "/a/..//h", "/.//a:b", "x:/.//h"], (s) {
 		assert(
@@ -833,7 +837,11 @@ test("uri_generated_round_trips", () {
 	authorities = [
 		None(),
 		Some(
-			uri.Authority(userinfo = None(), host = uri.RegName(""), port = None()),
+			uri.Authority(
+				userinfo = None(),
+				host = uri.RegName(""),
+				port = None(),
+			),
 		),
 		Some(
 			uri.Authority(

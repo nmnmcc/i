@@ -122,7 +122,12 @@ pure = <A>(value : A) -> Parser(A) {
 
 flag = (names : Names, help : String) -> Parser(Bool) {
 	Parser([
-		Field(name = names.long, short = names.short, help = help, kind = Flag()),
+		Field(
+			name = names.long,
+			short = names.short,
+			help = help,
+			kind = Flag(),
+		),
 	], (buckets) {
 		buckets |>
 			([values, ..tail]) { Ok((values != [], tail)) }
@@ -337,7 +342,9 @@ valid_short = (name : String) -> Bool {
 		& (_) { False() }
 }
 
-positional = (kind : Kind) -> Bool { kind == Positional() || kind == Remaining() }
+positional = (kind : Kind) -> Bool {
+	kind == Positional() || kind == Remaining()
+}
 
 validate = (fields : List(Field)) -> Result((), DefinitionError) {
 	go = (
@@ -518,7 +525,9 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 			}
 			& ([raw, ..tail]) {
 				{ options && raw == "--" } |>
-					(True()) { go(tail, index + 1, False(), buckets, positions) }
+					(True()) {
+						go(tail, index + 1, False(), buckets, positions)
+					}
 					& (False()) {
 						{
 							options &&

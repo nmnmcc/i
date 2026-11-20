@@ -406,7 +406,9 @@ test("is_utf8_invalid_test", () {
 })
 
 test("base64_encode_padded_test", () {
-	assert(bit_array.base64_encode(<<255, 127, 254, 252>>, True()) == "/3/+/A==")
+	assert(
+		bit_array.base64_encode(<<255, 127, 254, 252>>, True()) == "/3/+/A==",
+	)
 	()
 })
 
@@ -460,7 +462,8 @@ test("base64_encode_unaligned_2_test", () {
 
 test("base64_encode_unaligned_3_test", () {
 	assert(
-		bit_array.base64_encode(<<0xFA, 0xBC, 0x6D, 1:u1>>, True()) == "+rxtgA==",
+		bit_array.base64_encode(<<0xFA, 0xBC, 0x6D, 1:u1>>, True()) ==
+			"+rxtgA==",
 	)
 	()
 })
@@ -505,14 +508,16 @@ test("base64_decode_invalid_padding_test", () {
 
 test("base64_url_encode_padded_test", () {
 	assert(
-		bit_array.base64_url_encode(<<255, 127, 254, 252>>, True()) == "_3_-_A==",
+		bit_array.base64_url_encode(<<255, 127, 254, 252>>, True()) ==
+			"_3_-_A==",
 	)
 	()
 })
 
 test("base64_url_encode_unpadded_test", () {
 	assert(
-		bit_array.base64_url_encode(<<255, 127, 254, 252>>, False()) == "_3_-_A",
+		bit_array.base64_url_encode(<<255, 127, 254, 252>>, False()) ==
+			"_3_-_A",
 	)
 	()
 })

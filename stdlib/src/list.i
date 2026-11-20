@@ -180,7 +180,9 @@ index_of = <A>(list : List(A), item : A) -> Option(Int) {
 		rest |>
 			([]) { None() }
 			& ([x, ..xs]) {
-				{ x == item } |> (True()) { Some(i) } & (False()) { go(xs, i + 1) }
+				{ x == item } |>
+					(True()) { Some(i) }
+					& (False()) { go(xs, i + 1) }
 			}
 	}
 	go(list, 0)
@@ -332,7 +334,9 @@ try_map = <A, B, F, N>(
 drop = <A>(from : List(A), up_to : Int) -> List(A) {
 	{ up_to <= 0 } |>
 		(True()) { from }
-		& (False()) { from |> ([]) { [] } & ([_, ..xs]) { drop(xs, up_to - 1) } }
+		& (False()) {
+			from |> ([]) { [] } & ([_, ..xs]) { drop(xs, up_to - 1) }
+		}
 }
 
 /// The first `up_to` elements. When the list is shorter, the whole list.
@@ -491,7 +495,9 @@ find = <A, N>(in : List(A), one_that : (A) <- N -> Bool) -> Option(A) {
 	in |>
 		([]) { None() }
 		& ([x, ..xs]) {
-			one_that(x) |> (True()) { Some(x) } & (False()) { find(xs, one_that) }
+			one_that(x) |>
+				(True()) { Some(x) }
+				& (False()) { find(xs, one_that) }
 		}
 }
 
@@ -513,7 +519,9 @@ all = <A, N>(in : List(A), satisfying : (A) <- N -> Bool) -> Bool {
 /// `True` when the function gives `True` for some element. It stops at the
 /// first `True`. `False` for the empty list.
 any = <A, N>(in : List(A), satisfying : (A) <- N -> Bool) -> Bool {
-	in |> ([]) { False() } & ([x, ..xs]) { satisfying(x) || any(xs, satisfying) }
+	in |>
+		([]) { False() }
+		& ([x, ..xs]) { satisfying(x) || any(xs, satisfying) }
 }
 
 /// Pairs of the elements of two lists at the same places. When one list is
@@ -674,7 +682,10 @@ flip = (dir : Direction) -> Direction {
 }
 
 merge_all = <A, N>(runs : List(List(A)), by : (A, A) <- N -> Order) -> List(A) {
-	runs |> ([]) { [] } & ([run]) { run } & (_) { rounds(runs, Ascending(), by) }
+	runs |>
+		([]) { [] }
+		& ([run]) { run }
+		& (_) { rounds(runs, Ascending(), by) }
 }
 
 rounds = <A, N>(
@@ -684,7 +695,9 @@ rounds = <A, N>(
 ) -> List(A) {
 	runs |>
 		([]) { [] }
-		& ([run]) { dir |> (Ascending()) { run } & (Descending()) { reverse(run) } }
+		& ([run]) {
+			dir |> (Ascending()) { run } & (Descending()) { reverse(run) }
+		}
 		& (_) { rounds(next_round(runs, dir, by, []), flip(dir), by) }
 }
 

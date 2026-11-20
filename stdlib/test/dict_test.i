@@ -710,7 +710,9 @@ Blue = ()
 Colour = Red | Green | Blue
 
 test("hash_collision_fold_green_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "green\n"))
@@ -718,7 +720,9 @@ test("hash_collision_fold_green_test", () {
 })
 
 test("hash_collision_fold_red_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "red\n"))
@@ -726,7 +730,9 @@ test("hash_collision_fold_red_test", () {
 })
 
 test("hash_collision_fold_blue_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "blue\n"))
@@ -734,7 +740,9 @@ test("hash_collision_fold_blue_test", () {
 })
 
 test("hash_collision_map_size_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	uppercase = dict.map_values(colours, (_colour, name) {
 		string.to_upper(name)
@@ -745,7 +753,9 @@ test("hash_collision_map_size_test", () {
 })
 
 test("hash_collision_map_red_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	uppercase = dict.map_values(colours, (_colour, name) {
 		string.to_upper(name)
@@ -756,7 +766,9 @@ test("hash_collision_map_red_test", () {
 })
 
 test("hash_collision_map_green_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	uppercase = dict.map_values(colours, (_colour, name) {
 		string.to_upper(name)
@@ -767,7 +779,9 @@ test("hash_collision_map_green_test", () {
 })
 
 test("hash_collision_map_blue_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	uppercase = dict.map_values(colours, (_colour, name) {
 		string.to_upper(name)
@@ -778,7 +792,9 @@ test("hash_collision_map_blue_test", () {
 })
 
 test("hash_collision_values_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	assert(
 		list.sort(dict.values(colours), string.compare) ==
@@ -788,7 +804,9 @@ test("hash_collision_values_test", () {
 })
 
 test("hash_collision_keys_test", () {
-	colours = dict.from_list([(Red(), "red"), (Green(), "green"), (Blue(), "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	assert(
 		{

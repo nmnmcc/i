@@ -247,8 +247,9 @@ fn grouped_negatives_supply_the_same_written_group_facts() {
 #[test]
 fn shared_list_items_need_coverage_but_an_option_parameter_keeps_literals() {
     // Shared places get whole scalars; a once-occurring Some(A) keeps literals.
-    let (ds, lines) =
-        check("(\n\t(Option, Some, None) = i/option\n)\nk = (Some(\"a\")) { 1 } & (None()) { 2 }\n");
+    let (ds, lines) = check(
+        "(\n\t(Option, Some, None) = i/option\n)\nk = (Some(\"a\")) { 1 } & (None()) { 2 }\n",
+    );
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
         lines.iter().any(|l| l.contains("Option(\"a\")")),

@@ -677,7 +677,9 @@ cut = (xs : List(Int), separator : Int) -> (List(Int), List(Int), Bool) {
 	go = (rest, acc) {
 		rest |>
 			([]) { (list.reverse(acc), [], False()) }
-			& ([x, ..tail] ? x == separator) { (list.reverse(acc), tail, True()) }
+			& ([x, ..tail] ? x == separator) {
+				(list.reverse(acc), tail, True())
+			}
 			& ([x, ..tail]) { go(tail, [x, ..acc]) }
 	}
 	go(xs, [])
@@ -968,7 +970,9 @@ connection_loop = (stream, handler, buffer) {
 		& (Error(NeedMore())) { More(buffer) }
 		& (Error(BadMessage(why))) { Invalid(why) }
 	progress |>
-		(Invalid(_)) { write_server_reply(stream, response(Status(400)), True()) }
+		(Invalid(_)) {
+			write_server_reply(stream, response(Status(400)), True())
+		}
 		& (More(_)) {
 			bytes = net.read(stream, 65536)
 			{ bit_array.bit_size(bytes) == 0 } |>

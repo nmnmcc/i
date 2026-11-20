@@ -628,6 +628,9 @@ fail = <A, E>(q : Queue(A, E), e : E) <- (own : task.Scheduler) -> () {
 /// Example: after offering 1 and queue.shutdown(q), queue.take(q) == None.
 shutdown = <A, E>(q : Queue(A, E)) <- (own : task.Scheduler) -> () {
 	task.update(q.state, (state : QueueState(A, E)) {
-		(QueueState(..state, buffer = sequence.new(), terminal = Shutdown()), ())
+		(
+			QueueState(..state, buffer = sequence.new(), terminal = Shutdown()),
+			(),
+		)
 	})
 }

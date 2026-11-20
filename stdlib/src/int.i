@@ -155,10 +155,14 @@ abs = (x : Int) -> Int { { x < 0 } |> (True()) { -x } & (False()) { x } }
 negate = (x : Int) -> Int { -x }
 
 /// The smaller of two numbers.
-min = (a : Int, b : Int) -> Int { { a < b } |> (True()) { a } & (False()) { b } }
+min = (a : Int, b : Int) -> Int {
+	{ a < b } |> (True()) { a } & (False()) { b }
+}
 
 /// The greater of two numbers.
-max = (a : Int, b : Int) -> Int { { a > b } |> (True()) { a } & (False()) { b } }
+max = (a : Int, b : Int) -> Int {
+	{ a > b } |> (True()) { a } & (False()) { b }
+}
 
 /// The number, but not less than `min` and not greater than `max`. When
 /// `min` is greater than `max`, the two bounds are swapped.
@@ -183,7 +187,9 @@ clamp = (x : Int, min : Int, max : Int) -> Int {
 compare = (a : Int, with : Int) -> Order {
 	{ a == with } |>
 		(True()) { Equal() }
-		& (False()) { { a < with } |> (True()) { Less() } & (False()) { Greater() } }
+		& (False()) {
+			{ a < with } |> (True()) { Less() } & (False()) { Greater() }
+		}
 }
 
 /// `True` when the number is a multiple of 2.
@@ -193,7 +199,9 @@ is_even = (x : Int) -> Bool { x % 2 == 0 }
 is_odd = (x : Int) -> Bool { x % 2 != 0 }
 
 _power_result = (base : Int, of : Int) -> Result(Int, ()) {
-	{ of < 0 } |> (True()) { Error(()) } & (False()) { Ok(int_power(base, of, 1)) }
+	{ of < 0 } |>
+		(True()) { Error(()) }
+		& (False()) { Ok(int_power(base, of, 1)) }
 }
 
 int_power = (base : Int, exponent : Int, acc : Int) -> Int {
@@ -324,7 +332,9 @@ range = <Acc, N>(
 ) -> Acc {
 	step = { from <= to } |> (True()) { 1 } & (False()) { -1 }
 	go = (i, acc) {
-		{ i == to } |> (True()) { acc } & (False()) { go(i + step, run(acc, i)) }
+		{ i == to } |>
+			(True()) { acc }
+			& (False()) { go(i + step, run(acc, i)) }
 	}
 	go(from, with)
 }

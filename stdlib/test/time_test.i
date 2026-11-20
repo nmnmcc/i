@@ -171,7 +171,8 @@ test("time_instants", () {
 		time.compare_instants(epoch, time.from_unix_nanoseconds(0)) == Equal(),
 	)
 	assert(
-		time.compare_instants(time.from_unix_nanoseconds(1), epoch) == Greater(),
+		time.compare_instants(time.from_unix_nanoseconds(1), epoch) ==
+			Greater(),
 	)
 	()
 })

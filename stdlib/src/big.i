@@ -83,7 +83,9 @@ compare = (a : Int, b : Int) -> Int {
 	{ sa == sb } |>
 		(False()) { { sa < sb } |> (True()) { -1 } & (False()) { 1 } }
 		& (True()) {
-			{ sa == 0 } |> (True()) { 0 } & (False()) { sa * magnitude_order(a, b) }
+			{ sa == 0 } |>
+				(True()) { 0 }
+				& (False()) { sa * magnitude_order(a, b) }
 		}
 }
 
@@ -121,7 +123,9 @@ order_from = (a : Int, b : Int, i : Int) -> Int {
 											x3 = limb(a, i - 3)
 											y3 = limb(b, i - 3)
 											{ x3 == y3 } |>
-												(False()) { digit_order(x3, y3) }
+												(False()) {
+													digit_order(x3, y3)
+												}
 												& (True()) {
 													order_from(a, b, i - 4)
 												}
@@ -148,7 +152,9 @@ signed_add = (a : Int, sa : Int, b : Int, sb : Int) -> Int {
 		(True()) { a }
 		& (False()) {
 			{ sa == 0 } |>
-				(True()) { { sb == sign(b) } |> (True()) { b } & (False()) { -b } }
+				(True()) {
+					{ sb == sign(b) } |> (True()) { b } & (False()) { -b }
+				}
 				& (False()) {
 					{ sa == sb } |>
 						(True()) {
@@ -537,9 +543,13 @@ column = (
 		}
 }
 
-max = (a : Int, b : Int) -> Int { { a > b } |> (True()) { a } & (False()) { b } }
+max = (a : Int, b : Int) -> Int {
+	{ a > b } |> (True()) { a } & (False()) { b }
+}
 
-min = (a : Int, b : Int) -> Int { { a < b } |> (True()) { a } & (False()) { b } }
+min = (a : Int, b : Int) -> Int {
+	{ a < b } |> (True()) { a } & (False()) { b }
+}
 
 /// `a / b`, rounded toward zero; 0 when `b` is 0.
 divide = (a : Int, b : Int) -> Int {

@@ -30,7 +30,10 @@ Order = Less | Equal | Greater
 /// order.negate(Less)  // Greater
 /// ```
 negate = (order : Order) -> Order {
-	order |> (Less()) { Greater() } & (Equal()) { Equal() } & (Greater()) { Less() }
+	order |>
+		(Less()) { Greater() }
+		& (Equal()) { Equal() }
+		& (Greater()) { Less() }
 }
 
 /// Gives a compare function that orders values the other way round.
@@ -53,7 +56,9 @@ compare = (a : Order, with : Order) -> Order {
 	y = to_int(with)
 	{ x == y } |>
 		(True()) { Equal() }
-		& (False()) { { x < y } |> (True()) { Less() } & (False()) { Greater() } }
+		& (False()) {
+			{ x < y } |> (True()) { Less() } & (False()) { Greater() }
+		}
 }
 
 /// The greater of two orders, with `Less < Equal < Greater`.

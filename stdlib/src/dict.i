@@ -93,7 +93,9 @@ find = <K, V>(node : Node(K, V), hash : Int, key : K, depth : Int) -> Option(
 	node |>
 		(Empty()) { None() }
 		& (One(h, k, v)) {
-			{ h == hash && k == key } |> (True()) { Some(v) } & (False()) { None() }
+			{ h == hash && k == key } |>
+				(True()) { Some(v) }
+				& (False()) { None() }
 		}
 		& (Many(h, entries)) {
 			{ h == hash } |>
@@ -152,7 +154,9 @@ put = <K, V>(
 				(True()) {
 					{ k == key } |>
 						(True()) { (One(hash, key, value), False()) }
-						& (False()) { (Many(hash, [(k, v), (key, value)]), True()) }
+						& (False()) {
+							(Many(hash, [(k, v), (key, value)]), True())
+						}
 				}
 				& (False()) {
 					(join(depth, node, h, One(hash, key, value), hash), True())
@@ -199,7 +203,9 @@ put_entry = <K, V>(
 		([]) { (reverse_onto(before, [(key, value)]), True()) }
 		& ([(k, v), ..rest]) {
 			{ k == key } |>
-				(True()) { (reverse_onto(before, [(key, value), ..rest]), False()) }
+				(True()) {
+					(reverse_onto(before, [(key, value), ..rest]), False())
+				}
 				& (False()) { put_entry(rest, key, value, [(k, v), ..before]) }
 		}
 }
@@ -295,7 +301,12 @@ shrink = <K, V>(node : Node(K, V)) -> Node(K, V) {
 				x,
 				Empty(),
 				Empty(),
-			) | Branch(Empty(), Empty(), x, Empty()) | Branch(Empty(), Empty(), Empty(), x)
+			) | Branch(Empty(), Empty(), x, Empty()) | Branch(
+				Empty(),
+				Empty(),
+				Empty(),
+				x,
+			)
 		) { x |> (Branch(..)) { node } & (_) { x } }
 		& (_) { node }
 }
@@ -554,7 +565,12 @@ group = <V, K, N>(list : List(V), by : (V) <- N -> K) -> Dict(K, List(V)) {
 same_entries = <K, V>(first : Dict(K, V), second : Dict(K, V)) -> Bool {
 	size(first) == size(second) &&
 		fold(first, True(), (ok, k, v) {
-			ok && { get(second, k) |> (Some(w)) { w == v } & (None()) { False() } }
+			ok &&
+				{
+					get(second, k) |>
+						(Some(w)) { w == v }
+						& (None()) { False() }
+				}
 		})
 }
 

@@ -66,10 +66,10 @@ main = () {
 				{
 					log.write(
 						log.Entry(
-							level = log.Info,
+							level = log.Info(),
 							message = "greeting",
 							fields = [("name", opts.name)],
-							at = None,
+							at = None(),
 						),
 					)
 					greet(opts.name, opts.count)

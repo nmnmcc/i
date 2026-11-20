@@ -447,7 +447,8 @@ test("print_crlf", () {
 
 test("print_custom_delimiter", () {
 	assert(
-		csv.print_with([["a;b", "c"]], config(";", 0, False())) == "\"a;b\";c\n",
+		csv.print_with([["a;b", "c"]], config(";", 0, False())) ==
+			"\"a;b\";c\n",
 	)
 	()
 })

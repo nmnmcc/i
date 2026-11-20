@@ -170,7 +170,9 @@ binary = (n : Int, bits : List(Int), length : Int) -> (List(Int), Int) {
 }
 
 zeros = (h : State, count : Int) -> State {
-	{ count == 0 } |> (True()) { h } & (False()) { zeros(edge(h, 0), count - 1) }
+	{ count == 0 } |>
+		(True()) { h }
+		& (False()) { zeros(edge(h, 0), count - 1) }
 }
 
 follow = (h : State, bits : List(Int)) -> State {

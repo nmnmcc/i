@@ -24,7 +24,9 @@ must = <A, N>(make : () <- (Fail(queue.QueueError), ..N) -> A) <- (
 
 closed = <A, N>(body : () <- (Fail(queue.QueueError), ..N) -> A) <- (
 	..env : N,
-) -> Bool { fail.catch(body) |> (Error(queue.Closed())) { True() } & (_) { False() } }
+) -> Bool {
+	fail.catch(body) |> (Error(queue.Closed())) { True() } & (_) { False() }
+}
 
 test("queue_fifo_offer_then_take_test", () {
 	got = in_queue_scope((_) {
@@ -298,7 +300,19 @@ test("queue_shutdown_discards_and_wakes_waiters_test", () {
 			queue.size(full),
 		)
 	})
-	assert(got == (0, Ok(None()), Ok(None()), True(), Ok(None()), Ok(None()), True(), 0))
+	assert(
+		got ==
+			(
+				0,
+				Ok(None()),
+				Ok(None()),
+				True(),
+				Ok(None()),
+				Ok(None()),
+				True(),
+				0,
+			),
+	)
 	()
 })
 

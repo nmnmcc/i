@@ -289,7 +289,12 @@ test("log_format", () {
 	)
 	assert(
 		log.format(
-			log.Entry(level = log.Info(), message = "", fields = [], at = None()),
+			log.Entry(
+				level = log.Info(),
+				message = "",
+				fields = [],
+				at = None(),
+			),
 		) ==
 			"info \"\"",
 	)
@@ -318,7 +323,9 @@ gate_run = <N>(body : () <- N -> ()) { body() }
 
 test("gate_annotated_write", () {
 	{
-		assert(fail.catch(() { gate_write(entry(log.Info())) }) == Error("hello"))
+		assert(
+			fail.catch(() { gate_write(entry(log.Info())) }) == Error("hello"),
+		)
 		()
 	} <- (
 		GateSink(
@@ -335,7 +342,9 @@ test("gate_annotated_service", () {
 
 test("gate_generic_write", () {
 	{
-		assert(fail.catch(() { log.write(entry(log.Info())) }) == Error("hello"))
+		assert(
+			fail.catch(() { log.write(entry(log.Info())) }) == Error("hello"),
+		)
 		()
 	} <- (log.make((_ : log.Level) { True() }, (e) { fail.raise(e.message) }))
 })

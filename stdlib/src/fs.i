@@ -200,7 +200,10 @@ read_file = (path) {
 
 write_file = (path, bytes) {
 	resource.scoped(() {
-		f = resource.acquire(() { open(path, WriteTruncate()) }, (f) { close(f) })
+		f = resource.acquire(
+			() { open(path, WriteTruncate()) },
+			(f) { close(f) },
+		)
 		write(f, bytes)
 	})
 }
@@ -214,7 +217,9 @@ line_parts = (text : String, start : Int) -> List(String) {
 			done = start == core.byte_size(text)
 			done |>
 				(True()) { [] }
-				& (False()) { [slice(text, start, core.byte_size(text) - start)] }
+				& (False()) {
+					[slice(text, start, core.byte_size(text) - start)]
+				}
 		}
 }
 

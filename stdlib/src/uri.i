@@ -114,7 +114,9 @@ _parse_result = (text : String) -> Result(Uri, UriError) {
 				(a, path_tail, slash) = cut(xs, 47)
 				astart = start + 2
 				(value, offsets) = read_authority(a, astart)
-				path = slash |> (True()) { [47, ..path_tail] } & (False()) { [] }
+				path = slash |>
+					(True()) { [47, ..path_tail] }
+					& (False()) { [] }
 				(Some(value), path, astart + list.length(a), offsets)
 			}
 			& (_) { (None(), rest, start, []) }
@@ -201,7 +203,11 @@ _resolve_result = (base : Uri, reference : Uri) -> Result(Uri, UriError) {
 	b.scheme |>
 		(None()) {
 			Error(
-				UriError(part = WholePart(), offset = 0, problem = RelativeBase()),
+				UriError(
+					part = WholePart(),
+					offset = 0,
+					problem = RelativeBase(),
+				),
 			)
 		}
 		& (Some(_)) {
@@ -363,12 +369,19 @@ validate = (p : Parts, parsing : Bool) -> () {
 	p.authority |>
 		(None()) { () }
 		& (Some(a)) {
-			grammar_option(a.userinfo, UserInfoPart(), BadAuthority(), user_char)
+			grammar_option(
+				a.userinfo,
+				UserInfoPart(),
+				BadAuthority(),
+				user_char,
+			)
 			a.host |>
 				(RegName(h)) {
 					grammar(bytes(h), HostPart(), BadHost(), reg_char, 0)
 				}
-				& (IpLiteral(h)) { require(valid_ip(h), HostPart(), 0, BadHost()) }
+				& (IpLiteral(h)) {
+					require(valid_ip(h), HostPart(), 0, BadHost())
+				}
 			grammar_option(a.port, PortPart(), BadPort(), digit)
 		}
 	parsing |> (True()) { path_constraints(p) } & (False()) { () }
@@ -499,7 +512,9 @@ read_authority = (raw : List(Int), start : Int) -> (
 		& (False()) { (None(), raw, start) }
 	// Structure selects the components; userinfo grammar precedes host grammar.
 	fail.map_error(
-		() { grammar_option(userinfo, UserInfoPart(), BadAuthority(), user_char) },
+		() {
+			grammar_option(userinfo, UserInfoPart(), BadAuthority(), user_char)
+		},
 		(e : UriError) {
 			UriError(
 				part = e.part,
@@ -547,7 +562,11 @@ read_authority = (raw : List(Int), start : Int) -> (
 		}
 	(
 		Authority(userinfo = userinfo, host = host, port = port),
-		[(UserInfoPart(), start), (HostPart(), host_start), (PortPart(), port_start)],
+		[
+			(UserInfoPart(), start),
+			(HostPart(), host_start),
+			(PortPart(), port_start),
+		],
 	)
 }
 
@@ -696,7 +715,9 @@ cut = (xs : List(Int), delimiter : Int) -> (List(Int), List(Int), Bool) {
 	go = (rest, acc) {
 		rest |>
 			([]) { (list.reverse(acc), [], False()) }
-			& ([x, ..tail] ? x == delimiter) { (list.reverse(acc), tail, True()) }
+			& ([x, ..tail] ? x == delimiter) {
+				(list.reverse(acc), tail, True())
+			}
 			& ([x, ..tail]) { go(tail, [x, ..acc]) }
 	}
 	go(xs, [])

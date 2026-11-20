@@ -39,7 +39,9 @@ _to_string_result = (bits : BitArray) -> Result(String, ()) {
 
 /// `True` when the bits are whole bytes of correct UTF-8.
 is_utf8 = (bits : BitArray) -> Bool {
-	core.bit_array_to_string(bits) |> (Ok(_)) { True() } & (Error(_)) { False() }
+	core.bit_array_to_string(bits) |>
+		(Ok(_)) { True() }
+		& (Error(_)) { False() }
 }
 
 /// The number of bits.
@@ -132,7 +134,9 @@ compare = (a : BitArray, with : BitArray) -> Order {
 int_order = (a : Int, b : Int) -> Order {
 	{ a == b } |>
 		(True()) { Equal() }
-		& (False()) { { a < b } |> (True()) { Less() } & (False()) { Greater() } }
+		& (False()) {
+			{ a < b } |> (True()) { Less() } & (False()) { Greater() }
+		}
 }
 
 /// The text form of the bit array.

@@ -63,7 +63,9 @@ value = (input : List(Int), offset : Int) -> (Json, List(Int), Int) {
 	xs |>
 		([110, 117, 108, 108, ..rest]) { (Null(), rest, at + 4) }
 		& ([116, 114, 117, 101, ..rest]) { (Boolean(True()), rest, at + 4) }
-		& ([102, 97, 108, 115, 101, ..rest]) { (Boolean(False()), rest, at + 5) }
+		& ([102, 97, 108, 115, 101, ..rest]) {
+			(Boolean(False()), rest, at + 5)
+		}
 		& ([34, ..rest]) {
 			(s, tail, end) = read_string(rest, at + 1, [])
 			(Text(s), tail, end)
@@ -495,7 +497,9 @@ render = (
 					string.concat(
 						[
 							quote(k),
-							{ formatted } |> (True()) { ": " } & (False()) { ":" },
+							{ formatted } |>
+								(True()) { ": " }
+								& (False()) { ":" },
 							render(v, indent, depth + 1, formatted),
 						],
 					)

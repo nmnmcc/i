@@ -215,7 +215,10 @@ close = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.close(number))
 }
 
-stdio_mode = (Inherit()) { "inherit" } & (Null()) { "null" } & (Piped()) { "piped" }
+stdio_mode =
+	(Inherit()) { "inherit" }
+	& (Null()) { "null" }
+	& (Piped()) { "piped" }
 
 spawn_piped = (program, values, input, output, errors) <- (raw : Process) {
 	r = raw.spawn_piped(

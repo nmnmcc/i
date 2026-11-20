@@ -163,7 +163,9 @@ fraction = (
 			exponent(after, 0, 0, limit) |>
 				(Error(_)) { Error(()) }
 				& (Ok(e)) {
-					signed = exponent_negative |> (True()) { -e } & (False()) { e }
+					signed = exponent_negative |>
+						(True()) { -e }
+						& (False()) { e }
 					decimal(negative, coefficient, significant, signed - digits)
 				}
 		}
@@ -172,7 +174,9 @@ fraction = (
 
 // The number of significant digits, not counting zeros at the start.
 count_significant = (previous : Int, digit : Int) -> Int {
-	{ previous == 0 && digit == 0 } |> (True()) { 0 } & (False()) { previous + 1 }
+	{ previous == 0 && digit == 0 } |>
+		(True()) { 0 }
+		& (False()) { previous + 1 }
 }
 
 // When an exponent is greater than any digits could make up for, its exact
@@ -345,7 +349,9 @@ int_power = (base : Int, e : Int) -> Int {
 compare = (a : Float, with : Float) -> Order {
 	{ a == with } |>
 		(True()) { Equal() }
-		& (False()) { { a <. with } |> (True()) { Less() } & (False()) { Greater() } }
+		& (False()) {
+			{ a <. with } |> (True()) { Less() } & (False()) { Greater() }
+		}
 }
 
 /// Compares two Floats, and gives `Equal` when they are no more than
@@ -390,7 +396,9 @@ clamp = (x : Float, min : Float, max : Float) -> Float {
 }
 
 /// The Float without its sign.
-abs = (x : Float) -> Float { { x <. 0.0 } |> (True()) { -.x } & (False()) { x } }
+abs = (x : Float) -> Float {
+	{ x <. 0.0 } |> (True()) { -.x } & (False()) { x }
+}
 
 /// The Float with the other sign.
 negate = (x : Float) -> Float { -.x }
@@ -462,7 +470,9 @@ _power_result = (base : Float, of : Int) -> Result(Float, ()) {
 				}
 			{ base == -.1.0 } |>
 				(True()) {
-					{ e % 2 == 0 } |> (True()) { Ok(1.0) } & (False()) { Ok(-.1.0) }
+					{ e % 2 == 0 } |>
+						(True()) { Ok(1.0) }
+						& (False()) { Ok(-.1.0) }
 				}
 				& (False()) { pow(base, core.to_float(e)) }
 		}
@@ -1296,7 +1306,9 @@ trig_reduce = (x : Float) -> (Int, Float, Float) {
 		& (False()) { fm / int_power(2, -shift) }
 	tail = magnitude - represented
 	tail_negative = tail < 0
-	tail_magnitude = { tail_negative } |> (True()) { -tail } & (False()) { tail }
+	tail_magnitude = { tail_negative } |>
+		(True()) { -tail }
+		& (False()) { tail }
 	ft = { tail_magnitude == 0 } |>
 		(True()) { 0.0 }
 		& (False()) {

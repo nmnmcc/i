@@ -145,7 +145,8 @@ fn corpus() -> Vec<Case> {
         cases.push(float_case(source, x, expected));
     }
     cases.push(Case {
-        body: "{ a = { x <. 0.0 } |> (True()) { x } & (False()) { \"s\" }\ncore.inspect(a) }".into(),
+        body: "{ a = { x <. 0.0 } |> (True()) { x } & (False()) { \"s\" }\ncore.inspect(a) }"
+            .into(),
         input: Value::Float(1.0),
         expected: "\"s\"".into(),
         stop: false,

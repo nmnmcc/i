@@ -79,7 +79,8 @@ test("integer_rules", () {
 			Error(property.InvalidRange(3, 2)),
 	)
 	assert(
-		fail.catch(() { property.element([]) }) == Error(property.EmptyChoice()),
+		fail.catch(() { property.element([]) }) ==
+			Error(property.EmptyChoice()),
 	)
 	assert(
 		{
@@ -294,7 +295,8 @@ test("greedy_path_budget_and_replay", () {
 	assert(property.replay(gen, 0, 0, 0, [-1]) == None())
 	assert(property.replay(gen, 0, 0, 0, [99]) == None())
 	assert(
-		property.replay(property.make((_, _) { None() }), 0, 0, 0, []) == None(),
+		property.replay(property.make((_, _) { None() }), 0, 0, 0, []) ==
+			None(),
 	)
 })
 
@@ -502,7 +504,9 @@ test("list_order_and_generated_bounds", () {
 		assert(list.all(t.value, (x) { x >= -3 && x <= 3 }))
 		{ depth == 0 } |>
 			(True()) { () }
-			& (False()) { list.each(t.children(), (c) { ensure(c, depth - 1) }) }
+			& (False()) {
+				list.each(t.children(), (c) { ensure(c, depth - 1) })
+			}
 	}
 	list.each(list.range(0, 19), (seed) { ensure(root(lists, 5, seed), 3) })
 	assert(

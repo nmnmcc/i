@@ -28,7 +28,10 @@ user_schema = () {
 	role = schema.tagged_union(
 		"kind",
 		[
-			("admin", schema.map(schema.object(()), (_) { Admin() }, (_) { () })),
+			(
+				"admin",
+				schema.map(schema.object(()), (_) { Admin() }, (_) { () }),
+			),
 			(
 				"member",
 				schema.map(schema.object(()), (_) { Member() }, (_) { () }),

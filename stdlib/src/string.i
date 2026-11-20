@@ -200,7 +200,9 @@ split_once = (string : String, on : String) -> Option((String, String)) {
 /// ```
 lines = (string : String) -> List(String) {
 	list.map(split(string, "\n"), (line) {
-		ends_with(line, "\r") |> (True()) { drop_end(line, 1) } & (False()) { line }
+		ends_with(line, "\r") |>
+			(True()) { drop_end(line, 1) }
+			& (False()) { line }
 	})
 }
 
@@ -257,7 +259,9 @@ ends_with = (string : String, suffix : String) -> Bool {
 /// string.contains("theory", "ory")  // True
 /// ```
 contains = (does : String, contain : String) -> Bool {
-	core.index_of(does, contain, 0) |> (Ok(_)) { True() } & (Error(_)) { False() }
+	core.index_of(does, contain, 0) |>
+		(Ok(_)) { True() }
+		& (Error(_)) { False() }
 }
 
 /// Puts `with` in the place of every `each` in the string. When `each` is
@@ -500,7 +504,9 @@ compare_bytes = (a : BitArray, b : BitArray) -> Order {
 		((<<x, xs:bytes>>, <<y, ys:bytes>>)) {
 			{ x == y } |>
 				(True()) { compare_bytes(xs, ys) }
-				& (False()) { { x < y } |> (True()) { Less() } & (False()) { Greater() } }
+				& (False()) {
+					{ x < y } |> (True()) { Less() } & (False()) { Greater() }
+				}
 		}
 		& ((<<>>, <<>>)) { Equal() }
 		& ((<<>>, _)) { Less() }
@@ -524,7 +530,9 @@ to_option = (string : String) -> Option(String) {
 /// outside the string, including very negative ones, give None.
 at = (string : String, index : Int) -> Option(String) {
 	cs = core.codepoints(string)
-	i = { index < 0 } |> (True()) { list.length(cs) + index } & (False()) { index }
+	i = { index < 0 } |>
+		(True()) { list.length(cs) + index }
+		& (False()) { index }
 	list.at(cs, i) |>
 		(None()) { None() }
 		& (Some(c)) { Some(core.from_codepoints([c])) }
@@ -588,7 +596,12 @@ search_scalars = (
 /// Least full starting scalar index >= from; bounds must be in [0,length].
 /// Empty find matches from. Overlaps are eligible.
 index_of = (string : String, find : String, from : Int) -> Option(Int) {
-	search_scalars(core.codepoints(string), core.codepoints(find), from, False())
+	search_scalars(
+		core.codepoints(string),
+		core.codepoints(find),
+		from,
+		False(),
+	)
 }
 
 /// Greatest full starting scalar index <= from; the match may end after from.

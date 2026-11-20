@@ -208,7 +208,9 @@ hex_escape = (p : Parser, kind : Int) -> (Class, Parser) {
 		& (False()) {
 			{ kind == 120 } |>
 				(True()) { hex_digits(p, 2, 0, False(), False()) }
-				& (False()) { syntax_error(p, "Unicode escape requires braces") }
+				& (False()) {
+					syntax_error(p, "Unicode escape requires braces")
+				}
 		}
 }
 
@@ -282,7 +284,9 @@ finish_group = (p : Parser, outer : Flags, id : Int) -> (Ast, Parser) {
 	{ peek(tail) == 41 } |>
 		(False()) { syntax_error(tail, "unclosed group") }
 		& (True()) {
-			a = { id < 0 } |> (True()) { body } & (False()) { Capture(id, body) }
+			a = { id < 0 } |>
+				(True()) { body }
+				& (False()) { Capture(id, body) }
 			(a, Parser(..bump(tail), flags = outer))
 		}
 }
@@ -503,7 +507,9 @@ at_least_code = (body : Ast, low : Int, lazy : Bool, next : Int, b : Build) -> (
 ) {
 	loop = b.size
 	(child, end) = lower(body, loop, Build(code = b.code, size = b.size + 1))
-	fork = lazy |> (True()) { Fork(next, child) } & (False()) { Fork(child, next) }
+	fork = lazy |>
+		(True()) { Fork(next, child) }
+		& (False()) { Fork(child, next) }
 	tail = Build(..end, code = dict.insert(end.code, loop, fork))
 	{ low > 0 } |>
 		(True()) { required_code(body, low - 1, child, tail) }
@@ -656,7 +662,9 @@ byte_width = (c : Int) -> Int {
 		& (False()) {
 			{ c < 2048 } |>
 				(True()) { 2 }
-				& (False()) { { c < 65536 } |> (True()) { 3 } & (False()) { 4 } }
+				& (False()) {
+					{ c < 65536 } |> (True()) { 3 } & (False()) { 4 }
+				}
 		}
 }
 
@@ -751,7 +759,9 @@ closure = (
 										acc,
 									)
 								}
-								& (False()) { closure(re, rest, i, visited, acc) }
+								& (False()) {
+									closure(re, rest, i, visited, acc)
+								}
 						}
 						& (_) { closure(re, rest, i, visited, [thread, ..acc]) }
 				}
@@ -898,7 +908,9 @@ scan_all = (
 				(True()) {
 					at_end(end) |>
 						(True()) { list.reverse(acc) }
-						& (False()) { scan_all(re, advance(end), last_end, acc) }
+						& (False()) {
+							scan_all(re, advance(end), last_end, acc)
+						}
 				}
 				& (False()) {
 					empty |>
@@ -965,7 +977,9 @@ expand_replacement = (
 		& ([36, 36, ..tail]) { expand_replacement(tail, c, ["$", ..acc]) }
 		& ([36, ..tail]) {
 			braced = tail |> ([123, .._]) { True() } & (_) { False() }
-			start = braced |> (True()) { list.drop(tail, 1) } & (False()) { tail }
+			start = braced |>
+				(True()) { list.drop(tail, 1) }
+				& (False()) { tail }
 			(name, end, closed) = replacement_name(start, braced, [])
 			{ name != "" && closed } |>
 				(True()) {

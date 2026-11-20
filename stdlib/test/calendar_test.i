@@ -43,7 +43,8 @@ test("calendar_validation", () {
 		assert(calendar.is_leap_year(year) == expected)
 	})
 	assert(
-		fail.catch(() { calendar.date(1900, 2, 29) }) == Error(calendar.BadDay()),
+		fail.catch(() { calendar.date(1900, 2, 29) }) ==
+			Error(calendar.BadDay()),
 	)
 	assert(
 		fail.catch(() { calendar.date(2000, 2, 29) }) ==
@@ -58,10 +59,12 @@ test("calendar_validation", () {
 			Error(calendar.BadMonth()),
 	)
 	assert(
-		fail.catch(() { calendar.date(2024, 1, 0) }) == Error(calendar.BadDay()),
+		fail.catch(() { calendar.date(2024, 1, 0) }) ==
+			Error(calendar.BadDay()),
 	)
 	assert(
-		fail.catch(() { calendar.date(2024, 4, 31) }) == Error(calendar.BadDay()),
+		fail.catch(() { calendar.date(2024, 4, 31) }) ==
+			Error(calendar.BadDay()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(24, 0, 0, 0) }) ==
@@ -104,7 +107,8 @@ test("calendar_validation", () {
 	)
 	list.each([-1440, 1440], (n) {
 		assert(
-			fail.catch(() { calendar.offset(n) }) == Error(calendar.BadOffset()),
+			fail.catch(() { calendar.offset(n) }) ==
+				Error(calendar.BadOffset()),
 		)
 	})
 	list.each([-1439, 0, 1439], (n) {
@@ -376,7 +380,8 @@ test("calendar_text", () {
 	]
 	list.each(invalid, (text) {
 		assert(
-			fail.catch(() { calendar.parse(text) }) == Error(calendar.BadText()),
+			fail.catch(() { calendar.parse(text) }) ==
+				Error(calendar.BadText()),
 		)
 	})
 	()

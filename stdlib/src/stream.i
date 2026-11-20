@@ -57,7 +57,9 @@ wrap = <A, N>(item : A) -> Stream(A, Never, N) {
 
 /// Builds one cell per pull, without walking the list at construction.
 from_list = <A, N>(items : List(A)) -> Stream(A, Never, N) {
-	make(() { items |> ([]) { Done() } & ([x, ..xs]) { Next(x, from_list(xs)) } })
+	make(() {
+		items |> ([]) { Done() } & ([x, ..xs]) { Next(x, from_list(xs)) }
+	})
 }
 
 /// Stores a step without calling it. The private marker makes N invariant.

@@ -27,7 +27,9 @@ broken = () -> stream.Stream(Int, String, Never) {
 }
 
 head = <A, E, N>(s : stream.Stream(A, E, N)) -> option.Option(A) {
-	stream.pull(s) |> (stream.Done()) { None() } & (stream.Next(x, _)) { Some(x) }
+	stream.pull(s) |>
+		(stream.Done()) { None() }
+		& (stream.Next(x, _)) { Some(x) }
 }
 
 // Finite-observation laws, with distinct functions for composition.
@@ -727,7 +729,9 @@ test("stream_factory_demand", () {
 			})
 			u = stream.unfold(0, (n : Int) -> option.Option((Int, Int)) {
 				visit(n)
-				{ n < 2 } |> (True()) { Some((n, n + 1)) } & (False()) { None() }
+				{ n < 2 } |>
+					(True()) { Some((n, n + 1)) }
+					& (False()) { None() }
 			})
 			failing = stream.make(() -> stream.Step(Int, String, Trace) {
 				visit(88)

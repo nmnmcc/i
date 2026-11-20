@@ -960,7 +960,10 @@ test("cli_help", () {
 	)
 	assert(
 		{
-			e4_call_arg_0 = cli.flag(cli.Names(long = "help", short = None()), "")
+			e4_call_arg_0 = cli.flag(
+				cli.Names(long = "help", short = None()),
+				"",
+			)
 			e4_call_arg_1 = ["--help"]
 			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
 		} ==

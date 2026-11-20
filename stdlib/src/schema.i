@@ -151,7 +151,9 @@ nullable = <A>(s : Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 						& (Error(e)) { Error(e) }
 				}
 		},
-		write = (x) { x |> (None()) { json.Null() } & (Some(v)) { encode(s, v) } },
+		write = (x) {
+			x |> (None()) { json.Null() } & (Some(v)) { encode(s, v) }
+		},
 	)
 }
 
@@ -412,7 +414,9 @@ tagged_union = <A>(
 				(Some(json.Text(name))) {
 					ls.find_map(cases, (entry) {
 						(k, s) = entry
-						{ k == name } |> (True()) { Some(s) } & (False()) { None() }
+						{ k == name } |>
+							(True()) { Some(s) }
+							& (False()) { None() }
 					}) |>
 						(Some(s)) { _decode_result(s, x) }
 						& (None()) { Error(at(Field(key), error("tag"))) }

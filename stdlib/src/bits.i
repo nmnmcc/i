@@ -125,4 +125,6 @@ reverse = (list : List(BitArray), acc : List(BitArray)) -> List(BitArray) {
 	list |> ([]) { acc } & ([x, ..xs]) { reverse(xs, [x, ..acc]) }
 }
 
-min = (a : Int, b : Int) -> Int { { a < b } |> (True()) { a } & (False()) { b } }
+min = (a : Int, b : Int) -> Int {
+	{ a < b } |> (True()) { a } & (False()) { b }
+}

@@ -184,7 +184,10 @@ fn a_captured_service_row_keeps_callback_dependencies() {
     for supplied in [false, true] {
         let source = if supplied {
             // `Dependency = ()` makes the value `Dependency`.
-            source.replace("apply() <- (provided)", "apply() <- (Dependency(), provided)")
+            source.replace(
+                "apply() <- (provided)",
+                "apply() <- (Dependency(), provided)",
+            )
         } else {
             source.to_string()
         };

@@ -140,7 +140,11 @@ format = (entry : Entry) -> String {
 }
 
 rank = (level : Level) -> Int {
-	level |> (Debug()) { 0 } & (Info()) { 1 } & (Warning()) { 2 } & (Failure()) { 3 }
+	level |>
+		(Debug()) { 0 }
+		& (Info()) { 1 }
+		& (Warning()) { 2 }
+		& (Failure()) { 3 }
 }
 
 level_text = (level : Level) -> String {

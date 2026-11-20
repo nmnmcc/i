@@ -271,7 +271,9 @@ _int_result = (min : Int, max : Int) -> Result(Gen(Int), BuildError) {
 		& (False()) {
 			target = { min > 0 } |>
 				(True()) { min }
-				& (False()) { { max < 0 } |> (True()) { max } & (False()) { 0 } }
+				& (False()) {
+					{ max < 0 } |> (True()) { max } & (False()) { 0 }
+				}
 			Ok(
 				Gen((_, g) {
 					draw_int(g, max - min + 1) |>
@@ -504,7 +506,9 @@ scan = <A>(
 		(True()) { (current, reason, lists.reverse(path), checked, True()) }
 		& (False()) {
 			children |>
-				([]) { (current, reason, lists.reverse(path), checked, False()) }
+				([]) {
+					(current, reason, lists.reverse(path), checked, False())
+				}
 				& ([c, ..rest]) {
 					property(c.value) |>
 						(Fail(next_reason)) {
