@@ -56,7 +56,7 @@ acceptance or an unusable rule; `S3` misleading diagnostic; `S4` wording.
 | B4 | S2 | `i check` passes an entry whose need nobody provides; only build/run reports E0523 | §9.2 | check | open | `main` calls a function needing `Clock`; `i check` exit 0, `i run` E0523 |
 | B5 | S3 | Negative floats print `-1.5`/`-0.0` instead of `-.1.5`/`-.0.0` | §11.8 | runtime | open | `core.inspect(-.1.5)` → `-1.5` (this is SX16) |
 | B6 | S3 | `.0` on a labelled value is E0512 | §6.7 | check | open | `Pair = (Int, Int)`; `Pair(1, 2).0` → E0512 |
-| B13 | S2 | An import cycle also prints ~20 unrelated errors inside `std/src/test.is` with a wrong old-syntax hint | §2.1 | package | open | two modules importing each other in a package with `std` |
+| B13 | S2 | An import cycle also prints ~20 unrelated errors inside `stdlib/src/test.is` with a wrong old-syntax hint | §2.1 | package | open | two modules importing each other in a package with `std` |
 | B16 | S4 | `{ Int } -> Int` checks, and the form error becomes a later subtype error | §3 | check | open | `h : { Int } -> Int = (x : Int) { 1 }` → E0501 |
 | B17 | S4 | Positional duplicate parameters also emit a label E0219 | §6.11 | check | open | `f = (x, x) { x }` → E0218 + E0219 |
 | B18 | S4 | W0501 lands on the first branch and blames an "earlier clause" when the subject type kills it | §6.12 | check | open | `(3, 4) \|> ((0, y)) { y } & ((x, _)) { x }` |
