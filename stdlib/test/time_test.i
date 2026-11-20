@@ -243,7 +243,7 @@ test("timeout_timer_wins_test", () {
 	(r, elapsed) = time.measure(() {
 		fail.catch(() {
 			time.timeout(time.milliseconds(20), () {
-				resource.ensure(() { late() }, () { task.set(released, True) })
+				resource.ensure(() { late() }, () { task.set(released, True()) })
 			})
 		})
 	})
