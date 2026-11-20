@@ -561,7 +561,11 @@ poll = <A, E>(q : Queue(A, E)) <- (
 		{ state.takers != [] } |>
 			(True) {
 				{ sequence.is_empty(state.buffer) } |>
-					(True) { nothing_to_take(state) }
+					(True) {
+						state.terminal |>
+							(Failed(e)) { (state, TakeFailed(e)) }
+							& (_) { (state, TakeDone(None)) }
+					}
 					& (False) { (state, TakeDone(None)) }
 			}
 			& (False) {
@@ -572,21 +576,14 @@ poll = <A, E>(q : Queue(A, E)) <- (
 							TakeDone(Some(value)),
 						)
 					}
-					& (None) { nothing_to_take(state) }
+					& (None) {
+						state.terminal |>
+							(Failed(e)) { (state, TakeFailed(e)) }
+							& (_) { (state, TakeDone(None)) }
+					}
 			}
 	})
 	finish_take(step)
-}
-
-// The answer when nothing can be taken now: raise on a drained failure,
-// otherwise give `None`.
-nothing_to_take = <A, E>(state : QueueState(A, E)) -> (
-	QueueState(A, E),
-	TakeStep(A, E),
-) {
-	state.terminal |>
-		(Failed(e)) { (state, TakeFailed(e)) }
-		& (_) { (state, TakeDone(None)) }
 }
 
 /// The number of buffered values. For observation only: another task may
