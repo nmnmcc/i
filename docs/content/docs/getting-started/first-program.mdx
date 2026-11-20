@@ -53,7 +53,7 @@ main = () <- (io : Io) { io.print(greeting("hello")) }
 Hello, hello!
 ```
 
-The generated source is shown with shorter documentation comments. The second parenthesized group exports `greeting` for other modules; `main` is the entry, and `i run` supplies its `Io` service.
+The generated source is longer in its comments than the copy shown here; only comments differ. The second parenthesized group exports `greeting` for other modules; `main` is the entry, and `i run` supplies its `Io` service.
 
 ```sh
 cd hello
@@ -150,6 +150,6 @@ i check
 ```text
 ```
 
-`i fmt` rewrites source; `i check` checks without running it.
+`i fmt` rewrites source; `i check` checks without running it. `i run` takes a package or a declared entry, not a file: `i run src/main.i` reports `unknown entry src/main.i`; use the package (as above) or a named entry from `[entries]`.
 
 [Values](/docs/tour/values-and-data) · [Functions](/docs/tour/functions-and-branches) · [Packages](/docs/tour/packages) · [Services](/docs/tour/services-and-errors) · [Editor set-up](/docs/getting-started/editor-set-up)

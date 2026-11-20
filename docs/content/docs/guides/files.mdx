@@ -56,7 +56,7 @@ main = () {
 	fail.catch(() { fs.read_file(file) }) |>
 		(
 			Error(
-				fs.FsError(operation = operation, path = missing, reason = _, code = code),
+				fs.FsError(operation = operation, path = missing, code = code, ..),
 			)
 		) { stdio.print(operation <> ": " <> missing <> ": " <> code) }
 		& (Ok(_)) { panic("expected a missing file") }

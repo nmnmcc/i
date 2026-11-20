@@ -3,15 +3,22 @@ title: Install
 description: Build the compiler from source code.
 ---
 
-Build i from source code.
+Build i from source code. Get the repository and its binaryen submodule first:
 
 ```sh
+git clone https://github.com/nmnmcc/i
+cd i
 git submodule update --init crates/ilang-binaryen/binaryen
+```
+
+Install [Nix](https://nixos.org/download/) and [devenv 2.4.0](https://devenv.sh/getting-started/), then build in the development shell:
+
+```sh
 devenv shell
 cargo build --release
 ```
 
-Use Nix and devenv 2.4.0; the development shell supplies the pinned toolchain and Binaryen build tools. Git fetches the submodule; the first build compiles Binaryen from source.
+The development shell supplies the pinned toolchain and Binaryen build tools; the first build compiles Binaryen from source. There is no installer archive in the repository's releases: build here and keep `target/release/i`.
 
 ## Compiler path
 
