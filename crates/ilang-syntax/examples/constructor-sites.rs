@@ -29,6 +29,8 @@
 //!
 //! ```text
 //! FILE <path>                         (or SNIPPET <index> for a text request)
+//! IMPORT <hex alias> <hex path>       one per import; the alias is the written
+//!                                     one or the last part of the path
 //! ZERO <name>                         one per type defined as `()`
 //! CTOR <name> <fields>                one per type defined with data, `T = (…)`
 //! SITE value <start> <end> <hex>      a constructor used as a value
@@ -38,7 +40,9 @@
 //! ```
 //!
 //! Offsets are byte offsets into the UTF-8 source, end exclusive, and cover
-//! the written name without a module part; `<hex>` is that name's UTF-8 bytes
+//! the written name; a name written with a module is reported as `m.Name` and
+//! its offsets cover the whole written form (`m.Name`, or `(. m Name)` in the
+//! Lisp surface); `<hex>` is that name's UTF-8 bytes
 //! hex-encoded, as is a diagnostic message. `SITE` lines are ascending.
 //!
 //! `FAIL <path> <message>` replaces the group when the request itself is
@@ -147,9 +151,17 @@ impl Sites {
 
     fn expr(&mut self, e: &Expr, is_callee: bool) {
         match &e.kind {
-            ExprKind::Name { name, .. } => {
+            ExprKind::Name { module, name } => {
                 if !is_callee && is_upper(&name.name) {
-                    self.push(Kind::Value, name.span.0, &name.name);
+                    match module {
+                        // The whole written form: `m.Name`, or `(. m Name)`.
+                        Some(m) => self.push(
+                            Kind::Value,
+                            e.span.0,
+                            &format!("{}.{}", m.name, name.name),
+                        ),
+                        None => self.push(Kind::Value, name.span.0, &name.name),
+                    }
                 }
             }
             ExprKind::Quote(q) => self.datum(&q.0, Kind::Pattern),
@@ -218,8 +230,15 @@ impl Sites {
                     self.pattern(capture);
                 }
             }
-            PatternKind::Ctor { name, args, .. } => match args {
-                None => self.push(Kind::Pattern, name.span.0, &name.name),
+            PatternKind::Ctor { module, name, args } => match args {
+                None => match module {
+                    Some(m) => self.push(
+                        Kind::Pattern,
+                        p.span.0,
+                        &format!("{}.{}", m.name, name.name),
+                    ),
+                    None => self.push(Kind::Pattern, name.span.0, &name.name),
+                },
                 Some(args) => self.dpitems(args),
             },
             PatternKind::Data(items) => self.dpitems(items),
@@ -308,7 +327,22 @@ fn data_types(module: &Module) -> Vec<(String, usize)> {
         .collect()
 }
 
+/// `(alias, path)` of every import; the alias is the written one or the
+/// last path part, as the checker reads it.
+fn imports(module: &Module) -> Vec<(String, String)> {
+    module
+        .imports
+        .iter()
+        .filter_map(|i| {
+            let alias = i.alias.as_ref().or(i.path.last())?;
+            let path: Vec<&str> = i.path.iter().map(|p| p.name.as_str()).collect();
+            Some((alias.name.clone(), path.join("/")))
+        })
+        .collect()
+}
+
 struct Report {
+    imports: Vec<(String, String)>,
     zero: Vec<String>,
     ctors: Vec<(String, usize)>,
     sites: Vec<(u32, u32, Kind, String)>,
@@ -326,6 +360,7 @@ fn run(surface: Surface, source: &str) -> Report {
     sites.sort();
     sites.dedup();
     Report {
+        imports: imports(&module),
         zero: zero_types(&module),
         ctors: data_types(&module),
         sites,
@@ -342,12 +377,16 @@ fn hex(text: &str) -> String {
 
 fn report(output: &mut impl Write, name: &str, source: &str, surface: Surface) {
     let Report {
+        imports,
         zero,
         ctors,
         sites,
         diags,
     } = run(surface, source);
     writeln!(output, "{name}").unwrap();
+    for (alias, path) in imports {
+        writeln!(output, "IMPORT {} {}", hex(&alias), hex(&path)).unwrap();
+    }
     for name in zero {
         writeln!(output, "ZERO {name}").unwrap();
     }
