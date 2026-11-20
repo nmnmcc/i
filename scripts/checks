@@ -8,8 +8,9 @@
 #                             (rust-lint: formatting, Clippy and snippets; rust-test: the tests)
 #   scripts/checks snippets   every i snippet in the repository parses, or gives its registered
 #                             diagnostics (scripts/check-snippets and its own tests)
-#   scripts/checks doc-paths  every source path the documentation names exists
-#                             (scripts/check-doc-paths and its counterexamples)
+#   scripts/checks doc-paths  every source path and library module the documentation
+#                             names exists (scripts/check-doc-paths and
+#                             scripts/check-doc-modules, with their counterexamples)
 #   scripts/checks i          the release `i`, and with it the i sources;
 #                             `scripts/dev-new-machine` proves that a copy of
 #                             that `i` still makes, checks, runs and tests a
@@ -79,6 +80,8 @@ snippets() {
 doc-paths() {
   python3 -I scripts/check-doc-paths
   python3 -I scripts/check-doc-paths-test
+  python3 -I scripts/check-doc-modules
+  python3 -I scripts/check-doc-modules-test
 }
 
 # The slowest test targets of ilang-cli, which CI runs in a job of their own (cli-heavy);

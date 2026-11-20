@@ -17,6 +17,9 @@ import tempfile
 import time
 import tomllib
 
+import io
+import tarfile
+
 from example_fences import fences, generated, i_info, i_options, output_info, safe_file
 from paths import ROOT
 
@@ -174,6 +177,28 @@ def toml_value(value):
     raise ValueError(f'unsupported manifest value: {value!r}')
 
 
+def library_root():
+    """Examples run against the library `i new` writes, not the working tree."""
+    override = os.environ.get('LIBRARY_ROOT')
+    if override:
+        return Path(override)
+    tag = os.environ.get('LIBRARY_TAG') or subprocess.run(
+        ['git', '-C', str(ROOT), 'tag', '--list', 'stdlib-v*', '--sort=-v:refname'],
+        capture_output=True, text=True, check=True).stdout.split()[0]
+    directory = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag) / 'stdlib'
+    if directory.is_dir():
+        return directory
+    directory.mkdir(parents=True)
+    with tarfile.open(fileobj=io.BytesIO(subprocess.run(
+            ['git', '-C', str(ROOT), 'archive', f'{tag}:stdlib'],
+            capture_output=True, check=True).stdout)) as tar:
+        tar.extractall(directory, filter='data')
+    return directory
+
+
+LIBRARY = library_root()
+
+
 def prepare(example, project):
     name = example.package or page_name(example.page)
     testing = example.kind in ('test', 'test-fails')
@@ -193,7 +218,7 @@ def prepare(example, project):
     manifest.get('dev-dependencies', {}).pop('i', None)
     if not manifest.get('dev-dependencies', True):
         del manifest['dev-dependencies']
-    manifest.setdefault('dependencies', {})['i'] = {'path': str(ROOT / 'stdlib')}
+    manifest.setdefault('dependencies', {})['i'] = {'path': str(LIBRARY)}
     if testing:
         manifest.setdefault('test', {})['collection'] = 'i/test.tests'
     # A path dependency of the example that names the library names it
@@ -205,7 +230,7 @@ def prepare(example, project):
             if any('i' in other.get(table, {}) for table in ('dependencies', 'dev-dependencies')):
                 for table in ('dependencies', 'dev-dependencies'):
                     if 'i' in other.get(table, {}):
-                        other[table]['i'] = {'path': str(ROOT / 'stdlib')}
+                        other[table]['i'] = {'path': str(LIBRARY)}
                 sources[path] = ''.join(json.dumps(key) + ' = ' + toml_value(value) + '\n'
                                         for key, value in other.items())
     # Inline TOML tables preserve any supplementary manifest configuration.
