@@ -66,6 +66,23 @@
 //// `size` is for observation only: do not check it and then take, since
 //// another task can act in between. Use `poll` for a take that does not wait.
 ////
+//// Scope. The queue belongs to the task scope that is current when it is
+//// made, and the resource scope it is attached to must end inside that task
+//// scope. Put the task scope outside the resource scope:
+////
+//// ```text
+//// task.scope((group) {
+//// 	resource.scoped(() {
+//// 		q = queue.unbounded()
+//// 		body
+//// 	})
+//// })
+//// ```
+////
+//// The opposite nesting, `resource.scoped(() { task.scope(...) })`, stops
+//// with `panic: task: shared value is gone` when the resource scope ends,
+//// because the queue's release runs after its task scope has freed the ref.
+////
 //// Stability: experimental. Tracking: docs/design/std-v3.md.
 (
 	failure = i/fail
