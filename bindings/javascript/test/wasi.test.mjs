@@ -68,7 +68,7 @@ main = () {
 			Error(
 				process.ProcessError(
 					operation = "entropy",
-					reason = process.Invalid,
+					reason = process.Invalid(),
 					code = "invalid",
 				),
 			),
@@ -79,7 +79,7 @@ main = () {
 				fs.FsError(
 					operation = "open",
 					path = "/outside/no-preopen",
-					reason = fs.Denied,
+					reason = fs.Denied(),
 					code = "denied",
 				),
 			),
