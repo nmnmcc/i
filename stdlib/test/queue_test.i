@@ -482,6 +482,6 @@ test("queue_is_shut_down_when_its_resource_scope_ends_test", () {
 			(task.join(taker), "after")
 		})
 	})
-	assert(got == (None, "after"))
+	assert(got == (None(), "after"))
 	()
 })

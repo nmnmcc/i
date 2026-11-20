@@ -34,12 +34,12 @@ chain = (path : String, n : Int) {
 test("fs_round_trip_test", () {
 	path = fresh("round-trip")
 	resource.scoped(() {
-		f = fs.open(path, fs.WriteTruncate)
+		f = fs.open(path, fs.WriteTruncate())
 		fs.write(f, <<"hello":utf8>>)
 		fs.flush(f)
 	})
 	resource.scoped(() {
-		f = fs.open(path, fs.ReadOnly)
+		f = fs.open(path, fs.ReadOnly())
 		assert(fs.read(f, 3) == <<"hel":utf8>>)
 		assert(fs.read(f, 10) == <<"lo":utf8>>)
 		assert(fs.read(f, 10) == <<>>)
@@ -50,7 +50,7 @@ test("fs_round_trip_test", () {
 					fs.FsError(
 						operation = "read",
 						path = path,
-						reason = fs.Invalid,
+						reason = fs.Invalid(),
 						code = "invalid",
 					),
 				),
@@ -66,14 +66,14 @@ test("fs_scope_owns_handle_test", () {
 	path = fresh("scope")
 	fs.write_file(path, <<"x":utf8>>)
 	// The handle leaves its scope; the scope has closed it.
-	f = resource.scoped(() { fs.open(path, fs.ReadOnly) })
+	f = resource.scoped(() { fs.open(path, fs.ReadOnly()) })
 	assert(
 		fail.catch(() { fs.read(f, 1) }) ==
 			Error(
 				fs.FsError(
 					operation = "read",
 					path = path,
-					reason = fs.Closed,
+					reason = fs.Closed(),
 					code = "closed",
 				),
 			),
@@ -87,12 +87,14 @@ test("fs_scope_owns_handle_test", () {
 test("fs_open_missing_test", () {
 	path = fresh("missing")
 	assert(
-		fail.catch(() { resource.scoped(() { fs.open(path, fs.ReadOnly) }) }) ==
+		fail.catch(() {
+			resource.scoped(() { fs.open(path, fs.ReadOnly()) })
+		}) ==
 			Error(
 				fs.FsError(
 					operation = "open",
 					path = path,
-					reason = fs.NotFound,
+					reason = fs.NotFound(),
 					code = "not_found",
 				),
 			),
@@ -112,7 +114,7 @@ test("fs_copy_test", () {
 				fs.FsError(
 					operation = "metadata",
 					path = to,
-					reason = fs.NotFound,
+					reason = fs.NotFound(),
 					code = "not_found",
 				),
 			),
@@ -172,7 +174,7 @@ test("fs_walk_depth_cap_test", () {
 				fs.FsError(
 					operation = "walk",
 					path = root <> string.repeat("/d", 33),
-					reason = fs.Invalid,
+					reason = fs.Invalid(),
 					code = "depth",
 				),
 			),
@@ -212,19 +214,19 @@ test("fs_scope_error_releases_handle_test", () {
 	boom = fs.FsError(
 		operation = "test",
 		path = path,
-		reason = fs.Other,
+		reason = fs.Other(),
 		code = "boom",
 	)
-	slot : task.Ref(Option(fs.File)) = task.ref(None)
+	slot : task.Ref(Option(fs.File)) = task.ref(None())
 	r = fail.catch(() {
 		resource.scoped(() {
-			f = fs.open(path, fs.WriteTruncate)
+			f = fs.open(path, fs.WriteTruncate())
 			task.set(slot, Some(f))
 			fs.write(f, <<"partial":utf8>>)
 			fs.flush(f)
 			{ fs.metadata(path).size == 7 } |>
-				(True) { fail.raise(boom) }
-				& (False) { () }
+				(True()) { fail.raise(boom) }
+				& (False()) { () }
 		})
 	})
 	assert(r == Error(boom))
@@ -236,13 +238,13 @@ test("fs_scope_error_releases_handle_test", () {
 						fs.FsError(
 							operation = "read",
 							path = path,
-							reason = fs.Closed,
+							reason = fs.Closed(),
 							code = "closed",
 						),
 					),
 			)
 		}
-		& (None) { panic("fs_test: the handle was not kept") }
+		& (None()) { panic("fs_test: the handle was not kept") }
 	assert(fs.read_file(path) == <<"partial":utf8>>)
 	fs.remove(path)
 	()
@@ -259,7 +261,7 @@ test("fs_cancel_releases_handle_test", () {
 			task.race(
 				() {
 					resource.scoped(() {
-						f = fs.open(path, fs.ReadOnly)
+						f = fs.open(path, fs.ReadOnly())
 						task.send(ready, f)
 						task.sync(task.never())
 					})
@@ -274,7 +276,7 @@ test("fs_cancel_releases_handle_test", () {
 				fs.FsError(
 					operation = "read",
 					path = path,
-					reason = fs.Closed,
+					reason = fs.Closed(),
 					code = "closed",
 				),
 			),
@@ -292,7 +294,7 @@ test("fs_copy_same_path_test", () {
 				fs.FsError(
 					operation = "copy",
 					path = path,
-					reason = fs.Invalid,
+					reason = fs.Invalid(),
 					code = "same",
 				),
 			),
@@ -311,7 +313,7 @@ test("fs_read_lines_invalid_utf8_test", () {
 				fs.FsError(
 					operation = "read_lines",
 					path = path,
-					reason = fs.Invalid,
+					reason = fs.Invalid(),
 					code = "invalid",
 				),
 			),

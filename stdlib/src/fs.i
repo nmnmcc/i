@@ -126,14 +126,14 @@ Fs = (
 // The one map from the host's error codes to reasons.
 reason_of = (code : String) -> FsProblem {
 	code |>
-		("not_found") { NotFound }
-		& ("denied") { Denied }
-		& ("exists") { Exists }
-		& ("closed") { Closed }
-		& ("busy") { Busy }
-		& ("invalid" | "interrupted") { Invalid }
-		& ("unsupported") { Unsupported }
-		& (_) { Other }
+		("not_found") { NotFound() }
+		& ("denied") { Denied() }
+		& ("exists") { Exists() }
+		& ("closed") { Closed() }
+		& ("busy") { Busy() }
+		& ("invalid" | "interrupted") { Invalid() }
+		& ("unsupported") { Unsupported() }
+		& (_) { Other() }
 }
 
 failure = (operation : String, path : String, code : String) {
@@ -141,10 +141,10 @@ failure = (operation : String, path : String, code : String) {
 }
 
 mode_string =
-	(ReadOnly) { "read" }
-	& (WriteTruncate) { "truncate" }
-	& (Append) { "append" }
-	& (ReadWrite) { "read_write" }
+	(ReadOnly()) { "read" }
+	& (WriteTruncate()) { "truncate" }
+	& (Append()) { "append" }
+	& (ReadWrite()) { "read_write" }
 
 // Opens the host handle. A cancel while the open is in flight cancels the
 // request and closes a handle that has arrived already.
@@ -357,7 +357,7 @@ read_chunks = (file) {
 /// fs.read_file(path)  // <<"hello":utf8>>
 /// ```
 read_file = (path : String) {
-	resource.scoped(() { read_chunks(open(path, ReadOnly)) })
+	resource.scoped(() { read_chunks(open(path, ReadOnly())) })
 }
 
 /// Makes the file at `path` hold `bytes` and nothing else. The file is open
@@ -369,7 +369,7 @@ read_file = (path : String) {
 /// fs.write_file(path, <<"hello":utf8>>)
 /// ```
 write_file = (path : String, bytes : BitArray) {
-	resource.scoped(() { write(open(path, WriteTruncate), bytes) })
+	resource.scoped(() { write(open(path, WriteTruncate()), bytes) })
 }
 
 line_parts = (text : String, start : Int) -> List(String) {
@@ -380,8 +380,10 @@ line_parts = (text : String, start : Int) -> List(String) {
 		& (Error(_)) {
 			done = start == core.byte_size(text)
 			done |>
-				(True) { [] }
-				& (False) { [slice(text, start, core.byte_size(text) - start)] }
+				(True()) { [] }
+				& (False()) {
+					[slice(text, start, core.byte_size(text) - start)]
+				}
 		}
 }
 
@@ -426,11 +428,11 @@ copy_chunks = (source : File, target : File, total : Int) {
 /// ```
 copy = (from : String, to : String) {
 	{ from == to } |>
-		(True) { failure_with("copy", from, Invalid, "same") }
-		& (False) { () }
+		(True()) { failure_with("copy", from, Invalid(), "same") }
+		& (False()) { () }
 	resource.scoped(() {
-		source = open(from, ReadOnly)
-		target = open(to, WriteTruncate)
+		source = open(from, ReadOnly())
+		target = open(to, WriteTruncate())
 		copy_chunks(source, target, 0)
 	})
 }
@@ -441,14 +443,14 @@ child = (directory : String, name : String) -> String {
 	size = core.byte_size(directory)
 	slashed = size > 0 && slice(directory, size - 1, 1) == "/"
 	slashed |>
-		(True) { directory <> name }
-		& (False) { directory <> "/" <> name }
+		(True()) { directory <> name }
+		& (False()) { directory <> "/" <> name }
 }
 
 walk_from = (path : String, depth : Int) -> List(String) {
 	{ depth > max_walk_depth } |>
-		(True) { failure_with("walk", path, Invalid, "depth") }
-		& (False) { () }
+		(True()) { failure_with("walk", path, Invalid(), "depth") }
+		& (False()) { () }
 	metadata(path).kind |>
 		("directory") {
 			names = lists.sort(list(path), string.compare)

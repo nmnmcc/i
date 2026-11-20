@@ -38,9 +38,9 @@ temp_dir = () {
 		c = process.spawn_piped(
 			"sh",
 			["-c", "d=$(mktemp -d) && printf %s \"$d\""],
-			process.Null,
-			process.Piped,
-			process.Piped,
+			process.Null(),
+			process.Piped(),
+			process.Piped(),
 		)
 		out = process.collect(c)
 		assert(process.wait(c) == 0)
@@ -71,9 +71,9 @@ test("spawn_collect_test", () {
 		c = process.spawn_piped(
 			"sh",
 			["-c", "printf hello"],
-			process.Null,
-			process.Piped,
-			process.Piped,
+			process.Null(),
+			process.Piped(),
+			process.Piped(),
 		)
 		out = process.collect(c)
 		assert(out.stdout == <<"hello":utf8>>)
@@ -92,9 +92,9 @@ test("collect_drains_both_pipes_concurrently_test", () {
 		c = process.spawn_piped(
 			"sh",
 			["-c", "yes x | head -c 262144; yes y | head -c 262144 >&2"],
-			process.Null,
-			process.Piped,
-			process.Piped,
+			process.Null(),
+			process.Piped(),
+			process.Piped(),
 		)
 		out = process.collect(c)
 		assert(core.bit_size(out.stdout) == 262144 * 8)
@@ -109,9 +109,9 @@ test("spawn_piped_stdin_echo_test", () {
 		c = process.spawn_piped(
 			"sh",
 			["-c", "cat"],
-			process.Piped,
-			process.Piped,
-			process.Inherit,
+			process.Piped(),
+			process.Piped(),
+			process.Inherit(),
 		)
 		process.write_stdin(c, <<"echo me":utf8>>)
 		process.close_stdin(c)
@@ -128,9 +128,9 @@ test("spawn_config_at_directory_test", () {
 		c = process.spawn_config(
 			"sh",
 			["-c", "test \"$I_PROCESS_TEST\" = yes && test \"$PWD\" = /"],
-			process.Null,
-			process.Null,
-			process.Inherit,
+			process.Null(),
+			process.Null(),
+			process.Inherit(),
 			process.ReplaceEnvironment(["I_PROCESS_TEST=yes"]),
 			process.AtDirectory("/"),
 		)
@@ -175,7 +175,7 @@ test("scope_owns_child_test", () {
 	// The scope did not wait for the child's 30 seconds.
 	assert(now() - start < 10000000000)
 	nap(check_delay_ns)
-	assert(exists(marker) == False)
+	assert(exists(marker) == False())
 	remove_dir(dir)
 })
 
@@ -191,7 +191,7 @@ test("spawn_missing_program_test", () {
 			Error(
 				process.ProcessError(
 					operation = "spawn",
-					reason = process.NotFound,
+					reason = process.NotFound(),
 					code = "not_found",
 				),
 			),
@@ -219,7 +219,7 @@ test("wait_after_close_is_closed_test", () {
 				Error(
 					process.ProcessError(
 						operation = "wait",
-						reason = process.Closed,
+						reason = process.Closed(),
 						code = "closed",
 					),
 				),
@@ -235,7 +235,7 @@ test("cancelled_scope_stops_child_test", () {
 	marker = dir <> "/marker"
 	stop = process.ProcessError(
 		operation = "test",
-		reason = process.Other,
+		reason = process.Other(),
 		code = "stop",
 	)
 	start = now()
@@ -256,6 +256,6 @@ test("cancelled_scope_stops_child_test", () {
 	assert(r == Error(stop))
 	assert(now() - start < 10000000000)
 	nap(check_delay_ns)
-	assert(exists(marker) == False)
+	assert(exists(marker) == False())
 	remove_dir(dir)
 })

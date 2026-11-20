@@ -15,9 +15,9 @@ main = () {
 		child = process.spawn_piped(
 			"sh",
 			["-c", "echo hi; exit 3"],
-			process.Null,
-			process.Piped,
-			process.Inherit,
+			process.Null(),
+			process.Piped(),
+			process.Inherit(),
 		)
 		assert(process.read_stdout(child, 100) == <<"hi\n":utf8>>)
 		assert(process.wait(child) == 3)
@@ -25,9 +25,9 @@ main = () {
 		cat = process.spawn_piped(
 			"cat",
 			[],
-			process.Piped,
-			process.Piped,
-			process.Inherit,
+			process.Piped(),
+			process.Piped(),
+			process.Inherit(),
 		)
 		process.write_stdin(cat, <<"hello\n":utf8>>)
 		assert(process.read_stdout(cat, 100) == <<"hello\n":utf8>>)
@@ -37,11 +37,11 @@ main = () {
 		configured = process.spawn_config(
 			"sh",
 			["-c", "echo $I_TEST_VAR"],
-			process.Null,
-			process.Piped,
-			process.Inherit,
+			process.Null(),
+			process.Piped(),
+			process.Inherit(),
 			process.InheritEnvironment(["I_TEST_VAR=xyz"]),
-			process.InheritDirectory,
+			process.InheritDirectory(),
 		)
 		assert(process.read_stdout(configured, 100) == <<"xyz\n":utf8>>)
 		assert(process.wait(configured) == 0)
@@ -52,9 +52,9 @@ main = () {
 				"-c",
 				"test \"$I_TEST_VAR\" = xyz && test -z \"${HOME+x}\" && test \"$PWD\" = /",
 			],
-			process.Null,
-			process.Null,
-			process.Inherit,
+			process.Null(),
+			process.Null(),
+			process.Inherit(),
 			process.ReplaceEnvironment(["I_TEST_VAR=xyz"]),
 			process.AtDirectory("/"),
 		)
@@ -63,11 +63,11 @@ main = () {
 		removed = process.spawn_config(
 			"/bin/sh",
 			["-c", "test -z \"${HOME+x}\""],
-			process.Null,
-			process.Null,
-			process.Inherit,
+			process.Null(),
+			process.Null(),
+			process.Inherit(),
 			process.InheritEnvironment(["HOME"]),
-			process.InheritDirectory,
+			process.InheritDirectory(),
 		)
 		assert(process.wait(removed) == 0)
 		process.close(removed)
@@ -94,7 +94,7 @@ main = () {
 				Error(
 					process.ProcessError(
 						operation = "wait",
-						reason = process.Closed,
+						reason = process.Closed(),
 						code = "closed",
 					),
 				),
@@ -122,9 +122,9 @@ main = () {
 				// `ps -A` must work, or the check would pass without looking.
 				"ps -A >/dev/null 2>&1 || exit 2; ps -A -o ppid=,args= | grep -Eq \"^ *$PPID +sleep 30$\" && exit 1; exit 0",
 			],
-			process.Null,
-			process.Null,
-			process.Inherit,
+			process.Null(),
+			process.Null(),
+			process.Inherit(),
 		)
 		assert(process.wait(check) == 0)
 		process.close(check)

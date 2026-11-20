@@ -16,7 +16,7 @@ test("fake_capabilities", () {
 					Error(
 						process.ProcessError(
 							operation = "env",
-							reason = process.Other,
+							reason = process.Other(),
 							code = "missing",
 						),
 					),
@@ -53,7 +53,7 @@ test("host_capabilities", () {
 			Error(
 				process.ProcessError(
 					operation = "entropy",
-					reason = process.Invalid,
+					reason = process.Invalid(),
 					code = "invalid",
 				),
 			),
@@ -68,7 +68,7 @@ test("host_capabilities", () {
 				Error(
 					process.ProcessError(
 						operation = "wait",
-						reason = process.Closed,
+						reason = process.Closed(),
 						code = "closed",
 					),
 				),
