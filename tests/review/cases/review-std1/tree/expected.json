@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:1:1: error[E0101]: the head of a data type or an opaque type has only type parameters\nnote: src/main.i: if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\n1 error\n"
+      "stderr": "src/main.i:1:1: error[E0101]: the head of a data type or an opaque type has only type parameters\nnote: src/main.i: headers are written `(…)`, a match is `e |> (pattern) { value } & (_) { other }`, and a guard is `? condition`\n1 error\n"
     }
   }
 }

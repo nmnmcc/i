@@ -17,20 +17,20 @@ HEAVY = next((path for path in (ROOT.parent / 'cache/heavy', ROOT / '.rd/cache/h
               if path.is_file()), None)
 
 
-def newest_tag():
-    out = subprocess.run(['git', '-C', str(ROOT), 'tag', '--list', 'stdlib-v*', '--sort=-v:refname'],
-                         capture_output=True, text=True, check=True).stdout.split()
-    return out[0] if out else None
-
-
 def library_root():
-    """The library the site documents: the newest tag, the one `i new` writes."""
+    """The library the site documents: the tree being built.
+
+    A tag names a released library, and the released compiler is the one that
+    builds it. This tree carries the constructor change, which no released
+    compiler builds yet, so the site documents the checkout and marks it
+    unpublished; return to a tag when 0.2.0 and its compiler ship together.
+    """
     override = os.environ.get('LIBRARY_ROOT')
     if override:
         return Path(override).resolve()
-    tag = os.environ.get('LIBRARY_TAG') or newest_tag()
-    if not tag:
-        raise SystemExit('no stdlib-v* tag to document')
+    if not os.environ.get('LIBRARY_TAG'):
+        return ROOT / 'stdlib'
+    tag = os.environ.get('LIBRARY_TAG')
     archive = subprocess.run(['git', '-C', str(ROOT), 'archive', f'{tag}:stdlib'],
                              capture_output=True, check=True).stdout
     destination = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag)
@@ -43,7 +43,7 @@ def library_root():
     return directory
 
 
-TAG = os.environ.get('LIBRARY_TAG') or newest_tag()
+TAG = os.environ.get('LIBRARY_TAG')
 VERSION = TAG.removeprefix('stdlib-v') if TAG else None
 LIBRARY = library_root()
 
@@ -163,7 +163,8 @@ def generate():
             else:
                 break
         banner = (f'> Documents `{TAG}`, the version `i new` writes.'
-                  if VERSION else '> Documents the working-tree standard library.')
+                  if VERSION else '> Documents the working-tree standard library: the unreleased 0.2.0. '
+                  'No released compiler builds it yet, so `i new` still writes the released version.')
         output = ['---', 'title: ' + json.dumps(module), '---', '', banner, '', *([safe('\n'.join(opening)), ''] if any(line.strip() for line in opening) else [])]
         exports = next(groups(source), [])
         for name in exports:
@@ -186,14 +187,17 @@ def generate():
                 output += ['```text', written, '```', '']
         (OUT / (slug + '.mdx')).write_text('\n'.join(output))
     (OUT / 'meta.json').write_text(json.dumps({'title':'Modules','pages':pages}, indent=2) + '\n')
-    if VERSION:
-        links = ' · '.join('[' + slug[2:] + '](/docs/library/generated/' + slug + ')' for slug in pages)
-        text = INDEX.read_text()
-        start, end = '{/* generated:start */}', '{/* generated:end */}'
-        if start in text and end in text:
-            text = re.sub('(?s)' + re.escape(start) + '.*?' + re.escape(end),
-                          start + '\n\nDocuments `' + TAG + '`, the version `i new` writes. The source is [stdlib/src at `' + TAG + '`](https://github.com/nmnmcc/i/tree/' + TAG + '/stdlib/src).\n\n' + links + '\n\n' + end, text)
-            INDEX.write_text(text)
+    links = ' · '.join('[' + slug[2:] + '](/docs/library/generated/' + slug + ')' for slug in pages)
+    source = (f'Documents `{TAG}`, the version `i new` writes. The source is [stdlib/src at `{TAG}`](https://github.com/nmnmcc/i/tree/{TAG}/stdlib/src).'
+              if VERSION else
+              'Documents the working-tree standard library: the unreleased 0.2.0. '
+              'No released compiler builds it yet, so `i new` still writes the released version.')
+    text = INDEX.read_text()
+    start, end = '{/* generated:start */}', '{/* generated:end */}'
+    if start in text and end in text:
+        text = re.sub('(?s)' + re.escape(start) + '.*?' + re.escape(end),
+                      start + '\n\n' + source + '\n\n' + links + '\n\n' + end, text)
+        INDEX.write_text(text)
 
 
 if __name__ == '__main__':

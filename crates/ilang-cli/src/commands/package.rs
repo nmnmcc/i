@@ -1274,8 +1274,7 @@ fn earlier_interface(project: &Path, tag: &str) -> Result<Option<Result<Interfac
         })
     {
         outln!(
-            "the interface of `{tag}` is in the syntax from before {} (A3) and cannot be compared; check the interface by hand",
-            env!("CARGO_PKG_VERSION")
+            "the interface of `{tag}` is written in the previous syntax and cannot be compared; check the interface by hand"
         );
         return Ok(None);
     }

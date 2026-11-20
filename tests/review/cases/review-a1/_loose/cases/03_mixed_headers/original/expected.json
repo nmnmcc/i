@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/main.i:3:1: error[E0115]: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file\nsrc/main.i:4:15: error[E0111]: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`\nsrc/main.i:4:19: error[E0101]: expected an expression, found `->`\nnote: src/main.i: if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\n3 errors\n"
+      "stderr": "src/main.i:3:1: error[E0115]: a group in `( )` that is not followed by `=` is the imports or the exports, which come first in a file\nsrc/main.i:4:15: error[E0111]: the right side of `|>` must be a name, a call, or a chain of functions; `|>` is the weakest operator, so put anything else in a group: `{ x |> g } == 2`\nsrc/main.i:4:19: error[E0101]: expected an expression, found `->`\nnote: src/main.i: headers are written `(…)`, a match is `e |> (pattern) { value } & (_) { other }`, and a guard is `? condition`\n3 errors\n"
     }
   }
 }

@@ -3,6 +3,11 @@
 	testlib = (test) = i/test
 	i/time
 	i/list
+	i/task
+	i/resource
+	i/clock
+	i/request
+	i/core
 	(Less, Equal, Greater) = i/order
 )
 
@@ -209,3 +214,98 @@ test("time_huge_counts", () {
 	()
 })
 // Duration and Instant stay nominally distinct, with private constructors.
+
+// A clock that fails if anything sleeps on it: the tests that must not sleep
+// use it to prove that no sleep happened.
+unused_clock : clock.Clock = clock.Clock(
+	monotonic_ns = () { request.ready(Ok(0)) },
+	unix_ns = () { request.ready(Ok(0)) },
+	sleep_ns = (n) { request.ready(Error("unused")) },
+)
+
+late = () { task.sync(task.never()) }
+
+test("timeout_body_wins_test", () {
+	// The timer is a real hour away and is cancelled when the body returns.
+	value = time.timeout(time.hours(1), () {
+		task.yield()
+		7
+	})
+	assert(value == 7)
+	()
+})
+
+// The timer fires while the body is stuck. The body's `ensure` final sets a
+// flag, and the flag must be set by the time `timeout` returns: that is R5's
+// "return only after their finals end", observed.
+test("timeout_timer_wins_test", () {
+	released = task.ref(False())
+	(r, elapsed) = time.measure(() {
+		fail.catch(() {
+			time.timeout(time.milliseconds(20), () {
+				resource.ensure(
+					() { late() },
+					() { task.set(released, True()) },
+				)
+			})
+		})
+	})
+	assert(r == Error(time.Timeout(after = time.milliseconds(20))))
+	assert(task.get(released))
+	// The timer cannot fire before its deadline. No upper bound: load.
+	assert(time.to_nanoseconds(elapsed) >= 20000000)
+	()
+})
+
+test("timeout_expired_test", () {
+	ran = task.ref(False())
+	{
+		zero = fail.catch(() {
+			time.timeout(time.nanoseconds(0), () {
+				task.set(ran, True())
+				1
+			})
+		})
+		assert(zero == Error(time.Timeout(after = time.nanoseconds(0))))
+		negative = fail.catch(() {
+			time.timeout(time.nanoseconds(-5), () {
+				task.set(ran, True())
+				1
+			})
+		})
+		assert(negative == Error(time.Timeout(after = time.nanoseconds(-5))))
+		// A zero or negative duration never starts the body and never sleeps.
+		assert(task.get(ran) == False())
+		()
+	} <- (unused_clock)
+})
+
+test("timeout_body_error_test", () {
+	{
+		r = fail.catch(() {
+			time.timeout(time.seconds(1), () {
+				task.yield()
+				fail.raise("boom")
+			})
+		})
+		assert(r == Error("boom"))
+		()
+	} <- (unused_clock)
+})
+
+test("timeout_bad_deadline_test", () {
+	ran = task.ref(False())
+	too_big = time.nanoseconds(9223372036854775808)
+	{
+		r = fail.catch(() {
+			time.timeout(too_big, () {
+				task.set(ran, True())
+				1
+			})
+		})
+		assert(r == Error(time.BadDeadline(after = too_big)))
+		// The body never starts.
+		assert(task.get(ran) == False())
+		()
+	} <- (unused_clock)
+})

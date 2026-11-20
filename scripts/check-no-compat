@@ -4,9 +4,10 @@ things used to be.
 
 Expected output (tests/**/*.stderr, tests/**/*.out and the same files under
 crates/*/tests/), the expectation lines of spec case headers, and the user
-documentation describe the language as it is.
+documentation describe the language as it is. The library sources are included
+because their doc comments become the published reference.
 A phrase such as "no longer" or "deprecated" there is a compatibility note that
-belongs in the history, not in what a user reads. Source code is not scanned:
+belongs in the history, not in what a user reads. Crate source is not scanned:
 its comments legitimately talk about what changed.
 
   scripts/check-no-compat [--root PATH]
@@ -46,9 +47,15 @@ def files(root):
         for path in sorted(content.rglob('*')):
             if path.is_file() and path.suffix in ('.md', '.mdx') and 'node_modules' not in path.parts:
                 yield path, False
-    spec_md = root / 'docs' / 'spec.md'
-    if spec_md.is_file():
-        yield spec_md, False
+    for relative in ('docs/spec.md', 'bindings/javascript/README.md', 'editors/tree-sitter-i/README.md'):
+        path = root / relative
+        if path.is_file():
+            yield path, False
+    # The library's doc comments are published as reference pages.
+    library = root / 'stdlib' / 'src'
+    if library.is_dir():
+        for path in sorted(library.rglob('*.i')):
+            yield path, False
 
 
 def scanned_lines(path, header_only):

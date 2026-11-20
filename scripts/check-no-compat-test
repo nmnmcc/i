@@ -117,12 +117,30 @@ def main():
         write(root, 'docs/content/docs/c.mdx', 'undeprecatedness, legacyish, focused tooling\n')
         passes(root)
 
+        # The SDK and editor READMEs are user-facing too.
+        write(root, 'bindings/javascript/README.md', 'Legacy `imports` registrations.\n')
+        result = fails(root)
+        assert 'bindings/javascript/README.md:1: Legacy' in result.stderr, result.stderr
+        write(root, 'editors/tree-sitter-i/README.md', 'operators, including legacy ?\n')
+        result = fails(root)
+        assert 'editors/tree-sitter-i/README.md:1: legacy' in result.stderr, result.stderr
+        write(root, 'bindings/javascript/README.md', '`imports` registrations.\n')
+        write(root, 'editors/tree-sitter-i/README.md', 'operators, including ?\n')
+        passes(root)
+
         # Design notes and other non-user documents are history and are left alone.
         write(root, 'docs/design/history.md', 'This previously worked differently.\n')
         write(root, 'docs/performance.md', 'previously\n')
         write(root, 'docs/release.md', 'deprecated\n')
         write(root, 'docs/README.md', 'legacy\n')
         write(root, 'docs/testing.md', 'no longer\n')
+        passes(root)
+
+        # Library doc comments become reference pages, so they are scanned.
+        write(root, 'stdlib/src/a.i', '/// This flag is no longer read.\nflag = 1\n')
+        result = fails(root)
+        assert 'stdlib/src/a.i:1: no longer' in result.stderr, result.stderr
+        write(root, 'stdlib/src/a.i', '/// This flag is not read.\nflag = 1\n')
         passes(root)
 
         # Output fixtures under a crate are scanned; source files are not.
