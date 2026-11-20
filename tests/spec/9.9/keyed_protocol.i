@@ -28,7 +28,7 @@ Start = (run = (Scheduler) -> Turn)
 read = (k, value) {
 	key.unwrap(k, value) |>
 		(key.Found(v)) { v }
-		& (key.Missing) { panic("prototype: wrong key") }
+		& (key.Missing()) { panic("prototype: wrong key") }
 }
 
 identity = (x) { x }
@@ -41,7 +41,7 @@ send = (c, value) <- (scheduler : Scheduler) {
 
 receive = (c) <- (scheduler : Scheduler) {
 	Channel(k) = c
-	Proceed(value) = scheduler.step(Receive)
+	Proceed(value) = scheduler.step(Receive())
 	read(k, value)
 }
 
@@ -97,9 +97,9 @@ main = () {
 		string_result,
 	)
 	Step(Send(number), a1) = begin(a)
-	Step(Receive, b1) = begin(b)
+	Step(Receive(), b1) = begin(b)
 	Step(Send(text), b2) = control.resume(b1, Proceed(number))
-	Step(Receive, a2) = control.resume(
+	Step(Receive(), a2) = control.resume(
 		a1,
 		Proceed(key.wrap(key.new(), ())),
 	)

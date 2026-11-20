@@ -13,10 +13,10 @@ test("long_lists_of_tuples", () {
 	xs = list.map(list.range(1, 20_000), (x) { (x, "a") })
 	ys = list.map(list.range(1, 20_000), (x) { (x, "a") })
 	assert(xs == ys)
-	assert({ xs != ys } == False)
+	assert({ xs != ys } == False())
 
 	// A difference in the last element is still found.
-	zs = list.map(list.range(1, 20_000), (x) { (x, { x == 20_000 } |> (True) { "b" } & (False) { "a" }) })
+	zs = list.map(list.range(1, 20_000), (x) { (x, { x == 20_000 } |> (True()) { "b" } & (False()) { "a" }) })
 	assert(xs != zs)
 })
 

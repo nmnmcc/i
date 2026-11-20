@@ -21,7 +21,7 @@ ratio = 1.0 /. 2.0
 
 neg = -1
 
-both = True && False
+both = True() && False()
 
 cmp = 1 < 2
 

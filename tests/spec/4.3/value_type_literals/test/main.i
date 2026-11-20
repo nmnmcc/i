@@ -27,15 +27,15 @@ test("literal_fields_from_a_value", () {
 })
 
 accepts = (s : { Int | String }) {
-	s |> (_ : api.Methods) { True } & (_) { False }
+	s |> (_ : api.Methods) { True() } & (_) { False() }
 }
 
 test("literal_alias_runtime_tests", () {
 	assert(accepts("GET"))
 	assert(accepts("POST"))
-	assert(accepts("DELETE") == False)
-	assert(accepts(1) == False)
-	assert(accepts(100000000000000000000) == False)
+	assert(accepts("DELETE") == False())
+	assert(accepts(1) == False())
+	assert(accepts(100000000000000000000) == False())
 })
 
 Box(A) = (value = A)

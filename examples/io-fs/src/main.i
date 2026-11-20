@@ -25,13 +25,13 @@ main = () {
 	fs.remove(dir)
 	assert(
 		fail.catch(() {
-			resource.scoped(() { fs.open(moved, fs.ReadOnly) })
+			resource.scoped(() { fs.open(moved, fs.ReadOnly()) })
 		}) ==
 			Error(
 				fs.FsError(
 					operation = "open",
 					path = moved,
-					reason = fs.NotFound,
+					reason = fs.NotFound(),
 					code = "not_found",
 				),
 			),

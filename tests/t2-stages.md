@@ -459,7 +459,7 @@ The annotation reads the exact literal type of v. POST would be rejected.
 
 ```i
 Box(A) = (A)
-boxed = True |> (True) { Box(1) } & (False) { Box(2) }
+boxed = True() |> (True()) { Box(1) } & (False()) { Box(2) }
 Box(Number) = boxed
 ```
 

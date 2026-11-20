@@ -16,7 +16,7 @@ main = () <- (later : Later, root : request.Root, owner : request.Owner) {
 	b = later.echo("answer")
 	assert(request.count(owner) == 2)
 	assert(request.count_root(root) == 2)
-	assert(request.state(a) == request.Waiting)
+	assert(request.state(a) == request.Waiting())
 	assert(request.await_owned(b) == "answer")
 	assert(request.await_owned(a) == Ok(42))
 	assert(request.count_root(root) == 0)

@@ -63,7 +63,7 @@ fn a_constructor_with_one_form_has_no_hidden_form_restriction() {
     // A constructor without parameters has only one service form.
     // Omitting its subtraction cannot hide an argument equality.
     types(
-        "Only = ()\nwrap = <N>(body : () <- N -> ()) -> () { body() <- (Only) }\nexample = () { wrap(() { () }) }",
+        "Only = ()\nwrap = <N>(body : () <- N -> ()) -> () { body() <- (Only()) }\nexample = () { wrap(() { () }) }",
     );
 }
 
@@ -252,7 +252,7 @@ fn function_type_joins_preserve_scalar_error_inclusion() {
     // Subtype comparison governs scalar error value sets when function types
     // are joined; the row mode must reach merge_arg as well as calls.
     types(
-        "(\n\ti/fail\n)\none = () -> () { fail.raise(1) }\ntwo = () -> () { fail.raise(2) }\npick = (b : Bool) { b |> (True) { one } & (False) { two } }",
+        "(\n\ti/fail\n)\none = () -> () { fail.raise(1) }\ntwo = () -> () { fail.raise(2) }\npick = (b : Bool) { b |> (True()) { one } & (False()) { two } }",
     );
 }
 

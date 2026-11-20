@@ -95,7 +95,7 @@ fn macro_facts_boundary_keeps_chain_and_match_semantics() {
             (
                 "src/picks.is",
                 "(, pick)\n\
-                 (@ macro (= pick (-> (, a b) _ `(, ((& (-> (, True) _ ~a) (-> (, False) _ ~b)) True) (|> True (& (-> (, True) _ ~b) (-> (, False) _ ~a)))))))\n",
+                 (@ macro (= pick (-> (, a b) _ `(, ((& (-> (, (True)) _ ~a) (-> (, (False)) _ ~b)) (True)) (|> (True) (& (-> (, (True)) _ ~b) (-> (, (False)) _ ~a)))))))\n",
             ),
             (
                 "src/main.is",
@@ -111,7 +111,7 @@ fn macro_facts_boundary_keeps_chain_and_match_semantics() {
         &[(
             "src/main.is",
             "(, (= (, Io) (/ i io)))\n\
-                 (= main (-> (,) (<- _ (, (: io Io))) {(= (, x y) (, ((& (-> (, True) _ 1) (-> (, False) _ 2)) True) (|> True (& (-> (, True) _ 2) (-> (, False) _ 1))))) ((. io print) (|> x (& (-> (, 1) _ \"x=1\") (-> (, _) _ \"x=other\")))) ((. io print) (|> y (& (-> (, 1) _ \"y=1\") (-> (, _) _ \"y=other\"))))}))\n",
+                 (= main (-> (,) (<- _ (, (: io Io))) {(= (, x y) (, ((& (-> (, (True)) _ 1) (-> (, (False)) _ 2)) (True)) (|> (True) (& (-> (, (True)) _ 2) (-> (, (False)) _ 1))))) ((. io print) (|> x (& (-> (, 1) _ \"x=1\") (-> (, _) _ \"x=other\")))) ((. io print) (|> y (& (-> (, 1) _ \"y=1\") (-> (, _) _ \"y=other\"))))}))\n",
         )],
     );
 

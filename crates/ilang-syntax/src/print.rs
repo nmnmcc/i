@@ -351,6 +351,11 @@ fn float(x: f64) -> String {
     }
 }
 
+/// An UpName: its first character is upper case.
+fn is_upper(name: &str) -> bool {
+    name.chars().next().is_some_and(char::is_uppercase)
+}
+
 fn qualified(module: &Option<Ident>, name: &Ident) -> String {
     match module {
         Some(m) => format!("{}.{}", m.name, name.name),
@@ -760,6 +765,15 @@ impl Printer<'_> {
         self.expr(e, POSTFIX)
     }
 
+    /// The callee of a call: a constructor name is printed without the `()`
+    /// it has in a value position, since the call supplies it.
+    fn callee(&mut self, e: &Expr) -> Doc {
+        match &e.kind {
+            ExprKind::Name { module, name } if is_upper(&name.name) => t(qualified(module, name)),
+            _ => self.target(e),
+        }
+    }
+
     fn data_item(&mut self, item: &DItem) -> Part {
         let (start, end, doc_of): (u32, u32, _) = match item {
             DItem::Pos(e) => (e.span.0.start, e.span.0.end, None),
@@ -1063,7 +1077,7 @@ impl Printer<'_> {
     /// [`MAX_CALL_DEPTH`] is never on one line: its arguments go one per line
     /// (the layout of a call that does not fit the width).
     fn call(&mut self, e: &Expr, callee: &Expr, args: &[DItem]) -> Doc {
-        let callee = self.target(callee);
+        let callee = self.callee(callee);
         if call_depth(e) <= MAX_CALL_DEPTH || args.is_empty() {
             return cat(vec![callee, self.data(args, true)]);
         }

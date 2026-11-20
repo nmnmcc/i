@@ -402,7 +402,7 @@ fn the_wasi_imports_of_the_runtime_are_refused() {
         let e = build_error(&external);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
         let service = format!(
-            "@host(\"{wasi_module}\")\nW = ({name} = (Bool) -> ())\n\nmain = () <- (w : W) {{ w.{name}(True) }}\n"
+            "@host(\"{wasi_module}\")\nW = ({name} = (Bool) -> ())\n\nmain = () <- (w : W) {{ w.{name}(True()) }}\n"
         );
         let e = build_error(&service);
         assert!(e.contains("the runtime imports"), "{name}: {e}");
@@ -513,20 +513,20 @@ paused = () {
 	k = {
 		control.boundary((b) {
 			control.boundary((b2) { g(b, b2) })
-			Done
+			Done()
 		})
 	} |>
 		(Paused(k)) { k }
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 	handed = control.boundary((b0) {
 		{
 			control.cancel(k)
-			Lost
+			Lost()
 		} <- (Out(put = (k2) { control.suspend(b0, (rest) { Handed(k2) }) }))
 	})
 	handed |>
 		(Handed(Inner(k2))) { k2 }
-		& (Lost) { panic("k2 was not handed out") }
+		& (Lost()) { panic("k2 was not handed out") }
 }
 "#;
 
@@ -549,7 +549,7 @@ Over = ()
 // `h` resumes k2, which needs `Out`, so k3 needs it too.
 ThirdSum = Third | Over
 
-keep = (t) { t |> (Over) { Over } & (t) { t } }
+keep = (t) { t |> (Over()) { Over() } & (t) { t } }
 
 // Not in tail position, so the frame waits.
 inner = (k2) { control.resume(k2, ()) + 1 }
@@ -557,7 +557,7 @@ inner = (k2) { control.resume(k2, ()) + 1 }
 h = (b3, k2) {
 	control.suspend(b3, (k3) { Third(k3) })
 	inner(k2)
-	Over
+	Over()
 }
 "#;
 
@@ -582,7 +582,7 @@ main = () {
 		k2 = paused()
 		k3 = { control.boundary((b3) { o1(b3, k2) }) } |>
 			(Third(k3)) { k3 }
-			& (Over) { panic("not paused") }
+			& (Over()) { panic("not paused") }
 		control.resume(k3, ())
 		()
 	} <- (Out(put = (k2) { () }))
@@ -617,11 +617,11 @@ main = () {
 		k = {
 			control.boundary((b) {
 				h_tail(b)
-				Done
+				Done()
 			})
 		} |>
 			(Paused(k)) { k }
-			& (Done) { panic("not paused") }
+			& (Done()) { panic("not paused") }
 		{
 			control.resume(k, ())
 			()
@@ -662,11 +662,11 @@ main = () {
 		k = {
 			control.boundary((b) {
 				h_tail(b)
-				Done
+				Done()
 			})
 		} |>
 			(Paused(k)) { k }
-			& (Done) { panic("not paused") }
+			& (Done()) { panic("not paused") }
 		{
 			control.cancel(k)
 			()
@@ -705,13 +705,13 @@ body = (outer) {
 		)
 	})
 	say("after inner: " <> x)
-	Done
+	Done()
 }
 
 main = () <- (io : Io) {
 	k = { control.boundary((outer) { body(outer) }) } |>
 		(Paused(k)) { k }
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 	say("cancel")
 	control.cancel(k)
 	say("cancel gave ()")
@@ -752,11 +752,11 @@ paused = () {
 				)
 			})
 			fail.raise(7)
-			Done
+			Done()
 		})
 	} |>
 		(Paused(k)) { k }
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 }
 
 // `cancel` has no errors in its type. Here it runs the ordinary code
@@ -771,11 +771,11 @@ main = () <- (io : Io) {
 	r = fail.catch(() {
 		held = control.boundary((hold) {
 			resource.ensure(() { 99 }, () { with(hold, k) })
-			Over
+			Over()
 		})
 		held |>
 			(Held(k2)) { control.resume(k2, ()) }
-			& (Over) { panic("not held") }
+			& (Over()) { panic("not held") }
 	})
 	io.print(core.inspect(r))
 }

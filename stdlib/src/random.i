@@ -59,15 +59,15 @@ variant = (x : Int) -> Int {
 
 popcount = (x : Int, count : Int) -> Int {
 	{ x == 0 } |>
-		(True) { count }
-		& (False) { popcount(core.bit_and(x, x - 1), count + 1) }
+		(True()) { count }
+		& (False()) { popcount(core.bit_and(x, x - 1), count + 1) }
 }
 
 mix_gamma = (x : Int) -> Int {
 	z = core.bit_or(variant(x), 1)
 	{ popcount(xor_shift(z, 1), 0) < 24 } |>
-		(True) { core.bit_xor(z, 0xaaaaaaaaaaaaaaaa) }
-		& (False) { z }
+		(True()) { core.bit_xor(z, 0xaaaaaaaaaaaaaaaa) }
+		& (False()) { z }
 }
 
 /// Normalizes any seed modulo 2^64; seeds differing by 2^64 are equal.
@@ -86,8 +86,8 @@ word = (g : Generator) -> (Int, Generator) {
 // The least positive power of 2^64 that covers the bound.
 space_for = (below : Int, space : Int) -> Int {
 	{ space >= below } |>
-		(True) { space }
-		& (False) { space_for(below, space * word_size()) }
+		(True()) { space }
+		& (False()) { space_for(below, space * word_size()) }
 }
 
 // Words are assembled least significant first. Thread every rejected draw.
@@ -96,8 +96,8 @@ word_group = (g : Generator, space : Int, scale : Int, value : Int) -> (
 	Generator,
 ) {
 	{ scale == space } |>
-		(True) { (value, g) }
-		& (False) {
+		(True()) { (value, g) }
+		& (False()) {
 			(u, next) = word(g)
 			word_group(next, space, scale * word_size(), value + u * scale)
 		}
@@ -109,19 +109,19 @@ bounded = (g : Generator, below : Int, space : Int, limit : Int) -> (
 ) {
 	(u, next) = word_group(g, space, 1, 0)
 	{ u < limit } |>
-		(True) { (u % below, next) }
-		& (False) { bounded(next, below, space, limit) }
+		(True()) { (u % below, next) }
+		& (False()) { bounded(next, below, space, limit) }
 }
 
 /// A value in [0, below), with rejection to avoid modulo bias.
 /// InvalidBound carries a nonpositive bound, without drawing a word.
 int = (g : Generator, below : Int) -> (Int, Generator) {
 	{ below > 0 } |>
-		(True) {
+		(True()) {
 			space = space_for(below, word_size())
 			bounded(g, below, space, space - space % below)
 		}
-		& (False) { fail.raise(InvalidBound(below)) }
+		& (False()) { fail.raise(InvalidBound(below)) }
 }
 
 /// A Float in [0, 1), using the high 53 bits of one word.
@@ -141,8 +141,8 @@ native_split = (h : State) -> (State, State) {
 edge = (h : State, bit : Int) -> State {
 	(rest, a) = native_split(h)
 	{ bit == 0 } |>
-		(True) { a }
-		& (False) {
+		(True()) { a }
+		& (False()) {
 			(_, b) = native_split(rest)
 			b
 		}
@@ -159,18 +159,20 @@ split = (g : Generator) -> (Generator, Generator) {
 }
 
 valid_path = (path : List(Int)) -> Bool {
-	path |> ([]) { True } & ([i, ..rest]) { i > 0 && valid_path(rest) }
+	path |> ([]) { True() } & ([i, ..rest]) { i > 0 && valid_path(rest) }
 }
 
 // Produce the positive index's binary digits in most-significant-first order.
 binary = (n : Int, bits : List(Int), length : Int) -> (List(Int), Int) {
 	{ n == 0 } |>
-		(True) { (bits, length) }
-		& (False) { binary(n / 2, [n % 2, ..bits], length + 1) }
+		(True()) { (bits, length) }
+		& (False()) { binary(n / 2, [n % 2, ..bits], length + 1) }
 }
 
 zeros = (h : State, count : Int) -> State {
-	{ count == 0 } |> (True) { h } & (False) { zeros(edge(h, 0), count - 1) }
+	{ count == 0 } |>
+		(True()) { h }
+		& (False()) { zeros(edge(h, 0), count - 1) }
 }
 
 follow = (h : State, bits : List(Int)) -> State {
@@ -198,6 +200,6 @@ derive_path = (g : Generator, path : List(Int)) -> Generator {
 /// InvalidPath carries the whole supplied path, without deriving or drawing.
 at_path = (g : Generator, path : List(Int)) -> Generator {
 	valid_path(path) |>
-		(True) { derive_path(g, path) }
-		& (False) { fail.raise(InvalidPath(path)) }
+		(True()) { derive_path(g, path) }
+		& (False()) { fail.raise(InvalidPath(path)) }
 }

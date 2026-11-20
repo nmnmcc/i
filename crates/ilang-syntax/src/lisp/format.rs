@@ -219,6 +219,10 @@ impl Builder<'_> {
     }
 
     fn datum(&mut self, datum: &Datum) -> usize {
+        self.unwrapped(datum)
+    }
+
+    fn unwrapped(&mut self, datum: &Datum) -> usize {
         let (open, close, xs) = match &datum.kind {
             K::Quote(d) | K::Unquote(d) | K::Splice(d) => {
                 let mut parts = vec![Part::Text(if matches!(datum.kind, K::Quote(_)) {
@@ -250,7 +254,7 @@ impl Builder<'_> {
         };
         let mut items = Vec::new();
         let mut end = datum.span.start + open.len() as u32;
-        for child in xs {
+        for child in xs.iter() {
             self.gap(end, child.span.start, false, &mut items);
             let id = self.datum(child);
             items.push(Item::Datum(id));

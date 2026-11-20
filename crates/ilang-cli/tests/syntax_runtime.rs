@@ -79,20 +79,20 @@ test("exercise", () -> () {
 		made = syntax.make(syntax.Node(syntax.Name("made")), value)
 		assert(syntax.show(made) == "made")
 		assert(syntax.same_code(made, made))
-		assert(syntax.show_as(made, syntax.Expression) == "made")
+		assert(syntax.show_as(made, syntax.Expression()) == "made")
 		pair = syntax.make(syntax.Node(syntax.Round([made, value])), value)
 		assert(syntax.show(pair) == "(made (f x))")
-		assert(syntax.show_as(pair, syntax.Expression) == "made(f(x))")
-		assert(syntax.show_as(pair, syntax.ValueItem) == "made(f(x))")
-		assert(syntax.show_as(pair, syntax.Statement) == "made(f(x))")
-		assert(syntax.show_as(pair, syntax.Type) == "made(f(x))")
-		assert(syntax.show_as(pair, syntax.TypeItem) == "made(f(x))")
-		assert(syntax.show_as(made, syntax.Pattern) == "made")
-		assert(syntax.show_as(made, syntax.PatternItem) == "made")
-		assert(syntax.show_as(made, syntax.ExportItem) == "made")
-		assert(syntax.show_as(made, syntax.Format) == "made")
-		assert(syntax.show_as(made, syntax.Segment) == "made")
-		assert(syntax.show_as(made, syntax.Attribute) == "@made")
+		assert(syntax.show_as(pair, syntax.Expression()) == "made(f(x))")
+		assert(syntax.show_as(pair, syntax.ValueItem()) == "made(f(x))")
+		assert(syntax.show_as(pair, syntax.Statement()) == "made(f(x))")
+		assert(syntax.show_as(pair, syntax.Type()) == "made(f(x))")
+		assert(syntax.show_as(pair, syntax.TypeItem()) == "made(f(x))")
+		assert(syntax.show_as(made, syntax.Pattern()) == "made")
+		assert(syntax.show_as(made, syntax.PatternItem()) == "made")
+		assert(syntax.show_as(made, syntax.ExportItem()) == "made")
+		assert(syntax.show_as(made, syntax.Format()) == "made")
+		assert(syntax.show_as(made, syntax.Segment()) == "made")
+		assert(syntax.show_as(made, syntax.Attribute()) == "@made")
 		fail.catch(() { syntax.make(syntax.Node(syntax.Name("Bad Name")), value) }) |>
 			(Error(syntax.SyntaxError(message = message, at = at))) {
 				assert(message != "")
@@ -102,7 +102,7 @@ test("exercise", () -> () {
 		comma = syntax.make(syntax.Node(syntax.Symbol(",")), value)
 		assert(syntax.show(comma) == ",")
 		bad = syntax.make(syntax.Node(syntax.Round(BAD)), value)
-		fail.catch(() { syntax.show_as(bad, syntax.Expression) }) |>
+		fail.catch(() { syntax.show_as(bad, syntax.Expression()) }) |>
 			(Error(syntax.SyntaxError(message = message, at = at))) {
 				assert(message != "")
 				assert(syntax.same_code(at, bad))
@@ -401,7 +401,7 @@ test("exercise", () {
 		}
 		& (_) { panic("wrong splice captures") }
 	failed = syntax._match(pattern, syntax._template(2))
-	assert(syntax._match_ok(failed) == False)
+	assert(syntax._match_ok(failed) == False())
 	()
 })
 "#,

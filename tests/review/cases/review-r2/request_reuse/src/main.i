@@ -7,8 +7,8 @@
 Later = (echo = (String) -> Request(String))
 cycle = (n : Int) <- (later : Later) {
 	{ n == 0 } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			owner = request.open_owner()
 			{
 				old = later.echo("old")
@@ -16,7 +16,7 @@ cycle = (n : Int) <- (later : Later) {
 				fresh = later.echo("fresh")
 				request.cancel(request.ticket(old))
 				assert(request.await_owned(fresh) == "fresh")
-				assert(request.state(old) == request.Cancelled)
+				assert(request.state(old) == request.Cancelled())
 				request.close_owner(owner)
 				cycle(n - 1)
 			} <- (owner)

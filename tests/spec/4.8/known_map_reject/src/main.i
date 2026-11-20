@@ -5,4 +5,4 @@
 )
 x = list.map(["a"], (s) { s == "b" })
 
-main = () { assert(x == [False]) }
+main = () { assert(x == [False()]) }

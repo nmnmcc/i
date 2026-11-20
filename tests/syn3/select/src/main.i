@@ -23,7 +23,7 @@ gcd = (a : Int, 0) -> Int { a } & (a : Int, b : Int) -> Int { gcd(b, a % b) }
 
 /// `None` has a branch because the transition checker reads `Some(A)` and
 /// `None` as the constructors of `Option(A)`, which a group must cover.
-f = (Some(0)) { "zero" } & (Some(n)) { n } & (None) { "none" }
+f = (Some(0)) { "zero" } & (Some(n)) { n } & (None()) { "none" }
 
 first = (x : Int) { "a" } & (x : { Int | String }) { 1 }
 

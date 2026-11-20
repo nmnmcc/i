@@ -1232,49 +1232,49 @@ test("pbkdf2_rfc6070_sha256_8", () {
 })
 
 test("equal_empty", () {
-	assert(crypto.constant_time_equal(<<>>, <<>>) == True)
+	assert(crypto.constant_time_equal(<<>>, <<>>) == True())
 	()
 })
 
 test("equal_bytes", () {
-	assert(crypto.constant_time_equal(<<1, 2, 255>>, <<1, 2, 255>>) == True)
+	assert(crypto.constant_time_equal(<<1, 2, 255>>, <<1, 2, 255>>) == True())
 	()
 })
 
 test("equal_first", () {
-	assert(crypto.constant_time_equal(<<0, 2>>, <<1, 2>>) == False)
+	assert(crypto.constant_time_equal(<<0, 2>>, <<1, 2>>) == False())
 	()
 })
 
 test("equal_last", () {
-	assert(crypto.constant_time_equal(<<1, 2>>, <<1, 3>>) == False)
+	assert(crypto.constant_time_equal(<<1, 2>>, <<1, 3>>) == False())
 	()
 })
 
 test("equal_length", () {
-	assert(crypto.constant_time_equal(<<1>>, <<1, 0>>) == False)
+	assert(crypto.constant_time_equal(<<1>>, <<1, 0>>) == False())
 	()
 })
 
 test("equal_bits", () {
-	assert(crypto.constant_time_equal(<<5:u3>>, <<5:u3>>) == True)
+	assert(crypto.constant_time_equal(<<5:u3>>, <<5:u3>>) == True())
 	()
 })
 
 test("unequal_bits", () {
-	assert(crypto.constant_time_equal(<<4:u3>>, <<5:u3>>) == False)
+	assert(crypto.constant_time_equal(<<4:u3>>, <<5:u3>>) == False())
 	()
 })
 
 test("unequal_bitlength", () {
-	assert(crypto.constant_time_equal(<<0:u3>>, <<0:u4>>) == False)
+	assert(crypto.constant_time_equal(<<0:u3>>, <<0:u4>>) == False())
 	()
 })
 
 test("hmac_alignment", () {
 	assert(
 		fail.catch(() { crypto.hmac_sha256(<<1:u1>>, <<>>) }) ==
-			Error(crypto.UnalignedInput),
+			Error(crypto.UnalignedInput()),
 	)
 	()
 })
@@ -1282,7 +1282,7 @@ test("hmac_alignment", () {
 test("hmac512_alignment", () {
 	assert(
 		fail.catch(() { crypto.hmac_sha512(<<>>, <<1:u1>>) }) ==
-			Error(crypto.UnalignedInput),
+			Error(crypto.UnalignedInput()),
 	)
 	()
 })
@@ -1290,7 +1290,7 @@ test("hmac512_alignment", () {
 test("hkdf_negative", () {
 	assert(
 		fail.catch(() { crypto.hkdf_sha256(<<>>, <<>>, <<>>, -1) }) ==
-			Error(crypto.InvalidLength),
+			Error(crypto.InvalidLength()),
 	)
 	()
 })
@@ -1298,7 +1298,7 @@ test("hkdf_negative", () {
 test("hkdf_limit", () {
 	assert(
 		fail.catch(() { crypto.hkdf_sha256(<<>>, <<>>, <<>>, 8161) }) ==
-			Error(crypto.InvalidLength),
+			Error(crypto.InvalidLength()),
 	)
 	()
 })
@@ -1306,7 +1306,7 @@ test("hkdf_limit", () {
 test("hkdf512_limit", () {
 	assert(
 		fail.catch(() { crypto.hkdf_sha512(<<>>, <<>>, <<>>, 16321) }) ==
-			Error(crypto.InvalidLength),
+			Error(crypto.InvalidLength()),
 	)
 	()
 })
@@ -1314,7 +1314,7 @@ test("hkdf512_limit", () {
 test("hkdf_short_prk", () {
 	assert(
 		fail.catch(() { crypto.hkdf_expand_sha256(<<1>>, <<>>, 1) }) ==
-			Error(crypto.InvalidLength),
+			Error(crypto.InvalidLength()),
 	)
 	()
 })
@@ -1322,7 +1322,7 @@ test("hkdf_short_prk", () {
 test("pbkdf_zero_iterations", () {
 	assert(
 		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, 0, 1) }) ==
-			Error(crypto.InvalidIterations),
+			Error(crypto.InvalidIterations()),
 	)
 	()
 })
@@ -1330,7 +1330,7 @@ test("pbkdf_zero_iterations", () {
 test("pbkdf_negative_iterations", () {
 	assert(
 		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, -1, 1) }) ==
-			Error(crypto.InvalidIterations),
+			Error(crypto.InvalidIterations()),
 	)
 	()
 })
@@ -1338,7 +1338,7 @@ test("pbkdf_negative_iterations", () {
 test("pbkdf_negative_length", () {
 	assert(
 		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, 1, -1) }) ==
-			Error(crypto.InvalidLength),
+			Error(crypto.InvalidLength()),
 	)
 	()
 })
@@ -1346,7 +1346,7 @@ test("pbkdf_negative_length", () {
 test("pbkdf_limit", () {
 	assert(
 		fail.catch(() { crypto.pbkdf2_sha256(<<>>, <<>>, 1, 137438953441) }) ==
-			Error(crypto.InvalidLength),
+			Error(crypto.InvalidLength()),
 	)
 	()
 })
@@ -1354,7 +1354,7 @@ test("pbkdf_limit", () {
 test("pbkdf_alignment", () {
 	assert(
 		fail.catch(() { crypto.pbkdf2_sha256(<<1:u1>>, <<>>, 1, 1) }) ==
-			Error(crypto.UnalignedInput),
+			Error(crypto.UnalignedInput()),
 	)
 	()
 })
@@ -1371,7 +1371,7 @@ test("random_bytes_negative", () {
 	{
 		assert(
 			fail.catch(() { crypto.random_bytes(-1) }) ==
-				Error(crypto.InvalidLength),
+				Error(crypto.InvalidLength()),
 		)
 		()
 	} <- (
@@ -1388,7 +1388,7 @@ test("random_bytes_service_error", () {
 				Error(
 					process.ProcessError(
 						operation = "entropy",
-						reason = process.Other,
+						reason = process.Other(),
 						code = "entropy failed",
 					),
 				),

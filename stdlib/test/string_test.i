@@ -106,12 +106,12 @@ test("split_once_ok_test", () {
 })
 
 test("split_once_not_found_test", () {
-	assert(string.split_once("Gleam", ",") == None)
+	assert(string.split_once("Gleam", ",") == None())
 	()
 })
 
 test("split_once_empty_test", () {
-	assert(string.split_once("", ",") == None)
+	assert(string.split_once("", ",") == None())
 	()
 })
 
@@ -129,27 +129,27 @@ test("append_test", () {
 })
 
 test("compare_equal_test", () {
-	assert(string.compare("", "") == order.Equal)
+	assert(string.compare("", "") == order.Equal())
 	()
 })
 
 test("compare_a_gt_empty_test", () {
-	assert(string.compare("a", "") == order.Greater)
+	assert(string.compare("a", "") == order.Greater())
 	()
 })
 
 test("compare_lowercase_a_gt_uppercase_a_test", () {
-	assert(string.compare("a", "A") == order.Greater)
+	assert(string.compare("a", "A") == order.Greater())
 	()
 })
 
 test("compare_uppercase_a_lt_uppercase_b_test", () {
-	assert(string.compare("A", "B") == order.Less)
+	assert(string.compare("A", "B") == order.Less())
 	()
 })
 
 test("compare_t_gt_uppercase_abc_test", () {
-	assert(string.compare("t", "ABC") == order.Greater)
+	assert(string.compare("t", "ABC") == order.Greater())
 	()
 })
 
@@ -690,7 +690,7 @@ test("pop_codepoint_single_test", () {
 })
 
 test("pop_codepoint_empty_test", () {
-	assert(string.pop_codepoint("") == None)
+	assert(string.pop_codepoint("") == None())
 	()
 })
 
@@ -883,7 +883,7 @@ test("utf_codepoint_to_int_test", () {
 })
 
 test("to_option_empty_test", () {
-	assert(string.to_option("") == None)
+	assert(string.to_option("") == None())
 	()
 })
 
@@ -893,7 +893,7 @@ test("to_option_non_empty_test", () {
 })
 
 test("first_empty_test", () {
-	None = string.first("")
+	None() = string.first("")
 	()
 })
 
@@ -914,7 +914,7 @@ test("first_single_test", () {
 })
 
 test("last_empty_test", () {
-	None = string.last("")
+	None() = string.last("")
 	()
 })
 
@@ -984,27 +984,27 @@ InspectTypeTwo(A, B) = (A, B)
 InspectType(A, B) = InspectTypeZero | InspectTypeOne(A) | InspectTypeTwo(A, B)
 
 test("inspect_0_test", () {
-	assert(string.inspect(True) == "True")
+	assert(string.inspect(True()) == "True")
 	()
 })
 
 test("inspect_4_test", () {
-	assert(string.inspect(False) == "False")
+	assert(string.inspect(False()) == "False")
 	()
 })
 
 test("inspect_8_test", () {
-	assert(string.inspect([True, False]) == "[True, False]")
+	assert(string.inspect([True(), False()]) == "[True, False]")
 	()
 })
 
 test("inspect_12_test", () {
-	assert(string.inspect([False, False]) == "[False, False]")
+	assert(string.inspect([False(), False()]) == "[False, False]")
 	()
 })
 
 test("inspect_16_test", () {
-	assert(string.inspect([True, True]) == "[True, True]")
+	assert(string.inspect([True(), True()]) == "[True, True]")
 	()
 })
 
@@ -1014,37 +1014,37 @@ test("inspect_20_test", () {
 })
 
 test("inspect_24_test", () {
-	assert(string.inspect((True, False)) == "(True, False)")
+	assert(string.inspect((True(), False())) == "(True, False)")
 	()
 })
 
 test("inspect_28_test", () {
-	assert(string.inspect((False, False)) == "(False, False)")
+	assert(string.inspect((False(), False())) == "(False, False)")
 	()
 })
 
 test("inspect_32_test", () {
-	assert(string.inspect((True, True)) == "(True, True)")
+	assert(string.inspect((True(), True())) == "(True, True)")
 	()
 })
 
 test("inspect_36_test", () {
-	assert(string.inspect(((), True)) == "((), True)")
+	assert(string.inspect(((), True())) == "((), True)")
 	()
 })
 
 test("inspect_40_test", () {
-	assert(string.inspect(((), False)) == "((), False)")
+	assert(string.inspect(((), False())) == "((), False)")
 	()
 })
 
 test("inspect_44_test", () {
-	assert(string.inspect((True, ())) == "(True, ())")
+	assert(string.inspect((True(), ())) == "(True, ())")
 	()
 })
 
 test("inspect_48_test", () {
-	assert(string.inspect((False, ())) == "(False, ())")
+	assert(string.inspect((False(), ())) == "(False, ())")
 	()
 })
 
@@ -1416,7 +1416,7 @@ test("inspect_338_test", () {
 
 test("inspect_342_test", () {
 	assert(
-		string.inspect(([1, 2, 3], "🌈", "🏳️‍🌈", (1, "1", True))) ==
+		string.inspect(([1, 2, 3], "🌈", "🏳️‍🌈", (1, "1", True()))) ==
 			"([1, 2, 3], \"🌈\", \"🏳️‍🌈\", (1, \"1\", True))",
 	)
 	()
@@ -1433,12 +1433,12 @@ test("inspect_351_test", () {
 })
 
 test("inspect_355_test", () {
-	assert(string.inspect(Ok(True)) == "Ok(True)")
+	assert(string.inspect(Ok(True())) == "Ok(True)")
 	()
 })
 
 test("inspect_359_test", () {
-	assert(string.inspect(Ok(False)) == "Ok(False)")
+	assert(string.inspect(Ok(False())) == "Ok(False)")
 	()
 })
 
@@ -1453,12 +1453,12 @@ test("inspect_367_test", () {
 })
 
 test("inspect_371_test", () {
-	assert(string.inspect(Error(True)) == "Error(True)")
+	assert(string.inspect(Error(True())) == "Error(True)")
 	()
 })
 
 test("inspect_375_test", () {
-	assert(string.inspect(Error(False)) == "Error(False)")
+	assert(string.inspect(Error(False())) == "Error(False)")
 	()
 })
 
@@ -1468,7 +1468,7 @@ test("inspect_379_test", () {
 })
 
 test("inspect_383_test", () {
-	assert(string.inspect(InspectTypeZero) == "InspectTypeZero")
+	assert(string.inspect(InspectTypeZero()) == "InspectTypeZero")
 	()
 })
 
@@ -1537,7 +1537,7 @@ test("inspect_432_test", () {
 
 test("inspect_436_test", () {
 	assert(
-		string.inspect((_ : Int, _ : String) -> Bool { False }) ==
+		string.inspect((_ : Int, _ : String) -> Bool { False() }) ==
 			"//fn(a, b) { ... }",
 	)
 	()
@@ -1553,7 +1553,7 @@ test("inspect_441_test", () {
 
 test("inspect_446_test", () {
 	assert(
-		string.inspect(InspectTypeOne(InspectTypeZero)) ==
+		string.inspect(InspectTypeOne(InspectTypeZero())) ==
 			"InspectTypeOne(InspectTypeZero)",
 	)
 	()
@@ -1662,7 +1662,7 @@ test("inspect_charlist_test", () {
 // strings and bit arrays; these assertions replace duplicated host branches.
 test("target_inspect_tuple_test", () {
 	assert(
-		string.inspect((InspectTypeZero, InspectTypeZero)) ==
+		string.inspect((InspectTypeZero(), InspectTypeZero())) ==
 			"(InspectTypeZero, InspectTypeZero)",
 	)
 	()
@@ -1803,8 +1803,8 @@ test("split_unicode_needle_test", () {
 
 test("split_once_more_test", () {
 	assert(string.split_once("key=value=x", "=") == Some(("key", "value=x")))
-	assert(string.split_once("novalue", "=") == None)
-	assert(string.split_once("abc", "") == None)
+	assert(string.split_once("novalue", "=") == None())
+	assert(string.split_once("abc", "") == None())
 	assert(string.split_once("=", "=") == Some(("", "")))
 })
 
@@ -1959,13 +1959,13 @@ test("codepoints_test", () {
 })
 
 test("compare_more_test", () {
-	assert(string.compare("a", "b") == Less)
-	assert(string.compare("b", "a") == Greater)
-	assert(string.compare("abc", "abc") == Equal)
-	assert(string.compare("ab", "abc") == Less)
-	assert(string.compare("", "a") == Less)
-	assert(string.compare("é", "z") == Greater)
-	assert(string.compare("Z", "a") == Less)
+	assert(string.compare("a", "b") == Less())
+	assert(string.compare("b", "a") == Greater())
+	assert(string.compare("abc", "abc") == Equal())
+	assert(string.compare("ab", "abc") == Less())
+	assert(string.compare("", "a") == Less())
+	assert(string.compare("é", "z") == Greater())
+	assert(string.compare("Z", "a") == Less())
 	assert(
 		list.sort(["pear", "apple", "fig", "Apple"], string.compare) ==
 			["Apple", "apple", "fig", "pear"],

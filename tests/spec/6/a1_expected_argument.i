@@ -14,10 +14,10 @@ list_map = <A, B>(xs : List(A), f : (A) -> B) -> List(B) {
 main = () {
 	opts : List(Option(User)) = [
 		Some(User(name = "Ada")),
-		None,
+		None(),
 		Some(User(name = "Bob")),
 	]
-	names = list_map(opts, (Some(u)) { u.name } & (None) { "" })
+	names = list_map(opts, (Some(u)) { u.name } & (None()) { "" })
 	assert(names == ["Ada", "", "Bob"])
 	()
 }

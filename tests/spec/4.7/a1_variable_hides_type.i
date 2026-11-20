@@ -6,6 +6,6 @@
 id = <Int>(x : Int) { x }
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

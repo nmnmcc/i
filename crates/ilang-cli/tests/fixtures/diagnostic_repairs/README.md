@@ -3,9 +3,13 @@ Original model programs, copied byte for byte from the round2 archive.
 The `.txt` suffix keeps these intentionally invalid programs out of source
 formatting and snippet discovery. The CLI regression test supplies `src/main.i`
 and a manifest pointing at this worktree’s std; the program text is unchanged
-but for one edit: since `&` replaced `|` as the separator of value-level
-chains, each such `|` byte was changed to `&` (and nothing else), so the
-programs still reach the errors they were archived for. The offsets came from
+but for two mechanical edits, so that the programs still reach the errors they
+were archived for: since `&` replaced `|` as the separator of value-level
+chains, each such `|` byte was changed to `&`; and since a constructor is now a
+function, a bare zero-payload constructor in a value or pattern is written as
+its call, `C()`, which is what the repository migration wrote everywhere else.
+The `.stderr` expectations were re-recorded from the migrated text; they keep
+the same diagnostics, and only columns that follow an inserted call move. The offsets came from
 the chain-separators example of the one-shot `and-chain-migrate` script, run
 with the parser that still read `|`; in `t5-a1-r1.txt`, which does not parse, two
 branch separators at 116:10 and 117:10 lie where that parser recovers, and

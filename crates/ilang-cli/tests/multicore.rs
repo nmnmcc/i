@@ -12,7 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const SPIN: &str = "spin = (n : Int, x : Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n";
+const SPIN: &str = "spin = (n : Int, x : Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n";
 
 fn project(name: &str, source: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("ilang-multicore-{name}-{}", std::process::id()));
@@ -164,7 +164,7 @@ fn tasks_keep_running_on_their_worker_across_steps() {
     let (_, _, trace) = agree(
         "steps",
         &format!(
-            "(\n\ti/task\n\ti/stdio\n\ti/core\n)\n\n{SPIN}\ncollect = (c : task.Channel(Int), n : Int, acc : Int) -> Int {{\n\t{{ n == 0 }} |>\n\t\t(True) {{ acc }}\n\t\t& (False) {{ collect(c, n - 1, acc + task.receive(c)) }}\n}}\n\nmain = () {{\n\t(results, total) = task.scope((s) {{\n\t\tc : task.Channel(Int) = task.channel()\n\t\tsum = task.go(s, () {{ collect(c, 8, 0) }})\n\t\tresults = task.map_concurrently([1, 2, 3, 4, 5, 6, 7, 8], (i) {{\n\t\t\ta = spin(2000000 + i, i)\n\t\t\ttask.yield()\n\t\t\ttask.send(c, a)\n\t\t\t(spin(2000000 + i, a), task.path())\n\t\t}})\n\t\t(results, task.join(sum))\n\t}})\n\tstdio.print(core.inspect(results))\n\tstdio.print(core.inspect(total))\n}}\n"
+            "(\n\ti/task\n\ti/stdio\n\ti/core\n)\n\n{SPIN}\ncollect = (c : task.Channel(Int), n : Int, acc : Int) -> Int {{\n\t{{ n == 0 }} |>\n\t\t(True()) {{ acc }}\n\t\t& (False()) {{ collect(c, n - 1, acc + task.receive(c)) }}\n}}\n\nmain = () {{\n\t(results, total) = task.scope((s) {{\n\t\tc : task.Channel(Int) = task.channel()\n\t\tsum = task.go(s, () {{ collect(c, 8, 0) }})\n\t\tresults = task.map_concurrently([1, 2, 3, 4, 5, 6, 7, 8], (i) {{\n\t\t\ta = spin(2000000 + i, i)\n\t\t\ttask.yield()\n\t\t\ttask.send(c, a)\n\t\t\t(spin(2000000 + i, a), task.path())\n\t\t}})\n\t\t(results, task.join(sum))\n\t}})\n\tstdio.print(core.inspect(results))\n\tstdio.print(core.inspect(total))\n}}\n"
         ),
     );
     started_once(&trace);
@@ -197,7 +197,7 @@ fn channel_pipeline_agrees_across_worker_counts() {
     let (_, _, trace) = agree(
         "pipeline",
         &format!(
-            "(\n\ti/task\n\ti/stdio\n\ti/core\n)\n\n{SPIN}\nproduce = (out : task.Channel(Int), i : Int, n : Int) -> () {{\n\t{{ i > n }} |>\n\t\t(True) {{ () }}\n\t\t& (False) {{\n\t\t\ttask.send(out, i)\n\t\t\tproduce(out, i + 1, n)\n\t\t}}\n}}\n\nwork = (\n\tinput : task.Channel(Int),\n\tout : task.Channel((Int, Int)),\n\tn : Int\n) -> () {{\n\t{{ n == 0 }} |>\n\t\t(True) {{ () }}\n\t\t& (False) {{\n\t\t\ti = task.receive(input)\n\t\t\ttask.send(out, (i, spin(300000 + i, i)))\n\t\t\twork(input, out, n - 1)\n\t\t}}\n}}\n\ngather = (out : task.Channel((Int, Int)), n : Int, acc : List((Int, Int))) -> List(\n\t(Int, Int),\n) {{\n\t{{ n == 0 }} |>\n\t\t(True) {{ acc }}\n\t\t& (False) {{ gather(out, n - 1, [task.receive(out), ..acc]) }}\n}}\n\ninsert = (x : (Int, Int), xs : List((Int, Int))) -> List((Int, Int)) {{\n\txs |>\n\t\t([]) {{ [x] }}\n\t\t& ([y, ..rest]) {{\n\t\t\t(a, _) = x\n\t\t\t(b, _) = y\n\t\t\t{{ a < b }} |>\n\t\t\t\t(True) {{ [x, y, ..rest] }}\n\t\t\t\t& (False) {{ [y, ..insert(x, rest)] }}\n\t\t}}\n}}\n\nsort = (xs : List((Int, Int)), acc : List((Int, Int))) -> List((Int, Int)) {{\n\txs |> ([]) {{ acc }} & ([x, ..rest]) {{ sort(rest, insert(x, acc)) }}\n}}\n\nmain = () {{\n\tresults = task.scope((s) {{\n\t\tinput : task.Channel(Int) = task.channel()\n\t\tout : task.Channel((Int, Int)) = task.channel()\n\t\ttask.go(s, () {{ produce(input, 1, 32) }})\n\t\ttask.go(s, () {{ work(input, out, 8) }})\n\t\ttask.go(s, () {{ work(input, out, 8) }})\n\t\ttask.go(s, () {{ work(input, out, 8) }})\n\t\ttask.go(s, () {{ work(input, out, 8) }})\n\t\tcollector = task.go(s, () {{ gather(out, 32, []) }})\n\t\tsort(task.join(collector), [])\n\t}})\n\tstdio.print(core.inspect(results))\n}}\n"
+            "(\n\ti/task\n\ti/stdio\n\ti/core\n)\n\n{SPIN}\nproduce = (out : task.Channel(Int), i : Int, n : Int) -> () {{\n\t{{ i > n }} |>\n\t\t(True()) {{ () }}\n\t\t& (False()) {{\n\t\t\ttask.send(out, i)\n\t\t\tproduce(out, i + 1, n)\n\t\t}}\n}}\n\nwork = (\n\tinput : task.Channel(Int),\n\tout : task.Channel((Int, Int)),\n\tn : Int\n) -> () {{\n\t{{ n == 0 }} |>\n\t\t(True()) {{ () }}\n\t\t& (False()) {{\n\t\t\ti = task.receive(input)\n\t\t\ttask.send(out, (i, spin(300000 + i, i)))\n\t\t\twork(input, out, n - 1)\n\t\t}}\n}}\n\ngather = (out : task.Channel((Int, Int)), n : Int, acc : List((Int, Int))) -> List(\n\t(Int, Int),\n) {{\n\t{{ n == 0 }} |>\n\t\t(True()) {{ acc }}\n\t\t& (False()) {{ gather(out, n - 1, [task.receive(out), ..acc]) }}\n}}\n\ninsert = (x : (Int, Int), xs : List((Int, Int))) -> List((Int, Int)) {{\n\txs |>\n\t\t([]) {{ [x] }}\n\t\t& ([y, ..rest]) {{\n\t\t\t(a, _) = x\n\t\t\t(b, _) = y\n\t\t\t{{ a < b }} |>\n\t\t\t\t(True()) {{ [x, y, ..rest] }}\n\t\t\t\t& (False()) {{ [y, ..insert(x, rest)] }}\n\t\t}}\n}}\n\nsort = (xs : List((Int, Int)), acc : List((Int, Int))) -> List((Int, Int)) {{\n\txs |> ([]) {{ acc }} & ([x, ..rest]) {{ sort(rest, insert(x, acc)) }}\n}}\n\nmain = () {{\n\tresults = task.scope((s) {{\n\t\tinput : task.Channel(Int) = task.channel()\n\t\tout : task.Channel((Int, Int)) = task.channel()\n\t\ttask.go(s, () {{ produce(input, 1, 32) }})\n\t\ttask.go(s, () {{ work(input, out, 8) }})\n\t\ttask.go(s, () {{ work(input, out, 8) }})\n\t\ttask.go(s, () {{ work(input, out, 8) }})\n\t\ttask.go(s, () {{ work(input, out, 8) }})\n\t\tcollector = task.go(s, () {{ gather(out, 32, []) }})\n\t\tsort(task.join(collector), [])\n\t}})\n\tstdio.print(core.inspect(results))\n}}\n"
         ),
     );
     started_once(&trace);
@@ -261,7 +261,7 @@ fn shared_values_are_read_on_other_workers() {
     let (_, _, trace) = agree(
         "share",
         &format!(
-            "(\n\ti/task\n\ti/stdio\n\ti/core\n)\n\n{SPIN}\nupto = (n : Int, acc : List(Int)) -> List(Int) {{\n\t{{ n == 0 }} |> (True) {{ acc }} & (False) {{ upto(n - 1, [n, ..acc]) }}\n}}\n\ntotal = (xs : List(Int), acc : Int) -> Int {{\n\txs |> ([]) {{ acc }} & ([x, ..rest]) {{ total(rest, {{ acc + x }} % 65537) }}\n}}\n\nmain = () {{\n\tresults = task.scope((s) {{\n\t\tshared = task.share(s, upto(2000, []))\n\t\ttask.map_concurrently([1, 2, 3, 4, 5, 6, 7, 8], (i) {{\n\t\t\tspin(\n\t\t\t\t1500000 + i,\n\t\t\t\ttotal(task.get(shared), i),\n\t\t\t)\n\t\t}})\n\t}})\n\tstdio.print(core.inspect(results))\n}}\n"
+            "(\n\ti/task\n\ti/stdio\n\ti/core\n)\n\n{SPIN}\nupto = (n : Int, acc : List(Int)) -> List(Int) {{\n\t{{ n == 0 }} |> (True()) {{ acc }} & (False()) {{ upto(n - 1, [n, ..acc]) }}\n}}\n\ntotal = (xs : List(Int), acc : Int) -> Int {{\n\txs |> ([]) {{ acc }} & ([x, ..rest]) {{ total(rest, {{ acc + x }} % 65537) }}\n}}\n\nmain = () {{\n\tresults = task.scope((s) {{\n\t\tshared = task.share(s, upto(2000, []))\n\t\ttask.map_concurrently([1, 2, 3, 4, 5, 6, 7, 8], (i) {{\n\t\t\tspin(\n\t\t\t\t1500000 + i,\n\t\t\t\ttotal(task.get(shared), i),\n\t\t\t)\n\t\t}})\n\t}})\n\tstdio.print(core.inspect(results))\n}}\n"
         ),
     );
     assert_eq!(trace.published, 8);

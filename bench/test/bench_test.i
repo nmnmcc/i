@@ -27,7 +27,7 @@ randoms = (n : Int) -> List(Int) {
 }
 
 check = (ok : Bool, what : String) -> () {
-	ok |> (True) { () } & (False) { panic(what) }
+	ok |> (True()) { () } & (False()) { panic(what) }
 }
 
 test("list_build", () {
@@ -66,8 +66,8 @@ merge = (xs : List(Int), ys : List(Int), acc : List(Int)) -> List(Int) {
 				([]) { list.append(list.reverse(acc), xs) }
 				& ([y, ..ys2]) {
 					{ x > y } |>
-						(True) { merge(xs, ys2, [y, ..acc]) }
-						& (False) { merge(xs2, ys, [x, ..acc]) }
+						(True()) { merge(xs, ys2, [y, ..acc]) }
+						& (False()) { merge(xs2, ys, [x, ..acc]) }
 				}
 		}
 }
@@ -110,7 +110,7 @@ test("equality", () {
 	xs = list.map(list.range(1, 100_000), (x) { (x, "a") })
 	ys = list.map(list.range(1, 100_000), (x) { (x, "a") })
 	n = list.fold(list.range(1, 20), 0, (acc, _) {
-		{ xs == ys } |> (True) { acc + 1 } & (False) { acc }
+		{ xs == ys } |> (True()) { acc + 1 } & (False()) { acc }
 	})
 	check(n == 20, "equal")
 })

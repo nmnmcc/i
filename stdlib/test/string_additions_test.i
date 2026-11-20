@@ -13,9 +13,9 @@ test("access_and_taking", () {
 	assert(string.at("aé😀", 1) == Some("é"))
 	assert(string.at("aé😀", -1) == Some("😀"))
 	assert(string.at("aé😀", -3) == Some("a"))
-	assert(string.at("aé😀", -4) == None)
-	assert(string.at("aé😀", 3) == None)
-	assert(string.at("", 0) == None)
+	assert(string.at("aé😀", -4) == None())
+	assert(string.at("aé😀", 3) == None())
+	assert(string.at("", 0) == None())
 	assert(string.at("e\u{301}", 1) == Some("\u{301}"))
 	assert(string.at("👩\u{200d}💻", 1) == Some("\u{200d}"))
 	assert(string.take_start("aé😀", -1) == "")
@@ -32,12 +32,12 @@ test("access_and_taking", () {
 			assert(string.drop_end(s, k) <> string.take_end(s, k) == s)
 		})
 		list.each(list.range(-n - 1, n + 1), (i) {
-			normalized = { i < 0 } |> (True) { n + i } & (False) { i }
+			normalized = { i < 0 } |> (True()) { n + i } & (False()) { i }
 			{ normalized >= 0 && normalized < n } |>
-				(True) {
+				(True()) {
 					assert(string.at(s, i) == Some(string.slice(s, i, 1)))
 				}
-				& (False) { assert(string.at(s, i) == None) }
+				& (False()) { assert(string.at(s, i) == None()) }
 		})
 	})
 })
@@ -47,7 +47,7 @@ test("search_bounds_and_overlaps", () {
 	assert(string.last_index_of("aaa", "aa", 3) == Some(1))
 	assert(string.last_index_of("aaa", "aa", 0) == Some(0))
 	assert(string.last_index_of("aaa", "aa", 1) == Some(1))
-	assert(string.index_of("aaa", "aa", 2) == None)
+	assert(string.index_of("aaa", "aa", 2) == None())
 	assert(string.index_of("aé😀é", "é", 2) == Some(3))
 	assert(string.last_index_of("aé😀é", "é", 2) == Some(1))
 	list.each(["", "aé😀"], (s) {
@@ -57,12 +57,12 @@ test("search_bounds_and_overlaps", () {
 			assert(string.last_index_of(s, "", i) == Some(i))
 		})
 		list.each([-1, n + 1], (i) {
-			assert(string.index_of(s, "", i) == None)
-			assert(string.last_index_of(s, "", i) == None)
-			assert(string.index_of(s, "a", i) == None)
-			assert(string.last_index_of(s, "a", i) == None)
+			assert(string.index_of(s, "", i) == None())
+			assert(string.last_index_of(s, "", i) == None())
+			assert(string.index_of(s, "a", i) == None())
+			assert(string.last_index_of(s, "a", i) == None())
 		})
-		assert(string.index_of(s, "longer than the haystack", 0) == None)
+		assert(string.index_of(s, "longer than the haystack", 0) == None())
 	})
 })
 
@@ -79,8 +79,8 @@ test("count_replacement_and_last_split", () {
 	assert(string.split_once_last("aaa", "aa") == Some(("a", "")))
 	assert(string.split_once_last("=x=", "=") == Some(("=x", "")))
 	assert(string.split_once_last("=x", "=") == Some(("", "x")))
-	assert(string.split_once_last("x", "") == None)
-	assert(string.split_once_last("x", "y") == None)
+	assert(string.split_once_last("x", "") == None())
+	assert(string.split_once_last("x", "y") == None())
 	list.each(["", "abc", "éé😀é", "aaaaa"], (s) {
 		list.each(["", "a", "aa", "é", "😀"], (needle) {
 			assert(
@@ -93,7 +93,7 @@ test("count_replacement_and_last_split", () {
 					string.replace(s, needle, "aaé"),
 			)
 			string.split_once_last(s, needle) |>
-				(None) { () }
+				(None()) { () }
 				& (Some((left, right))) { assert(left <> needle <> right == s) }
 		})
 	})
@@ -154,8 +154,8 @@ test("callbacks_run_once_in_order_and_stop_on_error", () {
 					n = core.codepoint_to_int(c)
 					calls.call(n)
 					{ n == 233 } |>
-						(True) { fail.raise("second") }
-						& (False) { c }
+						(True()) { fail.raise("second") }
+						& (False()) { c }
 				})
 			})
 			assert(result == Error("second"))

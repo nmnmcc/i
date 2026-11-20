@@ -7,7 +7,7 @@ Next(A, E, N) = (A, Stream(A, E, N))
 Step(A, E, N) = Done | Next(A, E, N)
 
 new = <A, N>() -> Stream(A, Never, N) {
-	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { () })
+	Stream(() -> Step(A, Never, N) { Done() }, (_ : N) { () })
 }
 
 Bias = (value = Int)

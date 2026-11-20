@@ -556,7 +556,17 @@ impl<'a> Checker<'a> {
             let expected = self.binding_expected(binding);
             let (a, k) = self.infer_k(&binding.value, &expected);
             knowns.push(k);
+            let before = self.diags.len();
             self.fit(&binding.pattern, &a);
+            if let Some(hint) = self.constructor_hint_value(&binding.value) {
+                for diagnostic in &mut self.diags[before..] {
+                    if diagnostic.code == code::TYPE_MISMATCH
+                        && diagnostic.span == binding.pattern.span
+                    {
+                        diagnostic.message.push_str(&hint);
+                    }
+                }
+            }
             if self.binding_may_fail(&binding.pattern, &a) {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
@@ -1633,6 +1643,11 @@ impl<'a> Checker<'a> {
         {
             message.push_str(&hint);
         }
+        if matches!(f.kind, FailKind::Mismatch | FailKind::Values)
+            && let Some(hint) = self.constructor_call_hint(&f.lhs, span)
+        {
+            message.push_str(&hint);
+        }
         if let Some(fixed) = self.fix_notes.iter().find_map(|v| self.reads.fixed.get(v)) {
             message.push_str(&format!(
                 " (this type was fixed here: {})",
@@ -1641,6 +1656,64 @@ impl<'a> Checker<'a> {
         }
         self.fix_notes.clear();
         self.error(code, span, message);
+    }
+
+    /// The same hint for a value written as a bare zero-field constructor,
+    /// when the mismatch is reported at its binding rather than at the value.
+    fn constructor_hint_value(&self, e: &Expr) -> Option<String> {
+        let ExprKind::Name(ValueRef::Ctor(c)) = &e.kind else {
+            return None;
+        };
+        let TypeBody::Custom(ctors) = &self.p.ty(c.ty).body else {
+            return None;
+        };
+        if !ctors
+            .get(c.index as usize)
+            .is_some_and(|d| d.fields.is_empty())
+        {
+            return None;
+        }
+        let text = &self.sources.get(self.p.module(self.module).source).text;
+        let source = text.get(e.span.start as usize..e.span.end as usize)?;
+        Some(format!(
+            ". `{source}` is a constructor function; call it: `{source}()`"
+        ))
+    }
+
+    /// A bare zero-field constructor written where its result is expected:
+    /// the value is the constructor function, so offer the call.
+    fn constructor_call_hint(&self, lhs: &Ty, span: Span) -> Option<String> {
+        let Ty::Fn(ft) = lhs else {
+            return None;
+        };
+        if ft.parts() != Some(&[]) || ft.env != Ty::Never {
+            return None;
+        }
+        let Ty::Con(Head::Named(TypeRef::Custom(id)), _, _) = &ft.ret else {
+            return None;
+        };
+        let TypeBody::Custom(ctors) = &self.p.ty(*id).body else {
+            return None;
+        };
+        let [ctor] = ctors.as_slice() else {
+            return None;
+        };
+        if !ctor.fields.is_empty() {
+            return None;
+        }
+        let text = &self.sources.get(self.p.module(self.module).source).text;
+        let source = text.get(span.start as usize..span.end as usize)?;
+        let segments: Vec<&str> = source.split('.').collect();
+        let word = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_');
+        if segments.len() > 2 || !segments.iter().all(|s| word(s)) {
+            return None;
+        }
+        if segments.last() != Some(&ctor.name.as_str()) {
+            return None;
+        }
+        Some(format!(
+            ". `{source}` is a constructor function; call it: `{source}()`"
+        ))
     }
 
     /// Only offer a grouping repair for written, one-position data at the
@@ -1944,9 +2017,6 @@ impl<'a> Checker<'a> {
         let targs = self.fresh_args(c.ty);
         let fields = self.ctor_fields(c, &targs);
         let t = Ty::named(TypeRef::Custom(c.ty), targs);
-        if fields.is_empty() {
-            return t;
-        }
         Ty::Fn(Box::new(FnTy::new(fields, t, Ty::Never)))
     }
 
@@ -3861,6 +3931,7 @@ impl<'a> Checker<'a> {
             self.s.level += 1;
         }
         self.check_pattern_places(&b.pattern, Pol::Pos);
+        let before = self.diags.len();
         self.new_tyvars(&b.ty_vars);
         let mut binders = Vec::new();
         super::pattern::binders(&b.pattern, &mut binders);
@@ -3939,6 +4010,15 @@ impl<'a> Checker<'a> {
             }
         }
         self.report_coalescing(b.pattern.span);
+        // `x : T = C` reports the mismatch at the binding: the value's bare
+        // constructor is still the function, so offer the call as well.
+        if let Some(hint) = self.constructor_hint_value(&b.value) {
+            for diagnostic in &mut self.diags[before..] {
+                if diagnostic.code == code::TYPE_MISMATCH && diagnostic.span == b.pattern.span {
+                    diagnostic.message.push_str(&hint);
+                }
+            }
+        }
     }
 
     /// A fitted failure is decided in its own frame after holder linking.

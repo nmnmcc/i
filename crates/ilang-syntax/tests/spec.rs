@@ -1,5 +1,5 @@
 //! Every language-definition example parses without errors,
-//! and its print parses to the same tree.
+//! and its print parses to the same tree (up to the call of a constructor).
 
 #[path = "oracle.rs"]
 mod ilang_syntax;
@@ -38,6 +38,12 @@ fn spec_blocks_parse() {
             diags.is_empty(),
             "print of block at line {line}: {diags:?}\n{printed}"
         );
-        assert_eq!(module, again, "block at line {line}:\n{printed}");
+        // A constructor is printed with its call (`True()`), which reads
+        // back as the call: the trees are compared as the conversion does.
+        assert_eq!(
+            syn3::surface::ungrouped(&module),
+            syn3::surface::ungrouped(&again),
+            "block at line {line}:\n{printed}"
+        );
     }
 }

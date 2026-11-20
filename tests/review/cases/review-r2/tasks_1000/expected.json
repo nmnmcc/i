@@ -1,6 +1,6 @@
 {
-  "compiler": "40bc529124abc412c03c86938d128017062a63c6",
-  "binary_sha256": "7ce07318fbd1c3f26778cc5f4344044034db392b695a04d6d10563d9ec31cf0a",
+  "compiler": "520e72ee075e03a0ab799a4904d3d81671bfeca8",
+  "binary_sha256": "cba52d4e07043ccd175e3af69a5cc0bd0affd62204dfb0028b4fe4162ef2ffff",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {

@@ -67,7 +67,7 @@ new = <A, E>() <- (_scope : resource.Scope, own : task.Scheduler) -> Deferred(
 	A,
 	E,
 ) {
-	initial : DeferredState(A, E) = Waiting
+	initial : DeferredState(A, E) = Waiting()
 	Deferred(state = task.ref(initial))
 }
 
@@ -90,11 +90,11 @@ complete = <A, E>(d : Deferred(A, E), outcome : Result(A, E)) <- (
 ) -> Bool {
 	task.update(d.state, (state : DeferredState(A, E)) {
 		state |>
-			(Waiting) {
+			(Waiting()) {
 				next : DeferredState(A, E) = Done(outcome)
-				(next, True)
+				(next, True())
 			}
-			& (Done(_)) { (state, False) }
+			& (Done(_)) { (state, False()) }
 	})
 }
 
@@ -115,7 +115,9 @@ complete = <A, E>(d : Deferred(A, E), outcome : Result(A, E)) <- (
 poll = <A, E>(d : Deferred(A, E)) <- (own : task.Scheduler) -> Option(
 	Result(A, E),
 ) {
-	task.get(d.state) |> (Waiting) { None } & (Done(outcome)) { Some(outcome) }
+	task.get(d.state) |>
+		(Waiting()) { None() }
+		& (Done(outcome)) { Some(outcome) }
 }
 
 /// `True` once the deferred is completed. Needs `task.Scheduler`; raises
@@ -132,7 +134,7 @@ poll = <A, E>(d : Deferred(A, E)) <- (own : task.Scheduler) -> Option(
 /// })
 /// ```
 is_done = <A, E>(d : Deferred(A, E)) <- (own : task.Scheduler) -> Bool {
-	poll(d) |> (Some(_)) { True } & (None) { False }
+	poll(d) |> (Some(_)) { True() } & (None()) { False() }
 }
 
 /// Waits until the deferred is completed and gives its value, or raises its
@@ -156,7 +158,7 @@ await = <A, E>(d : Deferred(A, E)) <- (
 ) -> A {
 	poll(d) |>
 		(Some(outcome)) { fail.from_result(outcome) }
-		& (None) {
+		& (None()) {
 			task.yield()
 			await(d)
 		}

@@ -7,19 +7,19 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
 test("booleans_and_numbers", () {
 	check(
-		show(core.not(True)),
+		show(core.not(True())),
 		"False",
 	)
 	check(
-		show(core.not(False)),
+		show(core.not(False())),
 		"True",
 	)
 	check(
@@ -270,7 +270,7 @@ test("as_values", () {
 	fs |>
 		([f, _]) {
 			check(
-				show(f(True)),
+				show(f(True())),
 				"False",
 			)
 		}

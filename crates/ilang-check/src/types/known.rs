@@ -360,7 +360,8 @@ impl Checker<'_> {
                     _ => Ty::Top,
                 })
                 .collect();
-            return Ty::named(TypeRef::Custom(c.ty), args);
+            let ret = Ty::named(TypeRef::Custom(c.ty), args);
+            return Ty::Fn(Box::new(FnTy::new(Vec::new(), ret, Ty::Never)));
         }
         let params = (0..n)
             .map(|i| {

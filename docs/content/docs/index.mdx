@@ -53,11 +53,11 @@ description: "Functions, data, checked types and services, compiled to WebAssemb
 Ready = ()
 Waiting = (Int)
 message =
-	(Ready) { "ready" }
+	(Ready()) { "ready" }
 	& (Waiting(minutes)) { int.to_string(minutes) <> " min left" }
 
 main = () {
-	stdio.print(message(Ready))
+	stdio.print(message(Ready()))
 	stdio.print(message(Waiting(2)))
 }
 ```
@@ -81,7 +81,7 @@ ready
 
 Late = ()
 remaining = (due) {
-	due - now() |> (n ? n < 0) { fail.raise(Late) } & (n) { n }
+	due - now() |> (n ? n < 0) { fail.raise(Late()) } & (n) { n }
 }
 ```
 
@@ -102,7 +102,7 @@ test("a fake clock", () {
 	{
 		assert(app.remaining(42) == 2)
 		expired = fail.catch(() { app.remaining(30) })
-		assert(expired == Error(app.Late))
+		assert(expired == Error(app.Late()))
 	} <- (Clock(now = () { 40 }))
 })
 ```
@@ -174,7 +174,7 @@ main = () { stdio.print(unit(2)) }
 	sugar = (if) = hello/sugar
 )
 
-unit = (n) { n == 1 |> (True) { "minute" } & (False) { "minutes" } }
+unit = (n) { n == 1 |> (True()) { "minute" } & (False()) { "minutes" } }
 
 main = () { stdio.print(unit(2)) }
 
@@ -188,8 +188,8 @@ main = () { stdio.print(unit(2)) }
 (@ macro
   (= if
     (-> (, c a b) _
-      {(= true_branch `(-> (, True) _ ~a))
-       `(|> ~c (& ~true_branch (-> (, False) _ ~b)))})))
+      {(= true_branch `(-> (, (True)) _ ~a))
+       `(|> ~c (& ~true_branch (-> (, (False)) _ ~b)))})))
 ```
 </details>
 

@@ -48,28 +48,28 @@ parser = () {
 
 greet = (name, count) {
 	{ count > 0 } |>
-		(True) {
+		(True()) {
 			stdio.print("hello " <> name)
 			greet(name, count - 1)
 		}
-		& (False) { () }
+		& (False()) { () }
 }
 main = () {
 	{ process.args() == ["--help"] } |>
-		(True) {
+		(True()) {
 			usage = cli.help(options.parser(), "greet")
 			stdio.write(<<usage:utf8>>)
 			stdio.flush()
 		}
-		& (False) {
+		& (False()) {
 			cli.run(options.parser(), "greet", (opts) {
 				{
 					log.write(
 						log.Entry(
-							level = log.Info,
+							level = log.Info(),
 							message = "greeting",
 							fields = [("name", opts.name)],
-							at = None,
+							at = None(),
 						),
 					)
 					greet(opts.name, opts.count)

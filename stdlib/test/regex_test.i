@@ -17,7 +17,7 @@ compile = (pattern : String) -> regex.Regex {
 text = (pattern : String, input : String) -> String {
 	regex.find(compile(pattern), input) |>
 		(Some(m)) { m.text }
-		& (None) { "<no match>" }
+		& (None()) { "<no match>" }
 }
 
 test("literal", () {
@@ -613,7 +613,7 @@ test("error_position", () {
 test("capture_index_name", () {
 	c = regex.captures(compile("(?<first>a+)(b)?"), "xaa") |>
 		(Some(c)) { c }
-		& (None) { panic("capture") }
+		& (None()) { panic("capture") }
 	assert(
 		regex.group(c, 0) == Some(regex.Match(start = 1, end = 3, text = "aa")),
 	)
@@ -621,17 +621,17 @@ test("capture_index_name", () {
 		regex.group(c, 1) == Some(regex.Match(start = 1, end = 3, text = "aa")),
 	)
 	assert(regex.named(c, "first") == regex.group(c, 1))
-	assert(regex.group(c, 2) == None)
-	assert(regex.group(c, 3) == None)
-	assert(regex.group(c, -1) == None)
-	assert(regex.named(c, "unknown") == None)
+	assert(regex.group(c, 2) == None())
+	assert(regex.group(c, 3) == None())
+	assert(regex.group(c, -1) == None())
+	assert(regex.named(c, "unknown") == None())
 	()
 })
 
 test("capture_last_iteration", () {
 	c = regex.captures(compile("(a|b)+"), "ab") |>
 		(Some(c)) { c }
-		& (None) { panic("capture") }
+		& (None()) { panic("capture") }
 	assert(
 		regex.group(c, 1) == Some(regex.Match(start = 1, end = 2, text = "b")),
 	)
@@ -641,8 +641,8 @@ test("capture_last_iteration", () {
 test("capture_alternation", () {
 	c = regex.captures(compile("(a)|(b)"), "b") |>
 		(Some(c)) { c }
-		& (None) { panic("capture") }
-	assert(regex.group(c, 1) == None)
+		& (None()) { panic("capture") }
+	assert(regex.group(c, 1) == None())
 	assert(
 		regex.group(c, 2) == Some(regex.Match(start = 0, end = 1, text = "b")),
 	)
@@ -784,14 +784,14 @@ test("empty_input", () {
 		regex.is_match(compile(""), ""),
 	)
 	assert(
-		regex.find(compile("a"), "") == None,
+		regex.find(compile("a"), "") == None(),
 	)
 	()
 })
 
 test("catastrophic_5000", () {
 	assert(
-		regex.is_match(compile("(a*)*b"), string.repeat("a", 5000)) == False,
+		regex.is_match(compile("(a*)*b"), string.repeat("a", 5000)) == False(),
 	)
 	()
 })

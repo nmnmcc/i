@@ -74,5 +74,5 @@ test("client_timeout", () {
 			)
 		})
 	})
-	assert(result == Error(http.Timeout))
+	assert(result == Error(http.Timeout()))
 })

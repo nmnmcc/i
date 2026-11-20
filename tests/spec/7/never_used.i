@@ -4,6 +4,6 @@
 	testlib = (test) = i/test
 )
 
-name = (b : Bool) { b |> (True) { "yes" } & (_) { "no" } & (False) { "never" } }
+name = (b : Bool) { b |> (True()) { "yes" } & (_) { "no" } & (False()) { "never" } }
 
-test("names", () { name(False) |> ("no") { () } & (_) { panic("no") } })
+test("names", () { name(False()) |> ("no") { () } & (_) { panic("no") } })

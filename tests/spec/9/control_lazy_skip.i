@@ -10,8 +10,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -48,9 +48,9 @@ test("cancel_through_catch", () {
 				})
 				r |> (Ok(x)) { x }
 			})
-			Done
+			Done()
 		})
-		p |> (Paused(k)) { control.cancel(k) } & (Done) { panic("not paused") }
+		p |> (Paused(k)) { control.cancel(k) } & (Done()) { panic("not paused") }
 		"end"
 	})
 	check(r, "inner outer end")
@@ -72,14 +72,14 @@ paused_final = (log, h) {
 			)
 		})
 	})
-	Over
+	Over()
 }
 
 // A cancel goes through the record of a final function that waits.
 test("cancel_through_final", () {
 	r = control.boundary((log) {
 		held = control.boundary((h) { paused_final(log, h) })
-		held |> (Held(k2)) { control.cancel(k2) } & (Over) { panic("not held") }
+		held |> (Held(k2)) { control.cancel(k2) } & (Over()) { panic("not held") }
 		"end"
 	})
 	check(r, "inner outer end")

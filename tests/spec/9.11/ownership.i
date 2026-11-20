@@ -21,7 +21,7 @@ main = () <- (later : Later) {
 			),
 		)
 	})
-	assert(request.state(borrowed) == request.Waiting)
+	assert(request.state(borrowed) == request.Waiting())
 	request.cancel(request.ticket(borrowed))
 	owned = later.echo("owned")
 	control.boundary((b) {
@@ -34,5 +34,5 @@ main = () <- (later : Later) {
 			),
 		)
 	})
-	assert(request.state(owned) == request.Cancelled)
+	assert(request.state(owned) == request.Cancelled())
 }

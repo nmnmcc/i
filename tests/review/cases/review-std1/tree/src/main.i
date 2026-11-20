@@ -43,7 +43,7 @@ map_digit = (digit : Digit(a), with : (a) <- (Fail(e)) -> b) -> Digit(b) {
 map_tree = (tree : Tree(a), with : (a) <- (Fail(e)) -> b) -> Tree(b) {
 	case
 	tree
-	(EmptyTree) { EmptyTree }
+	(EmptyTree()) { EmptyTree() }
 		& (Single(x)) { Single(map_node(x, with)) }
 		& (Deep(m, l, mid, r)) {
 			Deep(m, map_digit(l, with), map_tree(mid, with), map_digit(r, with))

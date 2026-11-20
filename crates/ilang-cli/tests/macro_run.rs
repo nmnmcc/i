@@ -64,7 +64,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= choose (-> (, (: x (. syntax Syntax))) (. syntax Syntax) (|> x (& (-> (? (, `(f ~item)) False) _ item) (-> (, `(f ~`(g ~item))) _ item) (-> (, `(f ~item)) _ item) (-> (, `(s ~..[first .. rest])) _ first) (-> (, (| `(h ~item) `(i ~item))) _ item) (-> (, _) _ x))))))\n").unwrap();
+    std::fs::write(dir.path().join("src/main.is"), "(, (= syntax (/ i syntax)))\n(@ macro (= choose (-> (, (: x (. syntax Syntax))) (. syntax Syntax) (|> x (& (-> (? (, `(f ~item)) (False)) _ item) (-> (, `(f ~`(g ~item))) _ item) (-> (, `(f ~item)) _ item) (-> (, `(s ~..[first .. rest])) _ first) (-> (, (| `(h ~item) `(i ~item))) _ item) (-> (, _) _ x))))))\n").unwrap();
     let (graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let (parsed, diagnostics) = ilang_check::parse(&graph);

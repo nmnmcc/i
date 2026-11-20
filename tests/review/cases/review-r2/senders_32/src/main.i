@@ -10,8 +10,8 @@
 )
 spawn = (s, c, n : Int) {
 	{ n == 0 } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			task.go(s, () { task.send(c, n) })
 			spawn(s, c, n - 1)
 		}
@@ -20,8 +20,8 @@ spawn = (s, c, n : Int) {
 // pair in any order, so check that each value arrives exactly once.
 receive_all = (c, n : Int, seen : Int) {
 	{ n == 0 } |>
-		(True) { seen }
-		& (False) {
+		(True()) { seen }
+		& (False()) {
 			v = task.receive(c)
 			bit = core.shift_left(1, v)
 			assert(core.bit_and(seen, bit) == 0)

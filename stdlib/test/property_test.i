@@ -15,8 +15,8 @@ snapshot = <A>(t : property.Tree(A), depth : Int) -> String {
 	core.inspect(t.value) <>
 		{
 			{ depth == 0 } |>
-				(True) { "" }
-				& (False) {
+				(True()) { "" }
+				& (False()) {
 					core.inspect(
 						list.map(t.children(), (c) { snapshot(c, depth - 1) }),
 					)
@@ -34,7 +34,7 @@ root = <A>(gen : property.Gen(A), size : Int, seed : Int) -> property.Tree(A) {
 find_ten = (gen : property.Gen(Int), seed : Int) -> property.Tree(Int) {
 	assert(seed < 1000)
 	t = root(gen, 0, seed)
-	{ t.value == 10 } |> (True) { t } & (False) { find_ten(gen, seed + 1) }
+	{ t.value == 10 } |> (True()) { t } & (False()) { find_ten(gen, seed + 1) }
 }
 
 test("sampling_and_map_laws", () {
@@ -79,7 +79,8 @@ test("integer_rules", () {
 			Error(property.InvalidRange(3, 2)),
 	)
 	assert(
-		fail.catch(() { property.element([]) }) == Error(property.EmptyChoice),
+		fail.catch(() { property.element([]) }) ==
+			Error(property.EmptyChoice()),
 	)
 	assert(
 		{
@@ -123,8 +124,8 @@ test("integer_rules", () {
 	ensure = (node : property.Tree(Int), target : Int, depth : Int) -> () {
 		assert(node.value >= 0 && node.value <= 10)
 		{ depth == 0 } |>
-			(True) { () }
-			& (False) {
+			(True()) { () }
+			& (False()) {
 				list.each(node.children(), (c) {
 					assert(c.value < node.value)
 					ensure(c, target, depth - 1)
@@ -135,12 +136,12 @@ test("integer_rules", () {
 	Ok(positive) = fail.catch(() { property.int(3, 10) })
 	p = root(positive, 0, 0)
 	{ p.value == 3 } |>
-		(True) { assert(p.children() == []) }
-		& (False) {
+		(True()) { assert(p.children() == []) }
+		& (False()) {
 			assert(
 				list.first(p.children()) |>
 					(Some(c)) { c.value == 3 }
-					& (None) { False },
+					& (None()) { False() },
 			)
 		}
 })
@@ -148,8 +149,8 @@ test("integer_rules", () {
 valid_dependent = (t : property.Tree((Int, Int)), depth : Int) -> () {
 	assert(t.value.1 >= 0 && t.value.1 <= t.value.0)
 	{ depth == 0 } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			list.each(t.children(), (c) { valid_dependent(c, depth - 1) })
 		}
 }
@@ -208,7 +209,7 @@ test("filter_prunes_whole_subtrees", () {
 				max_discards = 0,
 				max_shrinks = 0,
 			),
-			(_) { property.Pass },
+			(_) { property.Pass() },
 		) ==
 			property.GaveUp(successes = 0, discards = 1),
 	)
@@ -220,8 +221,8 @@ test("greedy_path_budget_and_replay", () {
 	gen = property.make((_, _) { Some(ten) })
 	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
-			(True) { property.Fail(core.inspect(x)) }
-			& (False) { property.Pass }
+			(True()) { property.Fail(core.inspect(x)) }
+			& (False()) { property.Pass() }
 	}
 	property.Falsified(f) = property.check(
 		gen,
@@ -289,12 +290,13 @@ test("greedy_path_budget_and_replay", () {
 		predicate,
 	)
 	assert(c.checked == 7 && c.limited && list.length(c.path) == 7)
-	assert(property.replay(gen, 0, -1, 0, []) == None)
-	assert(property.replay(gen, 0, 0, -1, []) == None)
-	assert(property.replay(gen, 0, 0, 0, [-1]) == None)
-	assert(property.replay(gen, 0, 0, 0, [99]) == None)
+	assert(property.replay(gen, 0, -1, 0, []) == None())
+	assert(property.replay(gen, 0, 0, -1, []) == None())
+	assert(property.replay(gen, 0, 0, 0, [-1]) == None())
+	assert(property.replay(gen, 0, 0, 0, [99]) == None())
 	assert(
-		property.replay(property.make((_, _) { None }), 0, 0, 0, []) == None,
+		property.replay(property.make((_, _) { None() }), 0, 0, 0, []) ==
+			None(),
 	)
 })
 
@@ -410,7 +412,7 @@ test("config_and_protocol", () {
 			reason = "why\nnext",
 			path = [2, 1],
 			checked = 8,
-			limited = False,
+			limited = False(),
 		),
 	)
 	assert(
@@ -467,8 +469,8 @@ test("attempt_streams_seed_and_prefixes", () {
 			max_shrinks = 0,
 		), (s) {
 			{ s == 2 } |>
-				(True) { property.Pass }
-				& (False) { property.Discard }
+				(True()) { property.Pass() }
+				& (False()) { property.Discard() }
 		}) ==
 			property.Passed(successes = 3, discards = 6),
 	)
@@ -487,8 +489,8 @@ test("list_order_and_generated_bounds", () {
 		assert(seed < 1000)
 		t = root(gen, 4, seed)
 		{ list.length(t.value) == 4 } |>
-			(True) { t }
-			& (False) { find_four(seed + 1) }
+			(True()) { t }
+			& (False()) { find_four(seed + 1) }
 	}
 	t = find_four(0)
 	assert(
@@ -501,8 +503,10 @@ test("list_order_and_generated_bounds", () {
 		assert(list.length(t.value) >= 2 && list.length(t.value) <= 5)
 		assert(list.all(t.value, (x) { x >= -3 && x <= 3 }))
 		{ depth == 0 } |>
-			(True) { () }
-			& (False) { list.each(t.children(), (c) { ensure(c, depth - 1) }) }
+			(True()) { () }
+			& (False()) {
+				list.each(t.children(), (c) { ensure(c, depth - 1) })
+			}
 	}
 	list.each(list.range(0, 19), (seed) { ensure(root(lists, 5, seed), 3) })
 	assert(
@@ -511,7 +515,7 @@ test("list_order_and_generated_bounds", () {
 	assert(
 		property.sample(
 			{
-				e4_call_arg_0 = property.make((_, _) { None })
+				e4_call_arg_0 = property.make((_, _) { None() })
 				e4_call_arg_1 = 1
 				e4_call_arg_2 = 1
 				fail.catch(() {
@@ -523,7 +527,7 @@ test("list_order_and_generated_bounds", () {
 			1,
 			random.from_seed(0),
 		) ==
-			None,
+			None(),
 	)
 })
 
@@ -620,7 +624,7 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 	find = (seed : Int) -> property.Tree(Int) {
 		assert(seed < 1000)
 		t = root(negative, 0, seed)
-		{ t.value == -10 } |> (True) { t } & (False) { find(seed + 1) }
+		{ t.value == -10 } |> (True()) { t } & (False()) { find(seed + 1) }
 	}
 	assert(
 		list.map(find(0).children(), (c) { c.value }) == [0, -5, -8, -9],
@@ -633,7 +637,7 @@ test("negative_integer_boolean_element_and_list_element_order", () {
 	list.each(samples, (t) {
 		assert(
 			list.map(t.children(), (c) { c.value }) ==
-				{ t.value |> (True) { [False] } & (False) { [] } },
+				{ t.value |> (True()) { [False()] } & (False()) { [] } },
 		)
 	})
 	Ok(choices) = fail.catch(() {
@@ -672,8 +676,8 @@ test("budget_prefixes_and_discarded_children", () {
 	// The search also counts Discard; it never descends into that child.
 	predicate = (x : Int) -> property.Verdict {
 		{ x >= 6 } |>
-			(True) { property.Fail(core.inspect(x)) }
-			& (False) { property.Discard }
+			(True()) { property.Fail(core.inspect(x)) }
+			& (False()) { property.Discard() }
 	}
 	expected = [
 		([], 10),
@@ -718,7 +722,7 @@ test("dependent_branch_pruning_and_inner_alternatives", () {
 	gen = property.flat_map(outer, (n) {
 		property.make((s, _) {
 			n |>
-				(1) { None }
+				(1) { None() }
 				& (0) { Some(property.tree(0, () { [] })) }
 				& (_) {
 					Some(

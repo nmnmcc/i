@@ -632,7 +632,7 @@ impl<'a> Query<'a> {
             return result;
         };
         if def.fields.is_empty() {
-            return result;
+            return format!("() -> {result}");
         }
         let fields: Vec<String> = def
             .fields

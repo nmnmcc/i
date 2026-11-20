@@ -61,7 +61,7 @@ fn matches_and_chains() {
         "f = (n: Int) -> String ! _ {\n\tn |> {\n\t\t0 -> \"zero\"\n\t\t1 | 2 -> \"few\"\n\t\tx ? x > 9 -> \"many\"\n\t\t_ -> \"some\"\n\t}\n}\n",
     );
     same(
-        "name = (Some(u)) { u } & (None) { \"\" }\n",
+        "name = (Some(u)) { u } & (None()) { \"\" }\n",
         "name = {\n\tSome(u) -> u\n\tNone -> \"\"\n}\n",
     );
 }

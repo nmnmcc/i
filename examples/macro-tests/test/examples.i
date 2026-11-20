@@ -6,13 +6,13 @@
 
 test("adds two numbers", () { assert(1 + 1 == 2) })
 
-skip("not run", () { assert(False) })
+skip("not run", () { assert(False()) })
 
-fails("expected failure", () { assert(False) })
+fails("expected failure", () { assert(False()) })
 
 Problem = ()
 
-fails("typed error", () { fail.raise(Problem) })
+fails("typed error", () { fail.raise(Problem()) })
 
 SuiteService = (value = Int)
 

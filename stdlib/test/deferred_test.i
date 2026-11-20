@@ -56,7 +56,7 @@ test("many_readers_one_outcome_test", () {
 			(first, second, values, deferred.poll(d))
 		})
 	})
-	assert(v == (True, False, [5, 5, 5, 5, 5], Some(Ok(5))))
+	assert(v == (True(), False(), [5, 5, 5, 5, 5], Some(Ok(5))))
 	()
 })
 
@@ -70,7 +70,7 @@ test("second_complete_keeps_outcome_test", () {
 		third = deferred.complete(d, Error("third"))
 		(first, second, third, deferred.poll(d))
 	})
-	assert(v == (True, False, False, Some(Error("first"))))
+	assert(v == (True(), False(), False(), Some(Error("first"))))
 	()
 })
 
@@ -100,7 +100,7 @@ test("poll_waiting_is_none_test", () {
 		after = (deferred.poll(d), deferred.is_done(d))
 		(before, after)
 	})
-	assert(v == ((None, False), (Some(Ok(3)), True)))
+	assert(v == ((None(), False()), (Some(Ok(3)), True())))
 	()
 })
 
@@ -119,7 +119,7 @@ test("is_done_flips_at_completion_test", () {
 			(still, now, task.join(reader))
 		})
 	})
-	assert(v == (False, True, 9))
+	assert(v == (False(), True(), 9))
 	()
 })
 
@@ -163,7 +163,7 @@ test("cancelled_waiter_leaves_producer_and_readers_test", () {
 			)
 		})
 	})
-	assert(v == (Error("cancel"), False, True, 11, Some(Ok(11))))
+	assert(v == (Error("cancel"), False(), True(), 11, Some(Ok(11))))
 	()
 })
 
@@ -184,6 +184,6 @@ test("scope_ends_with_waiter_waiting_test", () {
 		completed = deferred.complete(d, Ok(1))
 		(ended, before, completed, deferred.poll(d))
 	})
-	assert(v == (Error("stop"), False, True, Some(Ok(1))))
+	assert(v == (Error("stop"), False(), True(), Some(Ok(1))))
 	()
 })

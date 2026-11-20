@@ -7,8 +7,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -59,10 +59,10 @@ test("values", () {
 	check(
 		show(
 			(
-				True && False,
-				False || True,
-				False && panic("no"),
-				True || panic("no"),
+				True() && False(),
+				False() || True(),
+				False() && panic("no"),
+				True() || panic("no"),
 			),
 		),
 		"(False, True, False, True)",

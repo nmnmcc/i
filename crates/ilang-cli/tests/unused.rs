@@ -24,7 +24,7 @@ fn unused_binding_warning_keeps_check_successful() {
     std::fs::create_dir(dir.path().join("test")).unwrap();
     std::fs::write(
         dir.path().join("test/forgotten.i"),
-        "forgotten = () { assert(True) }\n",
+        "forgotten = () { assert(True()) }\n",
     )
     .unwrap();
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_i"))

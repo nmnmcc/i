@@ -31,13 +31,13 @@ to_string = (x : Float) -> String {
 	// numbers are written out in place, because a top-level value is
 	// worked out at start, in the frame of every program.
 	sign = { core.shift_right(bits, 63) == 1 } |>
-		(True) { "-" }
-		& (False) { "" }
+		(True()) { "-" }
+		& (False()) { "" }
 	encoded = core.bit_and(core.shift_right(bits, 52), 2047)
 	fraction = core.bit_and(bits, 4503599627370495)
 	{ encoded == 0 && fraction == 0 } |>
-		(True) { core.concat([sign, "0.0"]) }
-		& (False) { core.concat([sign, ..positive(encoded, fraction)]) }
+		(True()) { core.concat([sign, "0.0"]) }
+		& (False()) { core.concat([sign, ..positive(encoded, fraction)]) }
 }
 
 // The pieces of the text of the positive Float with this exponent field and
@@ -46,18 +46,18 @@ positive = (encoded : Int, fraction : Int) -> List(String) {
 	// v = r / s × 2^e, with the midpoint distances minus / s and plus / s.
 	// At an exact normal power of two the binade below has half the spacing.
 	(mantissa, r, minus, plus, e) = { encoded == 0 } |>
-		(True) { (fraction, fraction * 2, 1, 1, -1075) }
-		& (False) {
+		(True()) { (fraction, fraction * 2, 1, 1, -1075) }
+		& (False()) {
 			m = fraction + 4503599627370496
 			low = { fraction == 0 && encoded > 1 } |>
-				(True) { 1 }
-				& (False) { 2 }
+				(True()) { 1 }
+				& (False()) { 2 }
 			(m, m * 4, low, 2, encoded - 1077)
 		}
 	inclusive = mantissa % 2 == 0
 	(r, s, minus, plus) = { e < 0 } |>
-		(True) { (r, core.shift_left(1, -e), minus, plus) }
-		& (False) {
+		(True()) { (r, core.shift_left(1, -e), minus, plus) }
+		& (False()) {
 			(
 				core.shift_left(r, e),
 				1,
@@ -68,11 +68,11 @@ positive = (encoded : Int, fraction : Int) -> List(String) {
 	// Scale by a power of ten first, from an estimate of the decimal
 	// exponent that is never too high: j <= floor(log10(v)). 78913 / 2^18 is
 	// just below log10(2); the binary exponent of v is at least `low`.
-	low = { encoded == 0 } |> (True) { -1075 } & (False) { encoded - 1023 }
+	low = { encoded == 0 } |> (True()) { -1075 } & (False()) { encoded - 1023 }
 	j = floor_divide(low * 78913, 262144) - 1
 	(r, s, minus, plus) = { j >= 0 } |>
-		(True) { (r, s * power_of_ten(j), minus, plus) }
-		& (False) {
+		(True()) { (r, s * power_of_ten(j), minus, plus) }
+		& (False()) {
 			t = power_of_ten(-j)
 			(r * t, s, minus * t, plus * t)
 		}
@@ -87,7 +87,7 @@ positive = (encoded : Int, fraction : Int) -> List(String) {
 
 // floor(a / b) for b > 0.
 floor_divide = (a : Int, b : Int) -> Int {
-	{ a < 0 } |> (True) { 0 - { b - 1 - a } / b } & (False) { a / b }
+	{ a < 0 } |> (True()) { 0 - { b - 1 - a } / b } & (False()) { a / b }
 }
 
 // 10^n, by squaring.
@@ -96,7 +96,7 @@ floor_divide = (a : Int, b : Int) -> Int {
 power_of_ten = (n : Int) -> Int { sixteens(n / 16) * small_power(n % 16, 1) }
 
 small_power = (n : Int, acc : Int) -> Int {
-	{ n == 0 } |> (True) { acc } & (False) { small_power(n - 1, acc * 10) }
+	{ n == 0 } |> (True()) { acc } & (False()) { small_power(n - 1, acc * 10) }
 }
 
 // 10^(16 k).
@@ -166,7 +166,7 @@ sixteens = (k : Int) -> Int {
 // `k` counting the steps.
 grow = (r : Int, s : Int, k : Int) -> (Int, Int) {
 	next = s * 10
-	{ r < next } |> (True) { (s, k) } & (False) { grow(r, next, k + 1) }
+	{ r < next } |> (True()) { (s, k) } & (False()) { grow(r, next, k + 1) }
 }
 
 // Exact normalization, part two: `1 <= r/s`. Multiplying the numerator and
@@ -178,8 +178,8 @@ shrink = (r : Int, s : Int, minus : Int, plus : Int, k : Int) -> (
 	Int,
 ) {
 	{ r >= s } |>
-		(True) { (r, minus, plus, k) }
-		& (False) { shrink(r * 10, s, minus * 10, plus * 10, k - 1) }
+		(True()) { (r, minus, plus, k) }
+		& (False()) { shrink(r * 10, s, minus * 10, plus * 10, k - 1) }
 }
 
 // The digits, last first, until the rest is inside the rounding interval,
@@ -201,10 +201,10 @@ generate = (
 	down = low < 0 || { inclusive && low == 0 }
 	up = high > 0 || { inclusive && high == 0 }
 	{ down || up } |>
-		(False) {
+		(False()) {
 			generate(rest * 10, s, minus * 10, plus * 10, inclusive, digits, k)
 		}
-		& (True) {
+		& (True()) {
 			// Where both shortest candidates are valid, the closer one; an
 			// exact halfway tie goes towards an even last digit.
 			half = rest * 2 - s
@@ -215,11 +215,11 @@ generate = (
 						{ half == 0 && digit % 2 == 1 }
 				}
 			round_up |>
-				(False) { (digits, k) }
-				& (True) {
+				(False()) { (digits, k) }
+				& (True()) {
 					carry(digits) |>
-						((more, True)) { (more, k + 1) }
-						& ((more, False)) { (more, k) }
+						((more, True())) { (more, k + 1) }
+						& ((more, False())) { (more, k) }
 				}
 		}
 }
@@ -228,14 +228,14 @@ generate = (
 // and then the digits are a single 1.
 carry = (reversed : List(Int)) -> (List(Int), Bool) {
 	reversed |>
-		([d, ..rest] ? d < 9) { ([d + 1, ..rest], False) }
-		& ([_]) { ([1], True) }
+		([d, ..rest] ? d < 9) { ([d + 1, ..rest], False()) }
+		& ([_]) { ([1], True()) }
 		& ([_, ..rest]) {
 			carry(rest) |>
-				((_, True)) { ([1], True) }
-				& ((more, False)) { ([0, ..more], False) }
+				((_, True())) { ([1], True()) }
+				& ((more, False())) { ([0, ..more], False()) }
 		}
-		& ([]) { ([1], True) }
+		& ([]) { ([1], True()) }
 }
 
 // Without zeros at the end, keeping at least one digit.
@@ -257,16 +257,16 @@ layout = (digits : List(Int), n : Int, k : Int, imprecise : Bool) -> List(
 	String,
 ) {
 	point = k - n
-	lower = { n == 1 } |> (True) { -4 } & (False) { -2 - n }
-	upper = { n == 1 || k >= 11 } |> (True) { 2 } & (False) { 1 }
+	lower = { n == 1 } |> (True()) { -4 } & (False()) { -2 - n }
+	upper = { n == 1 || k >= 11 } |> (True()) { 2 } & (False()) { 1 }
 	scientific = point < lower || point > upper || { point >= 0 && imprecise }
 	scientific |>
-		(True) {
+		(True()) {
 			digits |>
 				([first, ..rest]) {
 					fraction = { rest == [] } |>
-						(True) { ["0"] }
-						& (False) { texts(rest, []) }
+						(True()) { ["0"] }
+						& (False()) { texts(rest, []) }
 					append(
 						[digit_text(first), ".", ..fraction],
 						["e", ..int_text(k - 1)],
@@ -274,13 +274,13 @@ layout = (digits : List(Int), n : Int, k : Int, imprecise : Bool) -> List(
 				}
 				& ([]) { ["0.0"] }
 		}
-		& (False) {
+		& (False()) {
 			{ k <= 0 } |>
-				(True) { ["0.", ..zeros(-k, texts(digits, []))] }
-				& (False) {
+				(True()) { ["0.", ..zeros(-k, texts(digits, []))] }
+				& (False()) {
 					{ k >= n } |>
-						(True) { texts(digits, zeros(k - n, [".0"])) }
-						& (False) { split(digits, k, []) }
+						(True()) { texts(digits, zeros(k - n, [".0"])) }
+						& (False()) { split(digits, k, []) }
 				}
 		}
 }
@@ -288,8 +288,8 @@ layout = (digits : List(Int), n : Int, k : Int, imprecise : Bool) -> List(
 // The digits with a point after the first `k` of them.
 split = (digits : List(Int), k : Int, acc : List(String)) -> List(String) {
 	{ k == 0 } |>
-		(True) { reverse_texts(acc, [".", ..texts(digits, [])]) }
-		& (False) {
+		(True()) { reverse_texts(acc, [".", ..texts(digits, [])]) }
+		& (False()) {
 			digits |>
 				([d, ..rest]) { split(rest, k - 1, [digit_text(d), ..acc]) }
 				& ([]) { reverse_texts(acc, []) }
@@ -307,8 +307,8 @@ append = (front : List(String), back : List(String)) -> List(String) {
 // `count` zeros before `rest`.
 zeros = (count : Int, rest : List(String)) -> List(String) {
 	{ count <= 0 } |>
-		(True) { rest }
-		& (False) { zeros(count - 1, ["0", ..rest]) }
+		(True()) { rest }
+		& (False()) { zeros(count - 1, ["0", ..rest]) }
 }
 
 // The text of each digit, before `rest`.
@@ -325,13 +325,13 @@ digit_list = (digits : List(Int), acc : List(String)) -> List(String) {
 // The decimal digits of a small exponent, with `-` when it is negative.
 int_text = (e : Int) -> List(String) {
 	{ e < 0 } |>
-		(True) { ["-", ..int_digits(-e, [])] }
-		& (False) { int_digits(e, []) }
+		(True()) { ["-", ..int_digits(-e, [])] }
+		& (False()) { int_digits(e, []) }
 }
 
 int_digits = (e : Int, acc : List(String)) -> List(String) {
 	next = [digit_text(e % 10), ..acc]
-	{ e < 10 } |> (True) { next } & (False) { int_digits(e / 10, next) }
+	{ e < 10 } |> (True()) { next } & (False()) { int_digits(e / 10, next) }
 }
 
 digit_text = (d : Int) -> String {

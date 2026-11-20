@@ -3146,6 +3146,25 @@ impl<'a, 't> NativeResolver<'a, 't> {
             },
             P::Ctor { module, name, args } => {
                 let ctor = self.r.ctor(opt_id(module).as_ref(), &id(name));
+                // A constructor is a function: `True` is `() -> True`, so a
+                // pattern matches its value only as the call `True()`.
+                if args.is_none()
+                    && let Some(c) = ctor
+                    && let TypeBody::Custom(ctors) = &self.r.p.ty(c.ty).body
+                    && ctors
+                        .get(c.index as usize)
+                        .is_some_and(|d| d.fields.is_empty())
+                {
+                    let written = match module {
+                        None => name.name.clone(),
+                        Some(m) => format!("{}.{}", m.name, name.name),
+                    };
+                    self.r.error(
+                        code::CONSTRUCTOR_AS_PATTERN,
+                        name.span.0,
+                        format!("`{written}` is a constructor function; write `{written}()` to match its value"),
+                    );
+                }
                 let mut parts = Vec::new();
                 let mut spread = false;
                 for item in args.iter().flatten() {

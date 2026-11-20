@@ -8,8 +8,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -76,8 +76,8 @@ retry = <A, N>(times : Int, body : () <- N -> A) -> A {
 		(Ok(value)) { value }
 		& (Error(error)) {
 			{ times > 1 } |>
-				(True) { retry(times - 1, body) }
-				& (False) { fail.raise(error) }
+				(True()) { retry(times - 1, body) }
+				& (False()) { fail.raise(error) }
 		}
 }
 

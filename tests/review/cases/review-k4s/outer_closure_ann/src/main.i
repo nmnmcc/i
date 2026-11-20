@@ -5,4 +5,4 @@ use = <N>() <- (s : S(N)) {
 }
 run = <A, N>(body : () <- N -> A) { body() }
 D = ()
-test = <N>() <- (s : S(N)) { run(() -> () { use() }) <- (D) }
+test = <N>() <- (s : S(N)) { run(() -> () { use() }) <- (D()) }

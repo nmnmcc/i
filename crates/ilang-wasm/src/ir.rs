@@ -754,13 +754,21 @@ impl Point {
     }
 }
 
+/// How a constructor function makes its value.
+#[derive(Clone, Copy, Debug)]
+pub enum CtorBody {
+    Bool(bool),
+    Nil,
+    Record { ctor: u32, ty: u32 },
+}
+
 /// How a function is made.
 #[derive(Clone, Debug)]
 pub enum FuncKind {
     /// Code of the program.
     Code(Func),
     /// A constructor used as a value.
-    Ctor { ctor: u32, ty: u32, arity: u32 },
+    Ctor { body: CtorBody, arity: u32 },
     /// A library function of the runtime used as a value.
     Runtime { op: Op, arity: u32 },
 }

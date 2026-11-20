@@ -114,8 +114,8 @@ bool = Schema(
 )
 
 null = Schema(
-	read = (x) { x |> (json.Null) { Ok(()) } & (_) { Error(error("null")) } },
-	write = (_) { json.Null },
+	read = (x) { x |> (json.Null()) { Ok(()) } & (_) { Error(error("null")) } },
+	write = (_) { json.Null() },
 )
 
 literal_string = <K>(value : K) -> Schema(K, SchemaError) {
@@ -144,14 +144,16 @@ nullable = <A>(s : Schema(A, SchemaError)) -> Schema(Option(A), SchemaError) {
 	Schema(
 		read = (x) {
 			x |>
-				(json.Null) { Ok(None) }
+				(json.Null()) { Ok(None()) }
 				& (_) {
 					_decode_result(s, x) |>
 						(Ok(v)) { Ok(Some(v)) }
 						& (Error(e)) { Error(e) }
 				}
 		},
-		write = (x) { x |> (None) { json.Null } & (Some(v)) { encode(s, v) } },
+		write = (x) {
+			x |> (None()) { json.Null() } & (Some(v)) { encode(s, v) }
+		},
 	)
 }
 
@@ -271,7 +273,7 @@ field = <A, V>(
 				(Error(e)) { Error(e) }
 				& (Ok(r)) {
 					json.field(x, key) |>
-						(None) { Error(at(Field(key), error("field"))) }
+						(None()) { Error(at(Field(key), error("field"))) }
 						& (Some(v)) {
 							_decode_result(value, v) |>
 								(Error(e)) { Error(at(Field(key), e)) }
@@ -307,7 +309,7 @@ optional_field = <A, V>(
 				(Error(e)) { Error(e) }
 				& (Ok(r)) {
 					json.field(x, key) |>
-						(None) { Ok(put(r, None)) }
+						(None()) { Ok(put(r, None())) }
 						& (Some(v)) {
 							_decode_result(value, v) |>
 								(Error(e)) { Error(at(Field(key), e)) }
@@ -319,7 +321,7 @@ optional_field = <A, V>(
 			encode(base, r) |>
 				(json.Object(entries)) {
 					get(r) |>
-						(None) { json.Object(entries) }
+						(None()) { json.Object(entries) }
 						& (Some(v)) {
 							json.Object(
 								ls.append(entries, [(key, encode(value, v))]),
@@ -359,8 +361,8 @@ refine = <A>(
 				(Error(e)) { Error(e) }
 				& (Ok(v)) {
 					predicate(v) |>
-						(True) { Ok(v) }
-						& (False) { Error(error(message)) }
+						(True()) { Ok(v) }
+						& (False()) { Error(error(message)) }
 				}
 		},
 		write = (x) { encode(s, x) },
@@ -383,7 +385,7 @@ union = <A>(
 		write = (x) {
 			ls.at(schemas, choose(x)) |>
 				(Some(s)) { encode(s, x) }
-				& (None) { panic("schema: union selector") }
+				& (None()) { panic("schema: union selector") }
 		},
 	)
 }
@@ -412,17 +414,19 @@ tagged_union = <A>(
 				(Some(json.Text(name))) {
 					ls.find_map(cases, (entry) {
 						(k, s) = entry
-						{ k == name } |> (True) { Some(s) } & (False) { None }
+						{ k == name } |>
+							(True()) { Some(s) }
+							& (False()) { None() }
 					}) |>
 						(Some(s)) { _decode_result(s, x) }
-						& (None) { Error(at(Field(key), error("tag"))) }
+						& (None()) { Error(at(Field(key), error("tag"))) }
 				}
 				& (_) { Error(at(Field(key), error("tag"))) }
 		},
 		write = (x) {
 			ls.find_map(cases, (entry) {
 				(k, s) = entry
-				{ k == tag(x) } |> (True) { Some(s) } & (False) { None }
+				{ k == tag(x) } |> (True()) { Some(s) } & (False()) { None() }
 			}) |>
 				(Some(s)) {
 					encode(s, x) |>
@@ -439,7 +443,7 @@ tagged_union = <A>(
 						}
 						& (_) { panic("schema: tagged union object invariant") }
 				}
-				& (None) { panic("schema: unknown tag") }
+				& (None()) { panic("schema: unknown tag") }
 		},
 	)
 }

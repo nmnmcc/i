@@ -254,49 +254,49 @@ test("error_unicode_position", () {
 })
 
 test("invalid_delimiter_0", () {
-	fail.catch(() { csv.options("", 0, False) }) |>
+	fail.catch(() { csv.options("", 0, False()) }) |>
 		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
 	()
 })
 
 test("invalid_delimiter_1", () {
-	fail.catch(() { csv.options("ab", 0, False) }) |>
+	fail.catch(() { csv.options("ab", 0, False()) }) |>
 		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
 	()
 })
 
 test("invalid_delimiter_2", () {
-	fail.catch(() { csv.options("\n", 0, False) }) |>
+	fail.catch(() { csv.options("\n", 0, False()) }) |>
 		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
 	()
 })
 
 test("invalid_delimiter_3", () {
-	fail.catch(() { csv.options("\r", 0, False) }) |>
+	fail.catch(() { csv.options("\r", 0, False()) }) |>
 		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
 	()
 })
 
 test("invalid_delimiter_4", () {
-	fail.catch(() { csv.options("\"", 0, False) }) |>
+	fail.catch(() { csv.options("\"", 0, False()) }) |>
 		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
 	()
 })
 
 test("invalid_delimiter_5", () {
-	fail.catch(() { csv.options("\u{0000}", 0, False) }) |>
+	fail.catch(() { csv.options("\u{0000}", 0, False()) }) |>
 		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
 	()
 })
 
 test("invalid_delimiter_6", () {
-	fail.catch(() { csv.options("�", 0, False) }) |>
+	fail.catch(() { csv.options("�", 0, False()) }) |>
 		(Error(_)) { () }
 		& (Ok(_)) { panic("invalid delimiter") }
 	()
@@ -306,7 +306,7 @@ test("delimiter_semicolon", () {
 	assert(
 		{
 			e4_call_arg_0 = "a;b\nc;d"
-			e4_call_arg_1 = config(";", 0, False)
+			e4_call_arg_1 = config(";", 0, False())
 			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Ok([["a", "b"], ["c", "d"]]),
@@ -318,7 +318,7 @@ test("delimiter_unicode", () {
 	assert(
 		{
 			e4_call_arg_0 = "a🦀b\nc🦀d"
-			e4_call_arg_1 = config("🦀", 0, False)
+			e4_call_arg_1 = config("🦀", 0, False())
 			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Ok([["a", "b"], ["c", "d"]]),
@@ -330,7 +330,7 @@ test("delimiter_tab", () {
 	assert(
 		{
 			e4_call_arg_0 = "a\tb"
-			e4_call_arg_1 = config("\t", 0, False)
+			e4_call_arg_1 = config("\t", 0, False())
 			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Ok([["a", "b"]]),
@@ -351,7 +351,7 @@ test("width_explicit", () {
 	assert(
 		{
 			e4_call_arg_0 = "a,b"
-			e4_call_arg_1 = config(",", 2, False)
+			e4_call_arg_1 = config(",", 2, False())
 			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Ok([["a", "b"]]),
@@ -362,7 +362,7 @@ test("width_explicit", () {
 test("width_explicit_error", () {
 	{
 		e4_call_arg_0 = "a,b"
-		e4_call_arg_1 = config(",", 3, False)
+		e4_call_arg_1 = config(",", 3, False())
 		fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
 	} |>
 		(Error(_)) { () }
@@ -374,7 +374,7 @@ test("width_variable", () {
 	assert(
 		{
 			e4_call_arg_0 = "a\nb,c"
-			e4_call_arg_1 = config(",", -1, False)
+			e4_call_arg_1 = config(",", -1, False())
 			fail.catch(() { csv.parse_with(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Ok([["a"], ["b", "c"]]),
@@ -439,7 +439,7 @@ test("print_unicode", () {
 
 test("print_crlf", () {
 	assert(
-		csv.print_with([["a", "b"], ["c", "d"]], config(",", 0, True)) ==
+		csv.print_with([["a", "b"], ["c", "d"]], config(",", 0, True())) ==
 			"a,b\r\nc,d\r\n",
 	)
 	()
@@ -447,7 +447,8 @@ test("print_crlf", () {
 
 test("print_custom_delimiter", () {
 	assert(
-		csv.print_with([["a;b", "c"]], config(";", 0, False)) == "\"a;b\";c\n",
+		csv.print_with([["a;b", "c"]], config(";", 0, False())) ==
+			"\"a;b\";c\n",
 	)
 	()
 })
@@ -1012,7 +1013,7 @@ test("header_duplicate", () {
 test("header_width", () {
 	{
 		e4_call_arg_0 = "a,b\n1"
-		e4_call_arg_1 = config(",", -1, False)
+		e4_call_arg_1 = config(",", -1, False())
 		fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
 	} |>
 		(Error(_)) { () }
@@ -1091,7 +1092,7 @@ test("header_width_error_line", () {
 	assert(
 		{
 			e4_call_arg_0 = "a,b\n\n1\n"
-			e4_call_arg_1 = config(",", -1, False)
+			e4_call_arg_1 = config(",", -1, False())
 			fail.catch(() { csv.parse_header(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Error(
@@ -1153,7 +1154,7 @@ test("bare_cr_eof_pulls_once", () -> () {
 		{
 			last = stream.make(() -> stream.Step(String, Never, PullProbe) {
 				note_pull()
-				stream.Done
+				stream.Done()
 			})
 			source = stream.append(stream.from_list(["a\r"]), last)
 			assert(

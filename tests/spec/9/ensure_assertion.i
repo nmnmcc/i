@@ -9,6 +9,6 @@
 // functions run.
 main = () {
 	assertion.catch(() {
-		resource.ensure(() { assert(False) }, () { panic("final") })
+		resource.ensure(() { assert(False()) }, () { panic("final") })
 	})
 }

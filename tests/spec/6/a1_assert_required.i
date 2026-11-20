@@ -6,6 +6,6 @@
 pure : (Int) -> Int = (0) { 7 }
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

@@ -7,16 +7,16 @@
 
 check = (got : BitArray, want : BitArray) {
 	{ got == want } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			panic(core.inspect(got) <> " is not " <> core.inspect(want))
 		}
 }
 
 same = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 test("whole_bytes", () {

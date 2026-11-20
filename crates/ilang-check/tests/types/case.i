@@ -28,13 +28,13 @@ describe = (v) { v |> (_ : Int) { "int" } & (s : String) { s } }
 choice = (r) { r |> (Ok(v)) { v } & (Error(v)) { v } }
 
 // The clause expressions share one type.
-mixed = (b) { b |> (True) { 1 } & (False) { "no" } }
+mixed = (b) { b |> (True()) { 1 } & (False()) { "no" } }
 
 // Named patterns.
 named = (r) { r |> (Ok(_) = whole) { whole } & (Error(_)) { Ok(0) } }
 
 // A type variable in a type test is a compile error.
-bad = <A>(v : A) { v |> (x : A ? True) { x } & (_) { panic("unreachable") } }
+bad = <A>(v : A) { v |> (x : A ? True()) { x } & (_) { panic("unreachable") } }
 
 // A catch-all next to a pattern whose parts are tested.
 first_one = (p) { p |> ((1, x)) { x } & (_) { 0 } }

@@ -300,7 +300,7 @@ and src/main.i:
 Bundle = ()
 @host("probe", "request")
 Work = (start = () -> Request(Int))
-make = () <- (work : Work) { Bundle }
+make = () <- (work : Work) { Bundle() }
 probe = () <- (bundle : Bundle) { () }
 ```
 

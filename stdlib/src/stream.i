@@ -47,7 +47,7 @@ Step(A, E, N) = Done | Next(A, E, N)
 
 /// An empty stream in any chosen common environment.
 new = <A, N>() -> Stream(A, Never, N) {
-	Stream(() -> Step(A, Never, N) { Done }, (_ : N) { () })
+	Stream(() -> Step(A, Never, N) { Done() }, (_ : N) { () })
 }
 
 /// One item, followed by an empty tail.
@@ -57,7 +57,9 @@ wrap = <A, N>(item : A) -> Stream(A, Never, N) {
 
 /// Builds one cell per pull, without walking the list at construction.
 from_list = <A, N>(items : List(A)) -> Stream(A, Never, N) {
-	make(() { items |> ([]) { Done } & ([x, ..xs]) { Next(x, from_list(xs)) } })
+	make(() {
+		items |> ([]) { Done() } & ([x, ..xs]) { Next(x, from_list(xs)) }
+	})
 }
 
 /// Stores a step without calling it. The private marker makes N invariant.
@@ -81,7 +83,7 @@ unfold = <S, A, E, N>(
 ) -> Stream(A, E, N) {
 	make(() {
 		with(from) |>
-			(None) { Done }
+			(None()) { Done() }
 			& (Some((x, next))) { Next(x, unfold(next, with)) }
 	})
 }
@@ -99,7 +101,7 @@ map = <A, B, E, F, N>(
 ) -> Stream(B, E | F, N) {
 	make(() {
 		pull(over) |>
-			(Done) { Done }
+			(Done()) { Done() }
 			& (Next(x, tail)) { Next(with(x), map(tail, with)) }
 	})
 }
@@ -110,7 +112,7 @@ filter = <A, E, F, N>(
 	keeping : (A) <- (Fail(F), ..N) -> Bool
 ) -> Stream(A, E | F, N) {
 	filter_map(over, (x) {
-		keeping(x) |> (True) { Some(x) } & (False) { None }
+		keeping(x) |> (True()) { Some(x) } & (False()) { None() }
 	})
 }
 
@@ -121,10 +123,10 @@ filter_map = <A, B, E, F, N>(
 ) -> Stream(B, E | F, N) {
 	seek = (source : Stream(A, E, N)) -> Step(B, E | F, N) {
 		pull(source) |>
-			(Done) { Done }
+			(Done()) { Done() }
 			& (Next(x, tail)) {
 				with(x) |>
-					(None) { seek(tail) }
+					(None()) { seek(tail) }
 					& (Some(y)) { Next(y, filter_map(tail, with)) }
 			}
 	}
@@ -144,7 +146,7 @@ append = <A, E, F, N>(
 ) -> Stream(A, E | F, N) {
 	make(() {
 		pull(first) |>
-			(Done) { pull(second) }
+			(Done()) { pull(second) }
 			& (Next(x, tail)) { Next(x, append(tail, second)) }
 	})
 }
@@ -156,10 +158,10 @@ zip = <A, B, E, F, N>(
 ) -> Stream((A, B), E | F, N) {
 	make(() {
 		pull(first) |>
-			(Done) { Done }
+			(Done()) { Done() }
 			& (Next(x, xs)) {
 				pull(second) |>
-					(Done) { Done }
+					(Done()) { Done() }
 					& (Next(y, ys)) { Next((x, y), zip(xs, ys)) }
 			}
 	})
@@ -169,10 +171,10 @@ zip = <A, B, E, F, N>(
 take = <A, E, N>(from : Stream(A, E, N), up_to : Int) -> Stream(A, E, N) {
 	make(() {
 		{ up_to <= 0 } |>
-			(True) { Done }
-			& (False) {
+			(True()) { Done() }
+			& (False()) {
 				pull(from) |>
-					(Done) { Done }
+					(Done()) { Done() }
 					& (Next(x, tail)) { Next(x, take(tail, up_to - 1)) }
 			}
 	})
@@ -182,10 +184,10 @@ take = <A, E, N>(from : Stream(A, E, N), up_to : Int) -> Stream(A, E, N) {
 drop = <A, E, N>(from : Stream(A, E, N), up_to : Int) -> Stream(A, E, N) {
 	seek = (source : Stream(A, E, N), n : Int) -> Step(A, E, N) {
 		{ n <= 0 } |>
-			(True) { pull(source) }
-			& (False) {
+			(True()) { pull(source) }
+			& (False()) {
 				pull(source) |>
-					(Done) { Done }
+					(Done()) { Done() }
 					& (Next(_, tail)) { seek(tail, n - 1) }
 			}
 	}
@@ -199,11 +201,11 @@ take_while = <A, E, F, N>(
 ) -> Stream(A, E | F, N) {
 	make(() {
 		pull(from) |>
-			(Done) { Done }
+			(Done()) { Done() }
 			& (Next(x, tail)) {
 				keeping(x) |>
-					(False) { Done }
-					& (True) { Next(x, take_while(tail, keeping)) }
+					(False()) { Done() }
+					& (True()) { Next(x, take_while(tail, keeping)) }
 			}
 	})
 }
@@ -215,7 +217,7 @@ fold = <A, Acc, E, F, N>(
 	with : (Acc, A) <- (Fail(F), ..N) -> Acc
 ) -> Acc {
 	pull(over) |>
-		(Done) { from }
+		(Done()) { from }
 		& (Next(x, tail)) { fold(tail, with(from, x), with) }
 }
 
@@ -226,7 +228,7 @@ fold_until = <A, Acc, E, F, N>(
 	with : (Acc, A) <- (Fail(F), ..N) -> list.ContinueOrStop(Acc)
 ) -> Acc {
 	pull(over) |>
-		(Done) { from }
+		(Done()) { from }
 		& (Next(x, tail)) {
 			with(from, x) |>
 				(list.Stop(acc)) { acc }
@@ -254,7 +256,7 @@ to_list = <A, E, N>(stream : Stream(A, E, N)) -> List(A) {
 from_results = <A, E, N>(items : List(Result(A, E))) -> Stream(A, E, N) {
 	make(() {
 		items |>
-			([]) { Done }
+			([]) { Done() }
 			& ([x, ..xs]) { Next(fail.from_result(x), from_results(xs)) }
 	})
 }
@@ -268,7 +270,7 @@ attempt = <A, E, N>(stream : Stream(A, E, N)) -> Stream(
 	make(() {
 		fail.catch(() { pull(stream) }) |>
 			(Error(e)) { Next(Error(e), new()) }
-			& (Ok(Done)) { Done }
+			& (Ok(Done())) { Done() }
 			& (Ok(Next(x, tail))) { Next(Ok(x), attempt(tail)) }
 	})
 }
@@ -284,7 +286,7 @@ map_environment = <A, E, N, M>(
 ) -> Stream(A, E, M) {
 	make(() {
 		run(() { pull(stream) }) |>
-			(Done) { Done }
+			(Done()) { Done() }
 			& (Next(x, tail)) { Next(x, map_environment(tail, run)) }
 	})
 }
@@ -301,9 +303,9 @@ flatten = <A, B, E, F, G, N>(
 	) {
 		pull(current) |>
 			(Next(x, tail)) { Next(x, flatten(out, tail, f)) }
-			& (Done) {
+			& (Done()) {
 				pull(out) |>
-					(Done) { Done }
+					(Done()) { Done() }
 					& (Next(x, tail)) { seek(tail, f(x)) }
 			}
 	}

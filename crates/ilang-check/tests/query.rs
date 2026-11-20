@@ -131,7 +131,7 @@ describe = (u : User) {
 	label <> greet(u)
 }
 
-first = (o) { o |> (Some(v)) { v } & (None) { 0 } }
+first = (o) { o |> (Some(v)) { v } & (None()) { 0 } }
 
 Some(A) = (A)
 None = ()
@@ -203,8 +203,8 @@ fn type_of_local_names() {
 fn type_of_other_things() {
     let f = fixture();
     assert_eq!(f.hover("app/main", "Some(v)", 0), "Some : (A) -> Some(A)");
-    // A constructor's type is its own.
-    assert_eq!(f.hover("app/main", "None)", 0), "None : None");
+    // A constructor's type is the function that makes its value.
+    assert_eq!(f.hover("app/main", "None()", 0), "None : () -> None");
     assert_eq!(f.hover("app/main", "name", 0), "name : String");
     assert_eq!(
         f.hover("app/main", "User)", 0),
@@ -341,7 +341,7 @@ fn completions_of_members() {
 fn completions_of_fields_from_inference() {
     let f = Fixture::new(&[(
         "src/main.i",
-        "Point = (x = Int, y = Int)\norigin = Point(x = 0, y = 0)\nf = () {\n\tp = origin\n\tp.x + origin.y\n}\ng = (o : Point) {\n\to |> (Point(..) ? True) { o.x } & (_) { panic(\"unreachable\") }\n}\n",
+        "Point = (x = Int, y = Int)\norigin = Point(x = 0, y = 0)\nf = () {\n\tp = origin\n\tp.x + origin.y\n}\ng = (o : Point) {\n\to |> (Point(..) ? True()) { o.x } & (_) { panic(\"unreachable\") }\n}\n",
     )]);
     assert!(!f.checked.diags.iter().any(|d| d.is_error()));
     // A local name whose type is inferred.
@@ -633,7 +633,7 @@ fn private_value_and_written_alias_hovers_limit_literals_only_in_human_text() {
 
 // ---- The queries for references, rename, navigation and code actions ----
 
-const SHAPES_Q: &str = "(\n\tShape(..)\n\tarea\n)\n\nCircle = (radius = Int)\nDot = ()\nShape = Circle | Dot\n\narea = (s : Shape) -> Int {\n\ts |> (Circle(radius = radius)) { radius * 3 } & (Dot) { 0 }\n}\n";
+const SHAPES_Q: &str = "(\n\tShape(..)\n\tarea\n)\n\nCircle = (radius = Int)\nDot = ()\nShape = Circle | Dot\n\narea = (s : Shape) -> Int {\n\ts |> (Circle(radius = radius)) { radius * 3 } & (Dot()) { 0 }\n}\n";
 const MAIN_Q: &str = "(\n\t(Shape, Circle, area) = app/shapes\n)\n\nmain = () {\n\tc = Circle(radius = 2)\n\tarea(c) + area(Circle(radius = 1))\n}\n";
 
 fn shapes_fixture() -> Fixture {
@@ -724,7 +724,7 @@ fn query_rename_checks_kind_and_scope() {
 
 #[test]
 fn query_missing_clauses_of_a_match() {
-    let text = "Circle = (Int)\nDot = ()\nLine = ()\nShape = Circle | Dot | Line\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } }\n";
+    let text = "Circle = (Int)\nDot = ()\nLine = ()\nShape = Circle | Dot | Line\n\nf = (s : Shape) { s |> (Dot()) { 0 } & (Circle(1)) { 1 } }\n";
     let f = Fixture::new(&[("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");
@@ -775,7 +775,7 @@ fn query_completion_context() {
         q.completion_context(shapes, f.at("app/shapes", "Shape) ->", 0, 1)),
         CompletionContext::Type
     );
-    match q.completion_context(shapes, f.at("app/shapes", "Dot) { 0 }", 0, 0)) {
+    match q.completion_context(shapes, f.at("app/shapes", "Dot()) { 0 }", 0, 0)) {
         // The members of `Shape = Circle | Dot`.
         CompletionContext::Pattern { types } => assert_eq!(types.len(), 2),
         other => panic!("{other:?}"),
@@ -793,7 +793,7 @@ fn query_completion_context() {
 
 #[test]
 fn query_unused_imports_and_fixes() {
-    let text = "(\n  app/shapes\n)\n\nmain = () { area(Dot) }\n";
+    let text = "(\n  app/shapes\n)\n\nmain = () { area(Dot()) }\n";
     let f = Fixture::new(&[("src/shapes.i", SHAPES_Q), ("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");
@@ -814,7 +814,7 @@ fn query_unused_imports_and_fixes() {
 #[test]
 fn incomplete_syntax_three_branch_keeps_constructor_completion() {
     use ilang_check::query::CompletionContext;
-    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot) { 0 } & (Circle(1)) { 1 } & () { 2 } }\n";
+    let text = "Circle = (Int)\nRect = (width = Int, height = Int)\nDot = ()\nShape = Circle | Rect | Dot\n\nf = (s : Shape) { s |> (Dot()) { 0 } & (Circle(1)) { 1 } & () { 2 } }\n";
     let f = Fixture::new(&[("src/main.i", text)]);
     let q = f.query();
     let m = f.module("app/main");

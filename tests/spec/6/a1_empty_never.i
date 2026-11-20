@@ -6,6 +6,6 @@
 _empty : (Never) -> Int = core.never
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

@@ -159,6 +159,22 @@ fn apply(head: Datum, span: Span, parts: impl IntoIterator<Item = Datum>) -> Dat
     list(span, std::iter::once(head).chain(parts).collect())
 }
 
+/// An UpName: its first character is upper case.
+fn is_upper(name: &str) -> bool {
+    name.chars().next().is_some_and(char::is_uppercase)
+}
+
+/// The head of a call: a constructor name is bare, since the call supplies
+/// the list it has in a value position.
+fn head(callee: &Expr) -> Datum {
+    match &callee.kind {
+        ExprKind::Name { module, name } if is_upper(&name.name) => {
+            qualified(module, name, callee.span.0)
+        }
+        _ => expr(callee),
+    }
+}
+
 fn qualified(module: &Option<Ident>, n: &Ident, span: Span) -> Datum {
     match module {
         Some(m) => form_in(
@@ -540,7 +556,7 @@ fn expr(e: &Expr) -> Datum {
         ExprKind::Block(b) => block(b),
         ExprKind::Chain(fs) if fs.len() == 1 => function(&fs[0]),
         ExprKind::Chain(fs) => form("&", span, fs.iter().map(function)),
-        ExprKind::Call { callee, args } => apply(expr(callee), span, ditems(args)),
+        ExprKind::Call { callee, args } => apply(head(callee), span, ditems(args)),
         ExprKind::Provide { target, services } => form_in(
             "<-",
             gap(target.span.0, services.span.0),

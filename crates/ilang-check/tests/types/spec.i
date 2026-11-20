@@ -11,8 +11,8 @@ retry = <A, N>(times : Int, body : () <- N -> A) -> A {
 		(Ok(value)) { value }
 		& (Error(error)) {
 			{ times > 1 } |>
-				(True) { retry(times - 1, body) }
-				& (False) { fail.raise(error) }
+				(True()) { retry(times - 1, body) }
+				& (False()) { fail.raise(error) }
 		}
 }
 
@@ -58,8 +58,8 @@ numbers = () {
 // §9.6
 my_assert = (c : Bool) <- (a : Assert) {
 	c |>
-		(True) { () }
-		& (False) { a.fail(AssertionFailure(message = "assert")) }
+		(True()) { () }
+		& (False()) { a.fail(AssertionFailure(message = "assert")) }
 }
 
 // type: (c: Bool) -> () ! Assert
@@ -81,7 +81,7 @@ catch = (body) {
 // type: (body: () -> A ? E ! N) -> Result(A, AssertionFailure) ? E ! N - Assert
 checked = () {
 	catch(() {
-		assert(False)
+		assert(False())
 		1
 	})
 }

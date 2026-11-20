@@ -5,7 +5,7 @@
 	i/resource
 )
 
-check = (b : Bool) { b |> (True) { () } & (False) { panic("wrong") } }
+check = (b : Bool) { b |> (True()) { () } & (False()) { panic("wrong") } }
 
 id = <A>(a : A) -> A { a }
 
@@ -88,7 +88,7 @@ test("identity_and_capture", () {
 })
 
 relay = (f : (Float) -> Float, n : Int, x : Float) -> Float {
-	{ n == 0 } |> (True) { f(x) } & (False) { relay(f, n - 1, x) }
+	{ n == 0 } |> (True()) { f(x) } & (False()) { relay(f, n - 1, x) }
 }
 
 test("tail_million", () {

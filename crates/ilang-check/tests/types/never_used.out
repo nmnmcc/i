@@ -10,7 +10,7 @@ nested : (Result(Bool, ())) -> 1 | 2 | 3 | 4
 lists : (List(A)) -> 0 | 1
 bits : (A) -> Int
 dead : (A) -> 1
-2:63: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
+2:67: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
 4:37: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
 6:43: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
 10:48: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
@@ -18,7 +18,7 @@ dead : (A) -> 1
 17:42: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
 21:49: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
 23:50: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
-26:66: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
+26:70: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
 29:54: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
 35:32: warning[W0501]: this clause is never used: every value that its pattern matches is matched by an earlier clause without a guard
 2:1: warning[W0504]: top-level binding `after_all` is not used

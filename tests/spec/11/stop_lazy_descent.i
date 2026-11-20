@@ -38,13 +38,13 @@ out1 = (outer) {
 main = () {
 	p = control.boundary((outer) {
 		out1(outer)
-		Done
+		Done()
 	})
 	p |>
 		(Paused(k)) {
 			x = control.resume(k, ())
 			x
 		}
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 	()
 }

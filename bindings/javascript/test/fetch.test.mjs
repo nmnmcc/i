@@ -84,7 +84,7 @@ headers = (url: String) {
 		assert(text(res) == "sent")
 		http.header(res.headers, "X-Provider") |>
 			(Some(s)) { s }
-			& (None) { panic("missing response header") }
+			& (None()) { panic("missing response header") }
 	})
 }
 status = (url: String) {

@@ -56,7 +56,7 @@ nested = (r : Result(Int | String, ())) {
 
 // At a place below a tuple, with a part that must match too.
 pairs = (p : (Int | String, Bool)) {
-	p |> ((_ : Int, _)) { "" } & ((s, True)) { s } & ((_, False)) { "" }
+	p |> ((_ : Int, _)) { "" } & ((s, True())) { s } & ((_, False())) { "" }
 }
 
 // Two levels down: every `Result` below `Ok` is taken, but rule 12 takes
@@ -72,7 +72,7 @@ deep = (r : Result(Result(Int, String) | (), ())) {
 
 // Not taken: a guard, a literal, or a part that does not match every
 // value.
-guarded = (v : { Int | String }) { v |> (_ : Int ? True) { "int" } & (x) { x } }
+guarded = (v : { Int | String }) { v |> (_ : Int ? True()) { "int" } & (x) { x } }
 
 literal = (v : { Int | String }) { v |> (1) { "one" } & (x) { x } }
 
@@ -84,7 +84,7 @@ partial = (v : { Result(Int, String) | () }) {
 // part of `(True, _: Int)` and `(False, _: Int)` is not a catch-all, so
 // `Int` is not taken at the second part.
 by_patterns = (p : (Bool, Int | String)) {
-	p |> ((True, _ : Int)) { "t" } & ((False, _ : Int)) { "f" } & ((_, s)) { s }
+	p |> ((True(), _ : Int)) { "t" } & ((False(), _ : Int)) { "f" } & ((_, s)) { s }
 }
 
 // With no annotation, the type of the subject comes from the patterns.

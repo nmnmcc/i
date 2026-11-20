@@ -18,14 +18,14 @@ area = (s : Shape) -> Float {
 		& (Square(..) = q) { q.side *. q.side }
 }
 
-flip = (True) { False } & (False) { True }
+flip = (True()) { False() } & (False()) { True() }
 
 main = () {
 	b : Bool = area(Square(1.0)) <. 2.0
 	assert(b)
-	assert(flip(b) == False)
+	assert(flip(b) == False())
 	assert(area(Circle(1.0)) == 3.0)
 	r : Result(Int, String) = Ok(1)
-	r |> (Ok(n)) { assert(n == 1) } & (Error(_)) { assert(False) }
+	r |> (Ok(n)) { assert(n == 1) } & (Error(_)) { assert(False()) }
 	()
 }

@@ -13,7 +13,7 @@
 	sin_terms
 )
 R = (n = Int, d = Int)
-abs = (a : Int) -> Int { { a < 0 } |> (True) { -a } & (False) { a } }
+abs = (a : Int) -> Int { { a < 0 } |> (True()) { -a } & (False()) { a } }
 gcd = (a : Int, b : Int) -> Int { b |> (0) { a } & (_) { gcd(b, a % b) } }
 make = (n : Int, d : Int) -> R {
 	g = gcd(abs(n), d)
@@ -33,15 +33,15 @@ mul = (a : R, b : R) -> R {
 }
 div = (a : R, b : R) -> R {
 	{ b.n < 0 } |>
-		(True) { mul(a, R(n = -b.d, d = -b.n)) }
-		& (False) { mul(a, R(n = b.d, d = b.n)) }
+		(True()) { mul(a, R(n = -b.d, d = -b.n)) }
+		& (False()) { mul(a, R(n = b.d, d = b.n)) }
 }
 atan_terms = (z : R, count : Int) -> R {
 	square = mul(z, z)
 	go = (k : Int, term : R, sum : R) -> R {
 		{ k == count } |>
-			(True) { sum }
-			& (False) {
+			(True()) { sum }
+			& (False()) {
 				go(
 					k + 1,
 					mul(term, R(n = -square.n, d = square.d)),
@@ -55,8 +55,8 @@ sin_terms = (z : R, count : Int) -> R {
 	square = mul(z, z)
 	go = (k : Int, term : R, sum : R) -> R {
 		{ k == count } |>
-			(True) { sum }
-			& (False) {
+			(True()) { sum }
+			& (False()) {
 				next = div(
 					mul(term, R(n = -square.n, d = square.d)),
 					R(n = { 2 * k + 2 } * { 2 * k + 3 }, d = 1),

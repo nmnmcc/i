@@ -23,5 +23,5 @@ read : <A>(Key(A), Keyed) -> Result(A, ())
 
 /// Reads only a value marked by this same key.
 unwrap = <A>(k : Key(A), x : Keyed) -> Lookup(A) {
-	read(k, x) |> (Ok(v)) { Found(v) } & (Error(_)) { Missing }
+	read(k, x) |> (Ok(v)) { Found(v) } & (Error(_)) { Missing() }
 }

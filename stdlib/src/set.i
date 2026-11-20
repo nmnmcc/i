@@ -157,13 +157,13 @@ symmetric_difference = <A>(of : Set(A), and : Set(A)) -> Set(A) {
 /// `True` when every member of `first` is in `of`.
 is_subset = <A>(first : Set(A), of : Set(A)) -> Bool {
 	size(first) <= size(of) &&
-		fold(first, True, (ok, x) { ok && contains(of, x) })
+		fold(first, True(), (ok, x) { ok && contains(of, x) })
 }
 
 /// `True` when no member is in both sets.
 is_disjoint = <A>(first : Set(A), from : Set(A)) -> Bool {
 	(small, big) = by_size(first, from)
-	fold(small, True, (ok, x) { ok && core.not(contains(big, x)) })
+	fold(small, True(), (ok, x) { ok && core.not(contains(big, x)) })
 }
 
 /// `True` when both sets have the same members, whatever order they were put
@@ -179,5 +179,5 @@ same_elements = <A>(first : Set(A), second : Set(A)) -> Bool {
 }
 
 by_size = <X>(a : Set(X), b : Set(X)) -> (Set(X), Set(X)) {
-	{ size(a) <= size(b) } |> (True) { (a, b) } & (False) { (b, a) }
+	{ size(a) <= size(b) } |> (True()) { (a, b) } & (False()) { (b, a) }
 }

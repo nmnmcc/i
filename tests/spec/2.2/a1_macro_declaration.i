@@ -6,6 +6,6 @@
 inspect : <A>(A) -> String
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

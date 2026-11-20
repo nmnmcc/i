@@ -265,12 +265,12 @@ test("try_recover_error_to_error_test", () {
 test("option_to_result_test", () {
 	// The conversions from and to `Option` live in `i/option`.
 	assert(option.to_result(Some(1), "none") == Ok(1))
-	assert(option.to_result(None, "none") == Error("none"))
+	assert(option.to_result(None(), "none") == Error("none"))
 })
 
 test("option_from_result_test", () {
 	assert(option.from_result(Ok(1)) == Some(1))
-	assert(option.from_result(Error("e")) == None)
+	assert(option.from_result(Error("e")) == None())
 })
 
 test("stored_outcome_round_trip_test", () {
@@ -317,7 +317,7 @@ test("map_effects_test", () {
 test("error_union_test", () {
 	// `then` keeps the error type of the first result; a union is fine.
 	r : Result(Int, String | Int) = result.then(Ok(1), (x) {
-		{ x > 0 } |> (True) { Error(0) } & (False) { Error("negative") }
+		{ x > 0 } |> (True()) { Error(0) } & (False()) { Error("negative") }
 	})
 	assert(r == Error(0))
 })

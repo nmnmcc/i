@@ -167,7 +167,7 @@ f = () {
 			list.fold(
 				[1, 2, 3, 4],
 				0,
-				{ (n, _) { { n == 3 } |> (True) { n } & (False) { n + 1 } } },
+				{ (n, _) { { n == 3 } |> (True()) { n } & (False()) { n + 1 } } },
 			) ==
 				3,
 		)
@@ -247,8 +247,9 @@ fn grouped_negatives_supply_the_same_written_group_facts() {
 #[test]
 fn shared_list_items_need_coverage_but_an_option_parameter_keeps_literals() {
     // Shared places get whole scalars; a once-occurring Some(A) keeps literals.
-    let (ds, lines) =
-        check("(\n\t(Option, Some, None) = i/option\n)\nk = (Some(\"a\")) { 1 } & (None) { 2 }\n");
+    let (ds, lines) = check(
+        "(\n\t(Option, Some, None) = i/option\n)\nk = (Some(\"a\")) { 1 } & (None()) { 2 }\n",
+    );
     assert!(ds.is_empty(), "{ds:?}");
     assert!(
         lines.iter().any(|l| l.contains("Option(\"a\")")),
@@ -320,7 +321,7 @@ fn typed_complements_keep_the_head_and_cover_cross_columns() {
             None,
         ),
         (
-            "f = (p : (String, Bool)) {\n\tp |> ((x : String - \"a\", _)) { 1 } & ((\"a\", True)) { 2 }\n}",
+            "f = (p : (String, Bool)) {\n\tp |> ((x : String - \"a\", _)) { 1 } & ((\"a\", True())) { 2 }\n}",
             Some("(\"a\", False)"),
         ),
         (
@@ -349,7 +350,7 @@ fn narrowing_checks_the_entire_row_and_ignores_guards() {
         ("\"a\" ? c", "t", "String", false),
         ("\"a\" | \"b\"", "t", "String", true),
         ("Ok(\"a\")", "Ok(t)", "Result(String, ())", true),
-        ("(\"a\", True)", "(t, _)", "(String, Bool)", false),
+        ("(\"a\", True())", "(t, _)", "(String, Bool)", false),
         ("(\"a\", _)", "(t, _)", "(String, Bool)", true),
         (
             "(\"a\", x : Int)",

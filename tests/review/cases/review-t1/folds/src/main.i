@@ -8,7 +8,7 @@ main = () {
 	assert(rec(4, 0) == 4)
 	assert(
 		list.fold([1, 2, 3], 0, (n, x) {
-			{ n == 1 } |> (True) { n + x } & (False) { n + 1 }
+			{ n == 1 } |> (True()) { n + x } & (False()) { n + 1 }
 		}) ==
 			4,
 	)

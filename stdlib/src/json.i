@@ -61,9 +61,11 @@ whitespace = (xs : List(Int), at : Int) -> (List(Int), Int) {
 value = (input : List(Int), offset : Int) -> (Json, List(Int), Int) {
 	(xs, at) = whitespace(input, offset)
 	xs |>
-		([110, 117, 108, 108, ..rest]) { (Null, rest, at + 4) }
-		& ([116, 114, 117, 101, ..rest]) { (Boolean(True), rest, at + 4) }
-		& ([102, 97, 108, 115, 101, ..rest]) { (Boolean(False), rest, at + 5) }
+		([110, 117, 108, 108, ..rest]) { (Null(), rest, at + 4) }
+		& ([116, 114, 117, 101, ..rest]) { (Boolean(True()), rest, at + 4) }
+		& ([102, 97, 108, 115, 101, ..rest]) {
+			(Boolean(False()), rest, at + 5)
+		}
 		& ([34, ..rest]) {
 			(s, tail, end) = read_string(rest, at + 1, [])
 			(Text(s), tail, end)
@@ -193,12 +195,12 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 		([117, ..tail]) {
 			(n, after, end) = hex4(tail, at + 1)
 			{ n >= 55296 && n <= 56319 } |>
-				(True) {
+				(True()) {
 					after |>
 						([92, 117, ..next]) {
 							(low, rest, pos) = hex4(next, end + 2)
 							{ low >= 56320 && low <= 57343 } |>
-								(True) {
+								(True()) {
 									read_string(
 										rest,
 										pos,
@@ -213,7 +215,7 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 										],
 									)
 								}
-								& (False) {
+								& (False()) {
 									fail.raise(
 										JsonError(
 											offset = end,
@@ -231,9 +233,9 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 							)
 						}
 				}
-				& (False) {
+				& (False()) {
 					{ n >= 56320 && n <= 57343 } |>
-						(True) {
+						(True()) {
 							fail.raise(
 								JsonError(
 									offset = at,
@@ -241,7 +243,7 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 								),
 							)
 						}
-						& (False) {
+						& (False()) {
 							read_string(after, end, [scalar(n), ..acc])
 						}
 				}
@@ -258,12 +260,12 @@ escape = (xs : List(Int), at : Int, acc : List(BitArray)) -> (
 				& (116) { 9 }
 				& (_) { -1 }
 			{ code < 0 } |>
-				(True) {
+				(True()) {
 					fail.raise(
 						JsonError(offset = at, reason = "invalid escape"),
 					)
 				}
-				& (False) { read_string(tail, at + 1, [<<code>>, ..acc]) }
+				& (False()) { read_string(tail, at + 1, [<<code>>, ..acc]) }
 		}
 		& (_) {
 			fail.raise(JsonError(offset = at, reason = "unterminated escape"))
@@ -275,10 +277,10 @@ hex4 = (xs : List(Int), at : Int) -> (Int, List(Int), Int) {
 		([a, b, c, d, ..tail]) {
 			digits = [hex(a), hex(b), hex(c), hex(d)]
 			{ list.all(digits, (x) { x >= 0 }) } |>
-				(True) {
+				(True()) {
 					(list.fold(digits, 0, (n, x) { n * 16 + x }), tail, at + 4)
 				}
-				& (False) {
+				& (False()) {
 					fail.raise(
 						JsonError(
 							offset = at,
@@ -310,8 +312,8 @@ digit = (x : Int) -> Bool { x >= 48 && x <= 57 }
 
 number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 	(negative, start, pos) = xs |>
-		([45, ..tail]) { (True, tail, at + 1) }
-		& (_) { (False, xs, at) }
+		([45, ..tail]) { (True(), tail, at + 1) }
+		& (_) { (False(), xs, at) }
 	(whole, after, end) = start |>
 		([48, ..tail]) {
 			tail |>
@@ -328,7 +330,7 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 		([46, ..tail]) {
 			(ds, rem, p) = digits(tail, end + 1, [])
 			{ ds == [] } |>
-				(True) {
+				(True()) {
 					fail.raise(
 						JsonError(
 							offset = p,
@@ -336,9 +338,9 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 						),
 					)
 				}
-				& (False) { ([46, ..ds], rem, p, True) }
+				& (False()) { ([46, ..ds], rem, p, True()) }
 		}
-		& (_) { ([], after, end, False) }
+		& (_) { ([], after, end, False()) }
 	(exponent, remaining, final, is_float) = rest |>
 		([e, ..tail] ? e == 101 || e == 69) {
 			(sign, start_exp, exp_at) = tail |>
@@ -346,7 +348,7 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 				& (_) { ([], tail, finish + 1) }
 			(ds, rem, p) = digits(start_exp, exp_at, [])
 			{ ds == [] } |>
-				(True) {
+				(True()) {
 					fail.raise(
 						JsonError(
 							offset = p,
@@ -354,15 +356,15 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 						),
 					)
 				}
-				& (False) { (list.append([e, ..sign], ds), rem, p, True) }
+				& (False()) { (list.append([e, ..sign], ds), rem, p, True()) }
 		}
 		& (_) { ([], rest, finish, floating) }
-	prefix = negative |> (True) { [45, ..whole] } & (False) { whole }
+	prefix = negative |> (True()) { [45, ..whole] } & (False()) { whole }
 	num = text_bytes(
 		list.append(list.append(prefix, fraction), exponent),
 	)
 	parsed = is_float |>
-		(False) {
+		(False()) {
 			fail.catch(() { int.parse(num) }) |>
 				(Ok(n)) { Integer(n) }
 				& (Error(_)) {
@@ -371,14 +373,14 @@ number = (xs : List(Int), at : Int) -> (Json, List(Int), Int) {
 					)
 				}
 		}
-		& (True) {
+		& (True()) {
 			float_text = { fraction == [] } |>
-				(True) {
+				(True()) {
 					text_bytes(
 						list.append(list.append(prefix, [46, 48]), exponent),
 					)
 				}
-				& (False) { num }
+				& (False()) { num }
 			fail.catch(() { float.parse(float_text) }) |>
 				(Ok(n)) { Number(n) }
 				& (Error(_)) {
@@ -423,44 +425,44 @@ field = (json : Json, key : String) -> Option(Json) {
 		(Object(xs)) {
 			list.find_map(xs, (pair) {
 				(k, v) = pair
-				{ k == key } |> (True) { Some(v) } & (False) { None }
+				{ k == key } |> (True()) { Some(v) } & (False()) { None() }
 			})
 		}
-		& (_) { None }
+		& (_) { None() }
 }
 
 index = (json : Json, at : Int) -> Option(Json) {
-	json |> (Array(xs)) { list.at(xs, at) } & (_) { None }
+	json |> (Array(xs)) { list.at(xs, at) } & (_) { None() }
 }
 
 as_bool = (json : Json) -> Option(Bool) {
-	json |> (Boolean(x)) { Some(x) } & (_) { None }
+	json |> (Boolean(x)) { Some(x) } & (_) { None() }
 }
 
 as_int = (json : Json) -> Option(Int) {
-	json |> (Integer(x)) { Some(x) } & (_) { None }
+	json |> (Integer(x)) { Some(x) } & (_) { None() }
 }
 
 as_float = (json : Json) -> Option(Float) {
-	json |> (Number(x)) { Some(x) } & (_) { None }
+	json |> (Number(x)) { Some(x) } & (_) { None() }
 }
 
 as_string = (json : Json) -> Option(String) {
-	json |> (Text(x)) { Some(x) } & (_) { None }
+	json |> (Text(x)) { Some(x) } & (_) { None() }
 }
 
 as_array = (json : Json) -> Option(List(Json)) {
-	json |> (Array(x)) { Some(x) } & (_) { None }
+	json |> (Array(x)) { Some(x) } & (_) { None() }
 }
 
 as_object = (json : Json) -> Option(List((String, Json))) {
-	json |> (Object(x)) { Some(x) } & (_) { None }
+	json |> (Object(x)) { Some(x) } & (_) { None() }
 }
 
-print = (json : Json) -> String { render(json, "", 0, False) }
+print = (json : Json) -> String { render(json, "", 0, False()) }
 
 pretty = (json : Json, indent : Int) -> String {
-	render(json, string.repeat(" ", indent), 0, True)
+	render(json, string.repeat(" ", indent), 0, True())
 }
 
 render = (
@@ -470,9 +472,9 @@ render = (
 	formatted : Bool
 ) -> String {
 	json |>
-		(Null) { "null" }
-		& (Boolean(True)) { "true" }
-		& (Boolean(False)) { "false" }
+		(Null()) { "null" }
+		& (Boolean(True())) { "true" }
+		& (Boolean(False())) { "false" }
 		& (Integer(x)) { int.to_string(x) }
 		& (Number(x)) { float.to_string(x) }
 		& (Text(x)) { quote(x) }
@@ -495,7 +497,9 @@ render = (
 					string.concat(
 						[
 							quote(k),
-							{ formatted } |> (True) { ": " } & (False) { ":" },
+							{ formatted } |>
+								(True()) { ": " }
+								& (False()) { ":" },
 							render(v, indent, depth + 1, formatted),
 						],
 					)
@@ -515,9 +519,9 @@ collection = (
 	depth : Int,
 	formatted : Bool
 ) -> String {
-	{ xs == [] || formatted == False } |>
-		(True) { string.concat([open, string.join(xs, ","), close]) }
-		& (False) {
+	{ xs == [] || formatted == False() } |>
+		(True()) { string.concat([open, string.join(xs, ","), close]) }
+		& (False()) {
 			pad = string.repeat(indent, depth + 1)
 			string.concat(
 				[
@@ -558,7 +562,7 @@ quote = (s : String) -> String {
 }
 
 hex_char = (n : Int) -> Int {
-	{ n < 10 } |> (True) { n + 48 } & (False) { n + 87 }
+	{ n < 10 } |> (True()) { n + 48 } & (False()) { n + 87 }
 }
 
 /// Reports failure through `Fail(JsonError)`.

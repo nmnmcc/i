@@ -506,17 +506,33 @@ impl<'p> Emitter<'p> {
             FuncKind::Code(func) => self.code(&name, func, Some(id)),
             // A constructor or a library function used as a value has a
             // frame too, so that it takes the tail site of a tail call.
-            FuncKind::Ctor { ctor, ty, arity } => {
+            FuncKind::Ctor { body, arity } => {
                 let locals = vec![LocalType::Value; *arity as usize + 1];
                 self.header(&name, *arity, &locals);
                 if self.metered {
                     let _ = writeln!(self.out, "(call $macro_enter (i32.const {}))", arity + 1);
                 }
-                let fields: String = (0..*arity).map(|i| format!(" (local.get $l{i})")).collect();
+                let value = match *body {
+                    CtorBody::Bool(true) => "(global.get $value_true)".to_string(),
+                    CtorBody::Bool(false) => "(global.get $value_false)".to_string(),
+                    CtorBody::Nil => "(ref.null eq)".to_string(),
+                    // A constructor without fields is one shared value.
+                    CtorBody::Record { ctor, ty } if *arity == 0 => {
+                        self.ctors.insert((ctor, ty));
+                        format!("(global.get $k{ctor}_{ty})")
+                    }
+                    CtorBody::Record { ctor, ty } => {
+                        let fields: String =
+                            (0..*arity).map(|i| format!(" (local.get $l{i})")).collect();
+                        format!(
+                            "(call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {arity}{fields}))"
+                        )
+                    }
+                };
                 let _ = writeln!(
                     self.out,
                     "{}\
-                     (local.set $l{arity} (call $record (i32.const {ctor}) (i64.const {ty}) (array.new_fixed $values {arity}{fields})))\n\
+                     (local.set $l{arity} {value})\n\
                      {} (local.get $l{arity}))",
                     self.enter_call(),
                     self.leave()

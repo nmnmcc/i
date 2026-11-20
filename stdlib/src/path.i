@@ -39,8 +39,8 @@ clean = (path : String) -> String {
 							([x, ..xs] ? x != "..") { go(parts, xs) }
 							& (_) {
 								rooted |>
-									(True) { go(parts, acc) }
-									& (False) { go(parts, ["..", ..acc]) }
+									(True()) { go(parts, acc) }
+									& (False()) { go(parts, ["..", ..acc]) }
 							}
 					}
 					& (_) { go(parts, [part, ..acc]) }
@@ -117,7 +117,7 @@ extension = (path : String) -> String {
 
 /// Tests only for a leading slash.
 is_absolute = (path : String) -> Bool {
-	path |> ("/" <> _) { True } & (_) { False }
+	path |> ("/" <> _) { True() } & (_) { False() }
 }
 
 _relative_result = (from : String, to : String) -> Result(
@@ -127,22 +127,22 @@ _relative_result = (from : String, to : String) -> Result(
 	a = clean(from)
 	b = clean(to)
 	{ is_absolute(a) != is_absolute(b) } |>
-		(True) { Error(DifferentRoots) }
-		& (False) {
+		(True()) { Error(DifferentRoots()) }
+		& (False()) {
 			go = (left, right) {
 				(left, right) |>
 					(([x, ..xs], [y, ..ys]) ? x == y) { go(xs, ys) }
 					& (_) {
 						list.contains(left, "..") |>
-							(True) { Error(UnknownParent) }
-							& (False) {
+							(True()) { Error(UnknownParent()) }
+							& (False()) {
 								Ok(
 									render(
 										list.append(
 											list.map(left, (_) { ".." }),
 											right,
 										),
-										False,
+										False(),
 									),
 								)
 							}
@@ -179,9 +179,9 @@ segments = (path : String) -> List(String) {
 
 render = (parts : List(String), rooted : Bool) -> String {
 	(rooted, parts) |>
-		((False, [])) { "." }
-		& ((True, _)) { string.concat(["/", string.join(parts, "/")]) }
-		& ((False, _)) { string.join(parts, "/") }
+		((False(), [])) { "." }
+		& ((True(), _)) { string.concat(["/", string.join(parts, "/")]) }
+		& ((False(), _)) { string.join(parts, "/") }
 }
 
 clean_segments = (path : String) -> List(String) {

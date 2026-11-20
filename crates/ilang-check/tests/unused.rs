@@ -131,14 +131,14 @@ fn hint_requires_test_module_no_value_parameters_and_exact_nil() {
         ("src/main.i", "ordinary = () { () }"),
         (
             "test/check.i",
-            r#"forgotten = () { assert(True) }
+            r#"forgotten = () { assert(True()) }
 explicit = () -> () { () }
 alias = forgotten
 has_argument = (n : Int) { assert(n > 0) }
 returns_int = () { 1 }
 never_returns = () { panic("stop") }
-union_result = (b : Bool) { b |> (True) { () } & (False) { 1 } }
-with_environment = () <- (a : Assert) { assert(True) }
+union_result = (b : Bool) { b |> (True()) { () } & (False()) { 1 } }
+with_environment = () <- (a : Assert) { assert(True()) }
 "#,
         ),
     ]);
@@ -175,7 +175,7 @@ with_environment = () <- (a : Assert) { assert(True) }
 fn a_named_empty_type_is_not_unit() {
     // The test hint requires `()`, empty data, rather than a named type with no fields.
     assert_eq!(
-        warnings(&[("test/check.i", "Local = ()\nf = () { Local }")]),
+        warnings(&[("test/check.i", "Local = ()\nf = () { Local() }")]),
         [("f".into(), "top-level binding `f` is not used".into())]
     );
 }
@@ -229,7 +229,7 @@ fn pattern_lengths_and_nested_expression_references_count() {
 	read
 )
 size = 8
-guard = True
+guard = True()
 value = 1
 read = (<<n:u(size)>>) {
 	xs = [value]

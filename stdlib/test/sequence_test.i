@@ -20,10 +20,10 @@ check = (s : sequence.Sequence(Int), xs : List(Int)) -> () {
 // The example table of the sequence documentation, including saved source versions.
 test("sequence_examples", () {
 	empty = sequence.new()
-	assert(sequence.first(empty) == None)
-	assert(sequence.last(empty) == None)
-	assert(sequence.pop_front(empty) == None)
-	assert(sequence.pop_back(empty) == None)
+	assert(sequence.first(empty) == None())
+	assert(sequence.last(empty) == None())
+	assert(sequence.pop_front(empty) == None())
+	assert(sequence.pop_back(empty) == None())
 	fifo = sequence.push_back(
 		sequence.push_back(sequence.push_back(empty, 1), 2),
 		3,
@@ -32,21 +32,21 @@ test("sequence_examples", () {
 	Some((b, tail)) = sequence.pop_front(tail)
 	Some((c, tail)) = sequence.pop_front(tail)
 	assert((a, b, c) == (1, 2, 3))
-	assert(sequence.pop_front(tail) == None)
+	assert(sequence.pop_front(tail) == None())
 	Some((x, rest)) = sequence.pop_back(
 		sequence.push_front(sequence.from_list([2, 3]), 1),
 	)
 	assert(x == 3)
 	check(rest, [1, 2])
 	original = sequence.from_list([10, 20])
-	assert(sequence.at(original, -1) == None)
+	assert(sequence.at(original, -1) == None())
 	assert(sequence.at(original, 0) == Some(10))
-	assert(sequence.at(original, 2) == None)
+	assert(sequence.at(original, 2) == None())
 	Some(changed) = sequence.set(original, 1, 7)
 	check(changed, [10, 7])
 	check(original, [10, 20])
-	assert(sequence.set(original, -1, 7) == None)
-	assert(sequence.set(original, 2, 7) == None)
+	assert(sequence.set(original, -1, 7) == None())
+	assert(sequence.set(original, 2, 7) == None())
 	check(sequence.singleton(5), [5])
 	check(
 		sequence.reverse(
@@ -110,12 +110,12 @@ check_laws = (xs : List(Int), ys : List(Int), zs : List(Int)) -> () {
 			check(sequence.drop(a, i), list.drop(xs, i))
 			assert(sequence.at(a, i) == list.at(xs, i))
 			sequence.set(a, i, -10) |>
-				(None) { assert(i < 0 || i >= list.length(xs)) }
+				(None()) { assert(i < 0 || i >= list.length(xs)) }
 				& (Some(changed)) {
 					check(
 						changed,
 						list.index_map(xs, (x, j) {
-							{ i == j } |> (True) { -10 } & (False) { x }
+							{ i == j } |> (True()) { -10 } & (False()) { x }
 						}),
 					)
 				}
@@ -214,7 +214,7 @@ model = (
 				& (1) { (sequence.push_back(s, x), list.append(xs, [x])) }
 				& (2) {
 					sequence.pop_front(s) |>
-						(None) { (s, xs) }
+						(None()) { (s, xs) }
 						& (Some((v, rest))) {
 							assert(Some(v) == list.first(xs))
 							(rest, list.drop(xs, 1))
@@ -222,7 +222,7 @@ model = (
 				}
 				& (3) {
 					sequence.pop_back(s) |>
-						(None) { (s, xs) }
+						(None()) { (s, xs) }
 						& (Some((v, rest))) {
 							assert(Some(v) == list.last(xs))
 							(rest, list.take(xs, n - 1))
@@ -230,7 +230,7 @@ model = (
 				}
 				& (4) {
 					sequence.set(s, i, x) |>
-						(None) {
+						(None()) {
 							assert(i < 0 || i >= n)
 							(s, xs)
 						}
@@ -238,7 +238,9 @@ model = (
 							(
 								rest,
 								list.index_map(xs, (v, j) {
-									{ i == j } |> (True) { x } & (False) { v }
+									{ i == j } |>
+										(True()) { x }
+										& (False()) { v }
 								}),
 							)
 						}
@@ -281,15 +283,15 @@ test("sequence_persistent_model", () {
 // Traverse all the way through middle borrowing/collapse, alternating ends.
 drain = (s : sequence.Sequence(Int), low : Int, high : Int) -> () {
 	{ low >= high } |>
-		(True) { assert(sequence.is_empty(s)) }
-		& (False) {
+		(True()) { assert(sequence.is_empty(s)) }
+		& (False()) {
 			{ { low + high } % 2 == 0 } |>
-				(True) {
+				(True()) {
 					Some((x, rest)) = sequence.pop_front(s)
 					assert(x == low)
 					drain(rest, low + 1, high)
 				}
-				& (False) {
+				& (False()) {
 					Some((x, rest)) = sequence.pop_back(s)
 					assert(x == high - 1)
 					drain(rest, low, high - 1)
@@ -400,7 +402,7 @@ test("sequence_large_boundaries", () {
 })
 
 numbers = (n : Int) -> List(Int) {
-	{ n <= 0 } |> (True) { [] } & (False) { list.range(0, n - 1) }
+	{ n <= 0 } |> (True()) { [] } & (False()) { list.range(0, n - 1) }
 }
 
 Box = (value = Int)
@@ -454,12 +456,12 @@ test("sequence_callback_types_and_order", () {
 	)
 	union_error = (x : Int) -> Int {
 		{ x == 1 } |>
-			(True) { fail.raise(True) }
-			& (False) { fail.raise("other") }
+			(True()) { fail.raise(True()) }
+			& (False()) { fail.raise("other") }
 	}
 	assert(
 		fail.catch(() { sequence.each(sequence.singleton(1), union_error) }) ==
-			Error(True),
+			Error(True()),
 	)
 	assert(
 		fail.catch(() { sequence.map(sequence.singleton(2), union_error) }) ==
@@ -488,8 +490,10 @@ test("sequence_independent_histories", () {
 	versions = list.fold(numbers(128), [(back, xs)], (saved, x) {
 		[(old, model), .._] = saved
 		(next, expected) = { x % 2 == 0 } |>
-			(True) { (sequence.push_front(old, -x), [-x, ..model]) }
-			& (False) { (sequence.push_back(old, x), list.append(model, [x])) }
+			(True()) { (sequence.push_front(old, -x), [-x, ..model]) }
+			& (False()) {
+				(sequence.push_back(old, x), list.append(model, [x]))
+			}
 		check(next, expected)
 		[(next, expected), ..saved]
 	})

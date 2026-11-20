@@ -24,9 +24,9 @@ main = () {
 	assert(request.settled(t))
 	request.wait_any([t, t])
 	assert(request.take(r) == 37)
-	assert(request.state(r) == request.Taken)
+	assert(request.state(r) == request.Taken())
 	request.cancel(t)
-	assert(request.state(r) == request.Taken)
+	assert(request.state(r) == request.Taken())
 	assert(core.inspect(r) == "//request")
 	assert(core.inspect(t) == "//ticket")
 	assert(

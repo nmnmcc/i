@@ -10,18 +10,18 @@
     (-> (, value) _
       {(= t ((. syntax type_of) value))
        (|> ((. syntax subtype) t `Int)
-           (& (-> (, (. syntax Yes)) _ `(int_text ~value))
+           (& (-> (, ((. syntax Yes))) _ `(int_text ~value))
              (-> (, _) _
                (|>
                 ((. syntax subtype) t `String)
-                (& (-> (, (. syntax Yes)) _ value)
-                  (-> (, (. syntax NotKnown)) _
+                (& (-> (, ((. syntax Yes))) _ value)
+                  (-> (, ((. syntax NotKnown))) _
                     ((. fail raise)
                      ((. syntax SyntaxError)
                       (= message
                         "typed to_text cannot choose inside a generic binding")
                       (= at value))))
-                  (-> (, (. syntax No)) _
+                  (-> (, ((. syntax No))) _
                     ((. fail raise)
                      ((. syntax SyntaxError)
                       (= message "typed to_text expects Int or String")

@@ -60,7 +60,7 @@ test("inferred_shape", () {
 			y : x = "b"
 			y == "b"
 		}) ==
-			[True],
+			[True()],
 	)
 })
 
@@ -99,7 +99,7 @@ test("matched_holder_and_original_subject", () {
 				y : x = "s"
 				y == "s"
 			}
-			& (_) { True }
+			& (_) { True() }
 	}
 	assert(original(1))
 })

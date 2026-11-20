@@ -24,7 +24,9 @@ must = <A, N>(make : () <- (Fail(queue.QueueError), ..N) -> A) <- (
 
 closed = <A, N>(body : () <- (Fail(queue.QueueError), ..N) -> A) <- (
 	..env : N,
-) -> Bool { fail.catch(body) |> (Error(queue.Closed)) { True } & (_) { False } }
+) -> Bool {
+	fail.catch(body) |> (Error(queue.Closed())) { True() } & (_) { False() }
+}
 
 test("queue_fifo_offer_then_take_test", () {
 	got = in_queue_scope((_) {
@@ -41,11 +43,11 @@ test("queue_fifo_offer_then_take_test", () {
 		got ==
 			(
 				0,
-				[True, True, True],
+				[True(), True(), True()],
 				3,
 				[Some("a"), Some("b"), Some("c")],
 				0,
-				None,
+				None(),
 			),
 	)
 	()
@@ -66,9 +68,9 @@ test("queue_constructors_reject_non_positive_capacity_test", () {
 			q
 		})
 		(
-			bounded |> (Error(e)) { Some(e) } & (Ok(_)) { None },
-			dropping |> (Error(e)) { Some(e) } & (Ok(_)) { None },
-			sliding |> (Error(e)) { Some(e) } & (Ok(_)) { None },
+			bounded |> (Error(e)) { Some(e) } & (Ok(_)) { None() },
+			dropping |> (Error(e)) { Some(e) } & (Ok(_)) { None() },
+			sliding |> (Error(e)) { Some(e) } & (Ok(_)) { None() },
 		)
 	})
 	assert(
@@ -86,10 +88,10 @@ test("queue_bounded_offer_waits_for_room_test", () {
 	got = in_queue_scope((s) {
 		q : queue.Queue(Int, Never) = must(() { queue.bounded(1) })
 		first = must(() { queue.offer(q, 1) })
-		done = task.ref(False)
+		done = task.ref(False())
 		producer = task.go(s, () {
 			accepted = must(() { queue.offer(q, 2) })
-			task.set(done, True)
+			task.set(done, True())
 			accepted
 		})
 		task.yield()
@@ -100,7 +102,7 @@ test("queue_bounded_offer_waits_for_room_test", () {
 		accepted = task.join(producer)
 		(first, blocked, taken, accepted, task.get(done), queue.take(q))
 	})
-	assert(got == (True, (False, 1), Some(1), True, True, Some(2)))
+	assert(got == (True(), (False(), 1), Some(1), True(), True(), Some(2)))
 	()
 })
 
@@ -115,7 +117,7 @@ test("queue_bounded_offers_wait_in_order_test", () {
 		values = [queue.take(q), queue.take(q), queue.take(q)]
 		(values, task.join(a), task.join(b), queue.size(q))
 	})
-	assert(got == ([Some(1), Some(2), Some(3)], True, True, 0))
+	assert(got == ([Some(1), Some(2), Some(3)], True(), True(), 0))
 	()
 })
 
@@ -157,7 +159,7 @@ test("queue_poll_does_not_overtake_a_waiting_taker_test", () {
 		stolen = queue.poll(q)
 		(stolen, task.join(taker), queue.size(q))
 	})
-	assert(got == (None, Some(4), 0))
+	assert(got == (None(), Some(4), 0))
 	()
 })
 
@@ -169,7 +171,7 @@ test("queue_dropping_rejects_at_capacity_test", () {
 		})
 		(accepted, queue.size(q), queue.take(q), queue.take(q), queue.poll(q))
 	})
-	assert(got == ([True, True, False], 2, Some(1), Some(2), None))
+	assert(got == ([True(), True(), False()], 2, Some(1), Some(2), None()))
 	()
 })
 
@@ -181,7 +183,7 @@ test("queue_sliding_evicts_oldest_test", () {
 		})
 		(accepted, queue.size(q), queue.take(q), queue.take(q), queue.poll(q))
 	})
-	assert(got == ([True, True, True], 2, Some(2), Some(3), None))
+	assert(got == ([True(), True(), True()], 2, Some(2), Some(3), None()))
 	()
 })
 
@@ -201,7 +203,7 @@ test("queue_end_drains_then_none_test", () {
 		})
 		(refused, taken, queue.size(q))
 	})
-	assert(got == (True, Ok([Some(1), Some(2), None, None]), 0))
+	assert(got == (True(), Ok([Some(1), Some(2), None(), None()]), 0))
 	()
 })
 
@@ -214,7 +216,7 @@ test("queue_end_wakes_waiting_taker_test", () {
 		queue.end(q)
 		task.join(taker)
 	})
-	assert(got == None)
+	assert(got == None())
 	()
 })
 
@@ -233,7 +235,7 @@ test("queue_poll_after_fail_keeps_the_waiting_takers_value_test", () {
 		after = fail.catch(() { queue.poll(q) })
 		(before, taken, after)
 	})
-	assert(got == (Ok(None), Ok(Some(1)), Error("boom")))
+	assert(got == (Ok(None()), Ok(Some(1)), Error("boom")))
 	()
 })
 
@@ -257,7 +259,7 @@ test("queue_fail_drains_then_raises_test", () {
 	assert(
 		got ==
 			(
-				True,
+				True(),
 				Ok(Some(1)),
 				Error("boom"),
 				Error("boom"),
@@ -298,7 +300,19 @@ test("queue_shutdown_discards_and_wakes_waiters_test", () {
 			queue.size(full),
 		)
 	})
-	assert(got == (0, Ok(None), Ok(None), True, Ok(None), Ok(None), True, 0))
+	assert(
+		got ==
+			(
+				0,
+				Ok(None()),
+				Ok(None()),
+				True(),
+				Ok(None()),
+				Ok(None()),
+				True(),
+				0,
+			),
+	)
 	()
 })
 
@@ -311,7 +325,7 @@ test("queue_resource_scope_exit_shuts_down_test", () {
 		})
 		(queue.size(q), queue.take(q), closed(() { queue.offer(q, 2) }))
 	})
-	assert(got == (0, None, True))
+	assert(got == (0, None(), True()))
 	()
 })
 
@@ -328,7 +342,7 @@ take_soon = <A, E>(q : queue.Queue(A, E)) <- (
 			task.yield()
 			task.yield()
 			task.yield()
-			None
+			None()
 		},
 	)
 }
@@ -344,7 +358,7 @@ offer_soon = <A, E>(q : queue.Queue(A, E), value : A) <- (
 			task.yield()
 			task.yield()
 			task.yield()
-			None
+			None()
 		},
 	)
 }
@@ -388,7 +402,7 @@ test("queue_cancelled_offer_leaves_the_line_test", () {
 		offered = must(() { offer_soon(q, 3) })
 		(stopped, first, offered, take_soon(q), queue.poll(q))
 	})
-	assert(got == (Error("stop"), Some(1), Some(True), Some(3), None))
+	assert(got == (Error("stop"), Some(1), Some(True()), Some(3), None()))
 	()
 })
 
@@ -403,7 +417,7 @@ test("queue_losing_race_take_consumes_nothing_test", () {
 		after = queue.take(q)
 		(lost, lost_then, after, queue.size(q))
 	})
-	assert(got == (None, None, Some(9), 0))
+	assert(got == (None(), None(), Some(9), 0))
 	()
 })
 
@@ -419,7 +433,7 @@ test("queue_poll_takes_at_most_one_test", () {
 		left = queue.size(q)
 		(empty, first, left, queue.poll(q), queue.poll(q), queue.size(q))
 	})
-	assert(got == (None, Some(1), 1, Some(2), None, 0))
+	assert(got == (None(), Some(1), 1, Some(2), None(), 0))
 	()
 })
 
@@ -449,7 +463,7 @@ test("queue_module_example_test", () {
 			})
 		})
 	})
-	assert(got == [Some(1), Some(2), Some(3), None])
+	assert(got == [Some(1), Some(2), Some(3), None()])
 	()
 })
 
@@ -468,6 +482,6 @@ test("queue_is_shut_down_when_its_resource_scope_ends_test", () {
 			(task.join(taker), "after")
 		})
 	})
-	assert(got == (None, "after"))
+	assert(got == (None(), "after"))
 	()
 })

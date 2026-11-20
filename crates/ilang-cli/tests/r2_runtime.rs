@@ -358,30 +358,30 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
         "observe_change = (_root : Key(())) -> Request(()) { request.ready(()) }",
     ).replace(
         "@external(\"ilang:request\", \"has_work\")\nhas_work : (Ticket) -> Bool",
-        "has_work = (_ticket : Ticket) -> Bool { False }",
+        "has_work = (_ticket : Ticket) -> Bool { False() }",
     );
     let begin = source
         .find("@external(\"ilang:control\", \"finalizing\")")
         .unwrap();
     let end = source[begin..].find("\nFrame = (").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "finalizing = <A, R, N, B, M>(\n\t_k: Continuation(A, R, N),\n\t_b: Boundary(B, M)\n) -> Bool { False }\n"
+        + "finalizing = <A, R, N, B, M>(\n\t_k: Continuation(A, R, N),\n\t_b: Boundary(B, M)\n) -> Bool { False() }\n"
         + &source[end..];
     let begin = source
         .find("@external(\"ilang:worker\", \"enabled\")")
         .unwrap();
     let end = source[begin..].find("\ndrop_shares = ").unwrap() + begin;
     let source = source[..begin].to_string()
-        + "worker_enabled = () -> Bool { False }\n\
+        + "worker_enabled = () -> Bool { False() }\n\
            worker_publish = (_job: Job) -> Int { 0 }\n\
-           worker_claim = (_ticket: Int) -> Bool { True }\n\
+           worker_claim = (_ticket: Int) -> Bool { True() }\n\
            worker_adopt = (_ticket: Int, _task: Int) -> () { () }\n\
            worker_placeholder = () -> Continuation(StepAnswer, Turn, Never) { panic(\"no workers\") }\n\
-           worker_away = (_k: Continuation(StepAnswer, Turn, Never)) -> Bool { False }\n\
+           worker_away = (_k: Continuation(StepAnswer, Turn, Never)) -> Bool { False() }\n\
            worker_send = (_task: Int, _resume: Resume) -> () { () }\n\
            worker_inbox = () -> Int { 0 }\n\
            worker_message = () -> Remote { panic(\"no workers\") }\n\
-           worker_pending = () -> Bool { False }\n\
+           worker_pending = () -> Bool { False() }\n\
            worker_wait = () -> () { () }\n\
            worker_share_put = (_run: Key(()), _address: Address, _value: Keyed) -> () { () }\n\
            worker_share_get = (_run: Key(()), _address: Address) -> List(Keyed) { [] }\n\

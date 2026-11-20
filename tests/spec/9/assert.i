@@ -8,14 +8,14 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
 
 test("assert_true", () {
-	assert(True)
+	assert(True())
 	assert(1 + 1 == 2)
 })
 
@@ -25,13 +25,13 @@ catch_assert = () {
 		"Ok(1)",
 	)
 	check(
-		show(assertion.catch(() { assert(False) })),
+		show(assertion.catch(() { assert(False()) })),
 		"Error(AssertionFailure(message = \"assert\"))",
 	)
 	check(
 		show(
 			assertion.catch(() {
-				assert(True)
+				assert(True())
 				2
 			}),
 		),
@@ -120,7 +120,7 @@ test("can_not_fail", () {
 own_assert = () {
 	// Nested: the inner `catch` takes the failures of its body.
 	nested = assertion.catch(() {
-		inner = assertion.catch(() { assert(False) })
+		inner = assertion.catch(() { assert(False()) })
 		(inner, 2)
 	})
 	check(show(nested), "Ok((Error(AssertionFailure(message = \"assert\")), 2))")
@@ -129,7 +129,7 @@ own_assert = () {
 	get = () <- (a : Assert) { a }
 	outer = assertion.catch(() {
 		a = get()
-		assertion.catch(() { assert(False) <- (a) })
+		assertion.catch(() { assert(False()) <- (a) })
 	})
 	check(show(outer), "Error(AssertionFailure(message = \"assert\"))")
 }

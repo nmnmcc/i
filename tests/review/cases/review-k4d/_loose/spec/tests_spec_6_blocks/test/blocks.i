@@ -7,8 +7,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -24,7 +24,7 @@ test("shadowing", () {
 	}
 	check(show((x, y)), "(2, 21)")
 	check = "a local name may cover a top-level name"
-	{ check == "" } |> (True) { panic("no") } & (False) { () }
+	{ check == "" } |> (True()) { panic("no") } & (False()) { () }
 })
 
 test("values_in_every_place", () {
@@ -39,7 +39,7 @@ test("values_in_every_place", () {
 		"(\"three\", 8)",
 	)
 	check(
-		show([{ n > 2 } |> (True) { 1 } & (False) { 2 }, ..n |> (_) { [9] }]),
+		show([{ n > 2 } |> (True()) { 1 } & (False()) { 2 }, ..n |> (_) { [9] }]),
 		"[1, 9]",
 	)
 	s = (n, "x") |> ((3, t)) { t <> t } & (_) { "" }
@@ -52,7 +52,7 @@ test("recursion_inside_closures", () {
 		// its own function bodies.
 		(up, down) = (
 			(i) {
-				{ i >= limit } |> (True) { down(i) } & (False) { up(i + 1) }
+				{ i >= limit } |> (True()) { down(i) } & (False()) { up(i + 1) }
 			},
 			(i) { [i, limit] },
 		)

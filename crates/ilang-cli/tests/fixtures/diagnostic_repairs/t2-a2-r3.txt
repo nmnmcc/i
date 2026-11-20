@@ -25,7 +25,7 @@ read_manifest = (path) {
 										(Ok(paths)) { Ok(paths) }
 										& (Error(_)) { Error("invalid manifest") }
 								}
-								& (None) { Error("invalid manifest") }
+								& (None()) { Error("invalid manifest") }
 						}
 						& (Error(_)) { Error("invalid manifest") }
 				}
@@ -40,7 +40,7 @@ append_sources = (paths, file, total) {
 		& ([path, ..rest]) {
 			fs.read_file(path) |>
 				(Ok(bytes)) {
-					fs.open(file, fs.Append) |>
+					fs.open(file, fs.Append()) |>
 						(Ok(handle)) {
 							write_result = fail.catch(() { fs.write(handle, bytes) })
 							close_result = fail.catch(() { fs.close(handle) })

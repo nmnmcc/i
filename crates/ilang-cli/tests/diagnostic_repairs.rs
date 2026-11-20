@@ -49,8 +49,10 @@ fn original_model_programs_get_actionable_repairs() {
         };
     }
     // Every input here is the model's project/src/main.i, byte for byte but
-    // for value-level chain separators rewritten from `|` to `&` (see README).
-    // Exact stderr pins all original error codes, positions and counts. E4's
+    // for two mechanical rewrites: value-level chain separators from `|` to
+    // `&`, and a zero-payload constructor in a value or pattern written as its
+    // call, `C()` (see README). Exact stderr pins all original error codes,
+    // positions and counts. E4's
     // Fail-based bit_array.to_string also warns about the archive's unchanged
     // Ok pattern; its two additional warnings are retained in t5-a1-r3.stderr.
     for (name, source, expected) in [
@@ -212,7 +214,7 @@ fn an_unmatched_combination_still_reports_branch_selection() {
 fn unmatched_types_keep_grouping_advice_and_independent_argument_errors() {
     let diagnostics = check(&[(
         "src/main.i",
-        "word = (0) { \"zero\" } & (1) { \"one\" }\nbad = word(True)\n_ = bad\n",
+        "word = (0) { \"zero\" } & (1) { \"one\" }\nbad = word(True())\n_ = bad\n",
     )]);
     assert_eq!(
         diagnostics,

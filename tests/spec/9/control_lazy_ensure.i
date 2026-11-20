@@ -10,8 +10,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -75,9 +75,9 @@ test("cancel_runs_finals_innermost_first", () {
 				control.suspend(b, (k) { Paused(k) })
 				0
 			})
-			Done
+			Done()
 		})
-		p |> (Paused(k)) { control.cancel(k) } & (Done) { panic("not paused") }
+		p |> (Paused(k)) { control.cancel(k) } & (Done()) { panic("not paused") }
 		"cancelled"
 	})
 	check(r, "final 1 final 2 final 3 cancelled")

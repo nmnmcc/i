@@ -87,8 +87,8 @@ new = (permits : Int) <- (
 	own : task.Scheduler,
 ) -> Semaphore {
 	{ permits < 1 } |>
-		(True) { fail.raise(InvalidPermits(wanted = permits)) }
-		& (False) { () }
+		(True()) { fail.raise(InvalidPermits(wanted = permits)) }
+		& (False()) { () }
 	Semaphore(
 		state = task.ref(
 			SemaphoreState(
@@ -126,9 +126,9 @@ with_permits = <A, N>(s : Semaphore, n : Int, body : () <- N -> A) <- (
 ) -> A {
 	capacity = task.get(s.state).capacity
 	{ n < 0 || n > capacity } |>
-		(True) { fail.raise(InvalidPermits(wanted = n)) }
-		& (False) { () }
-	{ n == 0 } |> (True) { body() } & (False) { hold(s, n, body) }
+		(True()) { fail.raise(InvalidPermits(wanted = n)) }
+		& (False()) { () }
+	{ n == 0 } |> (True()) { body() } & (False()) { hold(s, n, body) }
 }
 
 /// `with_permits(s, 1, body)`. One permit is always a valid request, so it
@@ -200,8 +200,8 @@ admit = (s : Semaphore, ticket : Int, n : Int) <- (own : task.Scheduler) -> () {
 		take(st, ticket, n)
 	})
 	{ admitted } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			task.yield()
 			admit(s, ticket, n)
 		}
@@ -212,19 +212,19 @@ take = (st : SemaphoreState, ticket : Int, n : Int) -> (SemaphoreState, Bool) {
 	st.waiting |>
 		([head, ..rest]) {
 			{ head == ticket && st.permits >= n } |>
-				(True) {
+				(True()) {
 					(
 						SemaphoreState(
 							..st,
 							permits = st.permits - n,
 							waiting = rest,
 						),
-						True,
+						True(),
 					)
 				}
-				& (False) { (st, False) }
+				& (False()) { (st, False()) }
 		}
-		& ([]) { (st, False) }
+		& ([]) { (st, False()) }
 }
 
 // The cleanup step. A ticket still in the queue was never admitted: remove
@@ -234,18 +234,18 @@ take = (st : SemaphoreState, ticket : Int, n : Int) -> (SemaphoreState, Bool) {
 // `capacity` through a bug here, which stops the task.
 leave = (st : SemaphoreState, ticket : Int, n : Int) -> SemaphoreState {
 	{ list.contains(st.waiting, ticket) } |>
-		(True) {
+		(True()) {
 			SemaphoreState(
 				..st,
 				waiting = list.filter(st.waiting, (t : Int) { t != ticket }),
 			)
 		}
-		& (False) {
+		& (False()) {
 			permits = st.permits + n
 			{ permits > st.capacity } |>
-				(True) {
+				(True()) {
 					panic("semaphore: released more permits than capacity")
 				}
-				& (False) { SemaphoreState(..st, permits = permits) }
+				& (False()) { SemaphoreState(..st, permits = permits) }
 		}
 }

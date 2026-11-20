@@ -145,7 +145,7 @@ fn a_bare_bar_is_not_a_pipe() {
     // A function that returns Bool is an ordinary valid pipe target.
     let dir = project(
         "name = \"app\"\n",
-        &[("src/main.i", "main = () { True |> (value) { value } }")],
+        &[("src/main.i", "main = () { True() |> (value) { value } }")],
     );
     assert!(build(dir.path(), options()).is_ok());
 }

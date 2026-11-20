@@ -149,12 +149,12 @@ Process = (
 // The one place that reads host error codes.
 problem = (code : String) -> ProcessProblem {
 	code |>
-		("not_found") { NotFound }
-		& ("denied") { Denied }
-		& ("closed") { Closed }
-		& ("busy") { Busy }
-		& ("invalid") { Invalid }
-		& (_) { Other }
+		("not_found") { NotFound() }
+		& ("denied") { Denied() }
+		& ("closed") { Closed() }
+		& ("busy") { Busy() }
+		& ("invalid") { Invalid() }
+		& (_) { Other() }
 }
 
 raise_error = (operation : String, code : String) <- (
@@ -179,16 +179,16 @@ encode_items =
 		bytes = <<s:utf8>>
 		n = core.bit_size(bytes) / 8
 		{ n <= 4294967295 } |>
-			(True) { () }
-			& (False) { raise_error("spawn", "invalid") }
+			(True()) { () }
+			& (False()) { raise_error("spawn", "invalid") }
 		core.bit_array_concat([u32(n), bytes, encode_items(rest)])
 	}
 
 encode_args = (values) {
 	n = length(values)
 	{ n <= 4294967295 } |>
-		(True) { () }
-		& (False) { raise_error("spawn", "invalid") }
+		(True()) { () }
+		& (False()) { raise_error("spawn", "invalid") }
 	core.bit_array_concat([u32(n), encode_items(values)])
 }
 
@@ -362,7 +362,10 @@ close = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.close(number))
 }
 
-stdio_mode = (Inherit) { "inherit" } & (Null) { "null" } & (Piped) { "piped" }
+stdio_mode =
+	(Inherit()) { "inherit" }
+	& (Null()) { "null" }
+	& (Piped()) { "piped" }
 
 /// Like `spawn`, with a choice of `Inherit`, `Null` or `Piped` for stdin,
 /// stdout and stderr. Piped streams are used with `write_stdin`,
@@ -443,7 +446,7 @@ spawn_config = (
 		(InheritEnvironment(entries)) { ("inherit", entries) }
 		& (ReplaceEnvironment(entries)) { ("replace", entries) }
 	(cwd_mode, path) = directory |>
-		(InheritDirectory) { ("inherit", "") }
+		(InheritDirectory()) { ("inherit", "") }
 		& (AtDirectory(path)) { ("set", path) }
 	resource.acquire(
 		() {
@@ -584,8 +587,8 @@ drain_stdout = (child : Child, chunks : List(BitArray)) <- (
 ) -> BitArray {
 	chunk = read_stdout(child, chunk_size)
 	{ core.bit_size(chunk) == 0 } |>
-		(True) { core.bit_array_concat(reverse_onto(chunks, [])) }
-		& (False) { drain_stdout(child, [chunk, ..chunks]) }
+		(True()) { core.bit_array_concat(reverse_onto(chunks, [])) }
+		& (False()) { drain_stdout(child, [chunk, ..chunks]) }
 }
 
 drain_stderr = (child : Child, chunks : List(BitArray)) <- (
@@ -593,8 +596,8 @@ drain_stderr = (child : Child, chunks : List(BitArray)) <- (
 ) -> BitArray {
 	chunk = read_stderr(child, chunk_size)
 	{ core.bit_size(chunk) == 0 } |>
-		(True) { core.bit_array_concat(reverse_onto(chunks, [])) }
-		& (False) { drain_stderr(child, [chunk, ..chunks]) }
+		(True()) { core.bit_array_concat(reverse_onto(chunks, [])) }
+		& (False()) { drain_stderr(child, [chunk, ..chunks]) }
 }
 
 read_all_stdout = (child : Child) <- (raw : Process) -> BitArray {

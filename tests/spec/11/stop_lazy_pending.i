@@ -40,8 +40,8 @@ leaf = (b) {
 main = () {
 	p = control.boundary((b) {
 		f1(b)
-		Done
+		Done()
 	})
-	p |> (Paused(k)) { control.resume(k, ()) } & (Done) { panic("not paused") }
+	p |> (Paused(k)) { control.resume(k, ()) } & (Done()) { panic("not paused") }
 	()
 }

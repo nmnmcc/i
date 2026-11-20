@@ -17,8 +17,8 @@ name = () <- (value : Name) { value.text }
 
 walk = (b, n) {
 	{ n == 3 } |>
-		(True) { Done(name()) }
-		& (False) {
+		(True()) { Done(name()) }
+		& (False()) {
 			control.suspend(b, (k) { Paused(k) })
 			walk(b, n + 1)
 		}

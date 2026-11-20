@@ -134,7 +134,7 @@ fn corpus() -> Vec<Case> {
         ("{ a = x *. 0.5\n(a, a) |> ((b, c)) { b +. c } }", 0.5, 0.5),
         ("{ a = x *. 0.5\nr = (v = a)\nr.v +. a }", 0.5, 0.5),
         (
-            "{ a = x *. 0.5\n{ x <. 0.0 } |> (True) { a } & (False) { a +. 0.25 } }",
+            "{ a = x *. 0.5\n{ x <. 0.0 } |> (True()) { a } & (False()) { a +. 0.25 } }",
             0.5,
             0.5,
         ),
@@ -145,7 +145,8 @@ fn corpus() -> Vec<Case> {
         cases.push(float_case(source, x, expected));
     }
     cases.push(Case {
-        body: "{ a = { x <. 0.0 } |> (True) { x } & (False) { \"s\" }\ncore.inspect(a) }".into(),
+        body: "{ a = { x <. 0.0 } |> (True()) { x } & (False()) { \"s\" }\ncore.inspect(a) }"
+            .into(),
         input: Value::Float(1.0),
         expected: "\"s\"".into(),
         stop: false,
@@ -229,13 +230,13 @@ fn corpus() -> Vec<Case> {
         stop: true,
         events: vec!["before".into()],
     });
-    cases.push(float_case("{ f = { x <. 0.0 } |> (True) { (v: Float) -> Float { v } } & (False) { (v: Float) -> Float { v +. 0.0 } }\nrelay(f, 1000000, x) }", 0.5, 0.5));
+    cases.push(float_case("{ f = { x <. 0.0 } |> (True()) { (v: Float) -> Float { v } } & (False()) { (v: Float) -> Float { v +. 0.0 } }\nrelay(f, 1000000, x) }", 0.5, 0.5));
     cases.push(Case {
         body: "{ f = make_float(x) g = make_float(x) r = (value = x, callback = f) s = (value = x, callback = f) t = (value = x, callback = g) core.inspect(f == f && f != g && r == s && r != t) }".into(),
         input: Value::Float(-0.0), expected: "True".into(), stop: false, events: vec![],
     });
     for (x, expected) in [(-1.0, -0.5), (1.0, 0.0)] {
-        cases.push(float_case("{ a = { x <. 0.0 } |> (True) { x } & (False) { \"s\" }\na |> (v: Float) { v +. 0.5 } & (_) { 0.0 } }", x, expected));
+        cases.push(float_case("{ a = { x <. 0.0 } |> (True()) { x } & (False()) { \"s\" }\na |> (v: Float) { v +. 0.5 } & (_) { 0.0 } }", x, expected));
     }
     // exact rounded chains under dominating bounds, and chains whose
     // middle result overflows even though the final expression would be finite.
@@ -332,7 +333,7 @@ fn corpus() -> Vec<Case> {
             x,
             (x + x) + x * n as f64,
         ));
-        cases.push(float_case(&format!("{{ r = {{ x <. 0.0 }} |> (True) {{ (a = x, b = {n}.0) }} & (False) {{ (a = x, b = {}.0) }}\nr.a +. r.b }}", n + 1), x, x + if x < 0.0 { n as f64 } else { (n + 1) as f64 }));
+        cases.push(float_case(&format!("{{ r = {{ x <. 0.0 }} |> (True()) {{ (a = x, b = {n}.0) }} & (False()) {{ (a = x, b = {}.0) }}\nr.a +. r.b }}", n + 1), x, x + if x < 0.0 { n as f64 } else { (n + 1) as f64 }));
     }
     // cross-call scalar chains and closures with different captures share
     // code without sharing identity or the capture values.
@@ -624,11 +625,11 @@ record : (String) -> ()
 make_float = (x : Float) { (v : Float) -> Float { v +. x } }
 bounded_float = (x : Float) -> Float {
 	{ x >=. -.1.0 } |>
-		(False) { x }
-		& (True) {
+		(False()) { x }
+		& (True()) {
 			{ x <=. 1.0 } |>
-				(False) { x }
-				& (True) {
+				(False()) { x }
+				& (True()) {
 					a = x *. 0.5 +. 0.25
 					a *. 0.5 -. 0.125
 				}
@@ -742,17 +743,17 @@ unused_field = (x : Float) -> Float {
 }
 tie_add = (x : Float) -> Float {
 	{ x <=. 1.0e292 } |>
-		(True) {
+		(True()) {
 			{ x >=. 0.0 } |>
-				(True) { x +. 1.7976931348623157e308 }
-				& (False) { 0.0 }
+				(True()) { x +. 1.7976931348623157e308 }
+				& (False()) { 0.0 }
 		}
-		& (False) { 0.0 }
+		& (False()) { 0.0 }
 }
 bounded_div = (x : Float, y : Float) -> Float {
 	{ y >=. -.1.0e-300 } |>
-		(True) { { y <=. 1.0e-300 } |> (True) { x /. y } & (False) { 0.0 } }
-		& (False) { 0.0 }
+		(True()) { { y <=. 1.0e-300 } |> (True()) { x /. y } & (False()) { 0.0 } }
+		& (False()) { 0.0 }
 }
 "#,
     );

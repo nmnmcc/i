@@ -406,30 +406,32 @@ test("is_utf8_invalid_test", () {
 })
 
 test("base64_encode_padded_test", () {
-	assert(bit_array.base64_encode(<<255, 127, 254, 252>>, True) == "/3/+/A==")
+	assert(
+		bit_array.base64_encode(<<255, 127, 254, 252>>, True()) == "/3/+/A==",
+	)
 	()
 })
 
 test("base64_encode_padded_5_bytes_test", () {
 	assert(
-		bit_array.base64_encode(<<255, 127, 254, 252, 100>>, True) ==
+		bit_array.base64_encode(<<255, 127, 254, 252, 100>>, True()) ==
 			"/3/+/GQ=",
 	)
 	()
 })
 
 test("base64_encode_unpadded_test", () {
-	assert(bit_array.base64_encode(<<255, 127, 254, 252>>, False) == "/3/+/A")
+	assert(bit_array.base64_encode(<<255, 127, 254, 252>>, False()) == "/3/+/A")
 	()
 })
 
 test("base64_encode_zeros_test", () {
-	assert(bit_array.base64_encode(<<0, 0, 0>>, True) == "AAAA")
+	assert(bit_array.base64_encode(<<0, 0, 0>>, True()) == "AAAA")
 	()
 })
 
 test("base64_encode_empty_test", () {
-	assert(bit_array.base64_encode(<<>>, True) == "")
+	assert(bit_array.base64_encode(<<>>, True()) == "")
 	()
 })
 
@@ -438,7 +440,7 @@ test("base64_encode_large_test", () {
 		{
 			string.repeat("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", 1024 * 32)
 				|> bit_array.from_string
-				|> bit_array.base64_encode(True)
+				|> bit_array.base64_encode(True())
 		} ==
 			string.repeat(
 				"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB",
@@ -449,18 +451,19 @@ test("base64_encode_large_test", () {
 })
 
 test("base64_encode_unaligned_test", () {
-	assert(bit_array.base64_encode(<<-1:u7>>, True) == "/g==")
+	assert(bit_array.base64_encode(<<-1:u7>>, True()) == "/g==")
 	()
 })
 
 test("base64_encode_unaligned_2_test", () {
-	assert(bit_array.base64_encode(<<0xFA, 5:u3>>, True) == "+qA=")
+	assert(bit_array.base64_encode(<<0xFA, 5:u3>>, True()) == "+qA=")
 	()
 })
 
 test("base64_encode_unaligned_3_test", () {
 	assert(
-		bit_array.base64_encode(<<0xFA, 0xBC, 0x6D, 1:u1>>, True) == "+rxtgA==",
+		bit_array.base64_encode(<<0xFA, 0xBC, 0x6D, 1:u1>>, True()) ==
+			"+rxtgA==",
 	)
 	()
 })
@@ -505,25 +508,27 @@ test("base64_decode_invalid_padding_test", () {
 
 test("base64_url_encode_padded_test", () {
 	assert(
-		bit_array.base64_url_encode(<<255, 127, 254, 252>>, True) == "_3_-_A==",
+		bit_array.base64_url_encode(<<255, 127, 254, 252>>, True()) ==
+			"_3_-_A==",
 	)
 	()
 })
 
 test("base64_url_encode_unpadded_test", () {
 	assert(
-		bit_array.base64_url_encode(<<255, 127, 254, 252>>, False) == "_3_-_A",
+		bit_array.base64_url_encode(<<255, 127, 254, 252>>, False()) ==
+			"_3_-_A",
 	)
 	()
 })
 
 test("base64_url_encode_zeros_test", () {
-	assert(bit_array.base64_url_encode(<<0, 0, 0>>, True) == "AAAA")
+	assert(bit_array.base64_url_encode(<<0, 0, 0>>, True()) == "AAAA")
 	()
 })
 
 test("base64_url_encode_empty_test", () {
-	assert(bit_array.base64_url_encode(<<>>, True) == "")
+	assert(bit_array.base64_url_encode(<<>>, True()) == "")
 	()
 })
 
@@ -739,24 +744,24 @@ test("inspect_unaligned_3_test", () {
 })
 
 test("compare_equal_test", () {
-	assert(bit_array.compare(<<4:u5>>, <<4:u5>>) == Equal)
+	assert(bit_array.compare(<<4:u5>>, <<4:u5>>) == Equal())
 	()
 })
 
 test("compare_gt_test", () {
-	assert(bit_array.compare(<<4:u5, 3:u3>>, <<4:u5, 2:u3>>) == Greater)
+	assert(bit_array.compare(<<4:u5, 3:u3>>, <<4:u5, 2:u3>>) == Greater())
 	()
 })
 
 test("compare_lt_test", () {
-	assert(bit_array.compare(<<4:u5, 3:u3>>, <<4:u5, 4:u3>>) == Less)
+	assert(bit_array.compare(<<4:u5, 3:u3>>, <<4:u5, 4:u3>>) == Less())
 	()
 })
 
 test("compare_equal_with_zero_test", () {
 	assert(
 		bit_array.compare(<<4:u5, 3:u3, 0:u(0)>>, <<4:u5, 3:u3, 0:u(0)>>) ==
-			Equal,
+			Equal(),
 	)
 	()
 })
@@ -764,7 +769,7 @@ test("compare_equal_with_zero_test", () {
 test("compare_different_sizes_gt_test", () {
 	assert(
 		bit_array.compare(<<0:u2, 3:u4, 0:u(0)>>, <<0:u2, 3:u3, 0:u(0)>>) ==
-			Greater,
+			Greater(),
 	)
 	()
 })
@@ -774,48 +779,48 @@ test("compare_different_values_lt_test", () {
 	// second is: <<35>>
 	assert(
 		bit_array.compare(<<4:u5, 3:u4, 0:u(0)>>, <<4:u5, 3:u3, 0:u(0)>>) ==
-			Less,
+			Less(),
 	)
 	()
 })
 
 test("compare_lt_5_bits_test", () {
-	assert(bit_array.compare(<<3:u5>>, <<4:u5>>) == Less)
+	assert(bit_array.compare(<<3:u5>>, <<4:u5>>) == Less())
 	()
 })
 
 test("compare_lt_7_bits_test", () {
-	assert(bit_array.compare(<<3:u7>>, <<4:u7>>) == Less)
+	assert(bit_array.compare(<<3:u7>>, <<4:u7>>) == Less())
 	()
 })
 
 test("compare_gt_5_bits_test", () {
-	assert(bit_array.compare(<<5:u5>>, <<4:u5>>) == Greater)
+	assert(bit_array.compare(<<5:u5>>, <<4:u5>>) == Greater())
 	()
 })
 
 test("compare_longer_gt_test", () {
-	assert(bit_array.compare(<<4:u8>>, <<4:u5>>) == Greater)
+	assert(bit_array.compare(<<4:u8>>, <<4:u5>>) == Greater())
 	()
 })
 
 test("compare_shorter_lt_test", () {
-	assert(bit_array.compare(<<4:u5>>, <<4:u8>>) == Less)
+	assert(bit_array.compare(<<4:u5>>, <<4:u8>>) == Less())
 	()
 })
 
 test("compare_zero_shorter_lt_test", () {
-	assert(bit_array.compare(<<0:u5>>, <<0:u8>>) == Less)
+	assert(bit_array.compare(<<0:u5>>, <<0:u8>>) == Less())
 	()
 })
 
 test("compare_zero_equal_test", () {
-	assert(bit_array.compare(<<0:u5>>, <<0:u5>>) == Equal)
+	assert(bit_array.compare(<<0:u5>>, <<0:u5>>) == Equal())
 	()
 })
 
 test("compare_zero_longer_gt_test", () {
-	assert(bit_array.compare(<<0:u2>>, <<0:u1>>) == Greater)
+	assert(bit_array.compare(<<0:u2>>, <<0:u1>>) == Greater())
 	()
 })
 
@@ -919,21 +924,21 @@ test("base64_round_trip_test", () {
 	check = (bytes : BitArray) {
 		assert(
 			{
-				e4_call_arg_0 = bit_array.base64_encode(bytes, True)
+				e4_call_arg_0 = bit_array.base64_encode(bytes, True())
 				fail.catch(() { bit_array.base64_decode(e4_call_arg_0) })
 			} ==
 				Ok(bytes),
 		)
 		assert(
 			{
-				e4_call_arg_0 = bit_array.base64_encode(bytes, False)
+				e4_call_arg_0 = bit_array.base64_encode(bytes, False())
 				fail.catch(() { bit_array.base64_decode(e4_call_arg_0) })
 			} ==
 				Ok(bytes),
 		)
 		assert(
 			{
-				e4_call_arg_0 = bit_array.base64_url_encode(bytes, True)
+				e4_call_arg_0 = bit_array.base64_url_encode(bytes, True())
 				fail.catch(() { bit_array.base64_url_decode(e4_call_arg_0) })
 			} ==
 				Ok(bytes),
@@ -953,13 +958,13 @@ test("base64_round_trip_test", () {
 
 test("base64_rfc4648_test", () {
 	// The test vectors of RFC 4648, section 10.
-	assert(bit_array.base64_encode(<<"":utf8>>, True) == "")
-	assert(bit_array.base64_encode(<<"f":utf8>>, True) == "Zg==")
-	assert(bit_array.base64_encode(<<"fo":utf8>>, True) == "Zm8=")
-	assert(bit_array.base64_encode(<<"foo":utf8>>, True) == "Zm9v")
-	assert(bit_array.base64_encode(<<"foob":utf8>>, True) == "Zm9vYg==")
-	assert(bit_array.base64_encode(<<"fooba":utf8>>, True) == "Zm9vYmE=")
-	assert(bit_array.base64_encode(<<"foobar":utf8>>, True) == "Zm9vYmFy")
+	assert(bit_array.base64_encode(<<"":utf8>>, True()) == "")
+	assert(bit_array.base64_encode(<<"f":utf8>>, True()) == "Zg==")
+	assert(bit_array.base64_encode(<<"fo":utf8>>, True()) == "Zm8=")
+	assert(bit_array.base64_encode(<<"foo":utf8>>, True()) == "Zm9v")
+	assert(bit_array.base64_encode(<<"foob":utf8>>, True()) == "Zm9vYg==")
+	assert(bit_array.base64_encode(<<"fooba":utf8>>, True()) == "Zm9vYmE=")
+	assert(bit_array.base64_encode(<<"foobar":utf8>>, True()) == "Zm9vYmFy")
 	assert(
 		fail.catch(() { bit_array.base64_decode("Zm9vYmE=") }) ==
 			Ok(<<"fooba":utf8>>),
@@ -983,7 +988,7 @@ test("base64_invalid_test", () {
 
 test("base64_long_test", () {
 	bytes = bit_array.concat(list.repeat(<<1, 2, 3>>, 30_000))
-	encoded = bit_array.base64_encode(bytes, True)
+	encoded = bit_array.base64_encode(bytes, True())
 	assert(string.byte_size(encoded) == 120_000)
 	assert(fail.catch(() { bit_array.base64_decode(encoded) }) == Ok(bytes))
 })

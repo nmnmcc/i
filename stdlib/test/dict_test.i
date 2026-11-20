@@ -92,31 +92,31 @@ test("get_int_key_missing_test", () {
 	proplist = [(4, 0), (1, 1)]
 	m = dict.from_list(proplist)
 
-	assert(dict.get(m, 2) == None)
+	assert(dict.get(m, 2) == None())
 	()
 })
 
 test("get_custom_key_a_test", () {
-	proplist = [(A, 0), (B, 1)]
+	proplist = [(A(), 0), (B(), 1)]
 	m = dict.from_list(proplist)
 
-	assert(dict.get(m, A) == Some(0))
+	assert(dict.get(m, A()) == Some(0))
 	()
 })
 
 test("get_custom_key_b_test", () {
-	proplist = [(A, 0), (B, 1)]
+	proplist = [(A(), 0), (B(), 1)]
 	m = dict.from_list(proplist)
 
-	assert(dict.get(m, B) == Some(1))
+	assert(dict.get(m, B()) == Some(1))
 	()
 })
 
 test("get_custom_key_missing_test", () {
-	proplist = [(A, 0), (B, 1)]
+	proplist = [(A(), 0), (B(), 1)]
 	m = dict.from_list(proplist)
 
-	assert(dict.get(m, C) == None)
+	assert(dict.get(m, C()) == None())
 	()
 })
 
@@ -140,7 +140,7 @@ test("get_bit_array_key_missing_test", () {
 	proplist = [(<<1, 2, 3>>, 0), (<<3, 2, 1>>, 1)]
 	m = dict.from_list(proplist)
 
-	assert(dict.get(m, <<1, 3, 2>>) == None)
+	assert(dict.get(m, <<1, 3, 2>>) == None())
 	()
 })
 
@@ -273,7 +273,7 @@ test("delete_test", () {
 test("upsert_existing_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
-	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None) { 0 } }
+	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None()) { 0 } }
 
 	assert(
 		dict.upsert(d, "a", inc_or_zero) ==
@@ -285,7 +285,7 @@ test("upsert_existing_test", () {
 test("upsert_existing_b_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
-	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None) { 0 } }
+	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None()) { 0 } }
 
 	assert(
 		dict.upsert(d, "b", inc_or_zero) ==
@@ -297,7 +297,7 @@ test("upsert_existing_b_test", () {
 test("upsert_new_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
-	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None) { 0 } }
+	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None()) { 0 } }
 
 	assert(
 		dict.upsert(d, "z", inc_or_zero) ==
@@ -341,9 +341,9 @@ test("each_test", () {
 
 	assert(
 		dict.each(d, (k, v) {
-			True = (k, v) |>
-				(("a", 1) | ("b", 2) | ("c", 3) | ("d", 4)) { True }
-				& (_) { False }
+			True() = (k, v) |>
+				(("a", 1) | ("b", 2) | ("c", 3) | ("d", 4)) { True() }
+				& (_) { False() }
 			()
 		}) ==
 			(),
@@ -439,7 +439,7 @@ test("large_n_after_shrink_test", () {
 	l = range(0, n, [])
 
 	m = grow_and_shrink_map(n, 0)
-	list.map(l, (i) { assert(dict.get(m, i) == None) })
+	list.map(l, (i) { assert(dict.get(m, i) == None()) })
 	()
 })
 
@@ -528,7 +528,7 @@ test("peters_bug_test", () {
 				|> dict.insert(3, ())
 				|> dict.get(0)
 		} ==
-			None,
+			None(),
 	)
 	()
 })
@@ -543,7 +543,7 @@ test("zero_must_be_contained_get_test", () {
 test("zero_must_be_contained_has_key_test", () {
 	map = dict.new() |> dict.insert(0, ())
 
-	assert(dict.has(map, 0) == True)
+	assert(dict.has(map, 0) == True())
 	()
 })
 
@@ -630,8 +630,8 @@ CollidingKey = CollidingKey1 | CollidingKey2
 
 test("hash_collision_size_test", () {
 	d = dict.new()
-		|> dict.insert(CollidingKey1, 1)
-		|> dict.insert(CollidingKey2, 2)
+		|> dict.insert(CollidingKey1(), 1)
+		|> dict.insert(CollidingKey2(), 2)
 
 	assert(dict.size(d) == 2)
 	()
@@ -639,34 +639,34 @@ test("hash_collision_size_test", () {
 
 test("hash_collision_get_first_test", () {
 	d = dict.new()
-		|> dict.insert(CollidingKey1, 1)
-		|> dict.insert(CollidingKey2, 2)
+		|> dict.insert(CollidingKey1(), 1)
+		|> dict.insert(CollidingKey2(), 2)
 
-	assert(dict.get(d, CollidingKey1) == Some(1))
+	assert(dict.get(d, CollidingKey1()) == Some(1))
 	()
 })
 
 test("hash_collision_get_second_test", () {
 	d = dict.new()
-		|> dict.insert(CollidingKey1, 1)
-		|> dict.insert(CollidingKey2, 2)
+		|> dict.insert(CollidingKey1(), 1)
+		|> dict.insert(CollidingKey2(), 2)
 
-	assert(dict.get(d, CollidingKey2) == Some(2))
+	assert(dict.get(d, CollidingKey2()) == Some(2))
 	()
 })
 
 test("hash_collision_equality_insert_order_test", () {
-	d1 = dict.from_list([(CollidingKey1, 1), (CollidingKey2, 2)])
-	d2 = dict.from_list([(CollidingKey2, 2), (CollidingKey1, 1)])
+	d1 = dict.from_list([(CollidingKey1(), 1), (CollidingKey2(), 2)])
+	d2 = dict.from_list([(CollidingKey2(), 2), (CollidingKey1(), 1)])
 
 	assert(d1 == d2)
 	()
 })
 
 test("hash_collision_map_as_key_test", () {
-	d1 = dict.from_list([(CollidingKey1, 1), (CollidingKey2, 2)])
-	d2 = dict.from_list([(CollidingKey2, 2), (CollidingKey1, 1)])
-	d3 = dict.from_list([(CollidingKey1, -20), (CollidingKey2, 15)])
+	d1 = dict.from_list([(CollidingKey1(), 1), (CollidingKey2(), 2)])
+	d2 = dict.from_list([(CollidingKey2(), 2), (CollidingKey1(), 1)])
+	d3 = dict.from_list([(CollidingKey1(), -20), (CollidingKey2(), 15)])
 
 	outer = dict.new() |> dict.insert(d1, "inner") |> dict.insert(d3, "other")
 
@@ -676,9 +676,9 @@ test("hash_collision_map_as_key_test", () {
 
 test("hash_collision_after_delete_size_test", () {
 	d = dict.new()
-		|> dict.insert(CollidingKey1, 1)
-		|> dict.insert(CollidingKey2, 2)
-	d = dict.delete(d, CollidingKey1)
+		|> dict.insert(CollidingKey1(), 1)
+		|> dict.insert(CollidingKey2(), 2)
+	d = dict.delete(d, CollidingKey1())
 
 	assert(dict.size(d) == 1)
 	()
@@ -686,21 +686,21 @@ test("hash_collision_after_delete_size_test", () {
 
 test("hash_collision_after_delete_get_first_test", () {
 	d = dict.new()
-		|> dict.insert(CollidingKey1, 1)
-		|> dict.insert(CollidingKey2, 2)
-	d = dict.delete(d, CollidingKey1)
+		|> dict.insert(CollidingKey1(), 1)
+		|> dict.insert(CollidingKey2(), 2)
+	d = dict.delete(d, CollidingKey1())
 
-	assert(dict.get(d, CollidingKey1) == None)
+	assert(dict.get(d, CollidingKey1()) == None())
 	()
 })
 
 test("hash_collision_after_delete_get_second_test", () {
 	d = dict.new()
-		|> dict.insert(CollidingKey1, 1)
-		|> dict.insert(CollidingKey2, 2)
-	d = dict.delete(d, CollidingKey1)
+		|> dict.insert(CollidingKey1(), 1)
+		|> dict.insert(CollidingKey2(), 2)
+	d = dict.delete(d, CollidingKey1())
 
-	assert(dict.get(d, CollidingKey2) == Some(2))
+	assert(dict.get(d, CollidingKey2()) == Some(2))
 	()
 })
 
@@ -710,7 +710,9 @@ Blue = ()
 Colour = Red | Green | Blue
 
 test("hash_collision_fold_green_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "green\n"))
@@ -718,7 +720,9 @@ test("hash_collision_fold_green_test", () {
 })
 
 test("hash_collision_fold_red_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "red\n"))
@@ -726,7 +730,9 @@ test("hash_collision_fold_red_test", () {
 })
 
 test("hash_collision_fold_blue_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	str = dict.fold(colours, "", (acc, _color, name) { acc <> name <> "\n" })
 	assert(string.contains(str, "blue\n"))
@@ -734,7 +740,9 @@ test("hash_collision_fold_blue_test", () {
 })
 
 test("hash_collision_map_size_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	uppercase = dict.map_values(colours, (_colour, name) {
 		string.to_upper(name)
@@ -745,40 +753,48 @@ test("hash_collision_map_size_test", () {
 })
 
 test("hash_collision_map_red_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	uppercase = dict.map_values(colours, (_colour, name) {
 		string.to_upper(name)
 	})
 
-	assert(dict.get(uppercase, Red) == Some("RED"))
+	assert(dict.get(uppercase, Red()) == Some("RED"))
 	()
 })
 
 test("hash_collision_map_green_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	uppercase = dict.map_values(colours, (_colour, name) {
 		string.to_upper(name)
 	})
 
-	assert(dict.get(uppercase, Green) == Some("GREEN"))
+	assert(dict.get(uppercase, Green()) == Some("GREEN"))
 	()
 })
 
 test("hash_collision_map_blue_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	uppercase = dict.map_values(colours, (_colour, name) {
 		string.to_upper(name)
 	})
 
-	assert(dict.get(uppercase, Blue) == Some("BLUE"))
+	assert(dict.get(uppercase, Blue()) == Some("BLUE"))
 	()
 })
 
 test("hash_collision_values_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	assert(
 		list.sort(dict.values(colours), string.compare) ==
@@ -788,7 +804,9 @@ test("hash_collision_values_test", () {
 })
 
 test("hash_collision_keys_test", () {
-	colours = dict.from_list([(Red, "red"), (Green, "green"), (Blue, "blue")])
+	colours = dict.from_list(
+		[(Red(), "red"), (Green(), "green"), (Blue(), "blue")],
+	)
 
 	assert(
 		{
@@ -828,8 +846,8 @@ test_random_operations_loop = (
 	d : dict.Dict(Int, Int)
 ) -> () {
 	{ remaining > 0 } |>
-		(False) { assert_dict_matches_proplist(d, proplist, initial_seed) }
-		& (True) {
+		(False()) { assert_dict_matches_proplist(d, proplist, initial_seed) }
+		& (True()) {
 			seed1 = prng(seed)
 			op_choice = seed1 % 2
 			seed2 = prng(seed1)
@@ -850,7 +868,7 @@ test_random_operations_loop = (
 				& (_) {
 					new_proplist = list.key_pop(proplist, key) |>
 						(Some((_, rest))) { rest }
-						& (None) { proplist }
+						& (None()) { proplist }
 					test_random_operations_loop(
 						initial_seed,
 						seed2,
@@ -906,8 +924,8 @@ assert_dict_matches_proplist = <K, V>(
 	seed : Int
 ) -> () {
 	{ dict.size(d) == list.length(proplist) } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			panic(
 				"Size mismatch with seed " <>
 					int.to_string(seed) <>
@@ -921,8 +939,8 @@ assert_dict_matches_proplist = <K, V>(
 		(key, value) = pair
 		got = dict.get(d, key)
 		{ got == Some(value) } |>
-			(True) { () }
-			& (False) {
+			(True()) { () }
+			& (False()) {
 				panic(
 					"Get mismatch with seed " <>
 						int.to_string(seed) <>
@@ -936,8 +954,8 @@ assert_dict_matches_proplist = <K, V>(
 			}
 	})
 	{ d == dict.from_list(proplist) } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			panic(
 				"Structural equality failed with seed " <> int.to_string(seed),
 			)
@@ -948,9 +966,9 @@ assert_dict_matches_proplist = <K, V>(
 test("get_option_test", () {
 	d = dict.from_list([("a", 1), ("b", 2)])
 	assert(dict.get(d, "a") == Some(1))
-	assert(dict.get(d, "z") == None)
+	assert(dict.get(d, "z") == None())
 	assert(
-		dict.get(dict.new(), 1) == None,
+		dict.get(dict.new(), 1) == None(),
 	)
 })
 
@@ -993,7 +1011,7 @@ test("many_keys_test", () {
 	assert(dict.size(d) == n)
 	assert(dict.get(d, 1) == Some(1))
 	assert(dict.get(d, n) == Some(n * n))
-	assert(dict.get(d, n + 1) == None)
+	assert(dict.get(d, n + 1) == None())
 	assert(
 		list.all(list.range(1, n), (i) { dict.get(d, i) == Some(i * i) }),
 	)
@@ -1001,7 +1019,7 @@ test("many_keys_test", () {
 		i % 2 |> (0) { dict.delete(d, i) } & (_) { d }
 	})
 	assert(dict.size(d2) == n / 2)
-	assert(dict.get(d2, 2) == None)
+	assert(dict.get(d2, 2) == None())
 	assert(dict.get(d2, 3) == Some(9))
 	assert(
 		list.sort(dict.keys(d2), int.compare) ==
@@ -1033,7 +1051,7 @@ test("any_key_type_test", () {
 	assert(dict.get(d, (1, [2, 3])) == Some("b"))
 	assert(dict.get(d, <<1, 2>>) == Some("c"))
 	assert(dict.get(d, 1.5) == Some("d"))
-	assert(dict.get(d, Point(x = 2, y = 1)) == None)
+	assert(dict.get(d, Point(x = 2, y = 1)) == None())
 })
 
 test("zero_keys_test", () {
@@ -1046,7 +1064,7 @@ test("zero_keys_test", () {
 test("upsert_update_test", () {
 	count = (words) {
 		list.fold(words, dict.new(), (d, w) {
-			dict.upsert(d, w, (x) { x |> (Some(n)) { n + 1 } & (None) { 1 } })
+			dict.upsert(d, w, (x) { x |> (Some(n)) { n + 1 } & (None()) { 1 } })
 		})
 	}
 	d = count(["a", "b", "a", "c", "a"])
@@ -1184,11 +1202,11 @@ test("same_entries_colliding_keys_test", () {
 		assert(dict.get(d, "0pad") == Some(2))
 		assert(dict.has(d, "f3zx"))
 		without_first = dict.delete(d, "f3zx")
-		assert(dict.get(without_first, "f3zx") == None)
+		assert(dict.get(without_first, "f3zx") == None())
 		assert(dict.get(without_first, "0pad") == Some(2))
 		assert(dict.size(without_first) == 1)
 		without_second = dict.delete(d, "0pad")
-		assert(dict.get(without_second, "0pad") == None)
+		assert(dict.get(without_second, "0pad") == None())
 		assert(dict.get(without_second, "f3zx") == Some(1))
 		assert(dict.size(without_second) == 1)
 	})

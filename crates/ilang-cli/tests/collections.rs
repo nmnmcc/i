@@ -32,7 +32,7 @@ fn project(path: &Path) {
     .unwrap();
     std::fs::create_dir(path.join("src")).unwrap();
     std::fs::write(path.join("src/macros.is"), "(, (= syntax (/ i syntax)))\n(, emit)\n(@ macro (= emit (-> (, c x body) (<- _ (, (: it (. syntax Items)))) {((. it add) c x [] x) `(= ~x (-> (,) _ {~body}))})))\n").unwrap();
-    std::fs::write(path.join("src/main.i"), "(m = app/macros\nsyntax = i/syntax\ntask = i/task)\n(anchor)\n@external(\"test:unselected\", \"missing\")\nmissing : () -> ()\nanchor = ()\nm.emit(anchor, good, assert(True))\nm.emit(anchor, bad, assert(False))\nm.emit(anchor, number, 42)\nm.emit(anchor, compiler_only, syntax.show)\nm.emit(anchor, needs_foreign, missing())\nm.emit(anchor, concurrent, assert(task.both(() { 1 }, () { 2 }) == (1, 2)))\n").unwrap();
+    std::fs::write(path.join("src/main.i"), "(m = app/macros\nsyntax = i/syntax\ntask = i/task)\n(anchor)\n@external(\"test:unselected\", \"missing\")\nmissing : () -> ()\nanchor = ()\nm.emit(anchor, good, assert(True()))\nm.emit(anchor, bad, assert(False()))\nm.emit(anchor, number, 42)\nm.emit(anchor, compiler_only, syntax.show)\nm.emit(anchor, needs_foreign, missing())\nm.emit(anchor, concurrent, assert(task.both(() { 1 }, () { 2 }) == (1, 2)))\n").unwrap();
 }
 
 fn run_javascript(dir: &Path, built: &ilang_cli::BuiltCollection) {

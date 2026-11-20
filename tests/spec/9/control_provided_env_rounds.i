@@ -11,8 +11,8 @@ S = (attach = (() -> ()) -> (), peek = () -> Int)
 
 check = (want : Int) <- (s : S) -> Int {
 	{ s.peek() == 7 } |>
-		(True) { () }
-		& (False) { panic("peek") }
+		(True()) { () }
+		& (False()) { panic("peek") }
 	want
 }
 
@@ -42,5 +42,5 @@ main = () {
 		d = step(4)
 		a + b + c + d
 	})
-	{ sum == 10 } |> (True) { () } & (False) { panic("sum") }
+	{ sum == 10 } |> (True()) { () } & (False()) { panic("sum") }
 }

@@ -84,7 +84,7 @@ main = () {
 		& (Error(_)) { panic("benchmark regex") }
 	adversarial = string.repeat("a", 5000)
 	measure("regex_nested_repeat", 5000, () {
-		assert(regex.is_match(nested, adversarial) == False)
+		assert(regex.is_match(nested, adversarial) == False())
 		()
 	})
 	rows = list.repeat(["hello", "quoted,field", "é🦀"], 10000)

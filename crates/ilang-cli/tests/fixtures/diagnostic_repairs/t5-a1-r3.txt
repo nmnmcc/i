@@ -18,28 +18,28 @@ digit_value = (c : UtfCodepoint) -> Int {
 	n = core.codepoint_to_int(c)
 	{
 		n >= 48 && n <= 57
-	} |> (True) { n - 48 }
-		& (False) { -1 }
+	} |> (True()) { n - 48 }
+		& (False()) { -1 }
 }
 
 if_negative = (value : Int, negative : Bool) -> Int {
-	negative |> (True) { -value } & (False) { value }
+	negative |> (True()) { -value } & (False()) { value }
 }
 
 parse_integer_digits = (cps : List(UtfCodepoint), value : Int, index : Int, negative : Bool) -> Result(Int, ()) {
 	cps |>
 		([]) {
-			{ index > 0 } |> (True) { Ok(if_negative(value, negative)) }
-				& (False) { Error(()) }
+			{ index > 0 } |> (True()) { Ok(if_negative(value, negative)) }
+				& (False()) { Error(()) }
 		}
 		& ([c, ..rest]) {
 			d = digit_value(c)
 			{
 				d >= 0
-			} |> (True) {
+			} |> (True()) {
 				parse_integer_digits(rest, value * 10 + d, index + 1, negative)
 			}
-				& (False) { Error(()) }
+				& (False()) { Error(()) }
 		}
 }
 
@@ -51,20 +51,20 @@ parse_integer_token = (text : String) -> Result(Int, ()) {
 			{
 				n == 43 || n == 45
 			} |>
-				(True) {
+				(True()) {
 					{
 						rest == []
-					} |> (True) { Error(()) }
-						& (False) {
+					} |> (True()) { Error(()) }
+						& (False()) {
 							parse_integer_digits(rest, 0, 0, n == 45)
 						}
 				}
-				& (False) {
+				& (False()) {
 					parse_integer_digits(
 						core.codepoints(text),
 						0,
 						0,
-						False,
+						False(),
 					)
 				}
 		}
@@ -72,20 +72,20 @@ parse_integer_token = (text : String) -> Result(Int, ()) {
 
 field_string = (fields : List((String, json.Json)), key : String) -> Option(String) {
 	fields |>
-		([]) { None }
+		([]) { None() }
 		& ([(name, value), ..rest]) {
 			{
 				name == key
-			} |> (True) {
-				value |> (json.Text(text)) { Some(text) } & (_) { None }
+			} |> (True()) {
+				value |> (json.Text(text)) { Some(text) } & (_) { None() }
 			}
-				& (False) { field_string(rest, key) }
+				& (False()) { field_string(rest, key) }
 		}
 }
 
 valid_name_tail = (cps : List(UtfCodepoint)) -> Bool {
 	cps |>
-		([]) { True }
+		([]) { True() }
 		& ([c, ..rest]) {
 			n = core.codepoint_to_int(c)
 			{
@@ -102,13 +102,13 @@ valid_name = (name : String) -> Bool {
 				head >= 97 && head <= 122 && valid_name_tail(rest)
 			}
 		}
-		& (_) { False }
+		& (_) { False() }
 }
 
 name_length_ok = (name : String) -> Bool {
 	core.codepoints(name) |>
-		([_, _, _, _, _, _, _, _, _, _, _, _, .._]) { False }
-		& (_) { True }
+		([_, _, _, _, _, _, _, _, _, _, _, _, .._]) { False() }
+		& (_) { True() }
 }
 
 parse_jobs = (values : List(json.Json), seen : List(String), jobs : List(Job)) -> Result(List(Job), ()) {
@@ -121,15 +121,15 @@ parse_jobs = (values : List(json.Json), seen : List(String), jobs : List(Job)) -
 						{
 							valid_name(name) &&
 								name_length_ok(name) &&
-								list.contains(seen, name) == False
-						} |> (True) {
+								list.contains(seen, name) == False()
+						} |> (True()) {
 							parse_jobs(
 								rest,
 								[name, ..seen],
 								[Job(name = name, url = url), ..jobs],
 							)
 						}
-							& (False) { Error(()) }
+							& (False()) { Error(()) }
 					}
 						& (_) { Error(()) }
 				}
@@ -142,8 +142,8 @@ parse_jobs = (values : List(json.Json), seen : List(String), jobs : List(Job)) -
 fetch_one = (job : Job, outdir : String) -> String {
 	{
 		job.url == "bad-url"
-	} |> (True) { "ERROR " <> job.name }
-		& (False) { "ERROR " <> job.name }
+	} |> (True()) { "ERROR " <> job.name }
+		& (False()) { "ERROR " <> job.name }
 }
 
 run_jobs = (jobs : List(Job), outdir : String) -> List(String) {

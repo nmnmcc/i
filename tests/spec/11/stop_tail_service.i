@@ -1,13 +1,13 @@
 // spec: 11.7, 9.6
 // expect: stop "assertion failed: mine"
-// at: spec/main:10:33
+// at: spec/main:10:37
 // at: spec/main:13:19
 // at: spec/main:16:2
 
 // A tail call of a function of a service keeps its position as the first
 // one; the tail call of `check` is gone.
 check = (c : Bool) <- (a : Assert) {
-	c |> (True) { () } & (False) { a.fail(AssertionFailure(message = "mine")) }
+	c |> (True()) { () } & (False()) { a.fail(AssertionFailure(message = "mine")) }
 }
 
 apply = (f, x) { [f(x)] }

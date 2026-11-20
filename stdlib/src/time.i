@@ -107,8 +107,8 @@ _divide_result = (duration : Duration, by : Int) -> Result(
 	TimeError,
 ) {
 	{ by == 0 } |>
-		(True) { Error(DivisionByZero) }
-		& (False) { Ok(Duration(to_nanoseconds(duration) / by)) }
+		(True()) { Error(DivisionByZero()) }
+		& (False()) { Ok(Duration(to_nanoseconds(duration) / by)) }
 }
 
 compare = (first : Duration, second : Duration) -> Order {

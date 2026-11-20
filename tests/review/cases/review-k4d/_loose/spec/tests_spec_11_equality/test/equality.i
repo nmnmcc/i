@@ -7,8 +7,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 yes = (b : Bool) { check(core.inspect(b), "True") }
@@ -54,12 +54,12 @@ test("structures", () {
 	yes(User(name = "a", age = 1) == User(name = "a", age = 1))
 	no(User(name = "a", age = 1) == User(name = "a", age = 2))
 	yes(Some([1]) == Some([1]))
-	no(Some(1) == None)
-	yes(None == None)
+	no(Some(1) == None())
+	yes(None() == None())
 	no(Ok(1) == Error(1))
 	yes(Ok(()) == Ok(()))
-	yes(True == True)
-	no(True == False)
+	yes(True() == True())
+	no(True() == False())
 	yes(() == ())
 })
 

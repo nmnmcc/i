@@ -77,7 +77,7 @@ fn template_sites_keep_call_and_template_locations() {
             marks: BTreeSet::new(),
         },
     );
-    let mut datum = ilang_syntax::lisp::parse("(assert False)")
+    let mut datum = ilang_syntax::lisp::parse("(assert (False))")
         .unwrap()
         .datums
         .remove(0);
@@ -140,7 +140,7 @@ fn ordinary_sites_keep_the_same_wat_without_expansion_notes() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("src/main.i"),
-        "\nmain = () { assert(True) }\n",
+        "\nmain = () { assert(True()) }\n",
     )
     .unwrap();
     let (graph, _) = ilang_package::load(dir.path());
