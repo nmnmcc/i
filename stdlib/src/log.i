@@ -195,15 +195,13 @@ file = (path : String) {
 	make(
 		(_ : Level) { True },
 		(entry) {
-			i = fs.open(path, fs.Append)
-			resource.ensure(
-				() {
-					text = format(entry) <> "\n"
-					fs.write(i, <<text:utf8>>)
-					fs.flush(i)
-				},
-				() { fs.close(i) },
-			)
+			// The scope owns the handle and closes it after each entry.
+			resource.scoped(() {
+				i = fs.open(path, fs.Append)
+				text = format(entry) <> "\n"
+				fs.write(i, <<text:utf8>>)
+				fs.flush(i)
+			})
 		},
 	)
 }
