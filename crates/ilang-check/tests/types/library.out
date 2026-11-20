@@ -927,6 +927,7 @@ i/queue.forget_take : (Queue(A, B), Int) <- (task.Scheduler) -> ()
 i/queue.finish_take : (TakeStep(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.take : (Queue(A, B)) <- (Fail(B), task.Scheduler) -> Option(A)
 i/queue.poll : (Queue(A, B)) <- (Fail(B), task.Scheduler) -> Option(A)
+i/queue.nothing_to_take : (QueueState(A, B)) -> (QueueState(A, B), TakeStep(A, B))
 i/queue.size : (Queue(A, B)) <- (task.Scheduler) -> Int
 i/queue.end : (Queue(A, B)) <- (task.Scheduler) -> ()
 i/queue.fail : (Queue(A, B), B) <- (task.Scheduler) -> ()
