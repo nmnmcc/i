@@ -267,16 +267,16 @@ fn main() -> ExitCode {
             target,
             shard,
             workers,
-        } => cmd_test(
-            &project,
+        } => cmd_test(TestOptions {
+            project,
             opt,
             offline,
-            filter.as_deref(),
+            filter,
             time,
-            target.into(),
-            shard.as_deref(),
+            target: target.into(),
+            shard,
             workers,
-        ),
+        }),
         Command::Package(c) => commands::package::run(c),
         Command::Cache(c) => return finish(commands::cache::run(c)),
         Command::Spec(args) => return finish(commands::spec::run(args)),
@@ -559,17 +559,30 @@ fn cmd_run_collection(
     }
 }
 
-fn cmd_test(
-    project: &Path,
+/// The arguments of `i test`.
+struct TestOptions {
+    project: PathBuf,
     opt: u8,
     offline: bool,
-    filter: Option<&str>,
+    filter: Option<String>,
     time: bool,
     target: Target,
-    shard: Option<&str>,
+    shard: Option<String>,
     workers: usize,
-) -> anyhow::Result<ExitCode> {
-    let shard = match shard.map(parse_shard).transpose() {
+}
+
+fn cmd_test(args: TestOptions) -> anyhow::Result<ExitCode> {
+    let TestOptions {
+        project,
+        opt,
+        offline,
+        filter,
+        time,
+        target,
+        shard,
+        workers,
+    } = args;
+    let shard = match shard.as_deref().map(parse_shard).transpose() {
         Ok(shard) => shard,
         Err(message) => {
             eprintln!("error: {message}");
@@ -592,7 +605,7 @@ fn cmd_test(
         target,
         ..options(opt, true, offline)?
     };
-    let (b, entries) = match ilang_cli::build_tests(project, options, collection.as_deref()) {
+    let (b, entries) = match ilang_cli::build_tests(&project, options, collection.as_deref()) {
         Ok(value) => value,
         Err(error) => {
             eprintln!("{error}");
@@ -637,7 +650,7 @@ fn cmd_test(
             };
             let name = test_name(&entry);
             let mode = get("mode").unwrap_or("test");
-            if filter.is_some_and(|f| !name.contains(f)) {
+            if filter.as_deref().is_some_and(|f| !name.contains(f)) {
                 continue;
             }
             if mode == "skip" || (focused && mode != "only") {
