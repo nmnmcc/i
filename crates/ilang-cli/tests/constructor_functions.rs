@@ -76,7 +76,15 @@ fn a_zero_parameter_constructor_is_not_a_function_with_parameters() {
     );
     assert!(!out.status.success());
     let err = String::from_utf8(out.stderr).unwrap();
-    assert!(err.contains("error[E0501]"), "{err}");
+    // Each of the three must fail on its own: `c = True(1)` already fails in
+    // the call path, so a general `E0501` would hide the subtyping escape
+    // coming back for `apply(True, 1)` and `pick(False)`.
+    for line in [4, 5, 6] {
+        assert!(
+            err.contains(&format!("src/main.i:{line}:")),
+            "line {line} is not reported: {err}"
+        );
+    }
 }
 
 /// A function that needs an argument is not a function of no arguments.

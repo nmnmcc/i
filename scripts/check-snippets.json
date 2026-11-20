@@ -1387,23 +1387,6 @@
     ],
     "reason": "Render the source template; the test still exercises the generator"
   },
-  "crates/ilang-check/tests/alias_unions.rs:9f7bba4b52c6036a": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{}",
-        "\t\t& (C1(a, r)) { a + f0(r) }"
-      ]
-    ],
-    "reason": "Render the source template; the test still exercises the generator"
-  },
   "crates/ilang-cli/examples/migrate-syntax3-labels.rs:7372e79824e15040": {
     "not_source": "TOML manifest or manifest fragment"
   },
@@ -1938,27 +1921,6 @@
     ],
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
   },
-  "crates/ilang-cli/tests/wasi.rs:dce8e21640ce6174": {
-    "substitutions": [
-      [
-        "{wasi_module}",
-        "wasi_snapshot_preview1"
-      ],
-      [
-        "{name}",
-        "exit"
-      ],
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ]
-    ],
-    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
-  },
   "crates/ilang-lsp/src/uri.rs:9f9424a25148417a": {
     "not_source": true,
     "reason": "Reviewed annotation conversion: host diagnostic, URI, metadata, or protocol identity; its colon is not an i annotation."
@@ -2028,20 +1990,7 @@
       "E0107: a data type has no spread; `..N` is written only in the needs of a function type, after `<-`"
     ]
   },
-  "tests/review/cases/review-runtime/echo-types/src/task.i:16a58a0b7110f7a2": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters",
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
   "tests/review/cases/review-s6/probe/src/main.i:85c0687292ba6d00": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ]
-  },
-  "tests/review/cases/review-std1/factory/src/main.i:8c2864b9c5f6d54d": {
     "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
     "diagnostics": [
       "E0101: the head of a data type or an opaque type has only type parameters"
@@ -2225,13 +2174,6 @@
       ]
     ]
   },
-  "tests/review/cases/review-std1/tree/src/main.i:a94708754e53b03e": {
-    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
-    "diagnostics": [
-      "E0101: the head of a data type or an opaque type has only type parameters"
-    ],
-    "substitutions": []
-  },
   "tests/spec/4.6/written_poly_union_arity.i:003471a33db290d6": {
     "track": true,
     "diagnostics": [
@@ -2381,57 +2323,6 @@
         "n"
       ]
     ]
-  },
-  "crates/ilang-cli/tests/multicore.rs:c414ae96779cf8b4": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:1b558a72799d32d4": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
-  },
-  "crates/ilang-cli/tests/multicore.rs:5b46861c947bbc74": {
-    "substitutions": [
-      [
-        "{{",
-        "{"
-      ],
-      [
-        "}}",
-        "}"
-      ],
-      [
-        "{SPIN}",
-        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True) { x }\n\t\t& (False) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
-      ]
-    ],
-    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
   "crates/ilang-cli/tests/wasi.rs:4e335e1263edd876": {
     "substitutions": [
@@ -3171,5 +3062,150 @@
     "diagnostics": [
       "E0101: `|` no longer joins function values: join the branches with `&`"
     ]
+  },
+  "crates/ilang-cli/tests/wasi.rs:e8c8b20ef01e3f69": {
+    "substitutions": [
+      [
+        "{wasi_module}",
+        "wasi_snapshot_preview1"
+      ],
+      [
+        "{name}",
+        "exit"
+      ],
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ]
+    ],
+    "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
+  },
+  "crates/ilang-cli/tests/multicore.rs:c2d6e4ee67e51a30": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:517f02438fc002fb": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-cli/tests/multicore.rs:49feaee18e283b4b": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{SPIN}",
+        "spin = (n: Int, x: Int) -> Int {\n\t{ n == 0 } |>\n\t\t(True()) { x }\n\t\t& (False()) { spin(n - 1, { x * 75 + 74 } % 65537) }\n}\n"
+      ]
+    ],
+    "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
+  },
+  "crates/ilang-check/tests/alias_unions.rs:326f215eb4a39b0a": {
+    "substitutions": [
+      [
+        "{{",
+        "{"
+      ],
+      [
+        "}}",
+        "}"
+      ],
+      [
+        "{}",
+        "\t\t& (C1(a, r)) { a + f0(r) }"
+      ]
+    ],
+    "reason": "Render the source template; the test still exercises the generator"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:5cf0d037acffde11": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:da481e7b324d741e": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:b0b6db5779d12f46": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:5108d82622a6955f": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:c18a83096f4b9a0b": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:ea1f211d0ac03d55": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:2b3d9b80ff8fe368": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:93f438c1f8f8b257": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:325231a4014b24db": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:5c8f40239c311110": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:1afd8d96fef660d8": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "crates/ilang-syntax/examples/constructor-sites.rs:a97c99df48a9bbf6": {
+    "not_source": "the tool's output protocol, not i source"
+  },
+  "tests/review/cases/review-runtime/echo-types/src/task.i:9c40e2df6883c033": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters",
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/factory/src/main.i:b5f83635540b9186": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ]
+  },
+  "tests/review/cases/review-std1/tree/src/main.i:a07f1eebf4dc561b": {
+    "reason": "Existing negative lowercase type-head fixture. Syntax three requires bare UpName parameters (§2.8, §3.2), so parsing reports E0101 before the former E0232 checker diagnostics.",
+    "diagnostics": [
+      "E0101: the head of a data type or an opaque type has only type parameters"
+    ],
+    "substitutions": []
   }
 }
