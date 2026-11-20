@@ -465,8 +465,11 @@ i/float_text.digit_list : (List(Int), List(String)) -> List(String)
 i/float_text.int_text : (Int) -> List(String)
 i/float_text.int_digits : (Int, List(String)) -> List(String)
 i/float_text.digit_text : (Int) -> String
+i/fs.reason_of : (String) -> FsProblem
+i/fs.failure : (String, String, String) <- (Fail(FsError)) -> Never
 i/fs.mode_string : (OpenMode) -> "append" | "read" | "read_write" | "truncate"
-i/fs.open : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner) -> File
+i/fs.open_handle : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner) -> File
+i/fs.open : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner, resource.Scope) -> File
 i/fs.read : (File, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
 i/fs.write : (File, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
 i/fs.flush : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
@@ -484,6 +487,13 @@ i/fs.read_file : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -
 i/fs.write_file : (String, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
 i/fs.line_parts : (String, Int) -> List(String)
 i/fs.read_lines : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
+i/fs.copy_chunks : (File, File, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Int
+i/fs.copy : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Int
+i/fs.max_walk_depth : 32
+i/fs.child : (String, String) -> String
+i/fs.walk_from : (String, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
+i/fs.failure_with : (String, String, FsProblem, String) <- (Fail(FsError)) -> Never
+i/fs.walk : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
 i/http.content_length : "Content-Length"
 i/http.content_type : "Content-Type"
 i/http.transfer_encoding : "Transfer-Encoding"
@@ -839,6 +849,8 @@ i/path.segments : (String) -> List(String)
 i/path.render : (List(String), Bool) -> String
 i/path.clean_segments : (String) -> List(String)
 i/path.relative : (String, String) <- (Fail(RelativeError)) -> String
+i/process.problem : (String) -> ProcessProblem
+i/process.raise_error : (String, String) <- (Fail(ProcessError)) -> Never
 i/process.length : (List(A)) -> Int
 i/process.u32 : (Int) -> BitArray
 i/process.encode_items : (List(String)) <- (Fail(ProcessError)) -> BitArray
@@ -849,17 +861,26 @@ i/process.args : () <- (Arguments, Fail(ProcessError), request.Await, request.Ow
 i/process.env : (String) <- (Environment, Fail(ProcessError), request.Await, request.Owner) -> String
 i/process.cwd : () <- (Fail(ProcessError), WorkingDirectory, request.Await, request.Owner) -> String
 i/process.entropy : (Int) <- (Entropy, Fail(ProcessError), request.Await, request.Owner) -> BitArray
-i/process.spawn : (String, List(String)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
+i/process.await_spawn : (Request(Result(Int, String))) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
+i/process.release : (Child) <- (Process, request.Await, request.Owner) -> ()
+i/process.spawn : (String, List(String)) <- (Fail(ProcessError), Process, request.Await, request.Owner, resource.Scope) -> Child
 i/process.wait : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Int
 i/process.terminate : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
 i/process.close : (Child) <- (Process, request.Await, request.Owner) -> ()
 i/process.stdio_mode : (Stdio) -> "inherit" | "null" | "piped"
-i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
-i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
+i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, request.Await, request.Owner, resource.Scope) -> Child
+i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, request.Await, request.Owner, resource.Scope) -> Child
 i/process.read_stdout : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
 i/process.read_stderr : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
 i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
 i/process.close_stdin : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+i/process.chunk_size : 65536
+i/process.reverse_onto : (List(A), List(A)) -> List(A)
+i/process.drain_stdout : (Child, List(BitArray)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
+i/process.drain_stderr : (Child, List(BitArray)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
+i/process.read_all_stdout : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
+i/process.read_all_stderr : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
+i/process.collect : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner, resource.Scope, task.Runner, task.Scheduler) -> (stderr = BitArray, stdout = BitArray)
 i/property.defaults : () -> Config
 i/property.make : ((Int, random.Generator) -> Option(Tree(A))) -> Gen(A)
 i/property.sample : (Gen(A), Int, random.Generator) -> Option(Tree(A))
@@ -927,6 +948,7 @@ i/queue.forget_take : (Queue(A, B), Int) <- (task.Scheduler) -> ()
 i/queue.finish_take : (TakeStep(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.take : (Queue(A, B)) <- (Fail(B), task.Scheduler) -> Option(A)
 i/queue.poll : (Queue(A, B)) <- (Fail(B), task.Scheduler) -> Option(A)
+i/queue.nothing_to_take : (QueueState(A, B)) -> (QueueState(A, B), TakeStep(A, B))
 i/queue.size : (Queue(A, B)) <- (task.Scheduler) -> Int
 i/queue.end : (Queue(A, B)) <- (task.Scheduler) -> ()
 i/queue.fail : (Queue(A, B), B) <- (task.Scheduler) -> ()

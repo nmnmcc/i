@@ -82,7 +82,7 @@ make = <E, N>(
 ) -> Sink(E, N) { Sink(accept, send, (_ : N) { () }) }
 
 silent = <N>() -> Sink(Never, N) {
-	make((_ : Level) { False() }, (_ : Entry) { () })
+	make((_ : Level) { False }, (_ : Entry) { () })
 }
 
 filter = <E, N>(sink : Sink(E, N), accept : (Level) -> Bool) -> Sink(E, N) {
@@ -102,7 +102,7 @@ enabled = <E, N>(level : Level) <- (sink : Sink(E, N)) -> Bool {
 // Inferred returns retain the exact public error and environment rows.
 write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(accept, send, _) = sink
-	accept(entry.level) |> (True()) { send(entry) } & (False()) { () }
+	accept(entry.level) |> (True) { send(entry) } & (False) { () }
 }
 
 lazy = <E, F, N>(level : Level, message : () <- (Fail(F), ..N) -> String) <- (
@@ -110,22 +110,22 @@ lazy = <E, F, N>(level : Level, message : () <- (Fail(F), ..N) -> String) <- (
 ) {
 	Sink(accept, send, _) = sink
 	accept(level) |>
-		(True()) {
+		(True) {
 			send(
 				Entry(
 					level = level,
 					message = message(),
 					fields = [],
-					at = None(),
+					at = None,
 				),
 			)
 		}
-		& (False()) { () }
+		& (False) { () }
 }
 
 format = (entry : Entry) -> String {
 	stamp = entry.at |>
-		(None()) { [] }
+		(None) { [] }
 		& (Some(t)) { [" @", int.to_string(time.unix_nanoseconds(t))] }
 	fields = list.flat_map(entry.fields, (field) {
 		(key, value) = field
@@ -140,19 +140,15 @@ format = (entry : Entry) -> String {
 }
 
 rank = (level : Level) -> Int {
-	level |>
-		(Debug()) { 0 }
-		& (Info()) { 1 }
-		& (Warning()) { 2 }
-		& (Failure()) { 3 }
+	level |> (Debug) { 0 } & (Info) { 1 } & (Warning) { 2 } & (Failure) { 3 }
 }
 
 level_text = (level : Level) -> String {
 	level |>
-		(Debug()) { "debug" }
-		& (Info()) { "info" }
-		& (Warning()) { "warning" }
-		& (Failure()) { "failure" }
+		(Debug) { "debug" }
+		& (Info) { "info" }
+		& (Warning) { "warning" }
+		& (Failure) { "failure" }
 }
 
 quote = (text : String) -> String {
@@ -186,28 +182,26 @@ escape = (codepoint : UtfCodepoint) -> String {
 stderr = () -> Sink(
 	stdio.StdioError,
 	stdio.Stdio | request.Await | request.Owner,
-) { make((_ : Level) { True() }, (entry) { stdio.print_error(format(entry)) }) }
+) { make((_ : Level) { True }, (entry) { stdio.print_error(format(entry)) }) }
 
 /// A sink that writes each formatted entry to standard output.
 stdout = () -> Sink(
 	stdio.StdioError,
 	stdio.Stdio | request.Await | request.Owner,
-) { make((_ : Level) { True() }, (entry) { stdio.print(format(entry)) }) }
+) { make((_ : Level) { True }, (entry) { stdio.print(format(entry)) }) }
 
 /// A sink that appends each formatted entry to a file.
 file = (path : String) {
 	make(
-		(_ : Level) { True() },
+		(_ : Level) { True },
 		(entry) {
-			i = fs.open(path, fs.Append())
-			resource.ensure(
-				() {
-					text = format(entry) <> "\n"
-					fs.write(i, <<text:utf8>>)
-					fs.flush(i)
-				},
-				() { fs.close(i) },
-			)
+			// The scope owns the handle and closes it after each entry.
+			resource.scoped(() {
+				i = fs.open(path, fs.Append)
+				text = format(entry) <> "\n"
+				fs.write(i, <<text:utf8>>)
+				fs.flush(i)
+			})
 		},
 	)
 }

@@ -4,6 +4,7 @@
 	i/request
 	i/fail
 	i/core
+	i/resource
 )
 
 test("fake_capabilities", () {
@@ -15,6 +16,7 @@ test("fake_capabilities", () {
 					Error(
 						process.ProcessError(
 							operation = "env",
+							reason = process.Other,
 							code = "missing",
 						),
 					),
@@ -49,16 +51,28 @@ test("host_capabilities", () {
 	assert(
 		fail.catch(() { process.entropy(-1) }) ==
 			Error(
-				process.ProcessError(operation = "entropy", code = "invalid"),
+				process.ProcessError(
+					operation = "entropy",
+					reason = process.Invalid,
+					code = "invalid",
+				),
 			),
 	)
-	child = process.spawn("sh", ["-c", "exit 3"])
-	assert(process.wait(child) == 3)
-	assert(process.wait(child) == 3)
-	process.close(child)
-	assert(
-		fail.catch(() { process.wait(child) }) ==
-			Error(process.ProcessError(operation = "wait", code = "closed")),
-	)
+	resource.scoped(() {
+		child = process.spawn("sh", ["-c", "exit 3"])
+		assert(process.wait(child) == 3)
+		assert(process.wait(child) == 3)
+		process.close(child)
+		assert(
+			fail.catch(() { process.wait(child) }) ==
+				Error(
+					process.ProcessError(
+						operation = "wait",
+						reason = process.Closed,
+						code = "closed",
+					),
+				),
+		)
+	})
 	()
 })

@@ -2378,6 +2378,12 @@ These ordinary functions use the services described in §9.7; their definitions 
 | `write_file` | Write a whole file. |
 | `read_lines` | Read a file as text lines. |
 
+`i/fs` needs the platform's `Fs` service. `native`, `nodejs` and `wasi`
+provide it; an entry that needs it on any other target is the compile error
+"`Fs` is not provided by the target" (E0523).
+| `copy` | Copy one file into another and give the bytes copied. |
+| `walk` | List every path under a directory, depth first in name order. |
+
 #### `i/process`
 
 | Function | What it does |
@@ -2396,6 +2402,14 @@ These ordinary functions use the services described in §9.7; their definitions 
 | `wait` | Wait for a child to exit. |
 | `terminate` | Terminate a child. |
 | `close` | Close a child handle. |
+
+`i/process` needs the platform's `Process` service; `Arguments`,
+`Environment`, `WorkingDirectory` and `Entropy` are separate services.
+`Process` and `WorkingDirectory` are provided by `native` and `nodejs`,
+`Arguments` and `Environment` also by `wasi`, and `Entropy` by every target.
+An entry that needs a service its target does not give is the compile error
+"`T` is not provided by the target `t`" (E0523).
+| `collect` | Read the child’s piped standard output and standard error to the end, both at once. |
 
 #### `i/net`
 

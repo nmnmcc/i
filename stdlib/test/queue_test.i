@@ -466,3 +466,22 @@ test("queue_module_example_test", () {
 	assert(got == [Some(1), Some(2), Some(3), None()])
 	()
 })
+
+// The documented nesting: the resource scope ends inside the task scope, so
+// its exit shuts the queue down while the ref is alive, and frees a taker
+// that waits for a value nobody offers.
+test("queue_is_shut_down_when_its_resource_scope_ends_test", () {
+	got = task.run(() {
+		task.scope((s) {
+			taker = resource.scoped(() {
+				q : queue.Queue(Int, Never) = queue.unbounded()
+				waiting = task.go(s, () { queue.take(q) })
+				task.yield()
+				waiting
+			})
+			(task.join(taker), "after")
+		})
+	})
+	assert(got == (None, "after"))
+	()
+})

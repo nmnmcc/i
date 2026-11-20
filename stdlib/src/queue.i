@@ -66,6 +66,23 @@
 //// `size` is for observation only: do not check it and then take, since
 //// another task can act in between. Use `poll` for a take that does not wait.
 ////
+//// Scope. The queue belongs to the task scope that is current when it is
+//// made, and the resource scope it is attached to must end inside that task
+//// scope. Put the task scope outside the resource scope:
+////
+//// ```text
+//// task.scope((group) {
+//// 	resource.scoped(() {
+//// 		q = queue.unbounded()
+//// 		body
+//// 	})
+//// })
+//// ```
+////
+//// The opposite nesting, `resource.scoped(() { task.scope(...) })`, stops
+//// with `panic: task: shared value is gone` when the resource scope ends,
+//// because the queue's release runs after its task scope has freed the ref.
+////
 //// Stability: experimental. Tracking: docs/design/std-v3.md.
 (
 	failure = i/fail
@@ -159,8 +176,8 @@ without = (tickets : List(Int), ticket : Int) -> List(Int) {
 		([]) { [] }
 		& ([t, ..rest]) {
 			{ t == ticket } |>
-				(True()) { rest }
-				& (False()) { [t, ..without(rest, ticket)] }
+				(True) { rest }
+				& (False) { [t, ..without(rest, ticket)] }
 		}
 }
 
@@ -171,16 +188,16 @@ append_ticket = (tickets : List(Int), ticket : Int) -> List(Int) {
 }
 
 is_head = (tickets : List(Int), ticket : Int) -> Bool {
-	tickets |> ([t, .._]) { t == ticket } & ([]) { False() }
+	tickets |> ([t, .._]) { t == ticket } & ([]) { False }
 }
 
 is_open = <E>(terminal : Terminal(E)) -> Bool {
-	terminal |> (Open()) { True() } & (_) { False() }
+	terminal |> (Open) { True } & (_) { False }
 }
 
 has_room = <A, E>(state : QueueState(A, E)) -> Bool {
 	state.capacity |>
-		(None()) { True() }
+		(None) { True }
 		& (Some(n)) { sequence.length(state.buffer) < n }
 }
 
@@ -198,7 +215,7 @@ make = <A, E>(capacity : Option(Int), strategy : Strategy) <- (
 						takers = [],
 						offers = [],
 						next = 0,
-						terminal = Open(),
+						terminal = Open,
 					),
 				),
 				strategy = strategy,
@@ -214,8 +231,8 @@ make_bounded = <A, E>(capacity : Int, strategy : Strategy) <- (
 	error : Fail(QueueError),
 ) -> Queue(A, E) {
 	{ capacity > 0 } |>
-		(True()) { make(Some(capacity), strategy) }
-		& (False()) { failure.raise(InvalidCapacity(capacity = capacity)) }
+		(True) { make(Some(capacity), strategy) }
+		& (False) { failure.raise(InvalidCapacity(capacity = capacity)) }
 }
 
 /// A queue that holds at most `capacity` values. When it is full, `offer`
@@ -228,7 +245,7 @@ bounded = <A, E>(capacity : Int) <- (
 	scope : resource.Scope,
 	own : task.Scheduler,
 	error : Fail(QueueError),
-) -> Queue(A, E) { make_bounded(capacity, Backpressure()) }
+) -> Queue(A, E) { make_bounded(capacity, Backpressure) }
 
 /// A queue that holds at most `capacity` values. When it is full, `offer`
 /// gives `False` at once and keeps the queue as it was.
@@ -240,7 +257,7 @@ dropping = <A, E>(capacity : Int) <- (
 	scope : resource.Scope,
 	own : task.Scheduler,
 	error : Fail(QueueError),
-) -> Queue(A, E) { make_bounded(capacity, Dropping()) }
+) -> Queue(A, E) { make_bounded(capacity, Dropping) }
 
 /// A queue that holds at most `capacity` values. When it is full, `offer`
 /// removes the oldest buffered value, adds the new one and gives `True`.
@@ -252,7 +269,7 @@ sliding = <A, E>(capacity : Int) <- (
 	scope : resource.Scope,
 	own : task.Scheduler,
 	error : Fail(QueueError),
-) -> Queue(A, E) { make_bounded(capacity, Sliding()) }
+) -> Queue(A, E) { make_bounded(capacity, Sliding) }
 
 /// A queue with no capacity limit: `offer` never waits and always gives
 /// `True` while the queue is open.
@@ -263,7 +280,7 @@ sliding = <A, E>(capacity : Int) <- (
 unbounded = <A, E>() <- (scope : resource.Scope, own : task.Scheduler) -> Queue(
 	A,
 	E,
-) { make(None(), Backpressure()) }
+) { make(None, Backpressure) }
 
 // Inserts `value` into an open state that may act now. Gives the new state
 // and the offer's answer.
@@ -272,31 +289,31 @@ insert = <A, E>(state : QueueState(A, E), strategy : Strategy, value : A) -> (
 	Bool,
 ) {
 	{ has_room(state) } |>
-		(True()) {
+		(True) {
 			(
 				QueueState(
 					..state,
 					buffer = sequence.push_back(state.buffer, value),
 				),
-				True(),
+				True,
 			)
 		}
-		& (False()) {
+		& (False) {
 			strategy |>
-				(Dropping()) { (state, False()) }
-				& (Sliding()) {
+				(Dropping) { (state, False) }
+				& (Sliding) {
 					rest = sequence.pop_front(state.buffer) |>
 						(Some((_, rest))) { rest }
-						& (None()) { state.buffer }
+						& (None) { state.buffer }
 					(
 						QueueState(
 							..state,
 							buffer = sequence.push_back(rest, value),
 						),
-						True(),
+						True,
 					)
 				}
-				& (Backpressure()) { panic("queue: insert into a full queue") }
+				& (Backpressure) { panic("queue: insert into a full queue") }
 		}
 }
 
@@ -306,19 +323,19 @@ offer_first = <A, E>(
 	value : A
 ) -> (QueueState(A, E), OfferStep) {
 	{ is_open(state.terminal) } |>
-		(False()) { (state, OfferClosed()) }
-		& (True()) {
+		(False) { (state, OfferClosed) }
+		& (True) {
 			waits = strategy |>
-				(Backpressure()) {
+				(Backpressure) {
 					state.offers != [] || core.not(has_room(state))
 				}
-				& (_) { False() }
+				& (_) { False }
 			waits |>
-				(False()) {
+				(False) {
 					(next, accepted) = insert(state, strategy, value)
 					(next, OfferDone(accepted))
 				}
-				& (True()) {
+				& (True) {
 					ticket = state.next
 					(
 						QueueState(
@@ -339,16 +356,16 @@ offer_again = <A, E>(
 	value : A
 ) -> (QueueState(A, E), OfferStep) {
 	{ is_open(state.terminal) } |>
-		(False()) {
+		(False) {
 			(
 				QueueState(..state, offers = without(state.offers, ticket)),
-				OfferClosed(),
+				OfferClosed,
 			)
 		}
-		& (True()) {
+		& (True) {
 			{ is_head(state.offers, ticket) && has_room(state) } |>
-				(False()) { (state, OfferWait(ticket)) }
-				& (True()) {
+				(False) { (state, OfferWait(ticket)) }
+				& (True) {
 					(inserted, accepted) = insert(
 						QueueState(
 							..state,
@@ -407,7 +424,7 @@ offer = <A, E>(q : Queue(A, E), value : A) <- (
 		& (other) { other }
 	step |>
 		(OfferDone(accepted)) { accepted }
-		& (OfferClosed()) { failure.raise(Closed()) }
+		& (OfferClosed) { failure.raise(Closed) }
 		& (OfferWait(_)) { panic("queue: offer still waiting") }
 }
 
@@ -417,11 +434,11 @@ empty_answer = <A, E>(state : QueueState(A, E), ticket : Int) -> (
 	TakeStep(A, E),
 ) {
 	state.terminal |>
-		(Open()) { (state, TakeWait(ticket)) }
-		& (Ended() | Shutdown()) {
+		(Open) { (state, TakeWait(ticket)) }
+		& (Ended | Shutdown) {
 			(
 				QueueState(..state, takers = without(state.takers, ticket)),
-				TakeDone(None()),
+				TakeDone(None),
 			)
 		}
 		& (Failed(e)) {
@@ -450,7 +467,7 @@ take_now = <A, E>(state : QueueState(A, E), ticket : Int) -> (
 				TakeDone(Some(value)),
 			)
 		}
-		& (None()) { empty_answer(state, ticket) }
+		& (None) { empty_answer(state, ticket) }
 }
 
 take_first = <A, E>(state : QueueState(A, E)) -> (
@@ -459,7 +476,7 @@ take_first = <A, E>(state : QueueState(A, E)) -> (
 ) {
 	ticket = state.next
 	{ state.takers == [] } |>
-		(True()) {
+		(True) {
 			(next, step) = take_now(state, ticket)
 			step |>
 				(TakeWait(_)) {
@@ -474,7 +491,7 @@ take_first = <A, E>(state : QueueState(A, E)) -> (
 				}
 				& (_) { (next, step) }
 		}
-		& (False()) {
+		& (False) {
 			(
 				QueueState(
 					..state,
@@ -491,8 +508,8 @@ take_again = <A, E>(state : QueueState(A, E), ticket : Int) -> (
 	TakeStep(A, E),
 ) {
 	{ is_head(state.takers, ticket) } |>
-		(True()) { take_now(state, ticket) }
-		& (False()) { (state, TakeWait(ticket)) }
+		(True) { take_now(state, ticket) }
+		& (False) { (state, TakeWait(ticket)) }
 }
 
 take_wait = <A, E>(q : Queue(A, E), ticket : Int) <- (
@@ -559,16 +576,12 @@ poll = <A, E>(q : Queue(A, E)) <- (
 		// A waiting taker is first in line: a poll never takes its value,
 		// and a drained failure is only reported once nothing is left.
 		{ state.takers != [] } |>
-			(True()) {
+			(True) {
 				{ sequence.is_empty(state.buffer) } |>
-					(True()) {
-						state.terminal |>
-							(Failed(e)) { (state, TakeFailed(e)) }
-							& (_) { (state, TakeDone(None())) }
-					}
-					& (False()) { (state, TakeDone(None())) }
+					(True) { nothing_to_take(state) }
+					& (False) { (state, TakeDone(None)) }
 			}
-			& (False()) {
+			& (False) {
 				sequence.pop_front(state.buffer) |>
 					(Some((value, rest))) {
 						(
@@ -576,14 +589,21 @@ poll = <A, E>(q : Queue(A, E)) <- (
 							TakeDone(Some(value)),
 						)
 					}
-					& (None()) {
-						state.terminal |>
-							(Failed(e)) { (state, TakeFailed(e)) }
-							& (_) { (state, TakeDone(None())) }
-					}
+					& (None) { nothing_to_take(state) }
 			}
 	})
 	finish_take(step)
+}
+
+// The answer when nothing can be taken now: raise on a drained failure,
+// otherwise give `None`.
+nothing_to_take = <A, E>(state : QueueState(A, E)) -> (
+	QueueState(A, E),
+	TakeStep(A, E),
+) {
+	state.terminal |>
+		(Failed(e)) { (state, TakeFailed(e)) }
+		& (_) { (state, TakeDone(None)) }
 }
 
 /// The number of buffered values. For observation only: another task may
@@ -603,8 +623,8 @@ size = <A, E>(q : Queue(A, E)) <- (own : task.Scheduler) -> Int {
 end = <A, E>(q : Queue(A, E)) <- (own : task.Scheduler) -> () {
 	task.update(q.state, (state : QueueState(A, E)) {
 		{ is_open(state.terminal) } |>
-			(True()) { (QueueState(..state, terminal = Ended()), ()) }
-			& (False()) { (state, ()) }
+			(True) { (QueueState(..state, terminal = Ended), ()) }
+			& (False) { (state, ()) }
 	})
 }
 
@@ -616,8 +636,8 @@ end = <A, E>(q : Queue(A, E)) <- (own : task.Scheduler) -> () {
 fail = <A, E>(q : Queue(A, E), e : E) <- (own : task.Scheduler) -> () {
 	task.update(q.state, (state : QueueState(A, E)) {
 		{ is_open(state.terminal) } |>
-			(True()) { (QueueState(..state, terminal = Failed(e)), ()) }
-			& (False()) { (state, ()) }
+			(True) { (QueueState(..state, terminal = Failed(e)), ()) }
+			& (False) { (state, ()) }
 	})
 }
 
@@ -628,9 +648,6 @@ fail = <A, E>(q : Queue(A, E), e : E) <- (own : task.Scheduler) -> () {
 /// Example: after offering 1 and queue.shutdown(q), queue.take(q) == None.
 shutdown = <A, E>(q : Queue(A, E)) <- (own : task.Scheduler) -> () {
 	task.update(q.state, (state : QueueState(A, E)) {
-		(
-			QueueState(..state, buffer = sequence.new(), terminal = Shutdown()),
-			(),
-		)
+		(QueueState(..state, buffer = sequence.new(), terminal = Shutdown), ())
 	})
 }

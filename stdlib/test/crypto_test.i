@@ -1388,6 +1388,7 @@ test("random_bytes_service_error", () {
 				Error(
 					process.ProcessError(
 						operation = "entropy",
+						reason = process.Other,
 						code = "entropy failed",
 					),
 				),

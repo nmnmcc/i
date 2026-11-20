@@ -55,12 +55,22 @@ main = () {
 	)
 	assert(
 		fail.catch(() { process.env("MISSING") }) ==
-			Error(process.ProcessError(operation = "env", code = "not_found")),
+			Error(
+				process.ProcessError(
+					operation = "env",
+					reason = process.NotFound,
+					code = "not_found",
+				),
+			),
 	)
 	assert(
 		fail.catch(() { process.entropy(-1) }) ==
 			Error(
-				process.ProcessError(operation = "entropy", code = "invalid"),
+				process.ProcessError(
+					operation = "entropy",
+					reason = process.Invalid,
+					code = "invalid",
+				),
 			),
 	)
 	assert(
@@ -69,6 +79,7 @@ main = () {
 				fs.FsError(
 					operation = "open",
 					path = "/outside/no-preopen",
+					reason = fs.Denied,
 					code = "denied",
 				),
 			),
@@ -90,7 +101,7 @@ test('WASI rejects unavailable Net, Tls and Process at compile time', { timeout:
     for (const [source, service] of [["(\n\ti/tls\n)\nmain = () <- (t : tls.Tls) { () }", 'Tls'], ["(\n\ti/process\n)\nmain = () <- (p : process.Process) { () }", 'Process']]) {
       await writeFile(join(dir, 'src/main.i'), source);
       const out = spawnSync(cli, ['build', '--project', dir, '--target', 'wasi'], { encoding: 'utf8' });
-      assert.notEqual(out.status, 0); assert.match(out.stderr, new RegExp(service)); assert.match(out.stderr, /wasi/i);
+      assert.notEqual(out.status, 0); assert.match(out.stderr, new RegExp(service)); assert.match(out.stderr, /wasi/i); assert.match(out.stderr, /E0523/);
     }
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

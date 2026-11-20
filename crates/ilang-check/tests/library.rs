@@ -260,6 +260,8 @@ fn library_names() {
                 "read_file",
                 "write_file",
                 "read_lines",
+                "copy",
+                "walk",
             ],
         ),
         (
@@ -276,6 +278,7 @@ fn library_names() {
                 "read_stderr",
                 "write_stdin",
                 "close_stdin",
+                "collect",
                 "wait",
                 "terminate",
                 "close",
