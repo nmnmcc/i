@@ -1,7 +1,7 @@
 # Design: the host boundary for 0.2.0
 
-Status: first version for approval. Branch `design/host-boundary`, base
-`a21eae769`, 2026-11-21. Size evidence:
+Status: for review; P1-P7 decided 2026-11-21. Branch `design/host-boundary`,
+base `2398f0b12` (after the `stdlib/` rename). Size evidence:
 [`host-boundary-inventory.md`](host-boundary-inventory.md).
 
 No code is changed by this document. The product choices were decided on
@@ -27,7 +27,7 @@ The boundary has two directions and two products:
   group, and a hand-written dispatcher.
 - `Await`, `Owner`, `Root`, `Scheduler` and `Runner` become **implicit
   services**: inferred, never written in need rows, and dropped from them in
-  display; a genuine value parameter of one stays. The 106 exported signatures
+  display; a genuine value parameter of one stays. The 152 exported signatures
   that carry them today lose the row entries. This change and `hostcall` are
   one phase: both use the same hidden-parameter handling, and splitting them
   would edit the same signatures twice.
@@ -66,7 +66,7 @@ explicit where it differs. It is not a name rule: an absent or misspelled
 `main` gives an error, never a silently different product.
 
 Every package that another package depends on needs `product = "library"`;
-the phase adds the key to all of them (including `std` and the dependency
+the phase adds the key to all of them (including `stdlib/i.toml` and the dependency
 fixtures) with a script and a load test that no dependency is a program.
 
 ### 1.2 Rules that make the products real
@@ -83,7 +83,7 @@ fixtures) with a script and a load test that no dependency is a program.
 | `i deps` | prints `product: program` | prints `product: library` and its exports |
 
 A library with no `@export` is a warning (`W0330`) on the compiled root
-library only, not on every dependency (std has none), and not an error: a
+library only, not on every dependency (the library `i` has none), and not an error: a
 macro-only or import-only library exists.
 
 A program may itself be built for `host`; then it is still a command with
@@ -100,7 +100,7 @@ product, not of the spelling `main`. In a program, `add` is dead code unless
 | Required `product` on every package | 2 209 fixture manifests get a line | the default already produces safe errors; the sweep is noise |
 | `[package] type = "…"` | a table in every manifest, flat style broken | no second package key is planned |
 
-**Approval P1**: confirm optional `product`, default `"program"`, `"library"`
+**P1 (accepted)**: confirm optional `product`, default `"program"`, `"library"`
 explicit. Alternative: require it everywhere (2 209 edits, scriptable in one
 commit); `[package] kind` (same count plus a table). Cost of changing later:
 the manifest reader and the library-only manifests once.
@@ -162,7 +162,7 @@ error[E0612]: the `[wasm]` table was removed in 0.2.0
 | `pub` keyword | no `@`; reads like Rust | i has no keywords; a `name` `pub` would become reserved, and every attribute form already exists |
 | A module export group means a host export | no new syntax | conflates "another i module may import this" with "the host may call this"; makes every public helper a host entry and leaves no sync marker |
 
-**Approval P2**: confirm `@export` / `@export("sync")` on functions only.
+**P2 (accepted)**: confirm `@export` / `@export("sync")` on functions only.
 Alternative: also allow `@export` on a whole service type, exporting its
 fields as a group (cost: an object/handle protocol for obtaining the service
 value; +1 phase).
@@ -353,7 +353,7 @@ is part of the declared host contract, unlike the old `"async"`/`"request"`
 split which also forced `Request` into every field type. A mode is one word at
 the declaration, never repeated at a call.
 
-**Approval P3**: confirm the same-module accessor `make_<Type>` (no generated
+**P3 (accepted)**: confirm the same-module accessor `make_<Type>` (no generated
 files or modules) and that it is an ordinary exported name. Alternative: a
 separate `gen/` module per source module (a visible file for editors, but a
 module cycle when the service's own module calls the accessor; needs a third
@@ -371,7 +371,7 @@ wins because it reads as a constructor.
 | `@external("i:compiler/syntax/v1", "f")` | `@runtime("i:compiler/syntax/v1", "f")` |
 | `@host("ns")` | `@import("ns", "now")` |
 | `@host("ns", "async")`, `@host("ns", "request")` | `@import("ns")` (default `"later"`) |
-| `@js("expr")` | `@import("js", "expr")` |
+| `@js("expr")` | deleted; `@import("js", "expr")` after 0.2.0 |
 | `[wasm].exports = [...]` | `@export` on each function |
 | `[wasm].synchronous = [...]` | `@export("sync")` |
 
@@ -386,11 +386,11 @@ points at `@import("js", …)`.
 
 ### 4.2 Library conversion, exactly
 
-`lib/i` and `lib/prelude.i` (159 attribute lines):
+`stdlib/src` and `lib/prelude.i` (162 attribute lines):
 
 - 30 `ilang:core`, 12 `ilang:big`, 2 `ilang:bits`, 6 `ilang:control`,
-  3 `ilang:key`, 1 `ilang:resource`, 22 `ilang:request`, 14 `ilang:worker`,
-  1 `ilang:prelude`, 56 `i:compiler/syntax/v1` → `@runtime` (147 lines).
+  3 `ilang:key`, 1 `ilang:resource`, 25 `ilang:request`, 14 `ilang:worker`,
+  1 `ilang:prelude`, 56 `i:compiler/syntax/v1` → `@runtime` (150 lines).
 - 12 `@host` → `@import`:
   - `i:io/v1` → `@import("i:io/v1", "now")`;
   - `Clock`, `Stdio`, `Fs`, `Net`, `Tls`, `Fetch`, `Arguments`, `Environment`,
@@ -405,17 +405,18 @@ points at `@import("js", …)`.
   `hostcall.call(() -> raw.open(…))` and `hostcall.await`.
   The library package `i` therefore has `hostcall = true` in its synthesized
   manifest. This also makes the library the first real client of the switch.
-- `lib/i/clock.i:17`, `fetch.i:20`, `fs.i:43`, `io.i:10`, `net.i:42`,
-  `process.i:54,57,60,63,66`, `stdio.i:21`, `tls.i:31` are the 12 sites. The
+- `stdlib/src/clock.i:17`, `fetch.i:20`, `fs.i:110`, `io.i:10`, `net.i:42`,
+  `process.i:110,113,116,119,122`, `stdio.i:21`, `tls.i:31` are the 12 sites. The
   brief names five host services; the repository has twelve because `process`
   is split by capability, `stdio` exists beside `io`, and `tls` sits beside
   `net`. All twelve convert; none stay on `@host`.
 
-`std/`, `examples/`, `docs/content/` have **no** attribute site. They do need
-work: `std` (source and tests) and `examples/cli-log`,
-`examples/io-process/test` import `i/request`, so their manifests get
-`hostcall = true`; `std/src/http.i` and `std/src/log.i`
-lose the `Await`/`Owner` rows in their exported signatures (inventory §4).
+`examples/` and `docs/content/` have **no** attribute site. The `stdlib/src`
+modules outside the service list have none either. Two examples
+(`examples/cli-log`, `examples/io-process/test`) import `i/request`, so their
+manifests get `hostcall = true`; `stdlib/i.toml` gets it too. The library
+package `i` is exempt from E0325, so its rows may stay and only the display
+drops them (inventory §4).
 
 ### 4.3 `@js` (retired in 0.2.0, replacement after)
 
@@ -484,9 +485,9 @@ update this table in the same PR.
 | A5 | the platform list is rewritten in §10.2 and §2.6.1 points at it rather than repeating it |
 | A6 | the two async definitions collapse into one per-entry link-pass rule (§3.2) |
 | B4 | `i check` still must run the entry-need check; this design does not change B4 |
-| B20 | the built-in attribute list becomes `@import`/`@export`/`@runtime`/`@deprecated`; E0301/E0308 name them, closing B20's message mismatch |
+| B20 | the built-in list becomes `@import`/`@export`/`@runtime`/`@deprecated`; E0301/E0308 name those four **and `@macro`**, closing B20 |
 | B21 | attribute arguments are positional strings; `@external(module : …)` is retired with the name, closing B21 |
-| KH3 | a bare declaration now requires `@import` or `@runtime`; the diagnostic names both |
+| KH3 | a bare declaration now requires `@import` or `@runtime`, except a typed-macro signature; the diagnostic gives both fixes, "add `= e`" and the attribute, and names the typed-macro case |
 
 Rows outside this surface (B1, B30, B1a/B1b, etc.) are unaffected.
 
@@ -495,10 +496,10 @@ Rows outside this surface (B1, B30, B1a/B1b, etc.) are unaffected.
 | Option | Cost | Why not |
 |---|---|---|
 | Delete all three (chosen) | 509 attribute occurrences + 22 manifests + spec | required by the decision; no compatibility |
-| Keep `@external` for runtime intrinsics only | 147 fewer edits | it is visible in `lib/i` and keeps the bad name; `@runtime` cleanly separates "compiler op" from "host call" |
+| Keep `@external` for runtime intrinsics only | 150 fewer edits | it is visible in `stdlib/src` and keeps the bad name; `@runtime` cleanly separates "compiler op" from "host call" |
 | Keep `@js` | 17 occurrences, no implementation | it never worked; one uniform import attribute is the rule, and 0.2.0 can retire it without a replacement |
 
-**Approval P4**: `@runtime` as the library-only marker. Alternative: reuse
+**P4 (accepted)**: `@runtime` as the library-only marker. Alternative: reuse
 `@import` with a `"runtime"` mode (fewer names, but runtime ops are not
 imports and have no namespace registration).
 
@@ -522,8 +523,8 @@ three capabilities cannot be reached with the key off. A package that only
 uses `i/clock`-style wrappers never imports either and needs nothing.
 `i/hostcall` re-exports the `i/request` primitives the dispatcher needs, so
 most code imports one module. The library package `i` has the key on in its
-synthesized manifest (its own `i/task`, `i/fs`, … use the primitives). `std`
-and the `i/request` test fixtures set the key.
+manifest (its own `i/task`, `i/fs`, … use the primitives). The test
+fixtures set the key.
 
 `i/hostcall` is a new reserved library path (beside `i/core`); its module is
 always in the library graph. Without the key in the *importing package's*
@@ -684,7 +685,7 @@ a recoverable answer.
    signature, a **value** position of an implicit service is also `E0324`
    (the host cannot pass it); in a dependency's module export it stays,
    because i callers can pass it. The check is by type identity, so
-   `std/http.Request` (an HTTP record) is not the mechanics `Request`. The
+   `i/http.Request` (an HTTP record) is not the mechanics `Request`. The
    five implicit
    services may stay inside records and aliases because display hides them
    everywhere; they are only checked at the function's own row (they cannot be
@@ -703,7 +704,7 @@ a recoverable answer.
    implicit/hostcall type, so a metadata leak fails the build test.
 5. **Golden proof.** `crates/ilang-check/tests/types/library.out` has no
    implicit name in a need row after phase A. A second golden
-   `library.needs.out` has the full 240 occurrences, so the machinery is still
+   `library.needs.out` has the full 369 occurrences, so the machinery is still
    tested even though it is hidden.
 
 Rule 2 means an enabled package cannot accidentally leak by returning
@@ -747,11 +748,11 @@ it.
 
 ## 6. Transparent runtime
 
-`Await`, `Owner`, `Root` leave the 88 exported signatures, and
-`Scheduler`/`Runner` with them: the full implicit set is **106 exported
-signatures and 240 occurrences** (the 88/190 figure is `Await`/`Owner`/`Root`
-only; `Scheduler`/`Runner` add 23 exported lines and 50 occurrences, 5 shared
-with the 88, so 106/240). All of them are inferred and hidden, not removed:
+`Await`, `Owner`, `Root` leave the 113 exported signatures that carry them,
+and `Scheduler`/`Runner` with them: the full implicit set is **152 exported
+signatures and 369 occurrences** (the 113/258 figure is `Await`/`Owner`/`Root`
+only; `Scheduler`/`Runner` add 54 exported lines and 111 occurrences, 15
+shared, so +39 and 152). All of them are inferred and hidden, not removed:
 they remain ordinary services at run time and can still be obtained as values
 (`hostcall.root()`), but a signature neither writes nor shows them.
 
@@ -771,24 +772,25 @@ they remain ordinary services at run time and can still be obtained as values
 
 **One phase with `hostcall`**: both need the same hidden-parameter plumbing and
 edit the same files (`resolve.rs`, `infer.rs`, `platform.rs`, `lower.rs`,
-`library.out`). Two phases would touch all 106 signatures twice and re-baseline
+`library.out`). Two phases would touch all 152 signatures twice and re-baseline
 twice, for no earlier user value. Alternative: hide first, hostcall second
 (+1 CI cycle, ~40 min); not chosen.
 
 ### 6.1 Migration list
 
-The full 88 names are Appendix A. Split by file:
+The full 152 names are Appendix A. Split by file:
 
-- `lib/i/request.i`: 15 exported functions + 3 types.
-- `lib/i/task.i`: 5 exported functions; 9 more private signatures.
-- `lib/i/{clock,fs,process,net,tls,fetch,stdio}.i`: 68 exported signatures
+- `stdlib/src/request.i`: 15 exported functions + 3 types.
+- `stdlib/src/task.i`: 24 exported functions; 22 more private signatures.
+- `stdlib/src/{clock,fs,process,net,tls,fetch,stdio}.i`: 71 exported signatures
   (wrapper rows; most drop `Await, Owner` only).
-- `std/src/http.i`: 3 exported types/functions; `std/src/log.i`: 2.
-- `library.out` 103 lines and 9 review `expected.json` files.
+- `stdlib/src/{http,log,time,calendar,cli,crypto,deferred,queue,schedule,semaphore}.i`:
+  42 exported signatures and types.
+- `library.out` 159 lines and 9 review `expected.json` files.
 - 16 `tests/spec/9.11`/`9.9` fixtures and 7 review fixtures (Appendix A.2).
 - `docs/spec.md` §2.6.1, §9.7, §9.9, §9.11, §10.2; active design docs.
 
-`lib/i/request.i` keeps `Await = …`, `Root = …`, `Owner = …` as type
+`stdlib/src/request.i` keeps `Await = …`, `Root = …`, `Owner = …` as type
 definitions and keeps its need rows for binding them; display hides them, so
 `library.out` is clean. Other library modules drop their written rows where
 inference covers them; `i/task`'s `N - Await - …` subtractions stay and are
@@ -807,8 +809,8 @@ affected test group, not a full clean build.
 
 | Phase | User can now do | Main change | Parallel workers | Critical path |
 |---|---|---|---|---:|
-| 0 | nothing yet; the new forms parse and give the new errors | parser/AST forms, manifest `product`/`hostcall`, codes, `@runtime` in `lib/i`, `@import` service form | 4 | 1 cycle ≈ 40 min |
-| A | choose a group per call, replace the wait, write a dispatcher, with no `Await`/`Owner` in any signature | implicit services, hostcall module/types/lowering, library conversion, `deps`/build output, 88-signature corpus | 7 | 3 cycles ≈ 120 min |
+| 0 | nothing yet; the new forms parse and give the new errors | parser/AST forms, manifest `product`/`hostcall`, codes, `@runtime` in `stdlib/src`, `@import` service form | 4 | 1 cycle ≈ 40 min |
+| A | choose a group per call, replace the wait, write a dispatcher, with no `Await`/`Owner` in any signature | implicit services, hostcall module/types/lowering, library conversion, `deps`/build output, 152-signature corpus | 7 | 3 cycles ≈ 120 min |
 | B | build a library a host can call, exports marked where written | product rules, `@export`, `[wasm]` deletion, export stubs + Rust/JS/WASI export bindings, CLI errors | 6 | 2 cycles ≈ 80 min |
 | C | call a host function from user code and embed it with typed stubs | user `@import` host stubs for Rust/JS/WASI, `@js` retirement, old-attribute deletion, corpus | 6 | 3 cycles ≈ 120 min |
 | E | — | spec/design/docs/corpus, full verify, review, release gate | 4 | 2 cycles + review ≈ 120 min |
@@ -840,7 +842,7 @@ bindings* are inside B/C.
 
 **Release gate**: 0.2.0 is tagged only after E, with:
 `cargo test --workspace`, `scripts/dev-verify` and the review corpus green;
-no retired name in `docs/spec.md`, `lib/`, `std/`, `examples/`, `tests/`,
+no retired name in `docs/spec.md`, `lib/`, `stdlib/`, `examples/`, `tests/`,
 `crates/`, `bindings/`, `scripts/` or `docs/content/`;
 `library.out` has no implicit name; the binding goldens match.
 
@@ -877,7 +879,7 @@ parallel with the implementation.
    (both modules, message names `i.toml`); all rows of §5.4; a runtime panic
    fixture asserts the exact text; `i deps`/`i build` output golden.
 7. **No leak**: no implicit name appears in a `<-` need row of `library.out`
-   (value parameters/results may keep them); `library.needs.out` has all 240
+   (value parameters/results may keep them); `library.needs.out` has all 369
    occurrences; exporting a function returning `Call(Int)` E0324; an enabled
    dependency module-exporting `f : () -> Call(Int)` E0324; generated
    `.d.ts`/`.h`/`.rs` never encode an implicit need.
@@ -889,7 +891,7 @@ parallel with the implementation.
    under wasmtime with a C shim.
 9. **Retired syntax**: `@external`, `@host`, `@js`, `[wasm]` each give E0337/
    E0612 with the replacement (for `@js`: the post-0.2.0 `@import("js", …)`);
-   `git grep -F` proves none in `lib std examples
+   `git grep -F` proves none in `lib stdlib examples
    tests crates bindings scripts docs/spec.md docs/content`. Historical design docs
    keep the old names under a one-line "predates 0.2.0" banner and are checked
    only for the banner.
@@ -902,9 +904,9 @@ parallel with the implementation.
 | P2 | `@export` on functions only, `"sync"` argument | export whole services too (object protocol; +1 phase) | §2/§7 change |
 | P3 | same-module `make_<Type>` accessor | a separate `src/gen/` module (editors see a file, but its own module calling it makes a cycle); `impl_<Type>` name (shorter) | §3/§7 change |
 | P3 name collisions | E0208 (existing duplicate definition) | a new code (one more message) | trivial |
-| P4 | library-only `@runtime` for compiler ops | reuse `@import` with `"runtime"` mode (one name fewer, no registration) | §4.2 changes 147 lines differently |
+| P4 | library-only `@runtime` for compiler ops | reuse `@import` with `"runtime"` mode (one name fewer, no registration) | §4.2 changes 150 lines differently |
 | P5 | compile vs panic split of §5.4; `in_group`/`with_wait` names | linear `CallGroup` (new feature) | §5 tests change |
-| P6 | one phase for implicit services + hostcall | two phases (106 signatures twice, +1 cycle ≈ 40 min) | §6/§7 |
+| P6 | one phase for implicit services + hostcall | two phases (152 signatures twice, +1 cycle ≈ 40 min) | §6/§7 |
 | P7 | implicit services may not be written at all (E0325) | allow writing them (source stays dirty; no lint against drift; display hides them anyway) | §5.5/§6 |
 
 No approval is needed for: deleting all old syntax, `i/hostcall` import
@@ -917,7 +919,7 @@ All seven are accepted as proposed, with the owner's additions:
 
 - **P1 accepted.** `product` stays optional with program default. `E0617` must
   carry the literal sentence "if this package is a library, set
-  `product = \"library\"`"; `E0330` names the same fix. §1.1 and §8 case 1 pin
+  `product = "library"`"; `E0330` names the same fix. §1.1 and §8 case 1 pin
   the exact text.
 - **P2 accepted.** `@export` is function-only; no whole-service export.
 - **P3 accepted.** The same-module `make_<Type>` accessor, no `src/gen/`
@@ -952,32 +954,46 @@ All seven are accepted as proposed, with the owner's additions:
 
 ## Appendix A — the implicit-signature corpus
 
-The 88 figure counts `Await`/`Owner`/`Root` exported signatures only. The full
-set, with `Scheduler`/`Runner`, is 106 exported lines and 240 occurrences:
-103 `Await`/`Owner`/`Root` lines minus 15 private leaves 88 exported (4 of the
-88 are mixed); `Scheduler`/`Runner` add 23 exported lines and 50 occurrences,
-5 of which are already in the 88, so +18 and 106.
+The 113 figure counts `Await`/`Owner`/`Root` exported signatures only. The full
+set, with `Scheduler`/`Runner`, is 152 exported lines and 369 occurrences:
+159 `Await`/`Owner`/`Root` lines minus 46 private leaves 113 exported (15 of the
+113 are mixed); `Scheduler`/`Runner` add 54 exported lines and 111 occurrences,
+15 of which are already in the 113, so +39 and 152.
 `crates/ilang-check/tests/types/library.out`:
 
-`i/request` 15: 26,27,28,29,30,31,32,33,34,35,37,38,39,47,48
-`i/task` 5: 347,365,369,374,375
-`i/clock` 3: 419,420,421
-`i/fs` 14: 529–536,539–541,543,544,546
-`i/process` 14: 553–560,562–567
-`i/net` 16: 568–576,579,581–584,586,587
-`i/tls` 9: 594–602
-`i/fetch` 5: 603–607
-`i/stdio` 7: 608–614
+`i/calendar` 2: 141,142
+`i/cli` 2: 179,182
+`i/clock` 3: 183,184,185
+`i/crypto` 1: 264
+`i/deferred` 5: 290–294
+`i/fetch` 5: 337–341
+`i/fs` 16: 472–479,482–484,486,487,489,491,496
+`i/http` 8: 553,554,566,567,574,579,580,592
+`i/log` 3: 783,784,786
+`i/net` 16: 787–795,798,800–803,805,806
+`i/process` 15: 860–863,866–869,871–876,883
+`i/queue` 11: 932–935,941,949,950,952–955
+`i/request` 15: 1059–1068,1070–1072,1080,1081
+`i/schedule` 2: 1124,1126
+`i/semaphore` 4: 1159–1162
+`i/stdio` 7: 1244–1250
+`i/task` 24: 1499–1502,1589,1590,1592,1601–1603,1606–1615,1618,1620,1621,1625
+`i/time` 4: 1681–1683,1686
+`i/tls` 9: 1693–1701
 
-Private signatures also affected: `request.i` 53–56; `task.i` 230,260,264,266,
-346,373,376,378,417; `fs.i:542`; `tls.i:593`.
+Private signatures also affected (62): `cli.i` 178; `crypto.i` 254; `fs.i`
+471,485,490,494; `http.i` 555–557,559–561,571,572,575–577,582,584–586,595,596;
+`process.i` 864,865,879–882; `queue.i` 930,931,939,940,946,947; `request.i`
+1086–1089; `schedule.i` 1122,1123,1125; `semaphore.i` 1163,1164; `task.i`
+1435,1473,1475,1505,1509,1511,1588,1591,1594,1616,1617,1619,1622–1624,1663,
+1664; `tls.i` 1692.
 
 ### A.2 Supplied/platform sites and fixtures
 
-Platform citations: `docs/spec.md:458-460,1340,1580,1592,2472-2482`;
-`platform.rs:1-6,73-77,95-171`; `resolve.rs:1405-1497`;
-`lower.rs:973-982,1040-1051,1568-1572,1611-1648,2215-2225,2637-2655`;
-`emit/host.rs:9-13,218-235,601`.
+Platform citations: spec §2.6.1, §9.7, §9.9, §9.11, §10.2;
+`platform.rs` (`HOST_SERVICES`, `Stub`, `stub`);
+`resolve.rs::host_fns`; the entry stub in `lower.rs`; `emit/host.rs` request
+cells.
 
 Fixtures to re-bless or rewrite: the 9 `tests/spec/9.11` files and 7
 `tests/spec/9.9` files that name them (`race_then_read`, `cancel_ready_await`,
@@ -1063,7 +1079,7 @@ The synthesized `make_Logger` is an export of `app/lib`; the generated
 `build/app.rs` contains the `Logger` trait, the `add_logged` wrapper and the
 registration helper.
 
-## Appendix D — retired error catalogue
+## Appendix D — error catalogue
 
 | Code | Meaning |
 |---|---|

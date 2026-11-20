@@ -1,6 +1,7 @@
 # Inventory: the current host-boundary mechanism
 
-Measured at commit `a21eae769` on branch `design/host-boundary`, 2026-11-21.
+Measured at `2398f0b12` (after the `stdlib/` rename), branch
+`design/host-boundary`, 2026-11-21.
 Read-only: no source file was changed for this inventory. This file is the
 size estimate and the deletion checklist for
 [`host-boundary.md`](host-boundary.md).
@@ -12,12 +13,12 @@ every layer, both hosts, the ABI, and 150 fixtures:
 
 | Surface | Count |
 |---|---:|
-| `@external(...)` occurrences, whole repository | **310** |
-| `@host(...)` occurrences, whole repository | **182** |
+| `@external(...)` occurrences, whole repository | **308** |
+| `@host(...)` occurrences, whole repository | **172** |
 | `@js(...)` occurrences, whole repository | 17 |
-| `[wasm]` manifest tables | **22** |
-| Library type signatures that carry `Await`/`Owner`/`Root` | **88 exported** (103 total) |
-| ...with `Scheduler`/`Runner` added, the implicit set | **106 exported**, 240 occurrences |
+| `[wasm]` manifest tables | **21** |
+| Library type signatures that carry `Await`/`Owner`/`Root` | **113 exported** (159 total) |
+| ...with `Scheduler`/`Runner` added, the implicit set | **152 exported**, 369 occurrences |
 | Distinct `@external` namespaces | 32 |
 | Distinct `@host` namespaces | 42 |
 | Emitter / host files touching `HostCall`/`HostStart`/`HostReply` or import kinds | 14 |
@@ -30,60 +31,60 @@ engine surfaces are the checker (`resolve.rs`, `resolve/three.rs`,
 
 ## 1. The three attributes in source
 
-### 1.1 `lib/i` and `lib/prelude.i`
+### 1.1 `stdlib/src` and `lib/prelude.i`
 
-`@external` — 147, by namespace:
+`@external` — 150, by namespace:
 
 | Namespace | Files | Count |
 |---|---|---:|
-| `ilang:core` | `lib/i/core.i:36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,148,152` | 30 |
-| `i:compiler/syntax/v1` | `lib/i/syntax.i:178,194,197,200,203,206,209,212,256,259,262,265,268,271,293,296,299,302,305,308,311,314,317,320,323,326,329,332,335,338,341,344,347,350,353,356,359,362,365,368,371,374,377,380,481,601,604,607,610,613,616,619,622,625,628,631` | 56 |
-| `ilang:request` | `lib/i/request.i:48,51,54,57,60,63,66,69,72,75,112,115,118,121,124,127,151,155,160,163`; `lib/i/task.i:1510,1513` | 22 |
-| `ilang:worker` | `lib/i/task.i:1238,1241,1244,1247,1250,1253,1256,1259,1262,1265,1268,1271,1274,1277` | 14 |
-| `ilang:big` | `lib/i/big.i:29,33,38,42,46,51,58,61,64,69,72,76` | 12 |
-| `ilang:control` | `lib/i/control.i:12,17,24,28,32`; `lib/i/task.i:225` | 6 |
-| `ilang:key` | `lib/i/key.i:14,18,21` | 3 |
-| `ilang:bits` | `lib/i/bits.i:22,26` | 2 |
-| `ilang:resource` | `lib/i/resource.i:9` | 1 |
-| `ilang:prelude` | `lib/prelude.i:35` | 1 |
+| `i:compiler/syntax/v1` | `stdlib/src/syntax.i:178,194,197,200,203,206,209,212,256,259,262,265,268,271,293,296,299,302,305,308,311,314,317,320,323,326,329,332,335,338,341,344,347,350,353,356,359,362,365,368,371,374,377,380,481,601,604,607,610,613,616,619,622,625,628,631` | 56 |
+| `ilang:core` | `stdlib/src/core.i:36,40,44,48,52,56,60,64,68,72,76,80,84,88,92,96,100,104,108,112,116,120,124,128,132,136,140,144,148,152` | 30 |
+| `ilang:request` | `stdlib/src/request.i:48,51,54,57,60,63,66,69,72,75,112,115,118,121,124,127,151,155,160,163`; `stdlib/src/task.i:1523,1526`; `stdlib/src/resource.i:27,30,33` | 25 |
+| `ilang:worker` | `stdlib/src/task.i:1251,1254,1257,1260,1263,1266,1269,1272,1275,1278,1281,1284,1287,1290` | 14 |
+| `ilang:big` | `stdlib/src/big.i:29,33,38,42,46,51,58,61,64,69,72,76` | 12 |
+| `ilang:control` | `stdlib/src/control.i:12,17,24,28,32`; `stdlib/src/task.i:226` | 6 |
+| `ilang:key` | `stdlib/src/key.i:14,18,21` | 3 |
+| `ilang:bits` | `stdlib/src/bits.i:22,26` | 2 |
+| `ilang:resource` | `stdlib/src/resource.i:21` | 1 |
+| `ilang:prelude` | `lib/prelude.i:33` | 1 |
 
 `@host` — 12, every one a standard host service:
 
 | File:line | Namespace |
 |---|---|
-| `lib/i/clock.i:17` | `i:clock/v1` |
-| `lib/i/fetch.i:20` | `i:fetch/v1` |
-| `lib/i/fs.i:43` | `i:fs/v1` |
-| `lib/i/io.i:10` | `i:io/v1` |
-| `lib/i/net.i:42` | `i:net/v1` |
-| `lib/i/process.i:54` | `i:arguments/v1` |
-| `lib/i/process.i:57` | `i:environment/v1` |
-| `lib/i/process.i:60` | `i:working-directory/v1` |
-| `lib/i/process.i:63` | `i:entropy/v1` |
-| `lib/i/process.i:66` | `i:process/v1` |
-| `lib/i/stdio.i:21` | `i:stdio/v1` |
-| `lib/i/tls.i:31` | `i:tls/v1` |
+| `stdlib/src/clock.i:17` | `i:clock/v1` |
+| `stdlib/src/fetch.i:20` | `i:fetch/v1` |
+| `stdlib/src/fs.i:110` | `i:fs/v1` |
+| `stdlib/src/io.i:10` | `i:io/v1` |
+| `stdlib/src/net.i:42` | `i:net/v1` |
+| `stdlib/src/process.i:110` | `i:arguments/v1` |
+| `stdlib/src/process.i:113` | `i:environment/v1` |
+| `stdlib/src/process.i:116` | `i:working-directory/v1` |
+| `stdlib/src/process.i:119` | `i:entropy/v1` |
+| `stdlib/src/process.i:122` | `i:process/v1` |
+| `stdlib/src/stdio.i:21` | `i:stdio/v1` |
+| `stdlib/src/tls.i:31` | `i:tls/v1` |
 
 `@js` in the library: **0**. (`i/js`, `i/target`, `i/wasi` do not exist as
 source files; the `@js` feature is not implemented, see
-`docs/design/spec-known-gaps.md:23`.)
+`docs/design/spec-known-gaps.md`.)
 
-### 1.2 `std`, `examples`, `docs/content`
+### 1.2 `stdlib/src` other modules, `examples`, `docs/content`
 
-**0 occurrences in all three.** `std/src/*.i` and every example call the
-library wrappers only. This is the smallest part of the migration and the part
-that proves the intended shape: ordinary user code already never names the
-boundary.
+The `stdlib/src` modules other than the list above (http, log, crypto, cli,
+calendar, schedule, …) and every example have **0** attributes. They call the
+wrappers only. This is the smallest part of the migration and proves the
+intended shape: ordinary user code never names the boundary.
 
 ### 1.3 Tests and fixtures
 
 | Category | `@external` | `@host` | `@js` |
 |---|---:|---:|---:|
 | `tests/spec/**` (16 files) | 14 | 57 | 0 |
-| `tests/review/**` (24 files + 3 JSON) | 12 | 18 | 0 |
-| `tests/browser/**` (5 files) | 8 | 10 | 0 |
+| `tests/review/**` | 9 | 18 | 0 |
+| `tests/browser/**` | 7 | 9 | 0 |
 | `tests/performance/**` | 2 | 0 | 0 |
-| `crates/*/tests/**` (17 files) | 87 | 44 | 2 |
+| `crates/*/tests/**` | 82 | 41 | 2 |
 | `tests/r2-performance/intervals.i:3` | 1 | 0 | 0 |
 
 The namespaces are dominated by fixture names (`test:io/v1` 23,
@@ -124,8 +125,8 @@ Pinning tests that must be rewritten or replaced:
 `tests/spec/10.2/export_never_param/i.toml:8-9`,
 `tests/spec/10.2/export_never_value/i.toml:8-9`,
 `tests/spec/10.2/export_twice/i.toml:8-9`,
-`tests/spec/2.4/unused_roots/i.toml:5-6`,
-`tests/spec/6/t3_record_param_export/i.toml:4-5`.
+`tests/spec/2.4/unused_roots/i.toml:5-6`.
+
 
 Reader/validator/consumers: `crates/ilang-package/src/manifest.rs:9-18,70-77,116-141,188-206,299-342,388-394`,
 `crates/ilang-package/src/lib.rs:246-247,547-548,640-641`,
@@ -174,9 +175,9 @@ Reader/validator/consumers: `crates/ilang-package/src/manifest.rs:9-18,70-77,116
 
 ### 3.5 Spec and design text
 
-`docs/spec.md` — 31 lines: 79, 286, 292, 294, 295, 296, 362, 379, 465, 671,
-820, 1553, 1556, 1561, 1563, 2401, 2413, 2425, 2456, 2491, 2493, 2532, 2886,
-3026, 3118 (plus §10.2 at 2464, §B.2 at 3078, §B.5 at 3130, §B.6 at 3147).
+`docs/spec.md` — 25 lines: 79, 289, 295, 297, 298, 299, 365, 382, 470, 675,
+839, 1595, 1598, 1603, 1605, 2457, 2469, 2481, 2512, 2547, 2549, 2588, 2942,
+3082, 3174 (plus §10.2, §B.2, §B.5 and §B.6 as sections).
 
 Active design docs: `docs/design/js.md` (3 `@host`, 8 `@js`, 6
 `wasm.synchronous`, 4 `wasm.exports`), `native.md` (6/12), `runtime.md`
@@ -190,49 +191,53 @@ generic attribute rule).
 
 ## 4. `Await` / `Owner` / `Root` in public signatures
 
-`crates/ilang-check/tests/types/library.out` is 614 lines. **103** lines
-contain one of the three; **88 of those lines are exported names**, not 84.
-The 84 figure is `103 − 15 non-exported − 4 mixed`; the four mixed signatures
-are dropped by that arithmetic: `i/request.open_root:26`,
-`open_owner:28`, `wait_none:38`, `wait_none_root:39`.
+`crates/ilang-check/tests/types/library.out` is 1762 lines. **159** lines
+contain one of the three; **113 of those lines are exported names**. Adding
+`Scheduler`/`Runner` gives **152 exported lines / 369 occurrences**, with 15
+exported lines carrying both sets; 62 lines are private.
 
-| Module | exported lines | occurrences | env position | value position |
-|---|---:|---:|---:|---:|
-| `i/request` | 15 | 20 | 7 | 12 |
-| `i/task` | 5 | 22 | 5 | 0 |
-| `i/clock` | 3 | 6 | 3 | 0 |
-| `i/fs` | 14 | 28 | 14 | 0 |
-| `i/process` | 14 | 28 | 14 | 0 |
-| `i/net` | 16 | 38 | 16 | 0 |
-| `i/tls` | 9 | 24 | 9 | 0 |
-| `i/fetch` | 5 | 10 | 5 | 0 |
-| `i/stdio` | 7 | 14 | 7 | 0 |
-| **Total** | **88** | **190** | **80** | **12** |
+| Module | exported lines | occurrences |
+|---|---:|---:|
+| `i/calendar` | 2 | 4 |
+| `i/cli` | 2 | 4 |
+| `i/clock` | 3 | 6 |
+| `i/crypto` | 1 | 2 |
+| `i/deferred` | 5 | 5 |
+| `i/fetch` | 5 | 10 |
+| `i/fs` | 16 | 32 |
+| `i/http` | 8 | 66 |
+| `i/log` | 3 | 6 |
+| `i/net` | 16 | 38 |
+| `i/process` | 15 | 32 |
+| `i/queue` | 11 | 11 |
+| `i/request` | 15 | 20 |
+| `i/schedule` | 2 | 4 |
+| `i/semaphore` | 4 | 4 |
+| `i/stdio` | 7 | 14 |
+| `i/task` | 24 | 73 |
+| `i/time` | 4 | 14 |
+| `i/tls` | 9 | 24 |
+| **Total** | **152** | **369** |
 
-Source occurrences are 90: `lib/i/request.i` 38, `lib/i/task.i` 30 (both in
-types and bodies), `std/src/http.i` 18, `std/src/log.i` 4.
-
-Exported source declarations: `lib/i/request.i` 36,38,40 (types) and 78,80,82,
-86,88,90,92,94,96,98,107,109,140; `lib/i/task.i:3847,4079-4081`;
-`std/src/http.i:1247-1249,1253-1254,1286-1287,1293-1300,1308-1309`;
-`std/src/log.i:184,190`.
+Source occurrences are in `stdlib/src/request.i`, `task.i`, `http.i`,
+`log.i`, `crypto.i`, `cli.i`, `time.i`, `calendar.i` and `schedule.i`.
 
 Platform supply points that change when the three become implicit:
 
-- spec §2.6.1 `docs/spec.md:458-460`; §9.7 `:1580,1592`; §9.9 `:1340`; §10.2 `:2472-2482`.
+- spec §2.6.1, §9.7, §9.9, §9.11, §10.2.
 - `crates/ilang-check/src/platform.rs:1-6,73-77,95-171`.
 - `crates/ilang-check/src/resolve.rs:1405-1497` (adds `Await`/`Owner` to async service fields).
 - `crates/ilang-wasm/src/lower.rs:973-982,1040-1051,1568-1572,1611-1648,2215-2225,2637-2655`.
 - `crates/ilang-wasm/src/emit/host.rs:9-13,218-235,601`.
 
-Fixtures and goldens that pin them: 16 `tests/spec/9.11` and `9.9` files, 7
+Fixtures and goldens that pin them: the 16 `tests/spec/9.11`/`9.9` files, 7
 review fixtures + 9 `expected.json` lines, `tests/browser/fixtures/r2`, and
 `library.out` itself (all listed in `host-boundary.md` Appendix A).
 
 ## 5. What this means for the plan
 
 - The library conversion is the large mechanical part: 159 attribute lines in
-  `lib/i` + prelude, plus 88 signature edits.
+  `stdlib/src` + prelude, plus 152 signature edits.
 - The checker/codegen change is the risk: attribute contract, import kind,
   host service mode, entry stubs, export inference, ABI.
 - The fixture migration is broad but parallel (tests/spec, tests/review,
