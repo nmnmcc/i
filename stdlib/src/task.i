@@ -3840,9 +3840,10 @@ share = <A, E>(s : Group(E), value : A) <- (own : Scheduler) -> Shared(A) {
 	Shared(run = s.info.run, owner = s.info.id, id = id, values = values)
 }
 
-get = <A>(s : Shared(A)) <- (own : Scheduler) -> A {
-	read(s.values, ask(own, GetShare(s.run, s.owner, s.id)))
-}
+get =
+	<A>(s : Shared(A)) <- (own : Scheduler) -> A {
+		read(s.values, ask(own, GetShare(s.run, s.owner, s.id)))
+	}
 	& <A>(r : Ref(A)) <- (own : Scheduler) -> A {
 		read(r.values, ask(own, GetShare(r.run, r.id, r.id)))
 	}
