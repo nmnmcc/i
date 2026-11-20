@@ -31,7 +31,10 @@ class LibraryPages(unittest.TestCase):
             out.mkdir()
             page = out / 'i-fs.mdx'
             page.write_text('last complete generation\n')
+            index = root / 'index.mdx'
+            index.write_text('{/* generated:start */}\n{/* generated:end */}\n')
             with patch.object(library, 'ROOT', root), patch.object(library, 'OUT', out), \
+                    patch.object(library, 'LIBRARY', root / 'stdlib'), patch.object(library, 'INDEX', index), \
                     patch.object(library, 'BINARY', Path(sys.executable)), \
                     patch.object(library, 'checked_types', return_value={}):
                 with self.assertRaisesRegex(SystemExit, 'Missing inferred signatures: i/fs.read_file'):

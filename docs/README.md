@@ -9,7 +9,7 @@ npm run dev
 ```
 
 The development server prints its local URL. `npm run build` generates the
-standard and library reference before building the static site in `dist/`.
+standard and library reference before building the static site in `dist/`. The library reference is generated from the newest `stdlib-v*` tag, the version `i new` writes, not from the working tree; `../scripts/check-doc-modules` fails the build if a page names an `i/<module>` that tag does not have. A page about the next release starts with a visible `> **Unpublished.**` line and is left out.
 `npm run check:links` checks the built local links; `npm run check:examples`
 checks module-header blank lines, then fenced i examples with the repository's
 parser and snippet registry, then executes complete examples against the tree's compiler.

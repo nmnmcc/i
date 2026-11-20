@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""Counterexamples for scripts/check-doc-modules."""
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+CHECK = Path(__file__).resolve().with_name('check-doc-modules')
+
+
+def git(root, *args):
+    subprocess.run(['git', '-C', str(root), *args], check=True,
+                   capture_output=True, text=True)
+
+
+def run(root):
+    return subprocess.run([sys.executable, '-I', str(CHECK), '--root', str(root)],
+                          capture_output=True, text=True)
+
+
+def write(root, path, body):
+    target = root / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body)
+
+
+def main():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        git(root, 'init')
+        git(root, 'config', 'user.email', 'a@b')
+        git(root, 'config', 'user.name', 'a')
+        write(root, 'stdlib/i.toml', 'name = "i"\n')
+        write(root, 'stdlib/src/known.i', '(f)\nf = () { 1 }\n')
+        write(root, 'stdlib/test/known_test.i', '(testlib = (test) = i/test)\n')
+        write(root, 'stdlib/src/test.is', '(,)\n')
+        git(root, 'add', '-A')
+        git(root, 'commit', '-qm', 'library')
+        git(root, 'tag', 'stdlib-v0.1.0')
+
+        write(root, 'docs/page.mdx', 'Use `i/known`, `i/known_test` and `i/test`.\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        write(root, 'docs/page.mdx', 'Missing: `i/gone`.\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+        assert 'docs/page.mdx:1: i/gone is not in stdlib-v0.1.0' in result.stderr, result.stderr
+
+        # A page about the next release says so and is left out.
+        write(root, 'docs/page.mdx',
+              '> **Unpublished.** Next release.\n\n`i/gone`\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        # The standard is generated separately and may name target modules.
+        write(root, 'docs/content/docs/standard/generated/chapter.mdx', '`i/target`\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        # The newest tag is the one checked, not the first one.
+        git(root, 'tag', 'stdlib-v0.2.0')
+        write(root, 'stdlib/src/gone.i', '()\n')
+        git(root, 'add', '-A')
+        git(root, 'commit', '-qm', 'next')
+        git(root, 'tag', '-f', 'stdlib-v0.2.0')
+        write(root, 'docs/page.mdx', 'Now there: `i/gone`.\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        # Nothing to check against is an error, not a pass.
+        git(root, 'tag', '-d', 'stdlib-v0.1.0', 'stdlib-v0.2.0')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+        assert 'no stdlib-v* tag' in result.stderr, result.stderr
+
+    print('check-doc-modules counterexamples pass.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
