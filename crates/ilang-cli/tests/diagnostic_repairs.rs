@@ -49,8 +49,10 @@ fn original_model_programs_get_actionable_repairs() {
         };
     }
     // Every input here is the model's project/src/main.i, byte for byte but
-    // for value-level chain separators rewritten from `|` to `&` (see README).
-    // Exact stderr pins all original error codes, positions and counts. E4's
+    // for two mechanical rewrites: value-level chain separators from `|` to
+    // `&`, and a zero-payload constructor in a value or pattern written as its
+    // call, `C()` (see README). Exact stderr pins all original error codes,
+    // positions and counts. E4's
     // Fail-based bit_array.to_string also warns about the archive's unchanged
     // Ok pattern; its two additional warnings are retained in t5-a1-r3.stderr.
     for (name, source, expected) in [

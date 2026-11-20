@@ -174,7 +174,7 @@ main = () { stdio.print(unit(2)) }
 	sugar = (if) = hello/sugar
 )
 
-unit = (n) { n == 1 |> (True) { "minute" } & (False) { "minutes" } }
+unit = (n) { n == 1 |> (True()) { "minute" } & (False()) { "minutes" } }
 
 main = () { stdio.print(unit(2)) }
 
