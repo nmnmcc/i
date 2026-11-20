@@ -8,7 +8,7 @@
 	i/string
 	i/list
 	i/task
-	option = (Some, None) = i/option
+	option = (Option, Some, None) = i/option
 )
 
 // A path under the temporary directory that no other test or run uses.
