@@ -720,8 +720,6 @@ def main():
     run.add_argument('--shard', type=shard, help='K/N: run only the cases whose index in ID order is K-1 modulo N')
     run.add_argument('--list', action='store_true', help='print the selected case IDs and run nothing')
     sub.add_parser('parse-register')
-    migration = sub.add_parser('migrate-k4')
-    migration.add_argument('--binary', type=Path, default=ROOT / 'target/release/i')
     sub.add_parser('audit-k4')
     reporting = sub.add_parser('report')
     reporting.add_argument('--checks-log', type=Path)
@@ -738,9 +736,6 @@ def main():
     if args.mode == 'audit-k4':
         from k4_audit import audit
         audit()
-    elif args.mode == 'migrate-k4':
-        from k4_migrate import migrate
-        migrate(args.binary)
     elif args.mode == 'import':
         import_reviews(args)
     elif args.mode == 'run':

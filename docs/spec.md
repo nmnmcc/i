@@ -531,7 +531,7 @@ github.com/alice/json 1.4.0 9c3e1f0a5b7d2c4e8f6a1b3d5c7e9f0a2b4c6d8e sha256-6d2f
 The parts are the location, the version, the git commit of the tag, and the **hash** of the package, with one space between them. The hash is `sha256-` and the lowercase hex SHA-256 of these bytes: for each file of the package, in the order of their paths as UTF-8 bytes: the path from the package directory, with `/` between the parts; a zero byte; the size of the file as a decimal number; a zero byte; the bytes of the file. The files of the package are the files in the git tree of the commit under the package directory, with their bytes as git keeps them, before any change that a checkout makes to line ends. A symbolic link is a file whose bytes are its target. For a package got by location, `i.toml`, `src`, `test`, and every path below `src` or `test` must not be symbolic links. Source loading does not follow such links, even when their targets are inside the package. A tool cannot publish a package whose committed manifest or source paths contain such a link. Submodules are not part of the package.
 
 - When the files that are got for a package do not have the commit and the hash in `i.lock`, it is an error, and nothing is compiled. So a tag that is moved, or files that are changed on the way, are found.
-- When `i.lock` has no line for a reached version, the line is added. Lines for versions whose manifests are no longer read in either configuration are taken out. Raising a selected version does not remove a lower version that is still reached. Compilation still uses only the selected version of each package and major version (§2.7).
+- When `i.lock` has no line for a reached version, the line is added. Lines for versions whose manifests neither configuration reads are taken out. Raising a selected version does not remove a lower version that is still reached. Compilation still uses only the selected version of each package and major version (§2.7).
 - A tool may get the files from the repository or from any copy of it, because the hash makes certain they are the same files. Each use checks the actual file set and bytes against the committed package and the lock. A stored hash alone does not check a copy. Compilation consumes the checked bytes, without reopening mutable paths.
 
 
@@ -2191,7 +2191,7 @@ RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 | `poll` | `() -> ()` | Root hand-off with status 2, even with no requests |
 
 
-`cancel` makes every alias observe Cancelled, even for a previously Ready cell.
+`cancel` makes every alias observe Cancelled, even for a cell that was Ready.
 A Taken request stays Taken on cancel. It invokes ABI cancel only for a still-outstanding host id. Cancelling a Ready
 request never invokes that import. `await` or take on Cancelled stops with
 `panic("request: cancelled")`; on Taken it stops with `panic("request: taken")`;
@@ -2258,7 +2258,7 @@ foreign tickets. Its observation/check/subscription must be atomic too.
 Root is kept at go sites as a normal service. Changing Owner alone cannot move
 a group/request to another run. open_owner under a nested run's Root makes a
 nested group even if user code temporarily rebinds an outer Owner. Explicitly
-using a previously made outer Owner for a raw start still charges that outer
+using an outer Owner made earlier for a raw start still charges that outer
 group/root; this is a capability use, not a transfer of the group. Borrowed
 request tickets may be awaited by another run on the same worker. Opening or
 rebinding an independent Root is the public low-level operation for writing a
@@ -3120,7 +3120,7 @@ This appendix lists the rules that were chosen without a full discussion, until 
 
 A compiled program is one Wasm module. It needs the Wasm features garbage collection, typed function references, tail calls, and exception handling with `exnref`. Exceptions are used only inside the module: its tags are not exported, every export catches them, and an import must not throw one into the module. It exports:
 
-- `memory`: the linear memory used to pass buffers.
+- `memory`: the linear memory used for buffers.
 - `ilang_alloc(size: i32) -> i32`: gives the address of a new buffer of `size` bytes in `memory`. For size 0 it may give 0.
 - `ilang_free(address: i32, size: i32)`: frees a buffer made by `ilang_alloc`.
 - `ilang_start()`: starts the program by working out the top-level values (§2.5). It has no parameters and no results. The host calls it one time, after it makes the instance and before it calls any other export but `ilang_alloc` and `ilang_free`. During `ilang_start`, imports may be called as at any other time.
@@ -3193,7 +3193,7 @@ So for an export, the host makes the parameter buffers with `ilang_alloc`, frees
 - The host answers a request by calling the export `ilang_resume:namespace:label` of the function that started it. The first parameter is the request id, and the others are the results of the function as in §B.2. The result is a status again. The host may answer outstanding requests in any order, but one at a time. It makes the result buffers with `ilang_alloc` just before the call that gives them. A module that starts a request of a function and has no such export for it, or one of the wrong type, has a fault, and the host does not use the instance again.
 - A call of `ilang_resume:…` with an id that is not outstanding, or that another function started, traps.
 - When the status is 1 and no request is outstanding, the program can never go on. This is a fault of the module, and the host does not use the instance again.
-- When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it no longer needs; a module made by this compiler has no outstanding request at that point.
+- When the status is 0, the host calls the export `ilang_result:name` of the entry point, with no parameters, to get its results as in §B.2. Requests that are still outstanding are dropped: the host stops their work if it can and never answers them. This lets a program end work that it does not need; a module made by this compiler has no outstanding request at that point.
 
 - When the work of an async function fails in the host (not an error raised through its `Fail`, which is an answer), the host drops every outstanding request and does not use the instance again.
 

@@ -14,9 +14,6 @@ parse tests/spec/1.7/one_binding_function_error.i
 parse tests/spec/2.2/a1_empty_header.i
 parse tests/spec/2.2/a1_header_order.i
 parse tests/spec/2.2/a1_macro_attribute_same_line.i
-parse tests/spec/3/syn2_old_empty_record_type.i
-parse tests/spec/3/syn2_old_error_marker.i
-parse tests/spec/3/syn2_old_record_type.i
 parse tests/spec/4.6/written_poly_union.i
 parse tests/spec/4.6/written_poly_union_arity.i
 parse tests/spec/6/a1_wrong_pattern.i
@@ -30,9 +27,6 @@ parse tests/spec/6/multiline_open.i
 parse tests/spec/6/multiline_underindent.i
 parse tests/spec/6/raw_string_bad_escape.i
 parse tests/spec/6/raw_string_unterminated.i
-parse tests/spec/6/syn2_mixed_tuple.i
-parse tests/spec/6/syn2_old_brace_record.i
-parse tests/spec/6/syn2_old_mixed_tuple.i
 parse tests/spec/7/annotation_pipe_binding_error.i
 parse tests/spec/7/annotation_pipe_data_error.i
 parse tests/spec/7/annotation_pipe_result_error.i

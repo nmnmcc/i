@@ -239,7 +239,6 @@ def main():
     else:
         subprocess.run(command, check=True)
     config = json.loads(DATA.read_text())
-    config.pop("_syn2_old_forms", None)
     all_snippets = list(snippets())
     sources = []
     used = set()

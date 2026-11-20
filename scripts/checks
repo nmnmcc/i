@@ -7,10 +7,15 @@
 #   scripts/checks rust       Rust formatting, Clippy, snippets and the workspace tests
 #                             (rust-lint: formatting, Clippy and snippets; rust-test: the tests)
 #   scripts/checks snippets   every i snippet in the repository parses, or gives its registered
-#                             diagnostics (scripts/check-snippets and its own tests)
+#                             diagnostics (scripts/check-snippets and its own tests), then the
+#                             documentation checks doc-paths and no-compat, so a change that
+#                             only touches documentation runs them too
 #   scripts/checks doc-paths  every source path and library module the documentation
 #                             names exists (scripts/check-doc-paths and
 #                             scripts/check-doc-modules, with their counterexamples)
+#   scripts/checks no-compat  no output fixture, spec expectation or user documentation page
+#                             says how things used to be (scripts/check-no-compat and its
+#                             counterexamples)
 #   scripts/checks i          the release `i`, and with it the i sources;
 #                             `scripts/dev-new-machine` proves that a copy of
 #                             that `i` still makes, checks, runs and tests a
@@ -69,12 +74,13 @@ rust-lint() {
   cargo fmt --all -- --check
   cargo clippy --workspace --all-targets --locked -- -D warnings
   snippets
-  doc-paths
 }
 
 snippets() {
   scripts/check-snippets # builds the parser driver that its tests use
   python3 -I scripts/check-snippets-test
+  doc-paths
+  no-compat
 }
 
 doc-paths() {
@@ -82,6 +88,11 @@ doc-paths() {
   python3 -I scripts/check-doc-paths-test
   python3 -I scripts/check-doc-modules
   python3 -I scripts/check-doc-modules-test
+}
+
+no-compat() {
+  python3 -I scripts/check-no-compat
+  python3 -I scripts/check-no-compat-test
 }
 
 # The slowest test targets of ilang-cli, which CI runs in a job of their own (cli-heavy);
@@ -290,7 +301,7 @@ parts=("$@")
 if [[ ${#parts[@]} -eq 0 ]]; then parts=(rust i js editors); fi
 for part in "${parts[@]}"; do
   case "$part" in
-    rust | rust-lint | rust-test | snippets | doc-paths | i | js | editors) "$part" ;;
-    *) echo "checks: unknown part '$part' (rust, rust-lint, rust-test, snippets, doc-paths, i, js or editors)" >&2; exit 2 ;;
+    rust | rust-lint | rust-test | snippets | doc-paths | no-compat | i | js | editors) "$part" ;;
+    *) echo "checks: unknown part '$part' (rust, rust-lint, rust-test, snippets, doc-paths, no-compat, i, js or editors)" >&2; exit 2 ;;
   esac
 done

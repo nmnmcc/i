@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Counterexamples for scripts/check-no-compat."""
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+CHECK = Path(__file__).resolve().with_name('check-no-compat')
+
+
+def run(root):
+    return subprocess.run(
+        [sys.executable, '-I', str(CHECK), '--root', str(root)],
+        capture_output=True,
+        text=True,
+    )
+
+
+def write(root, relative, body):
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body)
+    return path
+
+
+def passes(root):
+    result = run(root)
+    assert result.returncode == 0, result.stderr
+    return result
+
+
+def fails(root):
+    result = run(root)
+    assert result.returncode == 1, result.stdout + result.stderr
+    return result
+
+
+def main():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+
+        # No tests/ or docs/ at all: nothing to scan, nothing wrong.
+        result = passes(root)
+        assert 'no compatibility phrases in 0 file(s)' in result.stdout, result.stdout
+
+        # A clean fixture and a clean page pass.
+        write(root, 'tests/a.stderr', 'error: x is not defined\n')
+        write(root, 'docs/content/docs/index.mdx', 'The language.\n')
+        passes(root)
+
+        # The mistake this exists for: an output fixture that tells the user
+        # what used to be.
+        write(root, 'tests/a.stderr', 'error: x is not defined\nx no longer exists\n')
+        result = fails(root)
+        assert 'tests/a.stderr:2: no longer: x no longer exists' in result.stderr, result.stderr
+        assert '1 compatibility phrase(s) in 1 file(s)' in result.stderr, result.stderr
+        write(root, 'tests/a.stderr', 'x no longer exists\n')
+        result = fails(root)
+        assert 'tests/a.stderr:1' in result.stderr, result.stderr
+
+        # Removing the line makes it pass again.
+        write(root, 'tests/a.stderr', '')
+        passes(root)
+
+        # .out fixtures too, case-insensitively.
+        write(root, 'tests/sub/b.out', 'Previously this printed 1\n')
+        result = fails(root)
+        assert 'tests/sub/b.out:1: Previously' in result.stderr, result.stderr
+        write(root, 'tests/sub/b.out', '1\n')
+        passes(root)
+
+        # Spec headers: an expectation line is scanned ...
+        write(root, 'tests/spec/1/a.i', '// spec: 1\n// expect: stop "no longer works"\nmain = () {}\n')
+        result = fails(root)
+        assert 'tests/spec/1/a.i:2: no longer' in result.stderr, result.stderr
+        # ... a `#` header in a .toml too ...
+        write(root, 'tests/spec/1/a.i', '// spec: 1\n// expect: pass\n')
+        write(root, 'tests/spec/1/b.toml', '# spec: 1\n# warning: "legacy form"\n')
+        result = fails(root)
+        assert 'tests/spec/1/b.toml:2: legacy' in result.stderr, result.stderr
+        write(root, 'tests/spec/1/b.toml', '# spec: 1\n# expect: pass\n')
+        passes(root)
+        # ... but an ordinary comment, or source, is not.
+        write(root, 'tests/spec/1/a.i', '// spec: 1\n// expect: pass\n// no longer\nused_to = 1 // removed in 2\n')
+        passes(root)
+
+        # Documentation pages.
+        write(root, 'docs/content/docs/a.mdx', 'This is legacy.\n')
+        result = fails(root)
+        assert 'docs/content/docs/a.mdx:1: legacy' in result.stderr, result.stderr
+        write(root, 'docs/content/docs/a.mdx', 'This is current.\n')
+        passes(root)
+        write(root, 'docs/spec.md', 'A field now requires a type.\n')
+        result = fails(root)
+        assert 'docs/spec.md:1: now requires' in result.stderr, result.stderr
+        write(root, 'docs/spec.md', 'A field has a type.\n')
+        passes(root)
+
+        # The @deprecated attribute is a feature, not a compatibility note.
+        write(root, 'docs/content/docs/b.mdx', '`@deprecated("x")`\n')
+        passes(root)
+        # ... and neither is its Lisp form.
+        write(root, 'docs/spec.md',
+              '| Attribute | `@deprecated("old") Item` | `(@ (deprecated "old") Item)` |\n')
+        passes(root)
+        # The current warning text "is deprecated" is a feature too ...
+        write(root, 'tests/a.stderr', 'warning[W0301]: `old` is deprecated: use fresh\n')
+        passes(root)
+        # ... but prose about a past name fails.
+        write(root, 'docs/content/docs/a.mdx', 'Old name was deprecated.\n')
+        result = fails(root)
+        assert 'docs/content/docs/a.mdx:1: deprecated' in result.stderr, result.stderr
+        write(root, 'docs/content/docs/a.mdx', 'This is current.\n')
+        passes(root)
+
+        # Whole words only.
+        write(root, 'docs/content/docs/c.mdx', 'undeprecatedness, legacyish, focused tooling\n')
+        passes(root)
+
+        # Design notes and other non-user documents are history and are left alone.
+        write(root, 'docs/design/history.md', 'This previously worked differently.\n')
+        write(root, 'docs/performance.md', 'previously\n')
+        write(root, 'docs/release.md', 'deprecated\n')
+        write(root, 'docs/README.md', 'legacy\n')
+        write(root, 'docs/testing.md', 'no longer\n')
+        passes(root)
+
+        # Output fixtures under a crate are scanned; source files are not.
+        write(root, 'crates/x/tests/a.stderr', 'x no longer exists\n')
+        write(root, 'crates/x/src/lib.rs', '// previously this was legacy\n')
+        result = fails(root)
+        assert 'crates/x/tests/a.stderr:1: no longer' in result.stderr, result.stderr
+        write(root, 'crates/x/tests/a.stderr', 'x is absent\n')
+        passes(root)
+
+    print('check-no-compat counterexamples pass.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

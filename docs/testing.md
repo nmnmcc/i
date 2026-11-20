@@ -154,18 +154,6 @@ observed outputs. Entry-rejection requirements also invoke `run` at O0/O2
 when source checking rejects, and require rejection before execution in all
 three commands. This preserves the former CLI boundary assertions.
 
-The one-time migration can be reconstructed with
-`UPDATE=1 scripts/review-corpus migrate-k4`. It reads the pinned local K4 test
-revision 9695b32a, formats complete programs, reuses identical permanent
-projects and registers distinct runtime variants. The source-building function
-from that pinned local test is the only historical code it calls; it does not
-execute preserved independent-review drivers. `k4-migration.json` records all
-103 old assertions and their 101 distinct permanent projects: 21 projects are
-reused and 80 entry/annotation variants are added. Original review payloads
-remain byte-for-byte intact for the integrity audit. The old K4 runners and
-fixture copies are removed; generation and timing use the QA commands above.
-
-
 For a targeted promotion, `run --case-list cases.json` selects a nonempty
 JSON list of registered IDs and rejects missing IDs. With UPDATE=1,
 `--keep-bounds` retains each saved observation budget; otherwise --timeout

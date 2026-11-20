@@ -16,11 +16,5 @@ num-bigint = "0.5.1"
 serde_json = "1"
 
 [[bin]]
-name = "migrate-syntax3"
-path = "migrate-syntax3.rs"
-[[bin]]
-name = "migrate-syntax3-pipe"
-path = "migrate-syntax3-pipe.rs"
-[[bin]]
 name = "migrate-tests"
 path = "migrate-tests.rs"

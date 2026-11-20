@@ -1,4 +1,4 @@
-//! Private old syntax for migration tools; never linked into the compiler.
+//! Private old syntax as a test oracle and test-span inspector; never linked into the compiler.
 pub use syntax3::{Code, Diagnostic, format, lex, old_syntax_hint, span, token};
 pub mod ast;
 mod ast_clone;
