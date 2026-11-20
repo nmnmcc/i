@@ -9,7 +9,13 @@ npm run dev
 ```
 
 The development server prints its local URL. `npm run build` generates the
-standard and library reference before building the static site in `dist/`. The library reference is generated from the newest `stdlib-v*` tag, the version `i new` writes, not from the working tree; `../scripts/check-doc-modules` fails the build if a page names an `i/<module>` that tag does not have. A page about the next release starts with a visible `> **Unpublished.**` line and is left out.
+standard and library reference before building the static site in `dist/`. The library reference is generated from the working tree and carries a **development tree** banner, not a version. This is temporary: the published compiler is 0.1.0 and rejects the current library, so a tag would advertise a version that `i new` users cannot build. `../scripts/check-doc-modules` compares against `stdlib/` in the same checkout. A page about a later release still says `> **Unpublished.**` and is left out.
+
+Switch both back when `v0.2.0` and `stdlib-v0.2.0` are published together:
+
+1. `generate-library.py` and `run-examples.py`: use `stdlib-v` + the paired version again (`paired()` and `require_tag()` in `library_version.py` are kept for this).
+2. `generate-library.py`: replace the development banner with `Documents stdlib-v<version>`, and restore the tag source link in the index.
+3. `check-doc-modules`: read `stdlib/src` and `stdlib/test` from that tag again and fail when the tag is missing. A page about the next release starts with a visible `> **Unpublished.**` line and is left out.
 `npm run check:links` checks the built local links; `npm run check:examples`
 checks module-header blank lines, then fenced i examples with the repository's
 parser and snippet registry, then executes complete examples against the tree's compiler.

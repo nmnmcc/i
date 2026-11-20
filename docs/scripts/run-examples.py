@@ -178,24 +178,15 @@ def toml_value(value):
 
 
 def library_root():
-    """Examples run against the library `i new` writes, not the working tree."""
+    """Examples run against the same library the reference describes.
+
+    Temporary: the checkout, until the 0.2.0 pair is published; see
+    docs/README.md.
+    """
     override = os.environ.get('LIBRARY_ROOT')
     if override:
         return Path(override)
-    tag = os.environ.get('LIBRARY_TAG') or (subprocess.run(
-        ['git', '-C', str(ROOT), 'tag', '--list', 'stdlib-v*', '--sort=-v:refname'],
-        capture_output=True, text=True, check=True).stdout.split() or [None])[0]
-    if not tag:
-        raise SystemExit('no stdlib-v* tag; fetch tags or set LIBRARY_TAG')
-    directory = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag) / 'stdlib'
-    if directory.is_dir():
-        return directory
-    directory.mkdir(parents=True)
-    with tarfile.open(fileobj=io.BytesIO(subprocess.run(
-            ['git', '-C', str(ROOT), 'archive', f'{tag}:stdlib'],
-            capture_output=True, check=True).stdout)) as tar:
-        tar.extractall(directory, filter='data')
-    return directory
+    return ROOT / 'stdlib'
 
 
 LIBRARY = library_root()

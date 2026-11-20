@@ -8,6 +8,7 @@ import re
 import subprocess
 import tarfile
 from spec_links import unlink_spec_references
+from library_version import paired, require_tag
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / 'docs/content/docs/library/generated'
@@ -17,34 +18,20 @@ HEAVY = next((path for path in (ROOT.parent / 'cache/heavy', ROOT / '.rd/cache/h
               if path.is_file()), None)
 
 
-def newest_tag():
-    out = subprocess.run(['git', '-C', str(ROOT), 'tag', '--list', 'stdlib-v*', '--sort=-v:refname'],
-                         capture_output=True, text=True, check=True).stdout.split()
-    return out[0] if out else None
-
-
 def library_root():
-    """The library the site documents: the newest tag, the one `i new` writes."""
+    """The library the site describes.
+
+    Temporary: the checkout, because no release pairs with the current language
+    yet. Switch to the `stdlib-v*` tag of the paired version once `v0.2.0` and
+    `stdlib-v0.2.0` are both published (docs/README.md says how).
+    """
     override = os.environ.get('LIBRARY_ROOT')
     if override:
         return Path(override).resolve()
-    tag = os.environ.get('LIBRARY_TAG') or newest_tag()
-    if not tag:
-        raise SystemExit('no stdlib-v* tag to document')
-    archive = subprocess.run(['git', '-C', str(ROOT), 'archive', f'{tag}:stdlib'],
-                             capture_output=True, check=True).stdout
-    destination = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag)
-    directory = destination / 'stdlib'
-    if directory.is_dir():
-        return directory
-    directory.mkdir(parents=True)
-    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        tar.extractall(directory, filter='data')
-    return directory
+    return (ROOT / 'stdlib').resolve()
 
 
-TAG = os.environ.get('LIBRARY_TAG') or newest_tag()
-VERSION = TAG.removeprefix('stdlib-v') if TAG else None
+VERSION = paired()
 LIBRARY = library_root()
 
 
@@ -162,8 +149,7 @@ def generate():
                 continue
             else:
                 break
-        banner = (f'> Documents `{TAG}`, the version `i new` writes.'
-                  if VERSION else '> Documents the working-tree standard library.')
+        banner = '> Development tree, for the unreleased 0.2.0; not a released tag.'
         output = ['---', 'title: ' + json.dumps(module), '---', '', banner, '', *([safe('\n'.join(opening)), ''] if any(line.strip() for line in opening) else [])]
         exports = next(groups(source), [])
         for name in exports:
@@ -186,13 +172,13 @@ def generate():
                 output += ['```text', written, '```', '']
         (OUT / (slug + '.mdx')).write_text('\n'.join(output))
     (OUT / 'meta.json').write_text(json.dumps({'title':'Modules','pages':pages}, indent=2) + '\n')
-    if VERSION:
+    if True:
         links = ' · '.join('[' + slug[2:] + '](/docs/library/generated/' + slug + ')' for slug in pages)
         text = INDEX.read_text()
         start, end = '{/* generated:start */}', '{/* generated:end */}'
         if start in text and end in text:
             text = re.sub('(?s)' + re.escape(start) + '.*?' + re.escape(end),
-                          start + '\n\nDocuments `' + TAG + '`, the version `i new` writes. The source is [stdlib/src at `' + TAG + '`](https://github.com/nmnmcc/i/tree/' + TAG + '/stdlib/src).\n\n' + links + '\n\n' + end, text)
+                          start + '\n\nDevelopment tree, for the unreleased 0.2.0; not a released tag. The source is `stdlib/src` in this checkout.\n\n' + links + '\n\n' + end, text)
             INDEX.write_text(text)
 
 
