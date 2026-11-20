@@ -112,8 +112,15 @@ def run_git(root, args):
 
 
 def tracked_sources(root):
-    """Every tracked `*.i` and `*.is` file that exists, in a stable order."""
-    out = run_git(root, ["ls-files", "-z", "--", "*.i", "*.is"])
+    """Every tracked `*.i` file that exists, in a stable order.
+
+    The Lisp surface is left to the hand edit that this rule needed: a
+    template datum `(. m C)` is a qualified type reference as often as a
+    constructor use, and no arity is knowable there. Its four rewritten sites
+    (a pattern in each `sugar.is`, and `True`/`False`/`First` as values in
+    `mp09_portable_hash`) are outside this tool.
+    """
+    out = run_git(root, ["ls-files", "-z", "--", "*.i"])
     paths = [p.decode("utf-8", "surrogateescape") for p in out.split(b"\0") if p]
     return sorted(p for p in set(paths) if os.path.isfile(os.path.join(root, p)))
 

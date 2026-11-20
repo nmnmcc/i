@@ -243,8 +243,7 @@ fn the_new_constructor_form_round_trips_unchanged() {
 
 #[test]
 fn conversion_to_lisp_writes_constructor_values_as_calls() {
-    let source =
-        "x = True()\ny = Some(1)\nf = (b : Bool) -> Int { b |> (True()) { 1 } & (False()) { 0 } }\n";
+    let source = "x = True()\ny = Some(1)\nf = (b : Bool) -> Int { b |> (True()) { 1 } & (False()) { 0 } }\n";
     let dir = package(&[("src/main.i", source)]);
     let out = fmt(&["--to", "is"], dir.path());
     assert!(
@@ -275,7 +274,10 @@ fn lisp_constructor_values_are_written_as_calls() {
         pretty.contains("(True x)") && !pretty.contains("((True)"),
         "{pretty}"
     );
-    assert!(pretty.contains("((. m Some))"), "{pretty}");
+    assert!(
+        pretty.contains("(. m Some)") && !pretty.contains("((. m Some))"),
+        "a qualified name is left alone: {pretty}"
+    );
     assert!(
         pretty.contains("(= a Int)") && !pretty.contains("(Int)"),
         "{pretty}"

@@ -54,8 +54,8 @@
 use std::io::{self, BufRead, Read, Write};
 
 use ilang_syntax::ast::{
-    Binding, Block, DItem, DPItem, Expr, ExprKind, Format, Function, InterpPart, ItemKind,
-    Module, Pattern, PatternKind, Stmt, TypeRhs,
+    Binding, Block, DItem, DPItem, Expr, ExprKind, Format, Function, InterpPart, ItemKind, Module,
+    Pattern, PatternKind, Stmt, TypeRhs,
 };
 use ilang_syntax::lisp::{Datum, DatumKind};
 use ilang_syntax::span::Span;
@@ -92,7 +92,8 @@ fn is_upper(name: &str) -> bool {
 
 impl Sites {
     fn push(&mut self, kind: Kind, span: Span, name: &str) {
-        self.sites.push((span.start, span.end, kind, name.to_string()));
+        self.sites
+            .push((span.start, span.end, kind, name.to_string()));
     }
 
     fn module(&mut self, module: &Module) {
@@ -155,11 +156,9 @@ impl Sites {
                 if !is_callee && is_upper(&name.name) {
                     match module {
                         // The whole written form: `m.Name`, or `(. m Name)`.
-                        Some(m) => self.push(
-                            Kind::Value,
-                            e.span.0,
-                            &format!("{}.{}", m.name, name.name),
-                        ),
+                        Some(m) => {
+                            self.push(Kind::Value, e.span.0, &format!("{}.{}", m.name, name.name))
+                        }
                         None => self.push(Kind::Value, name.span.0, &name.name),
                     }
                 }
@@ -271,6 +270,16 @@ impl Sites {
         match &d.kind {
             DatumKind::UpName(name) => self.push(kind, d.span, name),
             DatumKind::Round(xs) => {
+                // `(. m C)` is a qualified name, which in a template is a
+                // type reference far more often than a constructor value.
+                // Its arity cannot be known here, so it is left alone.
+                if let [head, module, member] = xs.as_slice()
+                    && matches!(&head.kind, DatumKind::Symbol(s) if s == ".")
+                    && matches!(module.kind, DatumKind::Name(_))
+                    && matches!(member.kind, DatumKind::UpName(_))
+                {
+                    return;
+                }
                 let mut rest = xs.iter();
                 if let Some(first) = xs.first()
                     && matches!(first.kind, DatumKind::UpName(_))

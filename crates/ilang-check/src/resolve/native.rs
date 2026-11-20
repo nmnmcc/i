@@ -3151,7 +3151,9 @@ impl<'a, 't> NativeResolver<'a, 't> {
                 if args.is_none()
                     && let Some(c) = ctor
                     && let TypeBody::Custom(ctors) = &self.r.p.ty(c.ty).body
-                    && ctors.get(c.index as usize).is_some_and(|d| d.fields.is_empty())
+                    && ctors
+                        .get(c.index as usize)
+                        .is_some_and(|d| d.fields.is_empty())
                 {
                     let written = match module {
                         None => name.name.clone(),

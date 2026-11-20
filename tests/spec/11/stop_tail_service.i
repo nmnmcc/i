@@ -1,6 +1,6 @@
 // spec: 11.7, 9.6
 // expect: stop "assertion failed: mine"
-// at: spec/main:10:33
+// at: spec/main:10:37
 // at: spec/main:13:19
 // at: spec/main:16:2
 

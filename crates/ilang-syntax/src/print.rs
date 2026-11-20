@@ -356,29 +356,13 @@ fn is_upper(name: &str) -> bool {
     name.chars().next().is_some_and(char::is_uppercase)
 }
 
-/// The builtin type names that are valid as type-test patterns (`(Int)`,
-/// `a = Int`). Written bare they are the type, so the formatter does not add
-/// the `()` of a constructor call to them.
-pub(crate) const BUILTIN_TYPES: [&str; 13] = [
-    "Int",
-    "Float",
-    "String",
-    "List",
-    "BitArray",
-    "UtfCodepoint",
-    "Never",
-    "Boundary",
-    "Continuation",
-    "Key",
-    "Keyed",
-    "Request",
-    "Ticket",
-];
-
-/// A name the formatter writes with its call (`True()`): an UpName that is
-/// not a builtin type name.
+/// A name the formatter writes with its call (`True()`): one of the two
+/// prelude constructors. Their data is `()` by definition. A user
+/// constructor's arity is not knowable from the syntax tree, so a bare
+/// UpName elsewhere is left alone: it is either a value of a payload
+/// constructor (the constructor function) or already a call.
 pub(crate) fn is_constructor(name: &str) -> bool {
-    is_upper(name) && !BUILTIN_TYPES.contains(&name)
+    matches!(name, "True" | "False")
 }
 
 fn qualified(module: &Option<Ident>, name: &Ident) -> String {

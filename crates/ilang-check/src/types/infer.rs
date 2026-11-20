@@ -2642,12 +2642,9 @@ impl<'a> Checker<'a> {
             }
             Ty::Fn(ft) => {
                 // The argument data of another shape is a
-                // mismatch of the parameter, except that a function whose
-                // parameter is the empty data ignores its argument.
-                if ft.parts() != Some(&[]) {
-                    let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
-                    self.sub2(&data, &ft.param, span, callee.span);
-                }
+                // mismatch of the parameter.
+                let data = Ty::tuple(placed.iter().map(|(t, _)| t.clone()).collect());
+                self.sub2(&data, &ft.param, span, callee.span);
                 self.add_env(ft.env.clone());
                 ft.ret.clone()
             }

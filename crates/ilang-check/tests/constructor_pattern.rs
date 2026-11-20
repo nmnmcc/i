@@ -7,7 +7,8 @@ mod common;
 use ilang_check::code;
 use ilang_package::Diagnostic;
 
-const BARE: &str = "r = (x : Bool) -> Int { x |> (True) { 1 } & (False) { 0 } }\nmain = () { r(True) }\n";
+const BARE: &str =
+    "r = (x : Bool) -> Int { x |> (True) { 1 } & (False) { 0 } }\nmain = () { r(True) }\n";
 const CALLED: &str =
     "r = (x : Bool) -> Int { x |> (True()) { 1 } & (False()) { 0 } }\nmain = () { r(True) }\n";
 
@@ -26,7 +27,10 @@ fn bare_constructor_pattern_reports() {
         );
         assert!(d.is_error());
         let start = (BARE.find(&format!("({name})")).unwrap() + 1) as u32;
-        assert_eq!((d.span.start, d.span.end), (start, start + name.len() as u32));
+        assert_eq!(
+            (d.span.start, d.span.end),
+            (start, start + name.len() as u32)
+        );
     }
 }
 

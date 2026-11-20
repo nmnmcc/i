@@ -1,8 +1,8 @@
 {
-  "compiler": "040109cb3c241dde7c7d9fcaefce1fcc7bd54f3c",
-  "binary_sha256": "9de164928abb87ff8e38802f3993c5b39b325723b38affc81c8f803e7dc95f3c",
+  "compiler": "8633c6bc2cf1321ddafa65bfc64278519e3c6a57",
+  "binary_sha256": "06c337b2d3a126d2a38655ebaf9a9ac4f061cbfba747e20affb0b1da839617af",
   "kind": "observation; semantic requirements are separate",
-  "bound_seconds": 60.0,
+  "bound_seconds": 10,
   "outcome": {
     "check": {
       "command": [
@@ -49,8 +49,8 @@
         "--opt",
         "2"
       ],
-      "exit": 0,
-      "stdout": "deep-ok\n",
+      "exit": "timeout",
+      "stdout": "",
       "stderr": ""
     }
   }

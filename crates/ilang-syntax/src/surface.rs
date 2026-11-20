@@ -13,16 +13,17 @@ use crate::{Code, Diagnostic};
 pub type Converted = Result<(String, Vec<Span>), Vec<Diagnostic>>;
 
 /// The tree without expression groups, with interpolation lowered to
-/// concatenation, and with a constructor called with no arguments read as
-/// the constructor (`True()` and `True`, the pattern `True()` and `True`):
-/// the printers write both with the call. These are the surface differences
+/// concatenation, and with `True()` and `False()` read as the constructor
+/// they call, in a value and in a pattern: the printers write both with the
+/// call. These are the surface differences
 /// before the core tree is compared.
 pub fn ungrouped(module: &Module) -> Module {
     struct Ungroup;
     impl Visitor for Ungroup {
         fn pattern(&mut self, p: &mut Pattern, enter: bool) {
             if !enter
-                && let PatternKind::Ctor { args, .. } = &mut p.kind
+                && let PatternKind::Ctor { name, args, .. } = &mut p.kind
+                && matches!(name.name.as_str(), "True" | "False")
                 && args.as_ref().is_some_and(Vec::is_empty)
             {
                 *args = None;
@@ -62,7 +63,7 @@ pub fn ungrouped(module: &Module) -> Module {
             if let ExprKind::Call { callee, args } = &mut e.kind
                 && args.is_empty()
                 && let ExprKind::Name { name, .. } = &callee.kind
-                && name.name.starts_with(char::is_uppercase)
+                && matches!(name.name.as_str(), "True" | "False")
             {
                 *e = std::mem::replace(
                     callee.as_mut(),

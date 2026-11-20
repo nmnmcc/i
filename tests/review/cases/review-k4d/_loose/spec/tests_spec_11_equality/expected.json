@@ -1,6 +1,6 @@
 {
-  "compiler": "61ba541d2d613d71acbc5ffb36812f98fba3979a",
-  "binary_sha256": "7ce07318fbd1c3f26778cc5f4344044034db392b695a04d6d10563d9ec31cf0a",
+  "compiler": "8633c6bc2cf1321ddafa65bfc64278519e3c6a57",
+  "binary_sha256": "06c337b2d3a126d2a38655ebaf9a9ac4f061cbfba747e20affb0b1da839617af",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {
@@ -9,29 +9,9 @@
         "check",
         "--types"
       ],
-      "exit": 0,
+      "exit": 1,
       "stdout": "spec/equality.check : (String, String) -> ()\nspec/equality.yes : (Bool) -> ()\nspec/equality.no : (Bool) -> ()\nspec/equality.top : (A) -> A\nspec/equality.alias : (A) -> A\nspec/equality.make : () -> (A) -> A\nspec/equality.generated_test : () -> ()\nspec/equality.generated_test : () -> ()\nspec/equality.mixed : (Int | String | ()) -> Bool\nspec/equality.generated_test : () -> ()\nspec/equality.generated_test : () -> ()\n",
-      "stderr": "test/equality.i:32:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`\ntest/equality.i:34:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False`\ntest/equality.i:35:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True`\ntest/equality.i:40:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False`\ntest/equality.i:57:5: warning[W0503]: the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False`\ntest/equality.i:59:5: warning[W0503]: the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False`\ntest/equality.i:62:5: warning[W0503]: the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False`\n"
-    },
-    "test0": {
-      "command": [
-        "test",
-        "--opt",
-        "0"
-      ],
-      "exit": 0,
-      "stdout": "pass spec/equality.values\npass spec/equality.structures\npass spec/equality.different_types\npass spec/equality.functions\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
-      "stderr": "test/equality.i:32:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`\ntest/equality.i:34:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False`\ntest/equality.i:35:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True`\ntest/equality.i:40:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False`\ntest/equality.i:57:5: warning[W0503]: the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False`\ntest/equality.i:59:5: warning[W0503]: the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False`\ntest/equality.i:62:5: warning[W0503]: the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False`\n"
-    },
-    "test2": {
-      "command": [
-        "test",
-        "--opt",
-        "2"
-      ],
-      "exit": 0,
-      "stdout": "pass spec/equality.values\npass spec/equality.structures\npass spec/equality.different_types\npass spec/equality.functions\npass spec/qa_corpus_runtime_test.qa_startup\n5 passed, 0 failed\n",
-      "stderr": "test/equality.i:32:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`\ntest/equality.i:34:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False`\ntest/equality.i:35:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True`\ntest/equality.i:40:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False`\ntest/equality.i:57:5: warning[W0503]: the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False`\ntest/equality.i:59:5: warning[W0503]: the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False`\ntest/equality.i:62:5: warning[W0503]: the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False`\n"
+      "stderr": "test/equality.i:32:5: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `==` is always `False`\ntest/equality.i:34:5: warning[W0503]: both sides are constants, `100000000000000000000` and `100000000000000000001`, which can never be equal, so `==` is always `False`\ntest/equality.i:35:6: warning[W0503]: both sides are constants, `1` and `2`, which can never be equal, so `!=` is always `True`\ntest/equality.i:40:5: warning[W0503]: both sides are constants, `\"a\"` and `\"A\"`, which can never be equal, so `==` is always `False`\ntest/equality.i:57:5: warning[W0503]: the two sides have the known types `Some(1)` and `None`, which can never be equal, so `==` is always `False`\ntest/equality.i:59:5: warning[W0503]: the two sides have the known types `Ok(1)` and `Error(1)`, which can never be equal, so `==` is always `False`\ntest/equality.i:62:5: warning[W0503]: the two sides have the known types `True` and `False`, which can never be equal, so `==` is always `False`\ntest/equality.i:87:6: error[E0501]: `()` is not a subtype of `(_)` (the type at test/equality.i:87:6 needs it)\ntest/equality.i:87:14: error[E0501]: `()` is not a subtype of `(_)` (the type at test/equality.i:87:14 needs it)\ntest/equality.i:88:6: error[E0501]: `()` is not a subtype of `(String, Int)` (the type at test/equality.i:88:6 needs it)\ntest/equality.i:88:14: error[E0501]: `()` is not a subtype of `(String, Int)` (the type at test/equality.i:88:14 needs it)\ntest/equality.i:89:6: error[E0501]: `()` is not a subtype of `(_)` (the type at test/equality.i:89:6 needs it)\ntest/equality.i:89:12: error[E0501]: `()` is not a subtype of `(_)` (the type at test/equality.i:89:12 needs it)\n6 errors\n"
     }
   }
 }
