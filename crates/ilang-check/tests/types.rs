@@ -58,17 +58,24 @@ fn output(graph: &PackageGraph, short: bool, library: bool) -> String {
     let mut out = String::new();
     if let (Some(program), Some(types)) = (&checked.program, &checked.types) {
         same_as_text(program, types);
-        for (i, m) in program.modules.iter().enumerate() {
-            let wanted = if library {
-                // The prelude and the library `i`, a dependency.
-                graph.is_language(m.package)
-            } else {
-                Some(m.package) == graph.root
-            };
-            if !wanted {
-                continue;
-            }
-            for line in types.lines(program, ilang_check::hir::ModuleId(i as u32)) {
+        // Path order, not the order in which the loader happened to make
+        // the modules.
+        let mut modules: Vec<(usize, &ilang_check::hir::Module)> = program
+            .modules
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| {
+                if library {
+                    // The prelude and the library `i`, a dependency.
+                    graph.is_language(m.package)
+                } else {
+                    Some(m.package) == graph.root
+                }
+            })
+            .collect();
+        modules.sort_by(|a, b| a.1.path.cmp(&b.1.path).then(a.0.cmp(&b.0)));
+        for (i, _) in modules {
+            for line in types.lines_marked(program, ilang_check::hir::ModuleId(i as u32), library) {
                 let line = if short {
                     line.strip_prefix("app/main.").unwrap_or(&line).to_string()
                 } else {
@@ -181,14 +188,10 @@ fn types() {
     );
 }
 
-/// The library modules type check with no problems, and their types are
-/// those of the library tables.
-/// Function types carry positional types rather than parameter binder names.
-/// `display::tree_with` uses the parameter data's shape keys, not `FnTy.labels`
-/// (which also holds binder names). Thus the runtime modules' `(x: Float)`
-/// is shown as `(Float)`; actual data labels are still shown as `label = T`.
-#[test]
-fn library() {
+/// The library graph of the snapshot: an empty app that depends on the
+/// library. `reverse_modules` reverses the library's module vector, which
+/// stands for a directory that the loader enumerated in another order.
+fn library_graph(reverse_modules: bool) -> PackageGraph {
     let dir = tempfile::tempdir().unwrap();
     common::write_manifest(dir.path(), "app");
     let (mut graph, _) = ilang_package::load(dir.path());
@@ -197,8 +200,35 @@ fn library() {
         graph.packages[library]
             .modules
             .retain(|m| m.path != "i/test");
+        if reverse_modules {
+            graph.packages[library].modules.reverse();
+        }
     }
-    let actual = output(&graph, false, true);
+    graph
+}
+
+fn library_output(reverse_modules: bool) -> String {
+    let graph = library_graph(reverse_modules);
+    output(&graph, false, true)
+}
+
+/// The library modules type check with no problems, their types are those of
+/// the library tables, and every definition has a shown type.
+/// Function types carry positional types rather than parameter binder names.
+/// `display::tree_with` uses the parameter data's shape keys, not `FnTy.labels`
+/// (which also holds binder names). Thus the runtime modules' `(x: Float)`
+/// is shown as `(Float)`; actual data labels are still shown as `label = T`.
+#[test]
+fn library() {
+    let actual = library_output(false);
+    let missing: Vec<&str> = actual
+        .lines()
+        .filter(|l| l.ends_with(": <no type scheme>"))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "definitions have no type scheme: {missing:#?}"
+    );
     let mut failed = Vec::new();
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/types/library.out");
     compare(&path, &actual, &mut failed);
@@ -206,6 +236,17 @@ fn library() {
         failed.is_empty(),
         "library types differ (run with UPDATE=1 to bless)"
     );
+}
+
+/// Two runs of the same source give the same snapshot, whatever order the
+/// graph's modules are in and whatever thread does the checking. Run the
+/// binary with `--test-threads=1` and with the default once each: neither
+/// changes the file.
+#[test]
+fn library_snapshot_depends_on_the_source_only() {
+    let first = library_output(false);
+    let second = std::thread::spawn(|| library_output(true)).join().unwrap();
+    assert_eq!(first, second);
 }
 
 /// A parameter used at many calls, each giving it an upper bound with one

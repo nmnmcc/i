@@ -694,18 +694,28 @@ impl Typed {
     /// `module/path.name : type` for each top-level name of the module, in
     /// source order.
     pub fn lines(&self, program: &Program, module: ModuleId) -> Vec<String> {
+        self.lines_marked(program, module, false)
+    }
+
+    /// [`Typed::lines`], and for a name that has no scheme a line
+    /// `module/path.name : <no type scheme>` when `marked`. A snapshot of a
+    /// program with errors then shows the definition instead of dropping it.
+    pub fn lines_marked(&self, program: &Program, module: ModuleId, marked: bool) -> Vec<String> {
         let m = program.module(module);
         (0..m.defs.len() as u32)
             .filter_map(|index| {
                 let d = DefId { module, index };
-                let Some(t) = self.schemes.get(&d) else {
-                    assert!(
-                        self.diagnosed,
-                        "accepted definitions must have type schemes"
-                    );
-                    return None;
-                };
-                Some(format!("{}.{} : {t}", m.path, m.defs[index as usize].name))
+                let name = &m.defs[index as usize].name;
+                match self.schemes.get(&d) {
+                    Some(t) => Some(format!("{}.{} : {t}", m.path, name)),
+                    None => {
+                        assert!(
+                            self.diagnosed,
+                            "accepted definitions must have type schemes"
+                        );
+                        marked.then(|| format!("{}.{} : <no type scheme>", m.path, name))
+                    }
+                }
             })
             .collect()
     }
