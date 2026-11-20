@@ -14,7 +14,7 @@ refer to that revision. Binaryen locations refer to submodule
 Keep Float arithmetic in f64 until a reference is needed. Keep small integer
 arithmetic in machine locals only while its exact value is represented. Give
 known calls scalar parameters and results; retain ordinary reference entries
-for unknown calls and stored functions. No rule recognizes std/float, a
+for unknown calls and stored functions. No rule recognizes i/float, a
 package name, or a coefficient table.
 
 The controlling spec sections are §4.7–4.8 (principal inference), §6.2
@@ -58,7 +58,7 @@ Built this lane's release compiler through `cache/heavy`, after initializing
 its Binaryen submodule using the plan's command-local URL override. Cargo
 metadata reports this lane as workspace root. No compiler source was patched.
 The six kernels compiled and ran at O0 and O2. The float source is from
-`de4d58d04c39539cdcb20ad68e7d93e5f5453795:std/src/float.i`; the isolated copy
+`de4d58d04c39539cdcb20ad68e7d93e5f5453795:stdlib/src/float.i`; the isolated copy
 exports one additional wrapper around its existing `fast_sincos`.
 
 Artifacts under `target/numeric/`:
@@ -853,7 +853,7 @@ Acceptance gates:
 | closures | <=400 | <=4, no per-element Float boxes | scalar 60, allow closure/capture array and boundaries |
 
 O0 has no speed target and should retain baseline counts. A <=500 ns sine
-compiler gate does **not** release std/float: the coordinator's <=20x-native
+compiler gate does **not** release i/float: the coordinator's <=20x-native
 ordinary gate and under-1-ms full-range gate still apply. These kernels cannot
 establish the interval slow path's worst case.
 
@@ -1056,7 +1056,7 @@ h = (b, x : Float) -> Float {
 
 main = () {
 	control.boundary((b) { h(b, 1.0e308) })
-	Nil
+	()
 }
 ```
 

@@ -6,7 +6,7 @@ Source baseline: `b9173ce013405fd3a055ffa34edf3b8829672104`.
 Repository line references are to that baseline, not the older baseline of
 std-1. Examples use the accepted syntax. Signature inventories describe ordinary
 bindings with bodies; they are not bare declarations. `Option`, `Some`, `None`
-come from `std/option`. `Result`, `Ok`, `Error`, `Assert`, and `AssertionFailure`
+come from `i/option`. `Result`, `Ok`, `Error`, `Assert`, and `AssertionFailure`
 are built in. Public interfaces below are complete additions, not replacements
 for existing exports.
 
@@ -26,7 +26,7 @@ Controlling sources, in order:
 | `docs/spec.md:591–598`, `:836–908`, `:957–997` | Strict calls, ordinary effects, and replaceable Assert; assertion.catch already supplies the required test boundary. |
 | `docs/spec.md:1014–1087`, `:1124–1145`, `:1218–1250` | SplitMix, exact integers, binary64, equality, bit conversions and UTF-8 primitives. |
 | `docs/design/syntax.md:99–200`, `:223–253`, `:372–386` | Import/export groups, declared type parameters and clause functions. |
-| `docs/design/runtime.md:199–283`; `lib/i/random.i:76–86`, `:126–170`, `:217–223` | Landed pure generators, rejection sampling, split and path derivation. No entropy service needed. |
+| `docs/design/runtime.md:199–283`; `stdlib/src/random.i:76–86`, `:126–170`, `:217–223` | Landed pure generators, rejection sampling, split and path derivation. No entropy service needed. |
 | `docs/design/std-1.md:886–984` | Ordinary module contracts belong in module docs; do not add redundant spec rules. Explicit interfaces, tests and honest costs. |
 | Plan `twinkling-swinging-perlis.md:30–56`, `:79`, `:520–550`, `:583–590` | Standalone language; Std-3 owns these modules after R1; string indexes count codepoints; STR owns interpolation. |
 | Ledger, entries “R1 landed” and “FP landed” | R1 and general field privacy are available. No std-specific compiler or runner extension. |
@@ -40,17 +40,17 @@ Facts checked by reading code:
 
 | Code region | Finding and consequence |
 |---|---|
-| `std/src/float.i:1–7`, `:14–57`, `:229–260`, `:317–338` | Finite-only API and existing rational-to-bits rounding. Reuse its integer techniques with explicit zero/sign/overflow handling. |
-| `std/src/float.i:480–515`, `:577–628` | Roots, powers, exp and log use Result for domain/overflow; exp/log/power already use plain-i fdlibm-derived code. Preserve their results. |
+| `stdlib/src/float.i:1–7`, `:14–57`, `:229–260`, `:317–338` | Finite-only API and existing rational-to-bits rounding. Reuse its integer techniques with explicit zero/sign/overflow handling. |
+| `stdlib/src/float.i:480–515`, `:577–628` | Roots, powers, exp and log use Result for domain/overflow; exp/log/power already use plain-i fdlibm-derived code. Preserve their results. |
 | `crates/ilang-wasm/src/runtime/values.rs:45–50`; `crates/ilang-wasm/src/runtime/core.rs:11–48` | Float construction rejects NaN/infinity; division by zero produces +0; sqrt uses f64.sqrt. Avoid invalid intermediates. |
-| `std/test/float_test.i:1027–1090`, `:1106–1203` | Bit-level parse/zero tests and overflow cases exist. Approximate equality alone is insufficient. |
-| `std/src/string.i:22–63`, `:70–77`, `:110–176`, `:239–308` | Scalar lengths and negative slice indexes already exist; empty split and replace have different established rules. |
-| `std/src/string.i:179–207`, `:330–389`, `:418–455` | Pattern_White_Space, simple casing, padding and conversions already exist. |
+| `stdlib/test/float_test.i:1027–1090`, `:1106–1203` | Bit-level parse/zero tests and overflow cases exist. Approximate equality alone is insufficient. |
+| `stdlib/src/string.i:22–63`, `:70–77`, `:110–176`, `:239–308` | Scalar lengths and negative slice indexes already exist; empty split and replace have different established rules. |
+| `stdlib/src/string.i:179–207`, `:330–389`, `:418–455` | Pattern_White_Space, simple casing, padding and conversions already exist. |
 | `crates/ilang-wasm/src/runtime/values/strings.rs:151–162`, `:170–198`, `:200–238` | Slices copy bytes; search compares at successive offsets; codepoints builds a whole list. No O(1) character indexing primitive. |
-| `std/test/string_test.i:2060–2103`, `:2115–2160`, `:2240–2247` | Empty pieces, trailing lines, negative slices, Unicode and invalid scalar conversion have tests to retain. |
-| `lib/i/assertion.i:13–22`; `crates/ilang-host/src/lib.rs:805–834`; `crates/ilang-cli/src/main.rs:250–302` | Catching Assert cancels its continuation; runner handles ordinary stops and prints their text. Report one AssertionFailure without a discovery hook. |
+| `stdlib/test/string_test.i:2060–2103`, `:2115–2160`, `:2240–2247` | Empty pieces, trailing lines, negative slices, Unicode and invalid scalar conversion have tests to retain. |
+| `stdlib/src/assertion.i:13–22`; `crates/ilang-host/src/lib.rs:805–834`; `crates/ilang-cli/src/main.rs:250–302` | Catching Assert cancels its continuation; runner handles ordinary stops and prints their text. Report one AssertionFailure without a discovery hook. |
 | `crates/ilang-check/src/types/infer.rs:232–255`, `:292–325` | Recursive groups are monomorphic internally. Use uniform recursive trees. |
-| `std/src/stream.i:43–55` | Effectful streams require invariant environments. This design stores only pure callbacks. |
+| `stdlib/src/stream.i:43–55` | Effectful streams require invariant environments. This design stores only pure callbacks. |
 
 Reading establishes available operations, not new algorithm performance. Section
 9 separates executed checks from design reasoning.
@@ -83,7 +83,7 @@ approximation.
    dependent generation regenerates dependent trees on outer shrinks. Budgets
    count checks, not arbitrary computation (strict calls, spec §6.2).
 4. **Float remains finite.** Nonfinite values have no cases in the domain.
-   Domain/rounded-overflow errors use Error(Nil), as square_root/real_power do;
+   Domain/rounded-overflow errors use Error(()), as square_root/real_power do;
    signed zeros use bits (spec §4.2/§11.3; `float.i:510–515`, `:613–618`).
 5. **Correct rounding for new math.** Certified Float and fixed-point enclosures refine until
    both endpoints round to identical bits. Existing Int and bit conversions
@@ -98,7 +98,7 @@ round trips, persistent-container models and numerical laws; trig for geometry,
 signals and simulations; scalar text operations for parsers, source tools and
 protocol text. Libraries remain optional ordinary i code.
 
-## 3. `std/property`
+## 3. `i/property`
 
 ### 3.1 Comparison
 
@@ -177,7 +177,7 @@ string: (max_length: Int) -> Result(Gen(String), BuildError)
 check(A): (gen: Gen(A), config: Config, property: (A) -> Verdict) -> Report(A)
 replay(A): (gen: Gen(A), seed: Int, attempt: Int, size: Int, path: List(Int)) -> Option(A)
 format(A): (report: Report(A), show: (A) -> String) -> String
-test(A): (gen: Gen(A), config: Config, property: (A) -> Nil ! Assert, show: (A) -> String) -> Nil ! Assert
+test(A): (gen: Gen(A), config: Config, property: (A) -> () ! Assert, show: (A) -> String) -> () ! Assert
 ```
 
 All factories are functions rather than shared weak polymorphic values. A is
@@ -186,10 +186,10 @@ written recursive result types, never polymorphic recursion. An ordinary client:
 
 ```i
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
-	std/list
-	std/property
+	i/list
+	i/property
 )
 
 test("reverse_twice", () {
@@ -242,7 +242,7 @@ outer branches without searching their descendants.
 **P4 Built-in generators.** Exact allocation/order is replay behavior for a
 package version. Size is ignored except by sized/list/string. random.int and
 random.at_path raise RandomError, rather than returning Result
-(`lib/i/random.i:128–135`, `:219–223`). Private wrappers use fail.catch and
+(`stdlib/src/random.i:128–135`, `:219–223`). Private wrappers use fail.catch and
 translate Error to None; they must not leak an error effect into Gen. A None
 derivation discards that attempt/element, or returns None from replay. All paths
 and bounds constructed below are valid, so this fallback is unreachable under
@@ -346,12 +346,12 @@ predicate. Discarded root or missing child also gives None. Positions count the
 retained list including duplicates. Guarantees require the same library
 version, generator code, captured values and P5's deterministic observations;
 a seed is not a serialized closure.
-Store reports with the lock file. Report protocol is `std/property v1`; changes
+Store reports with the lock file. Report protocol is `i/property v1`; changes
 to built-in sampling/shrink order require an explicit protocol version change.
 
 **P9 Assert adapter.** test calls check with a predicate which wraps each
-property invocation in assertion.catch. Ok(Nil) gives Pass; Error(failure)
-gives Fail(failure.message). Afterwards Passed returns Nil; other reports call
+property invocation in assertion.catch. Ok(()) gives Pass; Error(failure)
+gives Fail(failure.message). Afterwards Passed returns (); other reports call
 *the caller's* Assert.fail(AssertionFailure(format(report,show))). The final
 fail is outside the per-case catch. Runner sees one ordinary failed test.
 AssertionFailure carries a message, not the original stack: the final stop site
@@ -365,7 +365,7 @@ format uses decimal integers, LF separators, and exactly this order, without an
 added trailing LF:
 
 ```text
-std/property v1: falsified
+i/property v1: falsified
 seed: <normalized seed>
 attempt: <zero-based attempt>
 size: <size>
@@ -379,8 +379,8 @@ reason: <reason>
 
 Multiline show/reason text is included literally, including a final LF supplied
 by the caller. The formatter itself appends none. Passed gives
-`std/property v1 : passed; successes : <n>; discards : <d>`; GaveUp substitutes
-`gave up`; InvalidConfig gives `std/property v1: invalid config; <message>`.
+`i/property v1 : passed; successes : <n>; discards : <d>`; GaveUp substitutes
+`gave up`; InvalidConfig gives `i/property v1: invalid config; <message>`.
 show runs exactly twice for Falsified, zero times otherwise. It is pure, but
 printing arbitrary closures/host references is not a portable serialization;
 prefer a domain printer. Numeric/string/list reports can be stable.
@@ -401,7 +401,7 @@ replay assumptions. Root observations in P5/P8 mean reproducible data values
 or an explicitly chosen observational equivalence, not recreated identities.
 No library can infer that arbitrary callbacks meet this contract.
 
-## 4. Additions to `std/float`
+## 4. Additions to `i/float`
 
 Stage 3 targets error under 1 ulp; correct rounding (F1) is deferred to a later optimisation task.
 
@@ -429,19 +429,19 @@ pi: Float
 tau: Float
 sin: (x: Float) -> Float
 cos: (x: Float) -> Float
-tan: (x: Float) -> Result(Float, Nil)
-asin: (x: Float) -> Result(Float, Nil)
-acos: (x: Float) -> Result(Float, Nil)
+tan: (x: Float) -> Result(Float, ())
+asin: (x: Float) -> Result(Float, ())
+acos: (x: Float) -> Result(Float, ())
 atan: (x: Float) -> Float
 atan2: (y: Float, x: Float) -> Float
-hypot: (x: Float, y: Float) -> Result(Float, Nil)
+hypot: (x: Float, y: Float) -> Result(Float, ())
 radians: (degrees: Float) -> Float
-degrees: (radians: Float) -> Result(Float, Nil)
+degrees: (radians: Float) -> Result(Float, ())
 sign_bit: (x: Float) -> Bool
 copy_sign: (magnitude: Float, sign: Float) -> Float
 ```
 
-Rename current private integer sign_bit (`std/src/float.i:53`) to sign_mask
+Rename current private integer sign_bit (`stdlib/src/float.i:53`) to sign_mask
 and its private uses before exporting the function. No existing public name
 changes. Hyperbolics, expm1/log1p, cbrt, arbitrary-base logs, erf, gamma, complex
 numbers and vector math are deferred; each needs a stable algorithm and tests.
@@ -459,7 +459,7 @@ nonzero underflow preserves the real result's sign.
 
 Let M=(2-2^-52)*2^1023, the largest finite value, and T=M+2^970. At magnitude T,
 ties-to-even overflows to the conceptual next value 2^1024. Checked functions
-return Error(Nil) iff the rounded result would be nonfinite or the real domain
+return Error(()) iff the rounded result would be nonfinite or the real domain
 excludes the inputs. Results strictly between M and T round to M and succeed.
 Never construct a nonfinite Float, including an intermediate. No host math
 import, platform-dependent approximation or flush-to-zero mode.
@@ -470,7 +470,7 @@ pi during reduction or unit conversion. sign_bit tests bit 63; copy_sign clears
 that bit in magnitude and copies it from sign, preserving every other bit.
 
 NaN, +infinity and -infinity are outside Float. Parsing those spellings already
-returns Error(Nil); constructing their bits or computing nonfinite core
+returns Error(()); constructing their bits or computing nonfinite core
 arithmetic stops *before* a library call (spec §11.3/§13;
 `crates/ilang-wasm/src/runtime/values.rs:45–50`). There is no NaN propagation
 rule or infinity branch to implement. This note neither catches that stop nor extends Float.
@@ -647,7 +647,7 @@ unnecessarily; changing demand cannot change an enclosure. This is a
 determinism argument; executed target checks are recorded
 separately in section 11.
 
-`std/test/float_oracle.py` reproduces the review's 331 inputs, using MPFR's own
+`stdlib/test/float_oracle.py` reproduces the review's 331 inputs, using MPFR's own
 functions with directed intervals initially at 4096 bits. Both endpoints must
 round to identical binary64 bits or the oracle increases precision. This oracle
 does not reuse the production Machin/Taylor code or the review's rational model.
@@ -663,7 +663,7 @@ algorithm with a stated error bound below one ulp; it does not authorize such
 an alternative, weakening F1, or importing host mathematics. The implementation
 and measurement limitations are recorded in section 11.
 
-## 5. Additions to `std/string`
+## 5. Additions to `i/string`
 
 ### 5.1 Comparison and missing functions
 
@@ -737,7 +737,7 @@ reverse once and rebuild with core.from_codepoints. Initial at/take/traversal
 implementations cost O(B) time and O(n) auxiliary cells even for an early index:
 core.codepoints decodes the whole string. B is bytes and n scalars. Do not claim
 O(1) or O(index). For many random accesses a caller can convert once into
-std/sequence using from_list/at (`std/src/sequence.i:53–55`, `:121–130`)
+i/sequence using from_list/at (`stdlib/src/sequence.i:53–55`, `:121–130`)
 and use that module's separate bounds. No implicit cache.
 
 Search can compare a decoded needle against successive scalar-list suffixes.
@@ -786,15 +786,15 @@ and oracle scripts beside the existing tests:
 
 | File/region at baseline | Change |
 |---|---|
-| `std/src/property.i`, new, whole file | Imports/exports/types; tree helpers; generators; checker/replay; formatter/Assert adapter. |
-| `std/test/property_test.i`, new | Deterministic trees, laws, replay, budgets, invalid inputs and reporting. |
-| `std/src/float.i:14–57`, `:630–967`, appended private region | Exports/constants, private sign-mask rename, certified Float/fixed-point helpers and new math. Preserve existing kernels. |
-| `std/test/float_test.i:1027–1203`, append | Existing bit tests plus domains, signed zeros, quadrants and independent oracle fixtures. |
-| `std/src/string.i:22–63`, `:142–176`, `:246–308`, `:429–455`, append | Exports/docs, last split, access/search and scalar traversals. |
-| `std/test/string_test.i:2056–2279`, append | Scalar-list models, bounds/empty/callback cases and traversal-cost regressions. |
+| `stdlib/src/property.i`, new, whole file | Imports/exports/types; tree helpers; generators; checker/replay; formatter/Assert adapter. |
+| `stdlib/test/property_test.i`, new | Deterministic trees, laws, replay, budgets, invalid inputs and reporting. |
+| `stdlib/src/float.i:14–57`, `:630–967`, appended private region | Exports/constants, private sign-mask rename, certified Float/fixed-point helpers and new math. Preserve existing kernels. |
+| `stdlib/test/float_test.i:1027–1203`, append | Existing bit tests plus domains, signed zeros, quadrants and independent oracle fixtures. |
+| `stdlib/src/string.i:22–63`, `:142–176`, `:246–308`, `:429–455`, append | Exports/docs, last split, access/search and scalar traversals. |
+| `stdlib/test/string_test.i:2056–2279`, append | Scalar-list models, bounds/empty/callback cases and traversal-cost regressions. |
 
-The coordinator assigned oracle and test scripts under std/test; they add no
-runtime dependency. No required edits to std/i.toml, compiler,
+The coordinator assigned oracle and test scripts under i/test; they add no
+runtime dependency. No required edits to stdlib/i.toml, compiler,
 i/random, core, runner, STR or other notes.
 
 Order and gates:
@@ -843,12 +843,12 @@ CLI failure count, report text and exit status.
 | sign_bit(-.0.0); copy_sign(2.0,-.0.0) | True; -2.0 by bits (F2). |
 | sin/atan(-.0.0); tan/asin(-.0.0) | Negative-zero bits; last two wrapped in Ok (F3). |
 | cos(-.0.0); acos(1.0); acos(-.1.0) | 1.0; Ok(+0); Ok(pi) (F3). |
-| asin(1.0000000000000002); acos(-.2.0) | Error(Nil), before sqrt (F3/F8). |
+| asin(1.0000000000000002); acos(-.2.0) | Error(()), before sqrt (F3/F8). |
 | atan2(+0,-0); atan2(-0,-0); atan2(-0,+0) | +pi; -pi; -0 (F4; signs are mathematical table notation). |
 | atan2(min_positive,min_positive) | Rounded pi/4 without intermediate underflow (F4/F8). |
 | hypot(3.0,4.0); hypot(-0,+0) | Ok(5.0); Ok(+0) via exact squares (F8). |
-| hypot(max_finite,0.0); hypot(max_finite,max_finite) | Ok(max_finite); Error(Nil), no intermediate overflow (F1/F8). |
-| radians(180.0); degrees(0.0); degrees(max_finite) | pi; Ok(+0); Error(Nil) (F1/F9). |
+| hypot(max_finite,0.0); hypot(max_finite,max_finite) | Ok(max_finite); Error(()), no intermediate overflow (F1/F8). |
+| radians(180.0); degrees(0.0); degrees(max_finite) | pi; Ok(+0); Error(()) (F1/F9). |
 | sin/cos/tan at 1e300 and max_finite | Independent exact oracle bits, never reduction by rounded tau (F5–F9). |
 | core.float_from_bits(0x7ff0000000000000) | Existing stop before library call; separate negative fixture (F2). |
 | at("aé😀",1), at(...,-1), at(...,-4), at("",0) | Some("é"), Some("😀"), None, None (S1). |
@@ -944,19 +944,19 @@ functions or polymorphic recursion.
 
 ```i
 (
-	testlib = (test) = std/test
+	testlib = (test) = i/test
 	i/core
-	std/float
+	i/float
 )
 
 test("nonfinite_bits", () {
 	core.float_from_bits(0x7ff0000000000000)
-	Nil
+	()
 })
 
 test("overflow_before_result", () {
 	float.max_finite *. float.max_finite
-	Nil
+	()
 })
 ```
 
@@ -1115,7 +1115,7 @@ the heavy wrapper (`cargo build -p ilang-cli --release --locked`, exit 0).
 | Literal report text | P9: “Multiline show/reason text is included literally.” “Without a trailing LF” means the formatter adds none; it does not strip a caller-supplied final LF from reason. |
 | Keep failed feasibility visible | Coordinator ruling 4: “If a target cannot be met, do not relax the contract yourself”. F1 is unchanged; a bounded-error alternative needs a new decision. |
 
-`std/test/std3_interfaces.py` compares the compiler's shown types against each
+`stdlib/test/std3_interfaces.py` compares the compiler's shown types against each
 signature in sections 3.2, 4.1 and 5.2. All 49 new bindings match exactly,
 including argument labels and E/N effects; there are no inferred-interface
 differences beyond the explicit string correction. The inventories in those
@@ -1144,11 +1144,11 @@ lane, except that the quiet-window and heavy wrappers go before that prefix.
 | `target/release/i test --project std --opt 0` | 1,799 passed, 0 failed after the final source amendments were merged and lazy pi was installed. Includes 331 MPFR cases, 14 property tests, five string-addition tests and all existing tests. |
 | `target/release/i test --project std --opt 2` | 1,799 passed, 0 failed on the same sources. |
 | `target/release/i fmt --check std` | Exit 0. Generated vectors were formatted by their generator, not edited. |
-| `./scripts/old-syntax-check` | Exit 0: 1,194 extracted snippets, exact diagnostics, 19 future-track entries. No Std-3 exception was added or removed. The script sends its cargo build through the heavy wrapper. |
-| `python3 std/test/std3_interfaces.py` | 49/49 signatures match the corrected note exactly. |
-| `UPDATE=1 /tmp/review-std3/venv/bin/python std/test/float_oracle.py` | Generated 331 bit expectations with MPFR 4.2.2; the same command without UPDATE independently regenerated and compared equal. No Python math output is used as a transcendental oracle. |
-| `python3 std/test/float_hosts.py` | All 331 cases passed on native Wasmtime, Node v24.21.0 and WASI (Wasmtime CLI 49.0.2), at O0 and O2. The native compiler embeds Wasmtime 50. No browser run is claimed. |
-| `python3 std/test/property_failures.py` | At O0 and O2, intentionally returned exit 1: exactly one property assertion failure and three nonfinite-construction stops, before float library entry. The harness accepted those expected outcomes and exited 0. Its transient fixture was removed. |
+| `old-syntax-check` | Exit 0: 1,194 extracted snippets, exact diagnostics, 19 future-track entries. No Std-3 exception was added or removed. The script sends its cargo build through the heavy wrapper. |
+| `python3 stdlib/test/std3_interfaces.py` | 49/49 signatures match the corrected note exactly. |
+| `UPDATE=1 /tmp/review-std3/venv/bin/python stdlib/test/float_oracle.py` | Generated 331 bit expectations with MPFR 4.2.2; the same command without UPDATE independently regenerated and compared equal. No Python math output is used as a transcendental oracle. |
+| `python3 stdlib/test/float_hosts.py` | All 331 cases passed on native Wasmtime, Node v24.21.0 and WASI (Wasmtime CLI 49.0.2), at O0 and O2. The native compiler embeds Wasmtime 50. No browser run is claimed. |
+| `python3 stdlib/test/property_failures.py` | At O0 and O2, intentionally returned exit 1: exactly one property assertion failure and three nonfinite-construction stops, before float library entry. The harness accepted those expected outcomes and exited 0. Its transient fixture was removed. |
 
 Public interface comparison is an interpretation check. The MPFR tests check
 implemented output bits independently. The copied classification module used by
@@ -1202,7 +1202,7 @@ There is no remaining implementation interpretation conflict with spec 11.
 Command (exit 0, five repetitions, all three heavy slots held throughout):
 
 ```text
-/home/agent/Programming/i/.rd/cache/quiet direnv exec /home/agent/Programming/i python3 std/test/float_gate.py
+/home/agent/Programming/i/.rd/cache/quiet direnv exec /home/agent/Programming/i python3 stdlib/test/float_gate.py
 ```
 
 The script builds/runs at --opt 2 and compares with C libm compiled by the dev
@@ -1276,7 +1276,7 @@ Checking after withholding float (all through the dev shell):
 | `target/release/i test --project std --opt 0` | 1,465 passed, 0 failed. |
 | `target/release/i test --project std --opt 2` | 1,465 passed, 0 failed. |
 | `target/release/i fmt --check std` | Exit 0. |
-| `./scripts/old-syntax-check` | Exit 0: 1,193 snippets, 19 existing future entries. |
-| `python3 std/test/std3_interfaces.py` | 35/35 signatures match the property/string inventories. |
-| `python3 std/test/property_failures.py` | Harness exit 0: exactly one intentional ordinary property failure at each optimization level. |
-| `git diff --quiet refs/heads/redesign -- std/src/float.i std/test/float_test.i` | Exit 0: both files equal redesign. |
+| `old-syntax-check` | Exit 0: 1,193 snippets, 19 existing future entries. |
+| `python3 stdlib/test/std3_interfaces.py` | 35/35 signatures match the property/string inventories. |
+| `python3 stdlib/test/property_failures.py` | Harness exit 0: exactly one intentional ordinary property failure at each optimization level. |
+| `git diff --quiet refs/heads/redesign -- stdlib/src/float.i stdlib/test/float_test.i` | Exit 0: both files equal redesign. |

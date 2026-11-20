@@ -68,8 +68,8 @@ copied or built.
   about unused names and never removes initialization or changes Wasm.
 - Scope rule 5's hint is confined to test modules and recommends registering
   the function with the ordinary `test` macro. Environment parameters are allowed on test entries (§10.2).
-  The result must be inferred as the prelude's nominal `Nil`, not a type
-  merely spelled `Nil`, and must not be `Never` or a union containing `Nil`.
+  The result must be the unit type `()`, and must not be `Never` or a union
+  containing `()`.
 - Each pattern name is checked separately (scope rule 1, "a top-level
   binding that is not used"). Referencing a name does not mark its
   siblings as used, so unused sibling names can still warn. This preserves the `_` convention.

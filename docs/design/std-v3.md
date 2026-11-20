@@ -92,7 +92,7 @@ rule, and callback-last order. It does not depend on any new API:
 
 ```i
 (
-	std/list
+	i/list
 )
 
 doubled = (values : List(Int)) -> List(Int) {
@@ -121,11 +121,12 @@ case to a stable closed error family is breaking.
 
 This complete example already uses syntax three and today's failure API:
 
+<!-- old-syntax-check: E0101 -->
 ```i
 (
 	i/fail
-	std/list
-	std/option
+	i/list
+	i/option
 )
 
 BadPort = (text = String)
@@ -178,10 +179,10 @@ example = () {
 ### 2.4 Module boundary
 
 `i/…` holds specified language/runtime support, host contracts and minimal
-owned-request adapters. `std/…` holds data structures, protocols, codecs,
+owned-request adapters. `i/…` holds data structures, protocols, codecs,
 policies and reusable algorithms, including those with host needs. `i/` never
-imports `std/`. Shared small traversals may live in an ordinary internal
-foundation where an import cycle forbids reuse of `std/list`; that does not
+imports `i/`. Shared small traversals may live in an ordinary internal
+foundation where an import cycle forbids reuse of `i/list`; that does not
 create a second public API. Keep specified `i/random` in place. Do not move
 specified primitives or break host namespaces as a cosmetic cleanup.
 
@@ -209,7 +210,7 @@ signature catalogue in source comments. The checker owns signatures.
 //// Integer list transformations. Ordinary callbacks keep their native needs.
 //// Stability: experimental. Since: next. Tracking: docs/design/std-v3.md.
 (
-	std/list
+	i/list
 )
 
 /// Doubles each integer, preserving order.
@@ -236,13 +237,13 @@ stay separate from Fail. No test keyword or special standard-library runner.
 
 ```i
 (
-	testlib = (test) = std/test
-	std/list
+	testlib = (test) = i/test
+	i/list
 )
 
 test("mapping preserves order", () {
 	assert(list.map([2, 3], (n) { n * 2 }) == [4, 6])
-	Nil
+	()
 })
 ```
 
@@ -270,7 +271,7 @@ nominal type with hidden constructor, not the language's Opaque foreign type.
 Visible constructor definitions are public items too. Prelude types such as
 Result and BitArray are used, never redeclared. Free letters are universal.
 Aliases in these contracts are `ifs = i/fs`, `iprocess = i/process`,
-`fs = std/fs`, `process = std/process`, `net = i/net`, `tls = i/tls`,
+`fs = i/fs`, `process = i/process`, `net = i/net`, `tls = i/tls`,
 `fetch = i/fetch`, `stdio = i/stdio`, `clock = i/clock`, `random = i/random`,
 and otherwise the matching std module. Unqualified Scheduler is i/task's.
 Types local to a module keep their unqualified name. Blocks labelled `text`
@@ -331,13 +332,13 @@ catch : <A,N>(() <- (..N, Assert) -> A) <- N -> Result(A,AssertionFailure)
 boundary : <R,N>((Boundary(R,N)) <- N -> R) <- N -> R
 suspend : <A,R,N>(Boundary(R,N), (Continuation(A,R,N)) <- N -> R) -> A
 resume : <A,R,N>(Continuation(A,R,N), A) <- N -> R
-cancel : <A,R,N>(Continuation(A,R,N)) <- N -> Nil
+cancel : <A,R,N>(Continuation(A,R,N)) <- N -> ()
 escape : <R,N>(Boundary(R,N), R) -> Never
 keep_env : <A,B,E,N>((A) <- (..N, Fail(E)) -> B) <- N -> (A) <- (Fail(E)) -> B
 // i/resource
 Scope = private service
-ensure : <A,N>(() <- N -> A, () <- N -> Nil) <- N -> A
-acquire : <A,N>(() <- N -> A, (A) -> Nil) <- (..N, Scope) -> A
+ensure : <A,N>(() <- N -> A, () <- N -> ()) <- N -> A
+acquire : <A,N>(() <- N -> A, (A) -> ()) <- (..N, Scope) -> A
 scoped : <A,N>(() <- (..N, Scope) -> A) <- N -> A
 // i/key
 Found(A) = (A)
@@ -347,34 +348,34 @@ new : <A>() -> Key(A)
 wrap : <A>(Key(A),A) -> Keyed
 unwrap : <A>(Key(A),Keyed) -> Lookup(A)
 // i/request
-Await = (wait = (Ticket) -> Nil)
-Root = (key = Key(Nil))
-Owner = (key = Key(Nil), root = Root)
+Await = (wait = (Ticket) -> ())
+Root = (key = Key(()))
+Owner = (key = Key(()), root = Root)
 Waiting = (); Ready(A) = (A); Cancelled = (); Taken = ()
 RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 open_root : () <- (Root) -> Root
-close_root : (Root) -> Nil
+close_root : (Root) -> ()
 open_owner : () <- (Root) -> Owner
-close_owner : (Owner) -> Nil
+close_owner : (Owner) -> ()
 count : (Owner) -> Int
 count_root : (Root) -> Int
 settled_owner : (Owner) -> Bool
 settled_root : (Root) -> Bool
-cancel_all : (Owner) -> Nil
-cancel_all_root : (Root) -> Nil
-wait_none : (Owner) <- (Await) -> Nil
-wait_none_root : (Root) <- (Await) -> Nil
+cancel_all : (Owner) -> ()
+cancel_all_root : (Root) -> ()
+wait_none : (Owner) <- (Await) -> ()
+wait_none_root : (Root) <- (Await) -> ()
 within : <A,N>(() <- (..N, Owner) -> A) <- (..N, Root) -> A
 ready : <A>(A) -> Request(A)
 ticket : <A>(Request(A)) -> Ticket
 state : <A>(Request(A)) -> RequestState(A)
 take : <A>(Request(A)) -> A
 settled : (Ticket) -> Bool
-cancel : (Ticket) -> Nil
+cancel : (Ticket) -> ()
 await : <A>(Request(A)) <- (Await) -> A
 await_owned : <A>(Request(A)) <- (Await) -> A
-wait_any : (List(Ticket)) -> Nil
-poll : () -> Nil
+wait_any : (List(Ticket)) -> ()
+poll : () -> ()
 ```
 
 Scope registers releases in reverse acquisition order. Use kept non-Fail
@@ -390,9 +391,9 @@ from a finalizer. A's checking/examples must enforce the stated finalizer rule.
 | Module | Public contract, reference and migration |
 |---|---|
 | `i/big` | Keep the seven support functions below. Spec Int; E `BigInt.ts` for capability comparison. No second public integer type. |
-| `i/bits` | Keep wide segment algorithms. Spec §8, Go `encoding/binary/binary.go`. Checked user codecs live in std/bytes. |
+| `i/bits` | Keep wide segment algorithms. Spec §8, Go `encoding/binary/binary.go`. Checked user codecs live in i/bytes. |
 | `i/float_text` | Keep shortest round-trip formatter. Spec §11.8, Go `strconv/ftoa.go`. It is the single formatting algorithm. |
-| `i/core` | Keep necessary primitives and canonical inspect/hash/portable. Spec §13; E `Equal.ts`, `Hash.ts`. Raw conversion/search statuses become private adapters; public checked conversions/search use CoreError below. std/string maps a missing-search error to its ordinary Option answer. std wrappers translate domain errors, never reimplement the primitive. |
+| `i/core` | Keep necessary primitives and canonical inspect/hash/portable. Spec §13; E `Equal.ts`, `Hash.ts`. Raw conversion/search statuses become private adapters; public checked conversions/search use CoreError below. i/string maps a missing-search error to its ordinary Option answer. std wrappers translate domain errors, never reimplement the primitive. |
 
 ```text
 // i/big: operands obey private runtime representation invariants.
@@ -432,7 +433,7 @@ hash : <A>(A) -> Int
 portable : <A>(A) -> Bool
 ```
 
-The byte-offset `core.index_of` is a primitive interface; std/string's search
+The byte-offset `core.index_of` is a primitive interface; i/string's search
 uses scalar offsets. Neither offset may be reused in the other API. Compiler
 support declarations must remain target-neutral primitive operations. Changing
 public conversion heads requires the E4 primitive adapter migration; it must
@@ -459,9 +460,9 @@ Position = ImportItem | ExportItem | Item | Attribute | Type | DataTypeItem |
 // Each Position member has data ().
 SyntaxError = (message = String, at = Syntax)
 Definitions = (definition = (Syntax) <- (Fail(SyntaxError)) -> Syntax)
-Items = (add = (Syntax,Syntax,List((String,String)),Syntax) <- (Fail(SyntaxError)) -> Nil,
-         expose = (Syntax) <- (Fail(SyntaxError)) -> Nil)
-Diagnostics = (note = (String) -> Nil)
+Items = (add = (Syntax,Syntax,List((String,String)),Syntax) <- (Fail(SyntaxError)) -> (),
+         expose = (Syntax) <- (Fail(SyntaxError)) -> ())
+Diagnostics = (note = (String) -> ())
 Yes = (); No = (); NotKnown = (); Truth = Yes | No | NotKnown
 Types = (type_of = (Syntax) <- (Fail(SyntaxError)) -> Syntax,
          signature = () -> Syntax,
@@ -488,7 +489,7 @@ bounds. Dict/Set traversal order is unspecified. Sequence uses a measured tree.
 Use a canonical application projection, normally a list with a domain comparator,
 when content-based keys are wanted. These three containers stay experimental.
 
-#### std/option
+#### i/option
 
 Ordinary absence and its transformations. Reference: E `Option.ts`; G `option.gleam`.
 
@@ -514,7 +515,7 @@ map2 : <A, B, C, N>( Option(A), Option(B), (A, B) <- N -> C ) <- N -> Option(C)
 
 ```
 
-#### std/result
+#### i/result
 
 Stored outcomes after catch. Reference: E `Result.ts`; G `result.gleam`.
 
@@ -543,7 +544,7 @@ recover : <A, E, F, N>( Result(A, E), (E) <- N -> Result(A, F) ) <- N -> Result(
 
 ```
 
-#### std/list
+#### i/list
 
 Eager linked sequences, traversal and search. Reference: E `Array.ts`; G `list.gleam`.
 
@@ -598,7 +599,7 @@ key_find : <K, V>(List((K, V)), K) -> Option(V)
 key_filter : <K, V>(List((K, V)), K) -> List(V)
 key_pop : <K, V>(List((K, V)), K) -> Option((V, List((K, V))))
 key_set : <K, V>(List((K, V)), K, V) -> List((K, V))
-each : <A, B, N>(List(A), (A) <- N -> B) <- N -> Nil
+each : <A, B, N>(List(A), (A) <- N -> B) <- N -> ()
 partition : <A, N>(List(A), (A) <- N -> Bool) <- N -> ( List(A), List(A), )
 permutations : <A>(List(A)) -> List(List(A))
 window : <A>(List(A), Int) -> List(List(A))
@@ -618,7 +619,7 @@ min : <A, N>(List(A), (A, A) <- N -> Order) <- N -> Option(A)
 
 ```
 
-#### std/dict
+#### i/dict
 
 Persistent hash-trie dictionaries. Reference: E `HashMap.ts`, `Record.ts`; G `dict.gleam`; Go `maps/maps.go`.
 
@@ -640,7 +641,7 @@ to_list : <K, V>(Dict(K, V)) -> List((K, V))
 keys : <K, V>(Dict(K, V)) -> List(K)
 values : <K, V>(Dict(K, V)) -> List(V)
 fold : <K, V, Acc, N>( Dict(K, V), Acc, (Acc, K, V) <- N -> Acc ) <- N -> Acc
-each : <K, V, A, N>(Dict(K, V), (K, V) <- N -> A) <- N -> Nil
+each : <K, V, A, N>(Dict(K, V), (K, V) <- N -> A) <- N -> ()
 map_values : <K, V, W, N>(Dict(K, V), (K, V) <- N -> W) <- N -> Dict( K, W, )
 filter : <K, V, N>(Dict(K, V), (K, V) <- N -> Bool) <- N -> Dict(K, V)
 take : <K, V>(Dict(K, V), List(K)) -> Dict(K, V)
@@ -651,11 +652,11 @@ group : <V, K, N>(List(V), (V) <- N -> K) <- N -> Dict(K, List(V))
 same_entries : <K,V>(Dict(K,V),Dict(K,V)) -> Bool
 ```
 
-#### std/set
+#### i/set
 
 Persistent membership and set algebra. Reference: E `HashSet.ts`; G `set.gleam`.
 
-Keep all items; add same_elements. Storage stays Dict(A,Nil); no duplicate hashing engine.
+Keep all items; add same_elements. Storage stays Dict(A,()); no duplicate hashing engine.
 
 ```text
 Set(A) = private
@@ -668,7 +669,7 @@ contains : <A>(Set(A), A) -> Bool
 to_list : <A>(Set(A)) -> List(A)
 from_list : <A>(List(A)) -> Set(A)
 fold : <A, Acc, N>(Set(A), Acc, (Acc, A) <- N -> Acc) <- N -> Acc
-each : <A, B, N>(Set(A), (A) <- N -> B) <- N -> Nil
+each : <A, B, N>(Set(A), (A) <- N -> B) <- N -> ()
 map : <A, B, N>(Set(A), (A) <- N -> B) <- N -> Set(B)
 filter : <A, N>(Set(A), (A) <- N -> Bool) <- N -> Set(A)
 take : <A>(Set(A), List(A)) -> Set(A)
@@ -682,7 +683,7 @@ is_disjoint : <A>(Set(A), Set(A)) -> Bool
 same_elements : <A>(Set(A),Set(A)) -> Bool
 ```
 
-#### std/sequence
+#### i/sequence
 
 Persistent indexed deque and concatenation. Reference: E `Chunk.ts`; Go `slices/slices.go`.
 
@@ -711,12 +712,12 @@ drop : <A>(Sequence(A), Int) -> Sequence(A)
 reverse : <A>(Sequence(A)) -> Sequence(A)
 map : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> Sequence(B)
 fold : <A, Acc, N>( Sequence(A), Acc, (Acc, A) <- N -> Acc ) <- N -> Acc
-each : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> Nil
+each : <A, B, N>(Sequence(A), (A) <- N -> B) <- N -> ()
 same_elements : <A>(Sequence(A), Sequence(A)) -> Bool
 
 ```
 
-#### std/order
+#### i/order
 
 Ordering results and comparator composition. Reference: E `Order.ts`; G `order.gleam`.
 
@@ -739,7 +740,7 @@ by : <A,B,N>((A,A) <- N -> Order, (B) <- N -> A) -> (B,B) <- N -> Order
 combine : <A,N>((A,A) <- N -> Order, (A,A) <- N -> Order) -> (A,A) <- N -> Order
 ```
 
-#### std/pair
+#### i/pair
 
 Higher-order adapters for anonymous pairs. Reference: G `pair.gleam`.
 
@@ -753,7 +754,7 @@ map_second : <A, B, C, N>((A, B), (B) <- N -> C) <- N -> (A, C)
 
 ```
 
-#### std/bool
+#### i/bool
 
 Boolean conversion and useful function values. Reference: G `bool.gleam`; E `Boolean.ts`.
 
@@ -773,7 +774,7 @@ compare : (Bool, Bool) -> Order
 ### 3.4 Numbers, text and bytes — lane E
 
 Operational failures in these modules move from Result to the named Fail.
-No parse error uses Nil. Existing total predicates and absence queries remain
+No parse error uses (). Existing total predicates and absence queries remain
 total. Shared error shapes:
 
 ```text
@@ -793,7 +794,7 @@ BitProblem = Bounds | InvalidUtf8 | BadEncoding | Unaligned
 IntError and FloatError are owned in their respective modules. Repeated case
 spellings above are qualified identities, not a global shared error enum.
 
-#### std/int
+#### i/int
 
 Exact integers, checked arithmetic, radices and useful number algorithms. Reference: E `BigInt.ts`, `Number.ts`; G `int.gleam`; Go `strconv/atoi.go`.
 
@@ -840,7 +841,7 @@ gcd, lcm : (Int,Int) -> Int
 | to_base2 / to_base8 / to_base16 / to_base36 | to_base(value, 2 / 8 / 16 / 36), checked radix API |
 
 
-#### std/float
+#### i/float
 
 Finite binary64 parsing, checked math and formatting. Reference: E `Number.ts`; G `float.gleam`; Go `math/`, `strconv/ftoa.go`.
 
@@ -890,7 +891,7 @@ radians : (Float) -> Float
 degrees : (Float) <- (Fail(FloatError)) -> Float
 ```
 
-#### std/string
+#### i/string
 
 Unicode-scalar text. Reference: E `String.ts`; G `string.gleam`; Go `strings/strings.go`.
 
@@ -950,11 +951,11 @@ filter : <N>(String, (UtfCodepoint) <- N -> Bool) <- N -> String
 fold : <A, N>(String, A, (A, UtfCodepoint) <- N -> A) <- N -> A
 ```
 
-#### std/bit_array
+#### i/bit_array
 
 Arbitrary-bit operations and existing text/base codecs. Reference: G `bit_array.gleam`; Go `encoding/base64/base64.go`, `encoding/hex/hex.go`.
 
-Keep all listed items except inspect. Move Result validation to Fail(BitArrayError). Keep bit units for slice and explicit zero-padding behavior of existing codecs. Whole-byte IO uses std/bytes. Padding-Boolean encoders gain a one-argument default shape; explicit Bool shape remains, with documented meaning.
+Keep all listed items except inspect. Move Result validation to Fail(BitArrayError). Keep bit units for slice and explicit zero-padding behavior of existing codecs. Whole-byte IO uses i/bytes. Padding-Boolean encoders gain a one-argument default shape; explicit Bool shape remains, with documented meaning.
 
 ```text
 from_string : (String) -> BitArray
@@ -977,7 +978,7 @@ base64_url_decode : (String) <- (Fail(BitArrayError)) -> BitArray
 base64_encode, base64_url_encode : (BitArray) -> String
 ```
 
-#### std/crypto
+#### i/crypto
 
 SHA-2, HMAC, KDF and secure entropy. Reference: Go `crypto/sha256/`, `crypto/sha512/`, `crypto/subtle/constant_time.go`; E platform capability comparison.
 
@@ -1001,7 +1002,7 @@ constant_time_equal : (BitArray, BitArray) -> Bool
 random_bytes : (Int) <- (iprocess.Entropy, Fail(iprocess.ProcessError), request.Await, request.Owner) <- (Fail(CryptoError)) -> BitArray
 ```
 
-#### std/bytes — new
+#### i/bytes — new
 
 Whole-byte algorithms, assembly and bounded binary cursors. Reference:
 G `bytes_tree.gleam`; Go `bytes/bytes.go`, `encoding/binary/varint.go`.
@@ -1038,7 +1039,7 @@ reusing it repeats the same read. Varint is unsigned base-128, at most ten bytes
 for the interoperable 64-bit wire form; negative/overlong/non-minimal values fail.
 Builder assembly concatenates chunks once; repeated append does not flatten.
 
-#### std/unicode — new
+#### i/unicode — new
 
 One Unicode table and incremental UTF-8 decoder. Reference: Go
 `unicode/letter.go`, `unicode/utf8/utf8.go`; G `string.gleam`. Move regex's
@@ -1067,7 +1068,7 @@ regex compile validates names separately. Error offsets count bytes from the
 start of this decoder, including earlier chunks. No replacement-character
 policy silently masks malformed input.
 
-#### std/decimal — new, experimental
+#### i/decimal — new, experimental
 
 Exact base-ten arithmetic for application data. Reference: E `BigDecimal.ts`.
 Normalize coefficient/scale together so ordinary `==` and hash agree with
@@ -1107,7 +1108,7 @@ and DetachedScheduler implementation sentinels as the spec requires. Keep
 Event(A,E,N): E is used by sync's ordinary Fail need only. Add a bounded
 map shape, Ref get/set, and revision notifications plus the test-driver quiescence operation. `get`'s
 Shared and Ref cases have the same scheduler need and one result family.
-No separate std/ref implementation is created.
+No separate i/ref implementation is created.
 
 ```text
 Scheduler, Runner, Group(E), Task(A,E), Channel(A), Event(A,E,N), Shared(A), Ref(A)
@@ -1125,15 +1126,15 @@ scope, local_scope : <A,E,N>((Group(E)) <- (..N,Fail(E)) -> A)
 go : <A,E,N>(Group(E),() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> A)
   <- (..N,Scheduler) -> Task(A,E)
 join : <A,E>(Task(A,E)) <- (Fail(E),Scheduler) -> A
-yield : () <- (Scheduler) -> Nil
+yield : () <- (Scheduler) -> ()
 path : () <- (Scheduler) -> List(Int)
 random : () <- (Scheduler) -> random.Generator
 keep : <A,B,E,N>((A) <- (..N,Fail(E),Scheduler,Runner,request.Await) -> B)
   <- (..N,Scheduler) -> (A) <- (Fail(E),Scheduler) -> B
 channel, local_channel : <A>() <- (Scheduler) -> Channel(A)
-send : <A>(Channel(A),A) <- (Scheduler) -> Nil
+send : <A>(Channel(A),A) <- (Scheduler) -> ()
 receive : <A>(Channel(A)) <- (Scheduler) -> A
-send_event : <A>(Channel(A),A) -> Event(Nil,Never,Never)
+send_event : <A>(Channel(A),A) -> Event((),Never,Never)
 receive_event : <A>(Channel(A)) -> Event(A,Never,Never)
 join_event : <A,E>(Task(A,E)) -> Event(A,E,Never)
 always : <A>(A) -> Event(A,Never,Never)
@@ -1145,7 +1146,7 @@ share : <A,E>(Group(E),A) <- (Scheduler) -> Shared(A)
 get : <A>(Shared(A)) <- (Scheduler) -> A
 get : <A>(Ref(A)) <- (Scheduler) -> A
 ref : <A>(A) <- (Scheduler) -> Ref(A)
-set : <A>(Ref(A),A) <- (Scheduler) -> Nil
+set : <A>(Ref(A),A) <- (Scheduler) -> ()
 update : <A,B>(Ref(A),(A) -> (A,B)) <- (Scheduler) -> B
 both : <A,B,E,N>(() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> A,
   () <- (..N,Fail(E),Scheduler,Runner,request.Await) -> B) <- Tasks[N,E] -> (A,B)
@@ -1160,7 +1161,7 @@ map_concurrently : <A,B,E,N>(List(A),Int,
 Revision(A) = private
 snapshot : <A>(Ref(A)) <- (Scheduler) -> (value = A, revision = Revision(A))
 changed : <A>(Revision(A)) -> Event(A,Never,Never)
-quiesce : () <- (Scheduler) -> Nil
+quiesce : () <- (Scheduler) -> ()
 ```
 
 The two-argument map defaults to 32 workers; the explicit limit must be
@@ -1195,12 +1196,12 @@ Invalid handle use keeps the task stop contract; input capacity errors are Fail.
 
 | Module | Purpose and exact reference | Public types and functions |
 |---|---|---|
-| `std/deferred` | One completion, many readers. E `Deferred.ts`. | `Deferred(A,E)` private; `new : () <- C -> Deferred(A,E)`; `complete : (Deferred(A,E),Result(A,E)) <- (Scheduler) -> Bool`; `await : (Deferred(A,E)) <- (Scheduler,Fail(E)) -> A`; `poll : (Deferred(A,E)) <- (Scheduler) -> Option(Result(A,E))`; `is_done : (Deferred(A,E)) <- (Scheduler) -> Bool`. |
-| `std/semaphore` | FIFO admission with safe release. E `Semaphore.ts`; Go `sync/`. | `Semaphore` private; `SemaphoreError = InvalidPermits`, `InvalidPermits = (Int)`; `new : (Int) <- (C,Fail(SemaphoreError)) -> Semaphore`; `with_permits : (Semaphore,Int,() <- N -> A) <- (..N,Scheduler,Fail(SemaphoreError)) -> A`; `with_permit : (Semaphore,() <- N -> A) <- (..N,Scheduler) -> A`; `available : (Semaphore) <- (Scheduler) -> Int`. |
-| `std/queue` | Bounded/unbounded FIFO handoff. E `Queue.ts`. | `Queue(A,E)` private; `QueueError = InvalidCapacity | Closed`, `InvalidCapacity = (Int)`, `Closed = ()`; `bounded, dropping, sliding : (Int) <- (C,Fail(QueueError)) -> Queue(A,E)`; `unbounded : () <- C -> Queue(A,E)`; `offer : (Queue(A,E),A) <- (Scheduler,Fail(QueueError)) -> Bool`; `take : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `poll : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `size : (Queue(A,E)) <- (Scheduler) -> Int`; `end : (Queue(A,E)) <- (Scheduler) -> Nil`; `fail : (Queue(A,E),E) <- (Scheduler) -> Nil`; `shutdown : (Queue(A,E)) <- (Scheduler) -> Nil`. |
-| `std/pubsub` | Scoped broadcast to current subscribers. E `PubSub.ts`. | `PubSub(A)`, `Subscription(A)` private; `PubSubError = InvalidCapacity | Closed`, cases as above; `bounded, dropping, sliding : (Int) <- (C,Fail(PubSubError)) -> PubSub(A)`; `subscribe : (PubSub(A)) <- (C,Fail(PubSubError)) -> Subscription(A)`; `publish : (PubSub(A),A) <- (Scheduler,Fail(PubSubError)) -> Bool`; `take : (Subscription(A)) <- (Scheduler) -> Option(A)`; `unsubscribe : (Subscription(A)) <- (Scheduler) -> Nil`; `end, shutdown : (PubSub(A)) <- (Scheduler) -> Nil`. |
-| `std/latch` | Reusable open/closed gate. E `Latch.ts`. | `Latch` private; `new : (Bool) <- C -> Latch`; `open, close, release, await : (Latch) <- (Scheduler) -> Nil`; `is_open : (Latch) <- (Scheduler) -> Bool`. |
-| `std/fiber_set` | Dynamic jobs within one structured group. E `FiberSet.ts`. | `FiberSet(E,N)` private; `scoped : ((FiberSet(E,N)) <- (..N,Fail(E),Scheduler) -> A) <- Tasks[N,E] -> A`; `spawn : (FiberSet(E,N),() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> Nil) <- (..N,Scheduler) -> Nil`; `size : (FiberSet(E,N)) <- (Scheduler) -> Int`; `await_empty : (FiberSet(E,N)) <- (Scheduler,Fail(E)) -> Nil`. |
+| `i/deferred` | One completion, many readers. E `Deferred.ts`. | `Deferred(A,E)` private; `new : () <- C -> Deferred(A,E)`; `complete : (Deferred(A,E),Result(A,E)) <- (Scheduler) -> Bool`; `await : (Deferred(A,E)) <- (Scheduler,Fail(E)) -> A`; `poll : (Deferred(A,E)) <- (Scheduler) -> Option(Result(A,E))`; `is_done : (Deferred(A,E)) <- (Scheduler) -> Bool`. |
+| `i/semaphore` | FIFO admission with safe release. E `Semaphore.ts`; Go `sync/`. | `Semaphore` private; `SemaphoreError = InvalidPermits`, `InvalidPermits = (Int)`; `new : (Int) <- (C,Fail(SemaphoreError)) -> Semaphore`; `with_permits : (Semaphore,Int,() <- N -> A) <- (..N,Scheduler,Fail(SemaphoreError)) -> A`; `with_permit : (Semaphore,() <- N -> A) <- (..N,Scheduler) -> A`; `available : (Semaphore) <- (Scheduler) -> Int`. |
+| `i/queue` | Bounded/unbounded FIFO handoff. E `Queue.ts`. | `Queue(A,E)` private; `QueueError = InvalidCapacity | Closed`, `InvalidCapacity = (Int)`, `Closed = ()`; `bounded, dropping, sliding : (Int) <- (C,Fail(QueueError)) -> Queue(A,E)`; `unbounded : () <- C -> Queue(A,E)`; `offer : (Queue(A,E),A) <- (Scheduler,Fail(QueueError)) -> Bool`; `take : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `poll : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `size : (Queue(A,E)) <- (Scheduler) -> Int`; `end : (Queue(A,E)) <- (Scheduler) -> ()`; `fail : (Queue(A,E),E) <- (Scheduler) -> ()`; `shutdown : (Queue(A,E)) <- (Scheduler) -> ()`. |
+| `i/pubsub` | Scoped broadcast to current subscribers. E `PubSub.ts`. | `PubSub(A)`, `Subscription(A)` private; `PubSubError = InvalidCapacity | Closed`, cases as above; `bounded, dropping, sliding : (Int) <- (C,Fail(PubSubError)) -> PubSub(A)`; `subscribe : (PubSub(A)) <- (C,Fail(PubSubError)) -> Subscription(A)`; `publish : (PubSub(A),A) <- (Scheduler,Fail(PubSubError)) -> Bool`; `take : (Subscription(A)) <- (Scheduler) -> Option(A)`; `unsubscribe : (Subscription(A)) <- (Scheduler) -> ()`; `end, shutdown : (PubSub(A)) <- (Scheduler) -> ()`. |
+| `i/latch` | Reusable open/closed gate. E `Latch.ts`. | `Latch` private; `new : (Bool) <- C -> Latch`; `open, close, release, await : (Latch) <- (Scheduler) -> ()`; `is_open : (Latch) <- (Scheduler) -> Bool`. |
+| `i/fiber_set` | Dynamic jobs within one structured group. E `FiberSet.ts`. | `FiberSet(E,N)` private; `scoped : ((FiberSet(E,N)) <- (..N,Fail(E),Scheduler) -> A) <- Tasks[N,E] -> A`; `spawn : (FiberSet(E,N),() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> ()) <- (..N,Scheduler) -> ()`; `size : (FiberSet(E,N)) <- (Scheduler) -> Int`; `await_empty : (FiberSet(E,N)) <- (Scheduler,Fail(E)) -> ()`. |
 
 `Deferred.complete` accepts caught outcome data. First completion returns True;
 later ones return False and change nothing. Cancelling one waiter does not
@@ -1246,10 +1247,10 @@ Random service or duplicate TestRandom execution mechanism is added.
 // i/clock: raw Request(Result) fields are host reply data, not public sequencing.
 Clock = (monotonic_ns = () -> Request(Result(Int,String)),
          unix_ns = () -> Request(Result(Int,String)),
-         sleep_ns = (Int) -> Request(Result(Nil,String)))
+         sleep_ns = (Int) -> Request(Result((),String)))
 ClockError = (operation = String, code = String)
 monotonic_ns, unix_ns : () <- IO[Clock,ClockError] -> Int
-sleep_ns : (Int) <- IO[Clock,ClockError] -> Nil
+sleep_ns : (Int) <- IO[Clock,ClockError] -> ()
 // i/random
 Generator = private
 InvalidBound = (Int); InvalidPath = (List(Int))
@@ -1262,7 +1263,7 @@ split : (Generator) -> (Generator,Generator)
 at_path : (Generator,List(Int)) <- (Fail(RandomError)) -> Generator
 ```
 
-#### std/time and std/test_clock
+#### i/time and i/test_clock
 
 Keep Duration/Instant and all pure time operations. Add duration text and a
 high-level ordinary Clock. Reference: E `Duration.ts`, `DateTime.ts`,
@@ -1270,13 +1271,13 @@ high-level ordinary Clock. Reference: E `Duration.ts`, `DateTime.ts`,
 and virtual time use this same service. i/clock remains the raw host contract.
 
 ```text
-// std/time
+// i/time
 Duration, Instant = private
 DivisionByZero = (); BadText = (String); ClockFailure = (clock.ClockError)
 TimeError = DivisionByZero | BadText | ClockFailure
 Clock = (now = () <- (Fail(TimeError),Scheduler,request.Await,request.Owner) -> Instant,
          monotonic = () <- (Fail(TimeError),Scheduler,request.Await,request.Owner) -> Duration,
-         sleep = (Duration) <- (Fail(TimeError),Scheduler,request.Await,request.Owner) -> Nil)
+         sleep = (Duration) <- (Fail(TimeError),Scheduler,request.Await,request.Owner) -> ())
 nanoseconds, milliseconds, seconds, minutes, hours : (Int) -> Duration
 to_nanoseconds : (Duration) -> Int
 add, subtract : (Duration,Duration) -> Duration
@@ -1293,17 +1294,17 @@ format : (Duration) -> String
 native : () <- (clock.Clock) -> Clock
 now : () <- (Clock,Fail(TimeError),Scheduler,request.Await,request.Owner) -> Instant
 monotonic : () <- (Clock,Fail(TimeError),Scheduler,request.Await,request.Owner) -> Duration
-sleep : (Duration) <- (Clock,Fail(TimeError),Scheduler,request.Await,request.Owner) -> Nil
+sleep : (Duration) <- (Clock,Fail(TimeError),Scheduler,request.Await,request.Owner) -> ()
 measure : <A,E,N>(() <- (..N,Fail(E)) -> A)
   <- (..N,Clock,Scheduler,request.Await,request.Owner,Fail(E | TimeError)) -> (A,Duration)
-// std/test_clock
+// i/test_clock
 TestClock = private
 TestClockError = NegativeAdvance
 NegativeAdvance = (time.Duration)
 new : (time.Instant) <- (resource.Scope,Scheduler) -> TestClock
 clock : (TestClock) -> time.Clock
-advance : (TestClock,time.Duration) <- (Scheduler,Fail(TestClockError)) -> Nil
-set_time : (TestClock,time.Instant) <- (Scheduler) -> Nil
+advance : (TestClock,time.Duration) <- (Scheduler,Fail(TestClockError)) -> ()
+set_time : (TestClock,time.Instant) <- (Scheduler) -> ()
 pending : (TestClock) <- (Scheduler) -> List(time.Duration)
 ```
 
@@ -1322,7 +1323,7 @@ for differences. Duration text accepts signed integer quantities with `ns`,
 `us`, `ms`, `s`, `m`, `h`, summing adjacent terms; format emits an exact ns term
 for guaranteed round-trip. Named zones and leap seconds are not promised.
 
-#### std/calendar
+#### i/calendar
 
 Keep validated Gregorian Date/TimeOfDay/Offset, Civil and weekday cases.
 Reference: Go `time/time.go`; E `DateTime.ts`. All Result validation becomes
@@ -1357,11 +1358,11 @@ parse : (String) <- (Fail(CalendarError)) -> (Civil, Offset)
 format : (Civil, Offset) -> String
 ```
 
-#### std/random — new collection algorithms; deterministic testing in place
+#### i/random — new collection algorithms; deterministic testing in place
 
 Reference: E `Random.ts`; reuse i/random's state and errors. These are pure
 algorithms with explicit successor generators, not ambient service calls.
-`std/test_random` is deliberately not added: use i/random.from_seed/at_path,
+`i/test_random` is deliberately not added: use i/random.from_seed/at_path,
 task.test's script and test_clock as three separate reproducibility controls.
 This is the requested test version without duplicating random state machinery.
 
@@ -1374,19 +1375,19 @@ Empty choice returns None without drawing. Shuffle uses an unbiased bounded
 integer draw at each Fisher–Yates step; the private indexed workspace is an
 immutable Sequence. Secure bytes remain crypto.random_bytes with Entropy.
 
-#### std/concurrent and std/schedule — new
+#### i/concurrent and i/schedule — new
 
 Reference: E `Effect.ts`, `Schedule.ts`, `FiberSet.ts`. `concurrent` owns generic
 time limits; `i/task` owns race and bounded traversal. Do not duplicate them as
 HTTP-only helpers. No new race semantics are introduced.
 
 ```text
-// std/concurrent
+// i/concurrent
 ConcurrentError = Timeout
 Timeout = (after = time.Duration)
 timeout : <A,E,N>(() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> A,time.Duration)
   <- (..N,time.Clock,Scheduler,request.Owner,Fail(E | ConcurrentError | time.TimeError)) -> A
-// std/schedule
+// i/schedule
 Schedule(I,O,E,N), Decision(I,O,E,N) = private
 Metadata = (attempt = Int, elapsed = time.Duration)
 ScheduleError = InvalidCount | InvalidDelay | InvalidJitter
@@ -1433,7 +1434,7 @@ steps remain scheduler-cooperative. Exponential uses an integer factor ≥1.
 
 ### 3.7 Formats, schema and configuration — lane F
 
-#### std/json
+#### i/json
 
 Ordered JSON values and strict syntax. Reference: Go `encoding/json/encode.go`,
 `encoding/json/stream.go`; E `Schema.ts`. Keep all tagged scalar constructors,
@@ -1477,7 +1478,7 @@ these acceptance and wire policies before stability. Decoder byte/depth limits
 must be positive. Partial input keeps immutable parser state, never rescans
 an ever-growing prefix on every feed.
 
-#### std/schema
+#### i/schema
 
 One inspectable description supplies codecs, validation, JSON Schema and
 pure generators. Reference: E `Schema.ts`, `SchemaAST.ts`,
@@ -1570,7 +1571,7 @@ pure generation uses property size bounds; it must stop or discard when the
 budget is exhausted. Macro derivation is an optional later convenience through
 i/syntax; no compiler or private-constructor bypass is included today.
 
-#### std/csv
+#### i/csv
 
 Strict rows and incremental records. Reference: Go `encoding/csv/reader.go`,
 `writer.go`; current algorithms. Keep Options/CsvError. parse_with and
@@ -1599,7 +1600,7 @@ offsets. Existing delimiter/CRLF/width/blank-line behavior and chunk-demand
 regressions remain binding. Empty/malformed headers have explicit CsvError.
 `stream.attempt(rows(...))` captures row outcomes when that is the requested data.
 
-#### std/regex
+#### i/regex
 
 Immutable scalar NFA programs and search. Reference: Go `regexp/regexp.go`.
 Keep Regex, RegexError, Match, Captures and all ten functions. compile raises
@@ -1622,7 +1623,7 @@ replace, replace_all : (String,Regex,String) -> String
 split : (String,Regex) -> List(String)
 ```
 
-#### std/uri
+#### i/uri
 
 Validated URI references and the only query codec home. Reference: G
 `uri.gleam`; GH `request.gleam`; Go `net/url/url.go`. Keep Uri/Parts/Authority/
@@ -1662,7 +1663,7 @@ URI syntax validation does not validate DNS, port availability or filesystem
 containment. Preserve ordered repeated query pairs. No dynamic map substitutes
 for closed Parts data.
 
-#### std/cli
+#### i/cli
 
 Typed argument parsing, help and command execution. Reference: Go `flag/flag.go`;
 G's plain data/call conventions. Keep Parser/Names and fifteen operations.
@@ -1694,8 +1695,8 @@ map : (Parser(A,E,N),(A) <- (..N,Fail(E)) -> B) -> Parser(B,E,N)
 map2 : (Parser(A,E,N),Parser(B,E,N),(A,B) <- (..N,Fail(E)) -> C) -> Parser(C,E,N)
 parse : (List(String),Parser(A,E,N)) <- (..N,Fail(E | CliError)) -> A
 read : (Parser(A,E,N)) <- (..N,IO[iprocess.Arguments,E | CliError | iprocess.ProcessError]) -> A
-run : (Parser(A,E,N),String,(A) <- N -> Nil)
-  <- (..N,IO[iprocess.Arguments,stdio.Stdio,E | CliError | iprocess.ProcessError | stdio.StdioError]) -> Nil
+run : (Parser(A,E,N),String,(A) <- N -> ())
+  <- (..N,IO[iprocess.Arguments,stdio.Stdio,E | CliError | iprocess.ProcessError | stdio.StdioError]) -> ()
 help : (Parser(A,E,N),String) <- (Fail(CliError)) -> String
 text : (String) -> String
 integer : (String) <- (Fail(int.IntError)) -> Int
@@ -1706,7 +1707,7 @@ InvalidArgument. That existing case remains for parser-owned token validation.
 Usage/help failures do not swallow bad user data or failed output. Fake Args
 and Stdio tests exercise read/run, not just parser internals.
 
-#### std/config — new
+#### i/config — new
 
 Typed sources with explicit precedence. Reference: E `Config.ts`,
 `ConfigProvider.ts`. Schema owns structure/validation; Config does not invent
@@ -1739,7 +1740,7 @@ redacted : (Secret) -> String
 
 `fallback(first, second)` consults second only for None. Empty strings are
 present. Invalid data/source failure never falls back. Paths are explicit
-segments, not ambiguous dotted strings. Environment uses std/process.env for its absence classification, then prefix plus
+segments, not ambiguous dotted strings. Environment uses i/process.env for its absence classification, then prefix plus
 uppercase segments joined by `__`; missing environment means None, other
 process failures become ConfigError. Its default values are JSON Text; the
 application schema uses an explicit transform for text-to-port/bool conversion.
@@ -1754,7 +1755,7 @@ erasure or protection after the caller reveals/copies the string.
 
 ### 3.8 Streams, sinks and common byte IO — lane G
 
-#### std/stream
+#### i/stream
 
 Lazy production with ordinary need-bearing pulls. Reference: E `Stream.ts`,
 `Channel.ts`, `Pull.ts`; the existing replayable implementation is retained.
@@ -1784,7 +1785,7 @@ take, drop : (Stream(A,E,N),Int) -> Stream(A,E,N)
 take_while : (Stream(A,E,N),(A) <- (..N,Fail(F)) -> Bool) -> Stream(A,E | F,N)
 fold : (Stream(A,E,N),B,(B,A) <- N -> B) <- (..N,Fail(E)) -> B
 fold_until : (Stream(A,E,N),B,(B,A) <- N -> list.ContinueOrStop(B)) <- (..N,Fail(E)) -> B
-each : (Stream(A,E,N),(A) <- N -> B) <- (..N,Fail(E)) -> Nil
+each : (Stream(A,E,N),(A) <- N -> B) <- (..N,Fail(E)) -> ()
 to_list : (Stream(A,E,N)) <- (..N,Fail(E)) -> List(A)
 from_results : (List(Result(A,E))) -> Stream(A,E,N)
 attempt : (Stream(A,E,N)) -> Stream(Result(A,E),Never,N)
@@ -1842,7 +1843,7 @@ No stream callback outlives use. Buffer/map/merge need no public Channel IR.
 An input Reader and its response/file/connection owner close at the enclosing
 `run` boundary, including early take, decode error and cancellation.
 
-#### std/sink — new
+#### i/sink — new
 
 Reusable consumers with explicit leftovers. Reference: E `Sink.ts`. A sink
 contains an ordinary consuming function. It does not own a hidden scheduler.
@@ -1858,7 +1859,7 @@ fold_until : (B,(B,A) <- (..N,Fail(E)) -> list.ContinueOrStop(B)) -> Sink(A,B,E,
 collect : () -> Sink(A,List(A),E,N)
 take : (Int) <- (Fail(stream.StreamError)) -> Sink(A,List(A),E,N)
 head : () -> Sink(A,Option(A),E,N)
-each : ((A) <- (..N,Fail(E)) -> Nil) -> Sink(A,Nil,E,N)
+each : ((A) <- (..N,Fail(E)) -> ()) -> Sink(A,(),E,N)
 map : (Sink(A,B,E,N),(B) <- (..N,Fail(E)) -> C) -> Sink(A,C,E,N)
 zip : (Sink(A,B,E,N),Sink(A,C,E,N)) -> Sink(A,(B,C),E,N)
 ```
@@ -1869,7 +1870,7 @@ head on empty input returns None. fold_until consumes the stopping element
 and returns the following stream. `stream.run` consumers return End.value and deliberately leave End.rest
 inside the resource scope. Leftovers are never pulled speculatively.
 
-#### std/io — new
+#### i/io — new
 
 Small byte protocols, precise progress and bounded composition. Reference:
 Go `io/io.go`, `bufio/bufio.go`, `bufio/scan.go`. Keep i/io separate: it is the
@@ -1884,7 +1885,7 @@ Reader(E,N) = (read = (Int) <- (..N,Fail(E | IoError)) -> Option(BitArray))
 Writer(E,N) = (write = (BitArray) <- (..N,Fail(E | IoError)) -> Int)
 read_exact : (Reader(E,N),Int) <- (..N,Fail(E | IoError)) -> BitArray
 read_all : (Reader(E,N),max_bytes = Int) <- (..N,Fail(E | IoError)) -> BitArray
-write_all : (BitArray,Writer(E,N)) <- (..N,Fail(E | IoError)) -> Nil
+write_all : (BitArray,Writer(E,N)) <- (..N,Fail(E | IoError)) -> ()
 copy : (Reader(E,N),Writer(E,N),max_bytes = Int) <- (..N,Fail(E | IoError)) -> Int
 limit : (Reader(E,N),Int) <- (Fail(IoError)) -> Reader(E,N)
 tee : (Reader(E,N),Writer(E,N)) -> Reader(E,N)
@@ -1897,12 +1898,12 @@ bytes. It may return fewer than requested. Zero/negative bound fails IoError.
 A reader that receives both bytes and a later failure emits those bytes first
 and raises the retained failure on the next read; adapters cannot fabricate
 partial data a host never reports. A pure parser cursor is instead explicit
-successor state in std/bytes; from_bytes uses a scheduler Ref for IO-style reads.
+successor state in i/bytes; from_bytes uses a scheduler Ref for IO-style reads.
 
 Writer.write returns the accepted prefix length, 0..input byte count. It may
 raise after external partial effects. An empty write returns zero. write_all
 handles short writes, rejects zero progress on nonempty input, and never
-claims atomicity after an error. Today's Nil-returning host writes map success
+claims atomicity after an error. Today's ()-returning host writes map success
 to the full supplied byte count; their documented full-write promise must be
 tested. A host that can short-write must loop or report progress in its adapter.
 This chooses the style audit's counted-progress option; it is not a new ABI.
@@ -1926,11 +1927,11 @@ No new host operation or unsupported-only platform provider is added.
 
 | Module | Public types and disposition |
 |---|---|
-| `i/io` | Keep the specified public `Io = (print = (String) -> Nil)` service and no free functions. Best-effort newline printing intentionally reports no error. |
+| `i/io` | Keep the specified public `Io = (print = (String) -> ())` service and no free functions. Best-effort newline printing intentionally reports no error. |
 | `i/stdio` | Keep public Stdio constructor and all seven functions. Stdio's existing read/write/write_error/flush/flush_error Request fields stay. StdioError gains a typed reason; raw code remains diagnostic. |
-| `i/fs` | Keep private raw Fs/File constructors, OpenMode and Metadata. Keep minimal operations below. open is scope-owned through resource.Scope. FsError carries an FsProblem reason with the host code kept. copy (chunked, gives bytes) and walk (depth first, name order, capped at depth 32) are the new operations. Move read_file/write_file/read_lines algorithms to std/fs; update spec §9.12's convenience-operation location in the migration, rather than leaving two implementations.  `Fs` is provided on `native`, `nodejs` and `wasi`; any other target rejects an entry that needs it with E0523. |
+| `i/fs` | Keep private raw Fs/File constructors, OpenMode and Metadata. Keep minimal operations below. open is scope-owned through resource.Scope. FsError carries an FsProblem reason with the host code kept. copy (chunked, gives bytes) and walk (depth first, name order, capped at depth 32) are the new operations. Move read_file/write_file/read_lines algorithms to i/fs; update spec §9.12's convenience-operation location in the migration, rather than leaving two implementations.  `Fs` is provided on `native`, `nodejs` and `wasi`; any other target rejects an entry that needs it with E0523. |
 | `i/process` | Keep Arguments/Environment/WorkingDirectory/Entropy public constructors, raw Process and Child private. Keep all fourteen operations. Directory's value constructor becomes AtDirectory, fixing the duplicate name; the union is DirectoryMode. spawn, spawn_piped and spawn_config are scope-owned through resource.Scope. ProcessError carries a ProcessProblem reason with the host code kept. collect (both piped streams drained concurrently with task.both, unbounded, no wait) is the new operation.  `Process` and `WorkingDirectory` are provided on `native` and `nodejs`; any other target rejects an entry that needs them with E0523. |
-| `i/net` | Keep private Net/Listener/Stream/Datagram, NetError and all seventeen operations. Keep specified close_stream/close_listener/close_datagram rather than prematurely merging their different contracts. byte_stream retains a low-level lib-only byte record; std/io adaptation lives above it. |
+| `i/net` | Keep private Net/Listener/Stream/Datagram, NetError and all seventeen operations. Keep specified close_stream/close_listener/close_datagram rather than prematurely merging their different contracts. byte_stream retains a low-level lib-only byte record; i/io adaptation lives above it. |
 | `i/tls` | Keep Tls/Stream, TlsError and all eleven functions. Keep options/identity as closed data. accept's identity carries cert/key; split server options to alpn only, deleting ignored roots/cert/key fields from that argument. |
 | `i/fetch` | Keep Fetch/Response and five functions. Replace Fail(String) with one FetchError. Scope-owning HTTP construction is above this raw adapter. |
 
@@ -1959,9 +1960,9 @@ Public native functions use `IO[S,E]` from §3.1:
 ```text
 // i/stdio
 read : (Int) <- IO[Stdio,StdioError] -> BitArray
-write, write_error : (BitArray) <- IO[Stdio,StdioError] -> Nil
-flush, flush_error : () <- IO[Stdio,StdioError] -> Nil
-print, print_error : (String) <- IO[Stdio,StdioError] -> Nil
+write, write_error : (BitArray) <- IO[Stdio,StdioError] -> ()
+flush, flush_error : () <- IO[Stdio,StdioError] -> ()
+print, print_error : (String) <- IO[Stdio,StdioError] -> ()
 // i/fs
 File, Fs = private
 File = (number = Int, path = String)
@@ -1972,11 +1973,11 @@ FsProblem = NotFound | Denied | Exists | Closed | Busy | Invalid | Unsupported |
 FsError = (operation = String, path = String, reason = FsProblem, code = String)
 open : (String,OpenMode) <- (resource.Scope,Fs,Fail(FsError)) -> File
 read : (File,Int) <- IO[Fs,FsError] -> BitArray
-write : (File,BitArray) <- IO[Fs,FsError] -> Nil
-flush : (File) <- IO[Fs,FsError] -> Nil
-close : (File) <- IO[Fs] -> Nil
-remove, mkdir : (String) <- IO[Fs,FsError] -> Nil
-rename : (String,String) <- IO[Fs,FsError] -> Nil
+write : (File,BitArray) <- IO[Fs,FsError] -> ()
+flush : (File) <- IO[Fs,FsError] -> ()
+close : (File) <- IO[Fs] -> ()
+remove, mkdir : (String) <- IO[Fs,FsError] -> ()
+rename : (String,String) <- IO[Fs,FsError] -> ()
 list : (String) <- IO[Fs,FsError] -> List(String)
 metadata : (String) <- IO[Fs,FsError] -> Metadata
 temp_dir : () <- IO[Fs,FsError] -> String
@@ -2005,35 +2006,35 @@ spawn_piped : (String,List(String),Stdio,Stdio,Stdio) <- (resource.Scope,Process
 spawn_config : (String,List(String),Stdio,Stdio,Stdio,EnvironmentMode,DirectoryMode)
   <- (resource.Scope,Process,Fail(ProcessError)) -> Child
 read_stdout, read_stderr : (Child,Int) <- IO[Process,ProcessError] -> BitArray
-write_stdin : (Child,BitArray) <- IO[Process,ProcessError] -> Nil
-close_stdin : (Child) <- IO[Process,ProcessError] -> Nil
+write_stdin : (Child,BitArray) <- IO[Process,ProcessError] -> ()
+close_stdin : (Child) <- IO[Process,ProcessError] -> ()
 wait : (Child) <- IO[Process,ProcessError] -> Int
-terminate : (Child) <- IO[Process,ProcessError] -> Nil
-close : (Child) <- IO[Process] -> Nil
+terminate : (Child) <- IO[Process,ProcessError] -> ()
+close : (Child) <- IO[Process] -> ()
 collect : (Child) <- (resource.Scope,Process,task.Scheduler,task.Runner,Fail(ProcessError))
   -> (stdout = BitArray, stderr = BitArray)
 // spawn* attach the Child's release to the current resource.Scope before returning: terminate, wait (reaps), close; terminate/wait errors are dropped so the release cannot fail.
 // i/net
 Net, Listener, Stream, Datagram = private
 bind : (String,Int) <- IO[Net,NetError] -> Datagram
-send_to : (Datagram,String,Int,BitArray) <- IO[Net,NetError] -> Nil
+send_to : (Datagram,String,Int,BitArray) <- IO[Net,NetError] -> ()
 receive_from : (Datagram,Int) <- IO[Net,NetError] -> (address = String, port = Int, data = BitArray)
 local_address : (Datagram) <- IO[Net,NetError] -> String
-close_datagram : (Datagram) <- IO[Net] -> Nil
+close_datagram : (Datagram) <- IO[Net] -> ()
 listen : (String,Int) <- IO[Net,NetError] -> Listener
 local_port : (Listener | Datagram) <- IO[Net,NetError] -> Int
 accept : (Listener) <- IO[Net,NetError] -> Stream
 connect : (String,Int) <- IO[Net,NetError] -> Stream
 resolve : (String) <- IO[Net,NetError] -> List(String)
 read : (Stream,Int) <- IO[Net,NetError] -> BitArray
-write : (Stream,BitArray) <- IO[Net,NetError] -> Nil
-shutdown_write : (Stream) <- IO[Net,NetError] -> Nil
-close_stream : (Stream) <- IO[Net] -> Nil
-close_listener : (Listener) <- IO[Net] -> Nil
+write : (Stream,BitArray) <- IO[Net,NetError] -> ()
+shutdown_write : (Stream) <- IO[Net,NetError] -> ()
+close_stream : (Stream) <- IO[Net] -> ()
+close_listener : (Listener) <- IO[Net] -> ()
 stream_number : (Stream) -> Int
 byte_stream : (Stream) -> (read = (Int) <- IO[Net,NetError] -> BitArray,
-  write = (BitArray) <- IO[Net,NetError] -> Nil,
-  shutdown_write = () <- IO[Net,NetError] -> Nil, close = () <- IO[Net] -> Nil)
+  write = (BitArray) <- IO[Net,NetError] -> (),
+  shutdown_write = () <- IO[Net,NetError] -> (), close = () <- IO[Net] -> ())
 // i/tls
 Tls, Stream = private
 options : () -> (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)
@@ -2046,44 +2047,44 @@ dial : (String,Int,(alpn = List(String),cert = BitArray,key = BitArray,roots = B
   <- IO[Tls,net.Net,TlsError | net.NetError] -> Stream
 alpn : (Stream) <- IO[Tls,TlsError] -> String
 read : (Stream,Int) <- IO[Tls,TlsError] -> BitArray
-write : (Stream,BitArray) <- IO[Tls,TlsError] -> Nil
-shutdown_write : (Stream) <- IO[Tls,TlsError] -> Nil
-close : (Stream) <- IO[Tls] -> Nil
+write : (Stream,BitArray) <- IO[Tls,TlsError] -> ()
+shutdown_write : (Stream) <- IO[Tls,TlsError] -> ()
+close : (Stream) <- IO[Tls] -> ()
 byte_stream : (Stream) -> (read = (Int) <- IO[Tls,TlsError] -> BitArray,
-  write = (BitArray) <- IO[Tls,TlsError] -> Nil,
-  shutdown_write = () <- IO[Tls,TlsError] -> Nil, close = () <- IO[Tls] -> Nil)
+  write = (BitArray) <- IO[Tls,TlsError] -> (),
+  shutdown_write = () <- IO[Tls,TlsError] -> (), close = () <- IO[Tls] -> ())
 // i/fetch
 Fetch, Response = private
 open : (String,String,String,BitArray) <- IO[Fetch,FetchError] -> Response
 status : (Response) <- IO[Fetch,FetchError] -> Int
 headers : (Response) <- IO[Fetch,FetchError] -> String
 read : (Response,Int) <- IO[Fetch,FetchError] -> BitArray
-close : (Response) <- IO[Fetch] -> Nil
+close : (Response) <- IO[Fetch] -> ()
 ```
 
 The lib-only net/TLS byte records remain different because their nominal
-errors differ. Their algorithms are not duplicated: std/io's one contract
+errors differ. Their algorithms are not duplicated: i/io's one contract
 and G's native adapter functions handle EOF/progress. They cannot import
-std/io from lib/i. The native/fetch HTTP providers translate transport errors
+i/io from stdlib/src. The native/fetch HTTP providers translate transport errors
 once into HttpError while retaining typed underlying details.
 
-#### std/fs — new high-level home
+#### i/fs — new high-level home
 
 Scoped files and replaceable filesystem policy. Reference: E `FileSystem.ts`;
 Go `io/fs/fs.go`, `os/file.go`. Move today's i/fs.read_file/write_file/read_lines
-here and implement them through std/io and one acquisition path. The migration
+here and implement them through i/io and one acquisition path. The migration
 updates spec's module location with those moves. `FileSystem(N)` is an ordinary
 service so memory tests do not need mutable raw host fields or a second host ABI.
 It reuses i/ifs.OpenMode/Metadata/FsError; it defines no second filesystem error.
 
 ```text
 File(N) = (reader = io.Reader(ifs.FsError,N), writer = io.Writer(ifs.FsError,N),
-           flush = () <- (..N,Fail(ifs.FsError)) -> Nil, close = () <- N -> Nil)
+           flush = () <- (..N,Fail(ifs.FsError)) -> (), close = () <- N -> ())
 FileSystem(N) = (
   open = (String,ifs.OpenMode) <- (..N,resource.Scope,Fail(ifs.FsError)) -> File(N),
-  remove = (String) <- (..N,Fail(ifs.FsError)) -> Nil,
-  rename = (String,String) <- (..N,Fail(ifs.FsError)) -> Nil,
-  mkdir = (String) <- (..N,Fail(ifs.FsError)) -> Nil,
+  remove = (String) <- (..N,Fail(ifs.FsError)) -> (),
+  rename = (String,String) <- (..N,Fail(ifs.FsError)) -> (),
+  mkdir = (String) <- (..N,Fail(ifs.FsError)) -> (),
   list = (String) <- (..N,Fail(ifs.FsError)) -> List(String),
   metadata = (String) <- (..N,Fail(ifs.FsError)) -> ifs.Metadata,
   temp_dir = () <- (..N,Fail(ifs.FsError)) -> String)
@@ -2092,13 +2093,13 @@ memory : (dict.Dict(String,BitArray)) <- (resource.Scope,Scheduler) -> FileSyste
 open : (String,ifs.OpenMode) <- (FileSystem(N),..N,resource.Scope,Fail(ifs.FsError)) -> File(N)
 read_file : (String,max_bytes = Int)
   <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError)) -> BitArray
-write_file : (String,BitArray) <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError)) -> Nil
+write_file : (String,BitArray) <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError)) -> ()
 read_lines : (String,max_bytes = Int)
   <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError | unicode.UnicodeError)) -> List(String)
 stream : (String,chunk_bytes = Int)
   <- (FileSystem(N),..N,resource.Scope,Fail(ifs.FsError)) -> stream.Stream(BitArray,ifs.FsError | io.IoError,N)
 write_sink : (String) <- (FileSystem(N),..N,resource.Scope,Fail(ifs.FsError))
-  -> sink.Sink(BitArray,Nil,ifs.FsError | io.IoError,N)
+  -> sink.Sink(BitArray,(),ifs.FsError | io.IoError,N)
 copy : (String,String,max_bytes = Int)
   <- (FileSystem(N),..N,Fail(ifs.FsError | io.IoError)) -> Int
 walk : (String,max_depth = Int) <- (FileSystem(N),..N,resource.Scope,Fail(ifs.FsError))
@@ -2122,7 +2123,7 @@ operations fail FsError(Unsupported), not a fake platform installation that
 pretends an absent host capability exists. Service fakes themselves may model
 capabilities their tests choose; platform target tables remain authoritative.
 
-#### std/path
+#### i/path
 
 Pure slash-separated lexical paths. Reference: Go `path/path.go`.
 Keep all eight functions and their algorithms. RelativeError→PathError;
@@ -2142,7 +2143,7 @@ relative : (String,String) <- (Fail(PathError)) -> String
 Lexical clean is not filesystem containment. Native Windows path rules and
 file-URL conversion are separate extensions, never inferred from the target.
 
-#### std/process — new
+#### i/process — new
 
 Immutable commands and scoped pipelines. Reference: E
 `process/ChildProcess.ts`, `process/ChildProcessSpawner.ts`; Go `os/exec/exec.go`.
@@ -2156,10 +2157,10 @@ Command = (program = String, args = List(String), directory = iprocess.Directory
            stdout = iprocess.Stdio, stderr = iprocess.Stdio)
 Child(N) = (stdin = io.Writer(iprocess.ProcessError,N),
             stdout = io.Reader(iprocess.ProcessError,N), stderr = io.Reader(iprocess.ProcessError,N),
-            close_stdin = () <- (..N,Fail(iprocess.ProcessError)) -> Nil,
+            close_stdin = () <- (..N,Fail(iprocess.ProcessError)) -> (),
             wait = () <- (..N,Fail(iprocess.ProcessError)) -> Int,
-            terminate = () <- (..N,Fail(iprocess.ProcessError)) -> Nil,
-            close = () <- N -> Nil)
+            terminate = () <- (..N,Fail(iprocess.ProcessError)) -> (),
+            close = () <- N -> ())
 Spawner(N) = (spawn = (Command) <- (..N,resource.Scope,Fail(iprocess.ProcessError)) -> Child(N))
 Output = (status = Int, stdout = BitArray, stderr = BitArray)
 command : (String,List(String)) -> Command
@@ -2180,7 +2181,7 @@ and waits before closing handles. Spawn failure closes all earlier pipeline
 children. env maps only the native missing-variable condition to None; empty
 is Some(""). This is the shared absence adapter used by config.environment.
 
-#### std/terminal — new cooked IO
+#### i/terminal — new cooked IO
 
 Line-oriented interaction on stdin/stdout, useful without a raw terminal.
 Reference: E `Terminal.ts`; Go `bufio/scan.go`. This first API needs only the
@@ -2191,7 +2192,7 @@ TerminalError = LineTooLong
 LineTooLong = (limit = Int)
 read_line : (max_bytes = Int)
   <- IO[stdio.Stdio,TerminalError | stdio.StdioError | unicode.UnicodeError] -> Option(String)
-display : (String) <- IO[stdio.Stdio,stdio.StdioError] -> Nil
+display : (String) <- IO[stdio.Stdio,stdio.StdioError] -> ()
 prompt : (String,max_bytes = Int)
   <- IO[stdio.Stdio,TerminalError | stdio.StdioError | unicode.UnicodeError] -> Option(String)
 ```
@@ -2204,7 +2205,7 @@ contract; ordinary byte stdio remains usable on every supported target.
 
 ### 3.10 HTTP data, client and server — lane I
 
-#### std/http
+#### i/http
 
 Pure HTTP message data, framing and buffered-body decoding. Reference:
 E `http/HttpClientRequest.ts`, `http/HttpClientResponse.ts`; GH `request.gleam`,
@@ -2217,7 +2218,7 @@ Keep ordered repeated headers and case-insensitive names. RawHeaders and its
 constructor disappear; from_header_bytes preserves raw values explicitly.
 header_bytes stays, headers→header_values, add_header stays. BodyError's cases
 move into HttpError; BodyError disappears. NeedMore is progress, not an error.
-Timeout moves to std/concurrent. Query codecs live only in uri.
+Timeout moves to i/concurrent. Query codecs live only in uri.
 
 ```text
 Method = (String); Status = (Int); Headers = private
@@ -2267,7 +2268,7 @@ be positive; invalid options produce Invalid(BadMessage(...)). Stream drivers
 use the same head/framing logic incrementally. More remains ordinary parser
 progress, not a second computation failure protocol.
 
-#### std/http_client — new home for existing client work
+#### i/http_client — new home for existing client work
 
 Scoped pooled clients and transport substitution. Reference: E
 `http/HttpClient.ts`; Go `net/http/client.go`, `transport.go`.
@@ -2321,7 +2322,7 @@ Timeout/retry compose ordinary functions from C, with no HTTP-specific timing
 engine. Tracing middleware takes an ordinary send function and returns one;
 no package import installs logging, tracing or retry policy.
 
-#### std/http_server — new home for existing server work
+#### i/http_server — new home for existing server work
 
 Bounded, structured HTTP/1.1 serving and testable handlers. Reference: E
 `http/HttpServer.ts`, `http/HttpRouter.ts`, `http/HttpServerResponse.ts`;
@@ -2356,7 +2357,7 @@ close that peer; unhandled application E follows task-group failure rules.
 
 ### 3.11 Diagnostics, observability, caching, batching and tests — lane J
 
-#### std/cause — new diagnostic data
+#### i/cause — new diagnostic data
 
 Reference: E `Cause.ts`, `Exit.ts`; Go `errors/join.go`. This is explicit
 collected diagnostic data, not a catch-all runtime outcome. It contains only
@@ -2377,7 +2378,7 @@ report all concurrent failures; their least-path rule remains unchanged.
 No matcher module is added. Branches, guards, type tests and exhaustiveness
 already cover matching, selective recovery and domain dispatch.
 
-#### std/log
+#### i/log
 
 Structured, replaceable logging with explicit policy. Reference: E `Logger.ts`;
 Go `log/slog/handler.go`. Sink(E,N)→Logger(E,N) avoids confusion with stream
@@ -2391,13 +2392,13 @@ Debug = (); Info = (); Warning = (); Error = (); Level = Debug | Info | Warning 
 Value = json.Json | config.Secret
 Entry = (level = Level, message = String, fields = List((String,Value)), at = Option(time.Instant))
 Logger(E,N) = private service
-make : ((Level) -> Bool,(Entry) <- (..N,Fail(E)) -> Nil) -> Logger(E,N)
+make : ((Level) -> Bool,(Entry) <- (..N,Fail(E)) -> ()) -> Logger(E,N)
 silent : () -> Logger(Never,Never)
 filter : (Logger(E,N),(Level) -> Bool) -> Logger(E,N)
 minimum : (Logger(E,N),Level) -> Logger(E,N)
 enabled : (Level) <- (Logger(E,N)) -> Bool
-write : (Entry) <- (Logger(E,N),..N,Fail(E)) -> Nil
-lazy : (Level,() <- N -> String) <- (Logger(E,N),..N,Fail(E)) -> Nil
+write : (Entry) <- (Logger(E,N),..N,Fail(E)) -> ()
+lazy : (Level,() <- N -> String) <- (Logger(E,N),..N,Fail(E)) -> ()
 format, format_json : (Entry) -> String
 stdout, stderr : () -> Logger(stdio.StdioError,(stdio.Stdio,request.Await,request.Owner))
 file : (String) <- (fs.FileSystem(N),..N,resource.Scope,Fail(ifs.FsError))
@@ -2417,7 +2418,7 @@ write calls; scope close follows a documented non-failing close policy.
 No background logger queue or silent drop is installed by default. Users may
 compose queue/batch explicitly when their overflow and failure policy is known.
 
-#### std/metric — new
+#### i/metric — new
 
 Scoped measurement state and snapshots. Reference: E `Metric.ts`. One ordinary
 Registry service uses a Ref; there is no process-global mutable registry.
@@ -2432,15 +2433,15 @@ Value = Count | Level | Buckets
 Sample = (name = String, labels = List((String,String)), value = Value)
 Measurement = Add | Set | Observe
 Add = (Counter,Int); Set = (Gauge,Float); Observe = (Histogram,Float)
-Registry = (record = (Measurement) <- (Scheduler,Fail(MetricError)) -> Nil,
+Registry = (record = (Measurement) <- (Scheduler,Fail(MetricError)) -> (),
             snapshot = () <- (Scheduler) -> List(Sample))
 registry : (max_series = Int) <- (resource.Scope,Scheduler,Fail(MetricError)) -> Registry
 counter : (String,List((String,String))) <- (Fail(MetricError)) -> Counter
 gauge : (String,List((String,String))) <- (Fail(MetricError)) -> Gauge
 histogram : (String,List((String,String)),List(Float)) <- (Fail(MetricError)) -> Histogram
-add : (Counter,Int) <- (Registry,Scheduler,Fail(MetricError)) -> Nil
-set : (Gauge,Float) <- (Registry,Scheduler,Fail(MetricError)) -> Nil
-observe : (Histogram,Float) <- (Registry,Scheduler,Fail(MetricError)) -> Nil
+add : (Counter,Int) <- (Registry,Scheduler,Fail(MetricError)) -> ()
+set : (Gauge,Float) <- (Registry,Scheduler,Fail(MetricError)) -> ()
+observe : (Histogram,Float) <- (Registry,Scheduler,Fail(MetricError)) -> ()
 snapshot : () <- (Registry,Scheduler) -> List(Sample)
 ```
 
@@ -2452,7 +2453,7 @@ are rejected. Capacity bounds distinct name/label series, not observation count.
 Creating a description does not register global state. Snapshot order is stable
 by name and label list for deterministic tests and exporters.
 
-#### std/trace — new
+#### i/trace — new
 
 Operation spans and ordinary parent provision. Reference: E `Tracer.ts`.
 Keep needs visible. A tracer records completion without raising from cleanup.
@@ -2467,7 +2468,7 @@ Span = (context = SpanContext, parent = Option(SpanContext), name = String,
         ended = Option(time.Duration), status = SpanStatus,
         cause = Option(cause.Cause(String)))
 Tracer(N) = private service
-make : (random.Generator,(Span) <- N -> Nil) <- (resource.Scope,Scheduler) -> Tracer(N)
+make : (random.Generator,(Span) <- N -> ()) <- (resource.Scope,Scheduler) -> Tracer(N)
 root : () -> ParentSpan
 with_span : (String,List((String,json.Json)),() <- (..N,ParentSpan,Fail(E)) -> A)
   <- (Tracer(N),ParentSpan,time.Clock,Scheduler,request.Await,request.Owner,
@@ -2484,7 +2485,7 @@ completion. An unavailable final clock sample is ended=None; it cannot turn
 cleanup into a raised error. No correctness claim depends on real-time ordering.
 HTTP wire propagation/export backends are later adapters over SpanContext.
 
-#### std/cache — new
+#### i/cache — new
 
 Bounded LRU, monotonic TTL and shared in-progress loads. Reference: E `Cache.ts`.
 A scoped callback owns all loader jobs. Do not return a Cache from a short-lived
@@ -2500,10 +2501,10 @@ scoped : ((K) <- (..N,Fail(E),Scheduler,Runner,request.Await) -> A,Options,
   <- (..N,time.Clock,Scheduler,request.Await,request.Owner,Fail(F | CacheError | time.TimeError)) -> R
 get : (Cache(K,A,E),K) <- (Scheduler,Fail(E | CacheError | time.TimeError)) -> A
 get_cached : (Cache(K,A,E),K) <- (Scheduler,Fail(CacheError | time.TimeError)) -> Option(Result(A,E))
-set : (Cache(K,A,E),K,A) <- (Scheduler,Fail(CacheError | time.TimeError)) -> Nil
+set : (Cache(K,A,E),K,A) <- (Scheduler,Fail(CacheError | time.TimeError)) -> ()
 refresh : (Cache(K,A,E),K) <- (Scheduler,Fail(E | CacheError | time.TimeError)) -> A
-invalidate : (Cache(K,A,E),K) <- (Scheduler) -> Nil
-invalidate_all : (Cache(K,A,E)) <- (Scheduler) -> Nil
+invalidate : (Cache(K,A,E),K) <- (Scheduler) -> ()
+invalidate_all : (Cache(K,A,E)) <- (Scheduler) -> ()
 size : (Cache(K,A,E)) <- (Scheduler) -> Int
 ```
 
@@ -2524,7 +2525,7 @@ the old settled value until the new attempt succeeds. scoped uses the same
 producer/consumer race pattern as stream helpers: callback return cancels loader
 work and waits for cleanup. The cache handle never extends that lifetime.
 
-#### std/batch — new logical batching
+#### i/batch — new logical batching
 
 Combine application lookups without overloading i/request. Reference:
 E `Request.ts`, `RequestResolver.ts`. Resolver inputs/answers are immutable
@@ -2542,7 +2543,7 @@ scoped : ((List(Item(I))) <- (..N,Fail(E),Scheduler,Runner,request.Await) -> Lis
   Options,(Batcher(I,O,E)) <- (..N,Fail(F),Scheduler) -> R)
   <- (..N,time.Clock,Scheduler,request.Await,request.Owner,Fail(F | BatchError | time.TimeError)) -> R
 submit : (Batcher(I,O,E),I) <- (Scheduler,Fail(E | BatchError | time.TimeError)) -> O
-flush : (Batcher(I,O,E)) <- (Scheduler,Fail(BatchError | time.TimeError)) -> Nil
+flush : (Batcher(I,O,E)) <- (Scheduler,Fail(BatchError | time.TimeError)) -> ()
 pending : (Batcher(I,O,E)) <- (Scheduler) -> Int
 ```
 
@@ -2556,7 +2557,7 @@ one waiter does not cancel a dispatched batch needed by others. Scoped return
 cancels dispatch/loads and waits for cleanup. Compose cache's loader with submit
 when caching is wanted; there is no second cache implementation in batch.
 
-#### std/kv — new
+#### i/kv — new
 
 A small ordinary key/value service, schema views and explicit persistence.
 Reference: E `persistence/KeyValueStore.ts`. Memory and file providers share
@@ -2564,8 +2565,8 @@ one contract; neither imports a hidden global store.
 
 ```text
 Store(N) = (get = (String) <- (..N,Fail(KvError)) -> Option(BitArray),
-            set = (String,BitArray) <- (..N,Fail(KvError)) -> Nil,
-            remove = (String) <- (..N,Fail(KvError)) -> Nil,
+            set = (String,BitArray) <- (..N,Fail(KvError)) -> (),
+            remove = (String) <- (..N,Fail(KvError)) -> (),
             keys = () <- (..N,Fail(KvError)) -> List(String))
 KvError = (operation = String, key = String, reason = KvProblem)
 KvProblem = InvalidKey | FileFailure | IoFailure | InvalidValue
@@ -2575,14 +2576,14 @@ memory : () <- (resource.Scope,Scheduler) -> Store(Scheduler)
 file_store : (String,max_bytes = Int)
   <- (fs.FileSystem(N),..N,resource.Scope,Scheduler,Fail(KvError)) -> Store((N,Scheduler))
 get : (String) <- (Store(N),..N,Fail(KvError)) -> Option(BitArray)
-set : (String,BitArray) <- (Store(N),..N,Fail(KvError)) -> Nil
-remove : (String) <- (Store(N),..N,Fail(KvError)) -> Nil
+set : (String,BitArray) <- (Store(N),..N,Fail(KvError)) -> ()
+remove : (String) <- (Store(N),..N,Fail(KvError)) -> ()
 keys : () <- (Store(N),..N,Fail(KvError)) -> List(String)
 prefix : (Store(N),String) -> Store(N)
 get_schema : (String,schema.Schema(A,E,N,W))
   <- (Store(N),..N,Fail(KvError | schema.SchemaError | json.JsonError | unicode.UnicodeError | E)) -> Option(A)
 set_schema : (String,A,schema.Schema(A,E,D,N))
-  <- (Store(N),..N,Fail(KvError | schema.SchemaError | E)) -> Nil
+  <- (Store(N),..N,Fail(KvError | schema.SchemaError | E)) -> ()
 ```
 
 Only a missing key yields None. A corrupt stored value raises its typed decode
@@ -2598,7 +2599,7 @@ crash durability or secure exclusive temporary-file guarantee is promised.
 The store directory is explicitly owned by this service; do not mix unrelated
 writers into it. Unsupported backend guarantees cannot be inferred from Dict.
 
-#### std/property
+#### i/property
 
 Pure generators, lazy shrink trees and reproducible reports. Reference:
 E `Arbitrary.ts`; Go `testing/testing.go`. Keep all listed operations and
@@ -2642,7 +2643,7 @@ string : (Int) <- (Fail(PropertyError)) -> Gen(String)
 check : (Gen(A),Config,(A) <- N -> Verdict) <- N -> Report(A)
 replay : (Gen(A),Int,Int,Int,List(Int)) -> Option(A)
 format : (Report(A),(A) -> String) -> String
-test : (Gen(A),Config,(A) <- (..N,Assert) -> Nil,(A) -> String) <- (..N,Assert) -> Nil
+test : (Gen(A),Config,(A) <- (..N,Assert) -> (),(A) -> String) <- (..N,Assert) -> ()
 ```
 
 check repeats a callback while shrinking. Effectful properties must install
@@ -2652,7 +2653,7 @@ adapter catches Assert only and does not swallow typed failure. A shrink result
 is bounded/local, never advertised as the globally smallest counterexample.
 Fix the embedded Python Config probe to labelled construction.
 
-#### std/test and std/test_services
+#### i/test and i/test_services
 
 Reference: Go `testing/example.go`, `testing/testing.go`; E
 `testing/TestClock.ts`, `testing/TestConsole.ts`, `testing/TestSchema.ts`,
@@ -2661,12 +2662,12 @@ Keep ordinary test macros and migrate quoted suite provision to `<-`.
 Do not create a special test keyword, test Layer mechanism or second runner.
 
 ```text
-// std/test (test.is)
-tests : Nil
+// i/test (test.is)
+tests : ()
 test, skip, only, fails : (Syntax,Syntax) <- (syntax.Items,Fail(syntax.SyntaxError)) -> Syntax
 suite : (Syntax,Syntax) -> Syntax
 each : (Syntax,Syntax,Syntax) <- (syntax.Items,Fail(syntax.SyntaxError)) -> Syntax
-// std/test_services, new: recorders are immutable handles with scheduler-backed state.
+// i/test_services, new: recorders are immutable handles with scheduler-backed state.
 Console = (input = io.Reader(Never,Scheduler), stdout = io.Writer(Never,Scheduler),
            stderr = io.Writer(Never,Scheduler), output = () <- (Scheduler) -> BitArray,
            errors = () <- (Scheduler) -> BitArray)
@@ -2675,11 +2676,11 @@ TraceRecorder = (tracer = trace.Tracer(Scheduler), spans = () <- (Scheduler) -> 
 console : (BitArray) <- (resource.Scope,Scheduler) -> Console
 logs : () <- (resource.Scope,Scheduler) -> LogRecorder
 traces : (random.Generator) <- (resource.Scope,Scheduler) -> TraceRecorder
-round_trip : (A,schema.Schema(A,E,N,N)) <- (..N,Assert,Fail(E | schema.SchemaError)) -> Nil
+round_trip : (A,schema.Schema(A,E,N,N)) <- (..N,Assert,Fail(E | schema.SchemaError)) -> ()
 ```
 
 Raw Stdio request fields cannot call Scheduler. Console exposes the
-high-level std/io reader/writer contract so stateful recording remains ordinary
+high-level i/io reader/writer contract so stateful recording remains ordinary
 scheduler-owned state. Use fixed ready-reply Stdio fakes for raw adapter tests;
 use Console for stateful common-IO tests. Never run task effects inside a closed
 pure host Request field.
@@ -2700,7 +2701,7 @@ It is not an additional alias surface.
 | Current family | Coverage and final home |
 |---|---|
 | assertion, big, bits, clock, control, core, fail, failure, fetch, float_text | Retained/reconciled in i, except failure deleted into fail; §§3.2, 3.6, 3.9. |
-| fs, io, key, net, process, random, request, resource, stdio, syntax, task, tls | Minimal/spec support in i; fs convenience algorithms move to std/fs; §§3.2, 3.5, 3.6, 3.9. |
+| fs, io, key, net, process, random, request, resource, stdio, syntax, task, tls | Minimal/spec support in i; fs convenience algorithms move to i/fs; §§3.2, 3.5, 3.6, 3.9. |
 | option, result, list, dict, set, sequence, order, pair, bool | Existing data families retained, duplicate syntax/bridges removed; §3.3. |
 | int, float, string, bit_array, crypto | Existing algorithms retained and failures normalized; §3.4. bytes/unicode/decimal add distinct capabilities. |
 | calendar, time | Existing pure units/civil algorithms retained; §3.6. Clock/test_clock/random/schedule/concurrent complete policy paths. |
@@ -2714,8 +2715,8 @@ These extension boundaries have no phantom exports or eight-hour estimates:
 
 | Capability | Home when implemented; decision fixed now |
 |---|---|
-| Richer filesystem metadata, seek, links/permissions, exclusive temporary creation, watch | Extend i/fs host contract with explicit target support, then std/fs. Do not fake it with lexical checks or invent a platform capability. |
-| Raw terminal, size and key events | Optional i/terminal capability plus std/terminal policy; scope restores mode. Byte stdio stays available. |
+| Richer filesystem metadata, seek, links/permissions, exclusive temporary creation, watch | Extend i/fs host contract with explicit target support, then i/fs. Do not fake it with lexical checks or invent a platform capability. |
+| Raw terminal, size and key events | Optional i/terminal capability plus i/terminal policy; scope restores mode. Byte stdio stays available. |
 | Windows/native paths, Unicode normalization/graphemes/UTF-16 | Separate explicit path-style and unicode operations, with data versions. Existing scalar/POSIX meanings remain fixed. |
 | Named timezone data, gap/fold policy, cron | calendar/timezone data extension then schedule cron. Fixed offsets and monotonic policy ship first. |
 | WebSocket, Unix sockets, HTTP2, cookies/multipart/proxies/compression | Extend the corresponding protocol/transport modules, with scoped adapters and streaming tests. HTTP/1.1 and existing TCP/UDP/TLS are the release contract here. |
@@ -2780,7 +2781,7 @@ type identities, constructors/fields, aliases and required host namespaces.
 It normalizes type variables and proves supported semantic scheme equivalence.
 Proof-budget exhaustion fails; uncertain representation change requires major.
 It does not read maturity comments or prove behavior. The current
-`std/test/std3_interfaces.py` checks only 35 selected type strings; it is not
+`stdlib/test/std3_interfaces.py` checks only 35 selected type strings; it is not
 an all-library compatibility check and must not become another type-diff engine.
 
 Lane L exposes a read-only package command, decided CLI spelling for L:
@@ -2824,7 +2825,7 @@ A changed stable implementation needs either a contract-preserving explanation
 or a reviewed behavioral change note with tests. This is review evidence, not
 a claim that a script can prove semantic equivalence.
 
-`scripts/std-api-check` runs the following in order and fails closed:
+The API check runs the following in order and fails closed:
 
 1. Check std and shipped i/; generate the current interface and maturity list.
    Reject missing docs, missing example links, focus-only tests and invalid marks.
@@ -2834,7 +2835,7 @@ a claim that a script can prove semantic equivalence.
 3. Reject a stable export that reaches an experimental contract, or silently
    loses stable status. Check public constructors and deferred callback needs.
    Require replacement/migration notes for a new deprecation.
-4. Check reviewed behavior notes and run linked examples/laws. Compile/run
+4. Check reviewed behavior notes and run the linked examples and property tests. Compile/run
    representative clients from the previous supported release. Those clients
    exercise service provision and resource lifetimes, not just import names.
 5. Run the target matrix below and existing release checks. Fail an unexpected
@@ -2885,14 +2886,14 @@ If that baseline or the ordinary primitive-linking gate is unavailable by hour 2
 Do not restore provider plans or a second error mechanism to make a build pass.
 
 File sets below are exclusive. A lane owns its current and destination files,
-its matching `std/test/<name>_test.i`, and a matching new
-`std/test/examples/<name>_examples.i`. Existing multi-module test files belong
+its matching `stdlib/test/<name>_test.i`, and a matching new
+`stdlib/test/examples/<name>_examples.i`. Existing multi-module test files belong
 to the lane explicitly listed. Only that owner edits them. Consumers report
 needed changes to the owner. Use one isolated branch/worktree per lane. Merge
 complete slices into the integration branch at the stated checkpoints; no lane
 rebases or commits another lane's pending work. No lane edits shared spec,
 workflow or compiler files unless explicitly assigned. K owns application
-callers and example manifests. L alone edits std/i.toml, shared release lists
+callers and example manifests. L alone edits stdlib/i.toml, shared release lists
 and CI. Existing unrelated examples are
 migrated by K, never by module lanes.
 
@@ -2914,18 +2915,18 @@ regenerates L's snapshots or edits another lane's integration file.
 
 | Lane / budget | Exclusive source files and modules | Order and assumed cross-lane interfaces | Required tests and examples |
 |---|---|---|---|
-| A. Native effects and lifetime; 6 h | `lib/i/{fail,failure,assertion,control,resource,key,request,syntax,core,big,bits,float_text}.i`; `tests/spec/9/{keep_env,control_lazy_env,control_lazy_env_unwind}.i`; `docs/spec.md` library API/location clauses only, coordinated with the syntax owner; new `std/test/{fail,resource,request,syntax,key}_test.i` | Consolidate fail → reconcile row-only control → resource Scope/scoped/acquire → request handoff → syntax docs/hooks review. Exact primitive contracts are spec §§9.3–9.5, 9.8, 9.11 and syntax-three §2.10.7–9. No dependency on std. Coordinate E3/E5 compiler work with its existing owner. | Catch separation, narrowed rethrow, outlived handler rejection, reverse cleanup, nested/empty scope, cancel between acquisition and registration, unclaimed Ready release, no finalizer Fail. Preserve existing primitive regression suites. |
-| B. Task coordination; 7 h | `lib/i/task.i`; new `std/src/{deferred,semaphore,queue,pubsub,latch,fiber_set}.i`; matching new tests | Group rename/ref snapshots/change events/quiescence and bounded traversal → Deferred → Semaphore → bounded Queue → PubSub/Latch → scoped FiberSet. Assume A's Scope and ordinary Fail. Use task events and owner loops; no public scheduler protocol extension. Publish capacity/termination heads first. | FIFO/backpressure, losing select consumes nothing, cancelled waiter removal, exactly-once completion, permit handoff, scope closure, O(limit) live traversal children, no leaked handles. Existing task Rust/spec fixtures run unchanged apart from Group naming owned through integration. |
-| C. Time and policy; 6 h | `lib/i/{clock,random}.i`; `std/src/{time,calendar,random,schedule,concurrent,test_clock}.i`; `std/test/{clock,time,calendar}_test.i` and new matching tests | Keep exact Duration/Instant → task-level Clock service and virtual sleepers → timeout → schedule/retry/repeat → random test helpers. Assume B's Ref/channel/scopes and A's resource lifetime. Existing i/clock remains raw adapter. | Quiescent virtual time, sleepers registered after yields, cancellation removes sleeps, wall jumps do not affect duration, timeout waits for cleanup, exact attempt/delay vectors, bounded seeded jitter, seed/path replay. No real sleeping in policy unit tests. |
-| D. Collections and data; 6 h | `std/src/{option,result,list,dict,set,sequence,order,pair,bool}.i`; their current tests | Delete duplicate bridges → normalize names/shapes → preserve need propagation → content comparison laws. Assume core equality/hash from A, unchanged. Preserve collection algorithms; no canonical-tree project today. | Existing collection regression/property examples; different insertion/tree histories, hash collisions, stable sorting, empty lookup, effectful callbacks and first failure. Show explicit conversion to list for value keys. |
-| E. Numbers, text and binary data; 7 h | `std/src/{int,float,string,bit_array,bytes,unicode,decimal,crypto}.i`; matching tests plus `string_additions_test.i`; Unicode tables currently included by regex move only through F's coordinated deletion | Typed numeric/byte errors → subject-first codecs → shared Unicode data → incremental UTF-8 → byte assembly/search → small normalized Decimal. Assume A's core/entropy boundary; D's Order/List. Keep i/float_text algorithm. | Existing vectors and float-text regressions; invalid radix/domain/UTF-8 offsets; every UTF-8 split; whole-byte enforcement; byte search; Decimal normalization/rounding; no new timing-security claim. |
-| F. Formats, schema and configuration; 7 h | `std/src/{json,schema,csv,regex,uri,cli,config}.i`; matching current/new tests | Fail migration and argument order → retain parser algorithms → schema description + decode/encode/validate → config provider precedence. Assume E's UTF-8 and numeric errors, D's collections, H's environment/file adapters; describe schema metadata before consumers use it. | Round trips, duplicate JSON fields, unknown/missing/null distinctions, encode validation, unsupported custom derivation, CSV chunk boundaries and Fail, regex zero-width demand, URI byte offsets, CLI fake args, config missing/invalid/source-error precedence. |
-| G. Stream, sink and common IO; 7 h | `std/src/{stream,sink,io}.i`; their tests | Freeze Reader/Writer → scoped run → incremental adapters → Sink leftovers → bounded map/merge/buffer and time operators. Assume A Scope, B queues/events, C clock and E UTF-8. No std import in lib/i adapters: high-level adapters live here. | Pure replay/demand; scoped single-consumption IO; early take closes; decoder Fail/cancel closes; bounded memory and producers; leftovers are not read twice; every chunk boundary; short/zero-progress writes and exact-read EOF. |
-| H. Host IO and tools; 7 h | `lib/i/{fs,process,net,tls,stdio,io,fetch}.i`; `std/src/{fs,path,process,terminal}.i`; matching tests including `stdio_test.i`; existing IO example tests stay K-owned | Preserve raw ABI and creation guards → scoped high-level handles/adapters → bounded file streams/copy/walk → immutable commands with concurrent output drains → cooked terminal. Assume A Scope, G Reader/Writer/source contract, C timeout, F typed env/config errors. No new host imports in this day. | File cleanup at every handoff; injected read/write/flush errors; TLS option behavior; UDP empty packets; resolver/handshake cancel; child termination+wait and both pipe drains; bounded walk/link behavior; native/node/wasi capability differences. |
-| I. HTTP; 7 h | `std/src/{http,http_client,http_server}.i`; `std/test/{http,http_network}_test.i`; new client/server tests | Pure messages/framing → scoped Client factory → true native/fetch response pulls → streaming server response + bounded admission → generic timeout/retry adapters. Assume A Scope, B admission, C policies, F codecs, G IO, H net/TLS/fetch. | A response chunk arrives before body completion; early-close at every stage; pool survives body use; size limits; redirects never replay unsafe bodies; cross-origin sensitive headers; framing, request/response streams, cancellation waits for handlers. |
-| J. Application services and testing; 7 h | `std/src/{cause,log,metric,trace,cache,batch,kv,property,test_services}.i`, `std/src/test.is`; matching tests, `property_failures.py` | Cause data/test macros/properties and recorders → contextual log/metric/trace → scoped single-flight cache → batch dispatcher → memory/file KV. Assume A Scope, B Deferred/Queue, C monotonic clock, D Dict, F schema/config, H files. Start recorders/cache state machines before dependencies merge. | Lazy filtered logs, output failure policy, deterministic metric/span records, early/cancelled spans, cache capacity/TTL/invalidation/load races, cancellation of one shared waiter, partial/missing batch answers, KV round trips, property seed/shrink replay and suite `<-` handling. |
-| K. Programs and caller migration; 4 h, worker 11 first | All `examples/**` files that import affected modules; four new packages `examples/std-v3-{http,files,crawl,config}/**`; acceptance guide `docs/examples/std-v3.md` | Start with fakes against frozen heads. HTTP retry+timeout → scoped streaming file CSV processing → crawl with input-order bounded results → schema-validated config. Assume contracts A–J; module owners never edit these callers. | Each package runs and has a fake-service test. HTTP: transient failure then success and deadline cleanup. Files: early stop, malformed UTF-8/CSV, no leak. Crawl: measured max in-flight ≤ limit, fail/cancel cleanup. Config: env overrides file only when present, invalid override fails, secret rendered redacted. |
-| L. Stability list and CI; 3 h, worker 11 second | `std/i.toml`; `docs/design/std-v3-api.json`; `docs/design/std-v3-behavior.md`; `scripts/std-api-check`; `std/test/std3_interfaces.py`; CI workflow files under `.github/workflows/`; `crates/ilang-cli/src/commands/package.rs` and its `package_commands.rs` tests only for read-only comparator exposure | Extract final heads → metadata/dependency closure → read-only existing semantic comparator → tag and compiled-client gate. Assume all lanes' item docs and example links; coordinate compiler owner before touching package.rs. No handwritten second type-diff engine. | Deliberate removal/need/error/constructor/shape/host-namespace changes fail; independent export requires minor; dropped stable mark fails; experimental reachability fails; pre-A3 baseline skip is a hard review gate; examples compile. |
+| A. Native effects and lifetime; 6 h | `stdlib/src/{fail,assertion,control,resource,key,request,syntax,core,big,bits,float_text}.i`; `tests/spec/9/{keep_env,control_lazy_env,control_lazy_env_unwind}.i`; `docs/spec.md` library API/location clauses only, coordinated with the syntax owner; new `stdlib/test/{fail,resource,request,syntax,key}_test.i` | Consolidate fail → reconcile row-only control → resource Scope/scoped/acquire → request handoff → `docs/spec.md` and hooks review. Exact primitive contracts are spec §§9.3–9.5, 9.8, 9.11 and syntax-three §2.10.7–9. No dependency on std. Coordinate E3/E5 compiler work with its existing owner. | Catch separation, narrowed rethrow, outlived handler rejection, reverse cleanup, nested/empty scope, cancel between acquisition and registration, unclaimed Ready release, no finalizer Fail. Preserve existing primitive regression suites. |
+| B. Task coordination; 7 h | `stdlib/src/task.i`; new `stdlib/src/{deferred,semaphore,queue,pubsub,latch,fiber_set}.i`; matching new tests | Group rename/ref snapshots/change events/quiescence and bounded traversal → Deferred → Semaphore → bounded Queue → PubSub/Latch → scoped FiberSet. Assume A's Scope and ordinary Fail. Use task events and owner loops; no public scheduler protocol extension. Publish capacity/termination heads first. | FIFO/backpressure, losing select consumes nothing, cancelled waiter removal, exactly-once completion, permit handoff, scope closure, O(limit) live traversal children, no leaked handles. Existing task Rust/spec fixtures run unchanged apart from Group naming owned through integration. |
+| C. Time and policy; 6 h | `stdlib/src/{clock,random}.i`; `stdlib/src/{time,calendar,random,schedule,concurrent,test_clock}.i`; `stdlib/test/{clock,time,calendar}_test.i` and new matching tests | Keep exact Duration/Instant → task-level Clock service and virtual sleepers → timeout → schedule/retry/repeat → random test helpers. Assume B's Ref/channel/scopes and A's resource lifetime. Existing i/clock remains raw adapter. | Quiescent virtual time, sleepers registered after yields, cancellation removes sleeps, wall jumps do not affect duration, timeout waits for cleanup, exact attempt/delay vectors, bounded seeded jitter, seed/path replay. No real sleeping in policy unit tests. |
+| D. Collections and data; 6 h | `stdlib/src/{option,result,list,dict,set,sequence,order,pair,bool}.i`; their current tests | Delete duplicate bridges → normalize names/shapes → preserve need propagation → content comparison laws. Assume core equality/hash from A, unchanged. Preserve collection algorithms; no canonical-tree project today. | Existing collection regression/property examples; different insertion/tree histories, hash collisions, stable sorting, empty lookup, effectful callbacks and first failure. Show explicit conversion to list for value keys. |
+| E. Numbers, text and binary data; 7 h | `stdlib/src/{int,float,string,bit_array,bytes,unicode,decimal,crypto}.i`; matching tests plus `string_additions_test.i`; Unicode tables currently included by regex move only through F's coordinated deletion | Typed numeric/byte errors → subject-first codecs → shared Unicode data → incremental UTF-8 → byte assembly/search → small normalized Decimal. Assume A's core/entropy boundary; D's Order/List. Keep i/float_text algorithm. | Existing vectors and float-text regressions; invalid radix/domain/UTF-8 offsets; every UTF-8 split; whole-byte enforcement; byte search; Decimal normalization/rounding; no new timing-security claim. |
+| F. Formats, schema and configuration; 7 h | `stdlib/src/{json,schema,csv,regex,uri,cli,config}.i`; matching current/new tests | Fail migration and argument order → retain parser algorithms → schema description + decode/encode/validate → config provider precedence. Assume E's UTF-8 and numeric errors, D's collections, H's environment/file adapters; describe schema metadata before consumers use it. | Round trips, duplicate JSON fields, unknown/missing/null distinctions, encode validation, unsupported custom derivation, CSV chunk boundaries and Fail, regex zero-width demand, URI byte offsets, CLI fake args, config missing/invalid/source-error precedence. |
+| G. Stream, sink and common IO; 7 h | `stdlib/src/{stream,sink,io}.i`; their tests | Freeze Reader/Writer → scoped run → incremental adapters → Sink leftovers → bounded map/merge/buffer and time operators. Assume A Scope, B queues/events, C clock and E UTF-8. No std import in stdlib/src adapters: high-level adapters live here. | Pure replay/demand; scoped single-consumption IO; early take closes; decoder Fail/cancel closes; bounded memory and producers; leftovers are not read twice; every chunk boundary; short/zero-progress writes and exact-read EOF. |
+| H. Host IO and tools; 7 h | `stdlib/src/{fs,process,net,tls,stdio,io,fetch}.i`; `stdlib/src/{fs,path,process,terminal}.i`; matching tests including `stdio_test.i`; existing IO example tests stay K-owned | Preserve raw ABI and creation guards → scoped high-level handles/adapters → bounded file streams/copy/walk → immutable commands with concurrent output drains → cooked terminal. Assume A Scope, G Reader/Writer/source contract, C timeout, F typed env/config errors. No new host imports in this day. | File cleanup at every handoff; injected read/write/flush errors; TLS option behavior; UDP empty packets; resolver/handshake cancel; child termination+wait and both pipe drains; bounded walk/link behavior; native/node/wasi capability differences. |
+| I. HTTP; 7 h | `stdlib/src/{http,http_client,http_server}.i`; `stdlib/test/{http,http_network}_test.i`; new client/server tests | Pure messages/framing → scoped Client factory → true native/fetch response pulls → streaming server response + bounded admission → generic timeout/retry adapters. Assume A Scope, B admission, C policies, F codecs, G IO, H net/TLS/fetch. | A response chunk arrives before body completion; early-close at every stage; pool survives body use; size limits; redirects never replay unsafe bodies; cross-origin sensitive headers; framing, request/response streams, cancellation waits for handlers. |
+| J. Application services and testing; 7 h | `stdlib/src/{cause,log,metric,trace,cache,batch,kv,property,test_services}.i`, `stdlib/src/test.is`; matching tests, `property_failures.py` | Cause data/test macros/properties and recorders → contextual log/metric/trace → scoped single-flight cache → batch dispatcher → memory/file KV. Assume A Scope, B Deferred/Queue, C monotonic clock, D Dict, F schema/config, H files. Start recorders/cache state machines before dependencies merge. | Lazy filtered logs, output failure policy, deterministic metric/span records, early/cancelled spans, cache capacity/TTL/invalidation/load races, cancellation of one shared waiter, partial/missing batch answers, KV round trips, property seed/shrink replay and suite `<-` handling. |
+| K. Programs and caller migration; 4 h, worker 11 first | All `examples/**` files that import affected modules; four new packages under `examples/`; an acceptance guide | Start with fakes against frozen heads. HTTP retry+timeout → scoped streaming file CSV processing → crawl with input-order bounded results → schema-validated config. Assume contracts A–J; module owners never edit these callers. | Each package runs and has a fake-service test. HTTP: transient failure then success and deadline cleanup. Files: early stop, malformed UTF-8/CSV, no leak. Crawl: measured max in-flight ≤ limit, fail/cancel cleanup. Config: env overrides file only when present, invalid override fails, secret rendered redacted. |
+| L. Stability list and CI; 3 h, worker 11 second | `stdlib/i.toml`; `docs/design/std-v3-api.json`; `docs/design/std-v3-behavior.md`; `stdlib/test/std3_interfaces.py`; CI workflow files under `.github/workflows/`; `crates/ilang-cli/src/commands/package.rs` and its `package_commands.rs` tests only for read-only comparator exposure | Extract final heads → metadata/dependency closure → read-only existing semantic comparator → tag and compiled-client gate. Assume all lanes' item docs and example links; coordinate compiler owner before touching package.rs. No handwritten second type-diff engine. | Deliberate removal/need/error/constructor/shape/host-namespace changes fail; independent export requires minor; dropped stable mark fails; experimental reachability fails; pre-A3 baseline skip is a hard review gate; examples compile. |
 
 B and J are the largest new-code lanes. Deliver their minimal complete
 contracts first: bounded FIFO queue, one-shot Deferred, fixed Semaphore;
@@ -2945,7 +2946,7 @@ Do not substitute a semaphore around an unbounded spawn-per-input traversal.
 | G → H/I/K | Reader.read positive bound → Option(BitArray), None = EOF; Some is nonempty and within bound. Writer.write accepts immutable bytes and returns accepted prefix count; io.write_all handles short/zero progress. Partial external effects may precede failure. Scope encloses the entire use. Sink returns result and remaining Stream. |
 | H → I/J/K | Existing raw ABI and request ownership remain. High-level file/socket/child acquisition registers release in Scope before exposing handle. No fabricated support on targets without the host service. |
 | I → K | Explicit scoped Client; buffered send is built on streaming send plus bounded collection; native streaming reads live connection, not a buffered whole response. |
-| J → all/K/L | Test recorder values are ordinary provided services. Cache captures loader non-Fail needs deliberately, owns work in Scope, and shares in-flight outcomes. `std/test` remains ordinary item macros. |
+| J → all/K/L | Test recorder values are ordinary provided services. Cache captures loader non-Fail needs deliberately, owns work in Scope, and shares in-flight outcomes. `i/test` remains ordinary item macros. |
 
 ### 5.4 Integration and size control
 

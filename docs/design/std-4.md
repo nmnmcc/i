@@ -20,7 +20,7 @@ Interpretations where the task left a choice:
   classes. Source: Rust regex syntax and the task's Rust leftmost-first rule.
 - Positions in regex errors/matches count zero-based scalars. CSV errors count
   one-based scalars, including when input comes in chunks. This follows
-  `std/string`'s indexing convention; Go CSV's byte columns are not adopted.
+  `i/string`'s indexing convention; Go CSV's byte columns are not adopted.
 - Counted repetitions have RE2's 1000-count boundary. Pattern syntax outside
   the requested subset is a compile error, with a reason and position.
 - CSV skips blank physical lines and normalizes CRLF within quoted fields as
@@ -29,11 +29,11 @@ Interpretations where the task left a choice:
   skipping. LF is the default output ending; CRLF is configurable.
 - Headers must be unique. Header values decode as JSON strings through the
   existing schema combinators; there is no implicit number coercion or
-  special schema/CSV hook. Source: `std/schema`'s two-way JSON design.
+  special schema/CSV hook. Source: `i/schema`'s two-way JSON design.
 - RFC 6070 specifies HMAC-SHA-1, whereas this task specifies PBKDF2-HMAC-SHA-256.
   Its password/salt/count inputs are reused with independently calculated
   SHA-256 expected outputs. SHA-1 is not added.
-- The existing `std/bit_array.base16_encode`/`base16_decode` supply hex.
+- The existing `i/bit_array.base16_encode`/`base16_decode` supply hex.
   No duplicate public hex API is added.
 
 ## Implementation sources read
@@ -48,7 +48,7 @@ SHA-2 round constants and IVs are the standard's mathematical constants.
 | `rust-regex/regex-automata/src/nfa/thompson/pikevm.rs`, `search_imp`, `nexts`, epsilon closure | Per-position visited states, ordered threads, persistent capture slots, discard lower-priority paths after a candidate match. |
 | `rust-regex/regex-automata/src/hybrid/dfa.rs` | Read lazy DFA tradeoffs. A PikeVM suffices for all requested captures and avoids a mutable cache. |
 | `re2/doc/syntax.txt` | Group/repetition syntax, 1000-count restriction, explicit exclusion of lookaround and backreferences. |
-| `rust-regex/regex-syntax/src/unicode_tables/{perl_decimal,perl_space,perl_word,case_folding_simple}.rs` | Unicode 16 property data and all simple fold pairs, packed into immutable tables. The data license is `std/UNICODE-LICENSE`. |
+| `rust-regex/regex-syntax/src/unicode_tables/{perl_decimal,perl_space,perl_word,case_folding_simple}.rs` | Unicode 16 property data and all simple fold pairs, packed into immutable tables. The data license is `i/UNICODE-LICENSE`. |
 | `rust-regex/testdata/empty.toml` | Reference expectations for empty alternatives, nullable repeats, and non-overlapping iteration. |
 | `go/src/encoding/csv/{reader,writer}.go` | Strict quote state machine, newline normalization, configurable rune delimiter, inferred/fixed/variable field counts. |
 | [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180.txt) | Quoted fields, doubled quotes, embedded line breaks, record formatting. |
@@ -109,7 +109,7 @@ split, not a single `find`/`captures`/`is_match`. There is no lazy DFA cache.
 Streaming keeps its cursor, partial field, and partial row in immutable call
 arguments. One pull stops at a row boundary. Source failures remain in `E`;
 CSV failures are emitted once as an error value, followed by end of stream.
-Replaying a pull repeats its input operations, following `std/stream`.
+Replaying a pull repeats its input operations, following `i/stream`.
 The source owner must keep its resource scope around consumption.
 Parsing/printing use O(input/output scalars) work. A pull retains the current
 chunk plus row; collecting all rows naturally retains the complete result.
@@ -144,7 +144,7 @@ not claim to establish a side-channel property by measuring elapsed time.
 
 ## Measurements
 
-Reproduce with `target/release/i run --project std/bench/std4 --opt 2` after
+Reproduce with `target/release/i run --project i/bench/std4 --opt 2` after
 building this lane's CLI. The benchmark prepares input before timing and uses
 `i/clock.monotonic_ns`; assertions force the computed result to be observed.
 Decimal MB/s = bytes × 1000 / nanoseconds. Single runs on the shared machine
@@ -184,7 +184,7 @@ p = Path("target/std4/probe")
 (p / "i.toml").write_text('name = "std4_probe"\n')
 (p / "src/main.i").write_text(
     '(main)\nvalues = [' + ','.join(f'({n},[{n+1}])' for n in range(3000))
-    + ']\nmain = () { assert(values != [])\n Nil }\n')
+    + ']\nmain = () { assert(values != [])\n () }\n')
 ```
 
 Then `target/release/i check --project target/std4/probe`. The isolated probe
@@ -199,7 +199,7 @@ were regex 130, CSV 107, crypto 88; std O0 and O2 each reported 2170 passed,
 `standard_library_modules`: its exact expected module list omits the three
 new modules. The smallest reproduction is
 `cargo test -p ilang-package --test load standard_library_modules`; actual
-paths include `std/crypto`, `std/csv`, and `std/regex`, while the expected
+paths include `i/crypto`, `i/csv`, and `i/regex`, while the expected
 list in `crates/ilang-package/tests/load.rs:201` does not. Updating that
 assertion conflicts with the task's acceptance rule forbidding any `crates/`
 diff, so the assertion is unchanged. The full acceptance gate cannot pass

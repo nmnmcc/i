@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""Check that paths the documentation calls source exist.
+
+Only paths are checked: a path under crates/, stdlib/, lib/, scripts/ or
+examples/ that a page shows as a real source file must exist. Identifiers are
+left alone because a check on them is easy to make wrong.
+
+Generated directories and the target tree are not roots here; a relative path
+such as `src/main.i` is not checked either.
+"""
+import argparse
+import glob
+import re
+import sys
+from pathlib import Path
+
+ROOTS = ('crates', 'stdlib', 'std', 'lib', 'scripts', 'examples', 'docs')
+DOCS = ('README.md', 'docs/**/*.md', 'docs/**/*.mdx')
+# A path is a word starting with a root dir, or a `./` form. A match inside a
+# URL is skipped: there the character before the root is a plain slash and
+# the two before it are not `./`.
+TOKEN = re.compile(
+    r'(?:(?<![\w/.-])|(?<=\./))(' + '|'.join(ROOTS) + r')/[A-Za-z0-9_./{},*<>-]+'
+)
+# The same paths in a GitHub blob link: the link there is the documentation's
+# own claim and must hold too.
+URL = re.compile(
+    r'https://github\.com/nmnmcc/i/blob/main/(' + '|'.join(ROOTS) + r')/[A-Za-z0-9_./{},*<>-]+'
+)
+SKIP_LINE = re.compile(r'^\s*(?:import|export|use|mod)\b')
+# Reference-repository paths that start like ours.
+EXTERNAL = ('lib/elixir/', 'lib/module/', 'lib/Parse/', 'lib/src/')
+# Removed files still cited on purpose: a note other notes cite by line, the
+# pinned lane/b snapshot, and rows that record a deletion.
+REMOVED = {
+    'docs/design/runtime.md',
+    'lib/i/task.i',
+    'lib/i/request.i',
+    'crates/ilang-check/src/providers.rs',
+    'crates/ilang-check/tests/provider_graph.rs',
+    'crates/ilang-cli/tests/providers.rs',
+    'lib/i/failure.i',
+    'crates/ilang-check/src/types/records.rs',
+    'crates/ilang-syntax/src/parser_legacy.rs',
+    'scripts/old-syntax-check',
+    'lib/i',
+    # Planned or measured artifacts this tree does not carry.
+    'docs/design/std-v3-api.json',
+    'docs/design/std-v3-behavior.md',
+    'scripts/syn3-delete-*.py',
+    'stdlib/test/float_oracle.py',
+    'stdlib/test/float_hosts.py',
+    'stdlib/test/float_gate.py',
+    'stdlib/test/test_test.i',
+}
+
+
+def normalize(token):
+    """Strip what belongs to the citation, not the path."""
+    token = token.split(' ')[0].removeprefix('https://github.com/nmnmcc/i/blob/main/')
+    token = token.split('::')[0]
+    token = re.split(r':\d', token)[0]
+    return token.rstrip('.,;:)]*')
+
+
+def expand(token):
+    """The candidate paths for a token: brace sets and globs, or itself."""
+    if '<' in token or '…' in token:
+        return []
+    if '{' in token:
+        head, _, rest = token.partition('{')
+        inside, _, tail = rest.partition('}')
+        return [head + part + tail for part in inside.split(',')]
+    return [token]
+
+
+def check_file(root, path):
+    errors = []
+    text = path.read_text(errors='replace')
+    for number, line in enumerate(text.splitlines(), 1):
+        if SKIP_LINE.match(line):
+            continue
+        for match in list(TOKEN.finditer(line)) + list(URL.finditer(line)):
+            token = normalize(match.group(0))
+            candidates = expand(token)
+            if not candidates:
+                continue
+            if token.startswith(EXTERNAL):
+                continue
+            found = False
+            for candidate in candidates:
+                if candidate in REMOVED:
+                    found = True
+                    break
+                # A page may name a path from its own directory, as
+                # `project=examples/x` does below docs/content/docs.
+                for base in (root, path.parent):
+                    if '*' in candidate:
+                        if glob.glob(str(base / candidate)):
+                            found = True
+                    elif (base / candidate).exists():
+                        found = True
+                    if found:
+                        break
+                if found:
+                    break
+            if not found:
+                errors.append(f'{path.relative_to(root)}:{number}: {token}')
+    return errors
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    args = parser.parse_args()
+    root = args.root.resolve()
+    files = []
+    for pattern in DOCS:
+        files.extend(sorted(root.glob(pattern)))
+    errors = []
+    checked = 0
+    for path in files:
+        if not path.is_file() or {'node_modules', 'dist', '.astro'} & set(path.parts):
+            continue
+        checked += 1
+        errors.extend(check_file(root, path))
+    if errors:
+        print('\n'.join(errors), file=sys.stderr)
+        print(f'{len(errors)} documented source paths do not exist.', file=sys.stderr)
+        return 1
+    print(f'Documented source paths checked in {checked} files.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

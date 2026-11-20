@@ -383,12 +383,12 @@ that pattern; it is not a record field.
 | `f(a: b)` and `f (a: b)` | Labelled call, not a record argument. Use `f((a: b))` for that. |
 | `f` then `(a : b)` on the next line in a block | Two expressions; the second is a record. A break inside an enclosing parenthesis instead separates items. |
 | `(name : path)` at file start | Invalid header, not a record expression statement. Top-level expression statements are not permitted. Imports use `name = package/module`, not colon. |
-| `(name: std/path)` at file start | Still invalid; the slash does not validate the colon. |
+| `(name: i/path)` at file start | Still invalid; the slash does not validate the colon. |
 | `(a, b) = value` at file start | Existing tuple-pattern binding. |
 | Block's first expression `(a : b)` | Record if no function suffix follows. No brace-record scan needed. |
 | `(n) { (name: n) }` | Function returning a record; function bodies remain blocks. |
 | `()` as call argument, tuple/list part, RHS, guard or clause body | Empty record, except where a following function suffix or a pattern context decides otherwise. A record guard subsequently fails Bool checking. |
-| `() { ... }`, `() -> Nil { ... }`, `() -> Nil` in a type | Empty parameter lists. |
+| `() { ... }`, `() -> () { ... }`, `() -> ()` in a type | Empty parameter lists. |
 | `List((a : Int))`, `List((a : Int) -> T)` | Record argument type versus function argument type. |
 | `x : (a : Int) -> 1` in a clause | The type parser takes the arrow; no clause arrow remains. Error. Use `x : { (a : Int) } -> 1`. This is the old tuple/function-type boundary applied to records. |
 | `(f : (x) -> Int { x })` | One-field record, with no extra comma. |
@@ -633,8 +633,8 @@ signatures without changing their checking or runtime rules.
 
 ### Companion notes: exhaustive supersession checklist
 
-This list identifies the prose rules that become false, beyond mechanical
-changes to examples/signatures. It is not authority to rewrite historical
+This list identifies the prose rules that become false, beyond mechanical changes to
+examples and signatures. It is not authority to rewrite historical
 reports or expected-error fixtures indiscriminately.
 
 | Source region | Sentences/rules to remove or replace |
@@ -724,7 +724,7 @@ the prototype parser is
 `4679973f535248de7d3739bca4ab745f39c6f9ed5cd6ec39af51c1e5ded31e2a`.
 The production source files were never edited.
 
-The extraction used `scripts/old-syntax-check`'s `snippets()`
+The extraction used `old-syntax-check`'s `snippets()`
 (:105–125), including every tracked `.i`, fenced Markdown and candidate Rust/JS
 literal. I did not apply its fixture substitutions/expectation policy or run
 its full acceptance command. Hence the 352 baseline failures must not be
@@ -765,8 +765,8 @@ values/types/patterns. A zero does not count empty parameter lists as tuples.
 
 | Directory | Parsed files | Edited files | Match | Ordinary pipe | Error slot | V / T / P |
 |---|---:|---:|---:|---:|---:|---|
-| `std/src` | 21 | 21 | 730 | 0 | 216 | 0 / 0 / 0 |
-| `std/test` | 22 | 18 | 104 | 204 | 17 | 1 / 0 / 0 |
+| `stdlib/src` | 21 | 21 | 730 | 0 | 216 | 0 / 0 / 0 |
+| `stdlib/test` | 22 | 18 | 104 | 204 | 17 | 1 / 0 / 0 |
 | `lib` | 14 | 5 | 16 | 0 | 16 | 0 / 0 / 0 |
 | `examples` | 2 | 2 | 3 | 0 | 0 | 0 / 0 / 0 |
 | `bench` | 2 | 2 | 10 | 0 | 0 | 0 / 0 / 0 |
@@ -786,8 +786,8 @@ strings and invalid fixtures. They are not semantic counts:
 
 | Directory | All `.i` files | Old pipe token text | Question-mark text | Empty-parenthesis text |
 |---|---:|---:|---:|---:|
-| `std/src` | 21 | 739 | 259 | 107 |
-| `std/test` | 22 | 315 | 55 | 1,834 |
+| `stdlib/src` | 21 | 739 | 259 | 107 |
+| `stdlib/test` | 22 | 315 | 55 | 1,834 |
 | `lib` | 14 | 16 | 18 | 14 |
 | `examples` | 2 | 3 | 0 | 2 |
 | `bench` | 2 | 10 | 0 | 13 |
@@ -800,11 +800,11 @@ strings and invalid fixtures. They are not semantic counts:
 The relayed “737, of which 732 matches” is reproducible as a **line count**:
 737 lines contain the old pipe token, and 732 lines contain that token followed
 by a clause brace. The other five lines are documentation examples of ordinary
-pipes. `rg -o '\|>' std/src --glob '*.i'` counts occurrences instead and gives
+pipes. `rg -o '\|>' stdlib/src --glob '*.i'` counts occurrences instead and gives
 739, because two comment lines have two pipes each. AST traversal finds 730
 executable matches and zero ordinary pipes. The nine documentation occurrences
-are two matches (`std/src/dict.i:327`, `std/src/list.i:519`) and seven pipes
-(`std/src/dict.i:82,134,353,433`, `std/src/set.i:82`).
+are two matches (`stdlib/src/dict.i:327`, `stdlib/src/list.i:519`) and seven pipes
+(`stdlib/src/dict.i:82,134,353,433`, `stdlib/src/set.i:82`).
 The source file list for executable edits is kept locally in
 `target/syn2/files-to-migrate.txt`; this is a lower bound for a full migration.
 
@@ -819,8 +819,8 @@ record counts or instructions to replace braces automatically.
 
 | Extracted directory/kind | Empty brace-record text | Spread-prefix candidates | Label-colon brace candidates |
 |---|---:|---:|---:|
-| `std/src`, `lib`, `examples`, `bench`, `editors` | 0 | 0 | 0 |
-| `std/test` | 0 | 9 | 1 |
+| `stdlib/src`, `lib`, `examples`, `bench`, `editors` | 0 | 0 | 0 |
+| `stdlib/test` | 0 | 9 | 1 |
 | `crates` whole files | 0 | 0 | 37 |
 | `tests` except review | 0 | 9 | 33 |
 | `tests/review` | 3 | 50 | 207 |
@@ -838,16 +838,16 @@ The ten affected files with real empty tuples are:
 
 - `crates/ilang-check/tests/projects/attr_entry/src/main.i` (two values).
 - `crates/ilang-check/tests/types/basics.i` (one value).
-- `crates/ilang-syntax/tests/golden/fn_vs_tuple.i` (one value).
-- `crates/ilang-syntax/tests/golden/patterns.i` (one pattern).
-- `crates/ilang-syntax/tests/golden/types.i` (one type).
-- `std/test/string_test.i` and its review-corpus copy under
-  `tests/review/cases/review-k4s/std/test/string_test.i` (one value each).
+- `fn_vs_tuple.i` (one value).
+- `patterns.i` (one pattern).
+- `types.i` (one type).
+- `stdlib/test/string_test.i` and its review-corpus copy under
+  `tests/review/cases/review-k4s/stdlib/test/string_test.i` (one value each).
 - `tests/spec/11/text_form.i:83` and `tests/spec/6/data.i:42` (one value each).
 - `tests/spec/7/patterns.i:153–154` (one value and one nested pattern).
 
 These need reviewed expectation/meaning changes, not blind substitution of
-`Record` for every `()` and not a regex replacement by `Nil`.
+`Record` for every `()` and not a regex replacement by `()`.
 
 ### Focused parser tests
 
@@ -876,7 +876,7 @@ prototype:
 | `() == ()` | `True`; existing structural record equality, N1. |
 | Function taking `(a : Int)` called with `()` | Type error: record top does not guarantee field `a`, N1. |
 | A record field containing a function, with no trailing comma | Parses as a record; calling its field gives that function's result, D2. |
-| `() -> Nil` as annotation and `() { Nil }` as value | Both accepted; zero function parameters are not empty tuples, D2/D3. |
+| `() -> ()` as annotation and `() { () }` as value | Both accepted; zero function parameters are not empty tuples, D2/D3. |
 | Empty tuple pattern | Syntax error, N2. |
 | Mixed positional and labelled datum in either order | Syntax error, D4. |
 | Typed record clause against a union of differently shaped records | Do not add field-shape runtime discrimination; enforce existing head-test coverage obligation, records §7. |
@@ -890,7 +890,7 @@ reuse of `Case`, not just parse acceptance.
 ### T3: avoid doing syntax twice
 
 At the observed `lane/a` head `31444065`, the diff against this lane contains
-only the record kernel under `crates/ilang-check/src/types/records/` and its
+only the record kernel under `crates/ilang-check/src/types/shape.rs` and its
 module wiring. `bdd.rs:7–56` defines handles, operations and the demand budget;
 `graph.rs:14–18,53–62` has record-domain identity and record/union/intersection
 nodes. There is no syntax-crate diff. This is a read of a branch snapshot,
@@ -920,7 +920,7 @@ record formatter must land together with T3's syntax consumers.
 | `ilang-syntax/tests/{lex,parse,golden,format,spec}.rs` and fixture directories | New boundary matrix; reparse/canonical-tree and idempotence properties; reviewed new diagnostic goldens. Current properties are in `tests/format.rs:1–9` and `tests/spec.rs:29–54`. |
 | `crates/ilang-check/src/hir.rs:221–260`, `resolve.rs:810,1418,1795,2514`; `types/display.rs:1357` and T3's shown types | Normal `Record` name, no empty tuple surface, record display, preserved single-clause lowering, and scoped pipe/or diagnostic. Use T3's existing structural type representation. |
 | `crates/ilang-wasm/src/lower.rs:1562–1580,2289,2342`; T3 runtime record inspector | Check tuple arity removal at the source boundary; retain existing Case lowering; print record delimiters. Existing nominal `Record` names are unrelated. |
-| `scripts/old-syntax-check : 105–125,143–185`, its JSON, tests and docs; the removed `a2-meaning` finder; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
+| `old-syntax-check`, its JSON, tests and docs; the removed `a2-meaning` finder; `scripts/wat-diff : 67,382–422` | Second-migration extraction/reporting and explicit exceptions; regenerate reviewed content identities and diagnostics; retain strict WAT modes. |
 | `docs/spec.md`, `docs/design/{syntax,records,meta}.md` | Apply §5 together. Do not leave two accepted contradictory grammars. |
 | `editors/vscode`, package templates, Rust/JS embedded sources, all changed `.i`, comments and text/type expectations | Inventory by source role; update highlighting for caret, bar and match dot; preserve CR/CRLF and layout-sensitive tests. |
 
@@ -992,7 +992,7 @@ I attacked soundness, implementability and source agreement separately.
 1. `{ x | f }` was a clause block under the unchanged probe. Fixed the
    prototype's probe and P3. No comma workaround was introduced.
 2. Blindly grouping every old match subject broke the existing fixture
-   `crates/ilang-syntax/tests/golden/case_head.i`, where the subject begins
+   `case_head.i`, where the subject begins
    with a typed anonymous function. The resulting brace group was read as
    clauses. Fixed migration to group binary, unary and numeric subjects only;
    postfix-safe subjects stay ungrouped. That file now has the same AST.
@@ -1027,8 +1027,8 @@ I attacked soundness, implementability and source agreement separately.
 - A one-clause match on a failing constructor pattern still reports Assert;
   adding a guard or another clause still invokes coverage. Reusing `Case`
   keeps these differences; rewriting to a new generic call node might not.
-- Converting an old empty tuple value blindly to `Nil` changes equality against
-  existing `Nil` values. Converting its exact type to `Record` broadens the set.
+- Converting an old empty tuple value blindly to `()` changes equality against
+  existing `()` values. Converting its exact type to `Record` broadens the set.
   Neither is a semantics-preserving universal migration.
 
 After those corrections, two further passes found nothing serious:

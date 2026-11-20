@@ -107,7 +107,7 @@ the inner function does not use `unused` or `b`, so it has no captures, and `por
 
 - **H (home).** A value that is not portable is only ever reachable from the worker that made it.
 - **I1 (meaning).** `==` depends only on the content of a value and on function and key ids. `hash` and the text form depend only on the content: **only `==` reads ids**. Ids carry the worker index and the state of that worker's counter (part 3.4), so a text form or a hash that showed one would show placement. The text form of a function stays `//fn(a, b) { ... }` (only the arity, as `$inspect_function`, `inspect.rs:262`, writes it today), that of a key is `//key`, and that of a `Keyed` is `//keyed`; none of them shows an id or what a key marks. None of the three depends on addresses, instance globals, or which worker holds the value.
-- **I2 (fast paths).** `ref.eq` is only a fast path (for `True`, `False`, `Nil`, `[]`, labels, constant functions, identity values). Every answer it gives, the slow path gives too.
+- **I2 (fast paths).** `ref.eq` is only a fast path (for `True`, `False`, `()`, `[]`, labels, constant functions, identity values). Every answer it gives, the slow path gives too.
 - **I3 (sharing).** A copy keeps sharing and cycles exactly (D9).
 - **I4 (owner writes).** Only the worker that owns a GC object reads it to encode it. The receiver decodes into its own heap. No worker touches another worker's GC objects.
 
@@ -318,7 +318,7 @@ The format is MC's to design. It must:
 - be a tag-directed walk with an explicit stack (no Wasm recursion, so lists of 10^6 elements are fine), covering every `$obj` tag, `$cons`, records (tag 14) and `Keyed`;
 - keep sharing and cycles exactly (I3) with back-references, found by a mark or a `ref.eq` table (D9); a closure in a cycle is decoded with an empty captures array that is filled after;
 - write Ints as i31 or limbs, Floats as bits, Strings and bit arrays as bytes, custom values with their constructor and type ids (fixed per module), closures as in part 3.4;
-- write `True`, `False`, `Nil` and `[]` as markers that decode to the receiver's globals, and record labels as label indexes or bytes that the receiver interns again into its `$label_N`;
+- write `True`, `False`, `()` and `[]` as markers that decode to the receiver's globals, and record labels as label indexes or bytes that the receiver interns again into its `$label_N`;
 - stop the encode at tags 10, 11 and 12 and at a host request (P1). Because of P3, a portable path never gets that far.
 
 ## 10. Hosts
@@ -513,9 +513,9 @@ The `hash` row: "Which number is not fixed." becomes:
 
 - `docs/spec.md`: §2.5, §4.2, §4.5, §9.2, §9.4 (rules 3, 4 and 7), §9.7, new §9.8 (`i/key`, `Key`, `Keyed`), §10.1, §11.1, §11.4, §11.7, §11.8, new §11.9, §12, §13, §B.1, §B.4 (part 13).
 - `docs/design/meta.md` §8: one sentence that a `Syntax` value is not portable (§11.9), whatever its form.
-- `lib/i/core.i`: export `portable` as an `@external("ilang:core", …)` declaration, like `not` and `hash`.
-- `lib/i/key.i` (new): `new`, `wrap` and `unwrap` as `@external("ilang:core", …)` declarations.
-- `lib/i/control.i`: `keep_env`.
+- `stdlib/src/core.i`: export `portable` as an `@external("ilang:core", …)` declaration, like `not` and `hash`.
+- `stdlib/src/key.i` (new): `new`, `wrap` and `unwrap` as `@external("ilang:core", …)` declarations.
+- `stdlib/src/control.i`: `keep_env`.
 - `crates/ilang-wasm/src/lower.rs`: add `portable` and the key functions to the `CORE` and `CORE_FUNCS` name tables near `:120` and `:130`; the `keep_env` op, which keeps the `$env` array as it is (part 4); bit 0 of field 1 for closures with patched captures (part 3.6). `captures_of` (`:389`) is the definition of captures; it does not change, and a comment points at §11.9.
 - `crates/ilang-wasm/src/emit/mod.rs`: `closure()` writes the patch flag in field 1 and gives a patched closure's captures array its last element, the walk stamp (part 3.6). The `$clo{n}` types do not change.
 - `crates/ilang-wasm/src/emit/control.rs`: `$keep_reenter` and the frame record of a kept function (part 4).
@@ -523,7 +523,7 @@ The `hash` row: "Which number is not fixed." becomes:
 - `crates/ilang-wasm/src/runtime/values.rs`: `$core_portable`, a walk with an explicit stack like `$value_compare_i32`, with the walk stamp of part 3.6 (one new token for each walk). It gives False at tags 10, 11 and 12 and at a host request, and walks field 5 of `$obj` (tuples, custom values, closure captures, records), `$cons` heads and tails, `Keyed` values, and kept services. The key functions.
 - `crates/ilang-wasm/src/runtime/mod.rs`: the tag table (`:46`) gains a "portable" note, the patch flag, the key tag, and the planned `$clo` layout of part 3.4.
 - `crates/ilang-check/tests/library.rs`: the core and control export lists.
-- `lib/i/task.i`, `lib/i/random.i`: following part 18.
+- `stdlib/src/task.i`, `stdlib/src/random.i`: following part 18.
 - `docs/performance.md`: channel state kept until the channel's scope ends (part 7), the cost of `portable` checks (also on DAGs, part 3.6), pinned tasks under boundary services (part 4), the start-up conditions of part 3.5, and the distinction between portable IO wrappers and pinned arbitrary host references (part 12).
 
 **Track B (now, small):** frame records carry the point index (part 12).
@@ -593,7 +593,7 @@ The `hash` row: "Which number is not fixed." becomes:
 ## 17. Open questions
 
 1. Is `core.portable` accepted as a public built-in (D3), or should G2 ask for a narrower form? This note argues for public, because `i/task` is ordinary i code.
-2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : Nil) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
+2. `control.keep_env` takes a function of one parameter. Is that enough, or should there be a form for functions with no parameter as well? The number of parameters is part of a function type, and function types with different numbers of parameters cannot be put together (spec §4.4, §4.6), so `() -> A` is not `(x : ()) -> A`, and a zero-parameter body such as the `go` body `() -> A ^ E ! N` cannot be passed to `keep_env` as it is. `go` wraps it in a one-parameter function (part 4), and so can any other caller; a second form would save that wrapper.
 3. Per-task storage in general (a `task.local` facility built on keys) is not needed for Random any more (part 5): Random is a value. Should `i/task` still offer per-task storage for other uses? Any such storage lives in the scheduler, so reading it is a call to the `Scheduler` service.
 4. How does worker k > 0 enter `i/task`'s scheduler loop without a special case? One answer: the program's entry runs `task.run`, which, on N workers, is an ordinary host export or entry kind that every worker calls. Only that entry run uses N workers; a `task.run` from inside other code is a nested run with one worker (part 4). MC-D decides.
 5. Which general typed byte-state transaction interface implements part 7 without running i code under a lock? Recommended: ordinary request-mode services; require the MC-D prototype before MC-I.

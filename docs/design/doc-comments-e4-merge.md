@@ -14,7 +14,7 @@ only the prose cleanup was then applied.
 | --- | --- |
 | `crates/ilang-check/src/hir.rs` | Kept rest/spread/group fields and ordinary Fail representation; rewrote field explanations for the current service-key constraints. |
 | `crates/ilang-check/src/providers.rs` | Kept deletion; did not revive the provider implementation. |
-| `crates/ilang-check/src/resolve/three.rs` | Kept rest/provide resolution and all e4 branches; removed incidental rule citations. |
+| `crates/ilang-check/src/resolve/native.rs` | Kept rest/provide resolution and all e4 branches; removed incidental rule citations. |
 | `crates/ilang-check/src/types/display.rs` | Kept single-row and ordinary Fail rendering; cleaned citations in explanatory prose. |
 | `crates/ilang-check/src/types/infer.rs` | Kept one need row, Fail handling, variance and handler witnesses; replaced obsolete stage-history header with current invariants. |
 | `crates/ilang-check/src/types/mod.rs` | Kept e4 types and exports; replayed only matching comment rewrites. |
@@ -33,15 +33,15 @@ only the prose cleanup was then applied.
 | `crates/ilang-wasm/src/emit/workers.rs` | Kept worker ABI and e4 entry stubs; no provider plans restored. |
 | `crates/ilang-wasm/src/lower.rs` | Kept e4 lowering and $adapter_pin_call; cleaned surrounding constraints only. |
 | `crates/ilang-wasm/tests/control_lazy.rs` | Kept Continuation fixtures, compiled programs and expectations exactly; cleaned comments. |
-| `lib/i/assertion.i` | Kept current assertions and Fail calls; removed obsolete duplicate signature documentation. |
-| `lib/i/fail.i` | Kept ordinary Fail implementation and imports; removed comment citations. |
+| `stdlib/src/assertion.i` | Kept current assertions and Fail calls; removed obsolete duplicate signature documentation. |
+| `stdlib/src/fail.i` | Kept ordinary Fail implementation and imports; removed comment citations. |
 | `lib/i/failure.i` | Kept deletion; no obsolete failure alias restored. |
-| `std/src/calendar.i` | Kept Fail-based API and evaluation order; removed duplicate signature inventory and comment citations. |
-| `std/src/cli.i` | Kept Fail-based API and evaluation-order temporaries; removed duplicate signature inventory and comment citations. |
-| `std/src/float.i` | Kept e4 numerical implementation and evaluation order; cleaned documentation citations. |
-| `std/src/list.i` | Kept e4 list implementation and Fail behavior; cleaned documentation citations. |
-| `std/src/time.i` | Kept e4 time implementation and Fail behavior; cleaned documentation citations. |
-| `std/test/uri_test.i` | Kept e4 URI fixture code and expectations; removed incidental test-comment references. |
+| `stdlib/src/calendar.i` | Kept Fail-based API and evaluation order; removed duplicate signature inventory and comment citations. |
+| `stdlib/src/cli.i` | Kept Fail-based API and evaluation-order temporaries; removed duplicate signature inventory and comment citations. |
+| `stdlib/src/float.i` | Kept e4 numerical implementation and evaluation order; cleaned documentation citations. |
+| `stdlib/src/list.i` | Kept e4 list implementation and Fail behavior; cleaned documentation citations. |
+| `stdlib/src/time.i` | Kept e4 time implementation and Fail behavior; cleaned documentation citations. |
+| `stdlib/test/uri_test.i` | Kept e4 URI fixture code and expectations; removed incidental test-comment references. |
 
 The source-token proof checks every existing tracked Rust file and the library,
 standard-library and three extra checker-fixture sources. Exact literals,
@@ -94,7 +94,7 @@ error: could not compile `ilang-syntax-migration` (bin "migrate-syntax3-pipe" te
 warning: build failed, waiting for other jobs to finish...
 ```
 
-Both constructors are in `examples/legacy/support/legacy/parser.rs`; their
+Both constructors are in `crates/ilang-syntax/examples/legacy/support/legacy/parser.rs`; their
 executable tokens are unchanged from e4, as the source-token proof confirms.
 The coordinator's code-retention instruction prevents repairing these AST
 initializers in the comment lane. The adjusted checking tests all ten

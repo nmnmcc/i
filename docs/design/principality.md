@@ -232,7 +232,7 @@ requirements intersect their admissible providers. A principality proof
 must account for this separate sort and its row tails, rather than apply
 the value lattice theorem to the surface `&` notation unchanged.
 
-For a contravariant service `Emit(A) = (emit = (A) -> Nil)`, the meet of
+For a contravariant service `Emit(A) = (emit = (A) -> ())`, the meet of
 `Emit(Int)` and `Emit(String)` is `Emit(Int | String)`. A provider must handle
 both. For covariant `Read(A) = (read = () -> A)`, the meet of `Read(Int)`
 and `Read(String)` is `Read(Never)`. Under Owner Decision 1 and §4.1,
@@ -287,7 +287,7 @@ Candidate probes:
 
 ```i
 // 02-needs
-Emit(A) = (emit = (A) -> Nil)
+Emit(A) = (emit = (A) -> ())
 need_int = () <- (e : Emit(Int)) { e.emit(1) }
 need_string = () <- (e : Emit(String)) { e.emit("s") }
 both = () {
@@ -334,7 +334,7 @@ caught = () { fail.catch(body) }
 The last candidate tries the erroneous split described in syntax three's
 rule B: hiding the String error in the residual row instead of returning it.
 Observed: `02-needs` checks with
-`both : () <- (Emit(Int | String)) -> Nil`; `02-empty` rejects with E0515,
+`both : () <- (Emit(Int | String)) -> ()`; `02-empty` rejects with E0515,
 explicitly naming `Read(Int)` and `Read(String)` at that historical revision.
 Decision 1 now accepts this method-only `02-empty` probe, as explained above;
 only its required-value-field variant is empty. `02-rows` checks with
@@ -725,7 +725,7 @@ Ordinary extrusion is insufficient: flexible variables may acquire bounds;
 skolems may not.
 
 The actual restriction is explicit in
-[syn3/lower.rs](../../crates/ilang-syntax/src/syn3/lower.rs), `Cx::fn_type`:
+[syn3/lower.rs](../../crates/ilang-syntax/src/parse.rs), `Cx::fn_type`:
 generics on a function type other than the type of a binding report that
 stage 7 is unavailable. `Cx::chain` similarly rejects generic function
 literals outside a binding value. A binding's outer generics are lifted to
@@ -915,7 +915,7 @@ Directness is syntactic, so no purity inference is needed. `maker()` is not
 generalized even when it returns an identity; a direct alias of its result
 must not quantify the inherited weak variable.
 
-Enforcement: [syn3/lower.rs](../../crates/ilang-syntax/src/syn3/lower.rs)
+Enforcement: [syn3/lower.rs](../../crates/ilang-syntax/src/parse.rs)
 and [resolve.rs](../../crates/ilang-check/src/resolve.rs) retain binding
 directness. [infer.rs](../../crates/ilang-check/src/types/infer.rs),
 `local_binding`, raises the level only for direct values and generalizes
@@ -1149,10 +1149,10 @@ either diagnostic line or any expectation. This follows §4.7's recursive-type
 paragraph and retains §9.2's independent provider check.
 
 The remaining `alias_kind_error` requirement asks for E0515 on a program
-whose alias is `Row(N) = () <- (Fail(N)) -> Nil` and whose ordinary values
-have types `Svc(Int)` and `Svc(Nil)`, with covariant `Svc(A) = (() -> A)`.
+whose alias is `Row(N) = () <- (Fail(N)) -> ()` and whose ordinary values
+have types `Svc(Int)` and `Svc(())`, with covariant `Svc(A) = (() -> A)`.
 Here `N` is an error-payload type. §9.3 says “An error may be a value of any
-type”; §4.4 merges these value types as `Svc(Int | Nil)`. It is not an opaque
+type”; §4.4 merges these value types as `Svc(Int | ())`. It is not an opaque
 service row, and its payload constructors are not service keys under `<-`.
 The old rejection criterion needs review against those paragraphs; it has
 not been weakened or rewritten to claim a green corpus.
@@ -1254,7 +1254,7 @@ The three conflicts were resolved as follows:
 The solver/inference changes merged automatically. Main's whole-service
 inhabitance check, no universal-entry removal, explicit duplicate-provider
 E0225 behavior, and checker performance changes are retained. No changes
-relative to main remain in `std/`, `lib/`, or `examples/`: all 75 exported
+relative to main remain in `i/`, `lib/`, or `examples/`: all 75 exported
 Fail conversions in `effects-e4.md` and their adapted callers are unchanged.
 The first merged focused `deferred` row-scheme run passes both tests,
 including method-only acceptance and required-field rejection locally and

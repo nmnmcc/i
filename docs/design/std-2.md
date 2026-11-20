@@ -6,8 +6,8 @@ Source baseline: `b9173ce013405fd3a055ffa34edf3b8829672104`. Repository line
 references below mean that commit, unless another revision is named. The spec
 in this checkout already has the syntax migration; all examples use that syntax.
 Signature inventories describe bindings with bodies, not bodyless declarations.
-`Option`, `Some`, `None` come from `std/option`; `Order` from `std/order`.
-`Result`, `Ok`, `Error`, `List`, and `Nil` are built-in names.
+`Option`, `Some`, `None` come from `i/option`; `Order` from `i/order`.
+`Result`, `Ok`, `Error` and `List` are built-in names; `()` is the built-in unit type.
 
 ## 1. Problem, evidence, and boundaries
 
@@ -33,12 +33,12 @@ Code read, and its consequences:
 
 | Code region | Checked fact |
 |---|---|
-| `lib/i/clock.i:1`, `lib/i/process.i:1`, `lib/i/stdio.i:1`; `crates/ilang-package/src/library.rs:7–24` | The three IO modules contain reservation comments and export no API. They are embedded by the compiler. Do not add imports of their future names in phase one. |
-| `std/src/option.i:1–6`, `:28–31`; `std/src/result.i:1–5`; `lib/i/fail.i:10–33` | Absence uses Option, fallible pure operations use Result, and fail.from_result/catch bridge to error effects. Follow this style. |
-| `std/src/int.i:60–110`, `:355–411` | Integer parsing has an explicit grammar. `/` and remainder helpers differ from floor division/modulo. Negative epoch conversion needs floor division. |
-| `std/src/string.i:70–94`, `:299–308`; `lib/i/core.i:91–117` | Codepoint traversal and fragment concatenation exist. Repeated pop_codepoint reconstructs the remainder; scan one codepoint list or byte array instead. |
-| `std/src/order.i:21–27`; `std/src/stream.i:43–73`, `:93–109` | Order is Less/Equal/Greater; a stored service row uses an ordinary negative marker to keep it invariant. Reuse that technique for sinks. |
-| `std/src/dict.i:24–60`; `std/src/list.i:493–512` | Nominal storage and left-to-right Result folds are ordinary source; they suffice for descriptor metadata and validation; no typed heterogeneous runtime dictionary is needed. |
+| `stdlib/src/clock.i:1`, `stdlib/src/process.i:1`, `stdlib/src/stdio.i:1`; `crates/ilang-package/src/library.rs:7–24` | The three IO modules contain reservation comments and export no API. They are embedded by the compiler. Do not add imports of their future names in phase one. |
+| `stdlib/src/option.i:1–6`, `:28–31`; `stdlib/src/result.i:1–5`; `stdlib/src/fail.i:10–33` | Absence uses Option, fallible pure operations use Result, and fail.from_result/catch bridge to error effects. Follow this style. |
+| `stdlib/src/int.i:60–110`, `:355–411` | Integer parsing has an explicit grammar. `/` and remainder helpers differ from floor division/modulo. Negative epoch conversion needs floor division. |
+| `stdlib/src/string.i:70–94`, `:299–308`; `stdlib/src/core.i:91–117` | Codepoint traversal and fragment concatenation exist. Repeated pop_codepoint reconstructs the remainder; scan one codepoint list or byte array instead. |
+| `stdlib/src/order.i:21–27`; `stdlib/src/stream.i:43–73`, `:93–109` | Order is Less/Equal/Greater; a stored service row uses an ordinary negative marker to keep it invariant. Reuse that technique for sinks. |
+| `stdlib/src/dict.i:24–60`; `stdlib/src/list.i:493–512` | Nominal storage and left-to-right Result folds are ordinary source; they suffice for descriptor metadata and validation; no typed heterogeneous runtime dictionary is needed. |
 | `crates/ilang-check/src/types/infer.rs:231–247`, `:2127–2156`, `:2256–2285`, `:2340–2348` | Recursive groups start monomorphic; generalization and variance traverse ordinary types, including function effects. Do not propose polymorphic recursive parser trees. |
 | `crates/ilang-check/src/types/infer.rs:1606–1624` | Field selection now checks hidden constructors. Calendar validation cannot be bypassed through constructor update or a public field. |
 | `crates/ilang-check/src/types/solve.rs:688–714`, `:801–870`, `:950–999` | Environment unions, argument variance, and occurs checking are general solver operations. The logging probe in §7 exposes a failure here; this note does not diagnose its exact cause. |
@@ -99,7 +99,7 @@ launcher; log supports server diagnostics, build events, and deterministic test
 traces. They all use existing general features; there is no proposed feature
 whose usefulness rests only on one library.
 
-## 3. `std/time`
+## 3. `i/time`
 
 ### 3.1 Ideas considered
 
@@ -148,7 +148,7 @@ Phase two adds exactly these IO wrappers (clock = i/clock, request = i/request):
 
 ```text
 now: () -> Instant ? clock.ClockError ! clock.Clock | request.Await | request.Owner
-sleep: (duration: Duration) -> Nil ? clock.ClockError ! clock.Clock | request.Await | request.Owner
+sleep: (duration: Duration) -> () ? clock.ClockError ! clock.Clock | request.Await | request.Owner
 measure(A, E, N): (body: () -> A ^ E ! N) -> (A, Duration) ^ E | clock.ClockError ! N | clock.Clock | request.Await | request.Owner
 ```
 
@@ -200,7 +200,7 @@ Pure operations use O(1) integer operations and one wrapper at most. Bit cost
 depends on integer size. measure adds two requests, sleep one. No scheduling
 precision or timing benchmark is promised.
 
-## 4. `std/calendar`
+## 4. `i/calendar`
 
 ### 4.1 Ideas considered
 
@@ -215,7 +215,7 @@ precision or timing benchmark is promised.
 ### 4.2 Types and complete interface
 
 Date, TimeOfDay, Offset hide constructors. Civil, CalendarError and Weekday
-export constructors. `time` refers to std/time.
+export constructors. `time` refers to i/time.
 
 ```i
 Date = (Int, Int, Int)
@@ -358,7 +358,7 @@ linear in text length apart from big-integer digit arithmetic. Walking a
 codepoint/byte list and concatenating fragments once avoids repeated suffix
 copies. Calendar is entirely phase one and depends only on time’s pure part.
 
-## 5. `std/cli`
+## 5. `i/cli`
 
 ### 5.1 Ideas considered
 
@@ -429,8 +429,8 @@ A complete typed description, using only nominal constructors and functions:
 
 ```i
 (
-	cli = std/cli
-	(None) = std/option
+	cli = i/cli
+	(None) = i/option
 )
 
 Options = (jobs = Int, verbose = Bool)
@@ -514,7 +514,7 @@ preserve the original token instead of inventing a canonical name.
   under spec §11.7; the library cannot turn those into parse errors.
 - **A7 Converters.** text(s)=Ok(s). integer accepts an optional ASCII + or -,
   then one or more ASCII decimal digits, with no whitespace, separators or
-  trailing text, as std/int.parse does. Failure is Error("expected integer").
+  trailing text, as i/int.parse does. Failure is Error("expected integer").
   Range checks belong in a user callback, so port numbers, counts and negative
   quantities need no additional library rule.
 - **A8 Help.** help validates metadata, then emits `Usage: ` plus program plus
@@ -603,7 +603,7 @@ programs can dispatch a leading command token to separately typed parsers.
 | pure factory used separately at Int and String | Both compile; one weak binding follows ordinary value restriction, spec §4.7 |
 | read with fake process.args returning ["--jobs=4"] | Same parse result as explicit args; runtime §7.4 |
 
-## 6. `std/log`
+## 6. `i/log`
 
 ### 6.1 Ideas considered
 
@@ -618,7 +618,7 @@ programs can dispatch a leading command token to separately typed parsers.
 ### 6.2 Types and complete interface
 
 Level, Entry export constructors. Sink hides its constructor and fields; make
-is the public factory. `time` is std/time. Field pairs are ordered and may repeat.
+is the public factory. `time` is i/time. Field pairs are ordered and may repeat.
 Failure is the error severity; it avoids collision with built-in Error.
 
 ```i
@@ -633,17 +633,17 @@ Entry = (
 	fields = List((String, String)),
 	at = Option(time.Instant),
 )
-Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Level) -> Bool, (Entry) <- (Fail(E), ..N) -> (), (N) -> ())
 ```
 
 ```text
-make(E, N): (accept: (Level) -> Bool, send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)
+make(E, N): (accept: (Level) -> Bool, send: (Entry) -> () ^ E ! N) -> Sink(E, N)
 silent(N): () -> Sink(Never, N)
 filter(E, N): (sink: Sink(E, N), accept: (Level) -> Bool) -> Sink(E, N)
 minimum(E, N): (sink: Sink(E, N), level: Level) -> Sink(E, N)
 enabled(E, N): (level: Level) -> Bool ! Sink(E, N)
-write(E, N): (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
-lazy(E, F, N): (level: Level, message: () -> String ^ F ! N) -> Nil ^ E | F ! N | Sink(E, N)
+write(E, N): (entry: Entry) -> () ^ E ! N | Sink(E, N)
+lazy(E, F, N): (level: Level, message: () -> String ^ F ! N) -> () ^ E | F ! N | Sink(E, N)
 format: (entry: Entry) -> String
 ```
 
@@ -664,7 +664,7 @@ stderr: () -> Sink(stdio.StdioError, stdio.Stdio | request.Await | request.Owner
 - **L2 Delivery.** make stores callbacks without calling them. enabled calls
   the current Sink’s accept exactly once. write obtains the current service,
   calls its accept once and, only on True, calls send exactly once with the
-  original Entry. False returns Nil. No retry, buffering, task spawn, flush,
+  original Entry. False returns (). No retry, buffering, task spawn, flush,
   deduplication, or failure suppression occurs in the core. An error from send
   is the original E. Cancellation and cleanup follow ordinary call rules.
 - **L3 Laziness.** lazy checks accept once; False calls neither message nor
@@ -677,7 +677,7 @@ stderr: () -> Sink(stdio.StdioError, stdio.Stdio | request.Await | request.Owner
   accept is always False. All these factories are pure. Calling enabled then
   write performs two checks; enabled gives a query result, not a reservation.
 - **L5 Services and errors.** E is covariant; N is invariant through the unused
-  `(N)->Nil` marker, made as `(_ : N) { Nil }` and never called. Composition uses
+  `(N)->()` marker, made as `(_ : N) { () }` and never called. Composition uses
   one chosen N, not an invariant union of free row variables. Different Sink
   instances in an environment must have equal arguments, per spec §9.2;
   there is no automatic union of two sinks’ error/environment parameters.
@@ -717,7 +717,7 @@ or avoid recursively calling itself.
 | Write Entry(Info,"hello",[],None) to capture sink | One identical entry, no clock; L1/L2 |
 | Replace sink inside a block, call a previously made producer | Replacement sees entry; spec §9.2/L2 |
 | minimum at Warning, write Debug then Failure | Only Failure delivered; L1/L4 |
-| False accept and lazy message that raises | Nil, message not called; L3 |
+| False accept and lazy message that raises | (), message not called; L3 |
 | True accept and lazy message that raises "bad" | Original "bad", no send; L3 |
 | Send raises custom error | Same error in fail.catch, no retry; L2/L5 |
 | Format Entry(Info,"a\nb",[("k","v"),("k","")],None) | `info "a\nb" "k"="v" "k"=""` with escaped LF, no actual LF; L6 |
@@ -752,24 +752,24 @@ same failure was reproduced with the complete four-field Entry of §6.
 )
 
 Entry = (message = String)
-Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> Nil, (N) -> Nil)
+Sink(E, N) = ((Entry) <- (Fail(E), ..N) -> (), (N) -> ())
 
-make = <E, N>(send : (Entry) <- (Fail(E), ..N) -> Nil) -> Sink(E, N) {
-	Sink(send, (_ : N) { Nil })
+make = <E, N>(send : (Entry) <- (Fail(E), ..N) -> ()) -> Sink(E, N) {
+	Sink(send, (_ : N) { () })
 }
 
 write = <E, N>(entry : Entry) <- (sink : Sink(E, N)) {
 	Sink(send, _) = sink
 	send(entry)
 }
-// Shown: (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
+// Shown: (entry: Entry) -> () ^ E ! N | Sink(E, N)
 example = () {
 	fail.catch(() { write(Entry(message = "seen")) }) <- (
 		make((entry) { fail.raise(entry.message) }),
 	)
 }
 // Current compiler: E0505 at example; expected Ok/Error value has type
-// Result(Nil, String), with Error("seen") at run time.
+// Result((), String), with Error("seen") at run time.
 ```
 
 A finite instantiation E=String, N=Never satisfies the intended call; no
@@ -784,7 +784,7 @@ checker, though it is still not a build of this exact baseline.
 An explicit closed instantiation works with the inferred implementation:
 
 ```i
-send : (Entry) <- (Fail(String), Sink(String, Never)) -> Nil = write
+send : (Entry) <- (Fail(String), Sink(String, Never)) -> () = write
 
 working = () {
 	fail.catch(() { send(Entry("seen")) }) <- (
@@ -812,7 +812,7 @@ this fix. The eventual positive regression must keep the unsafe-row negative
 case rejected:
 
 ```i
-Consumer(A) = { ((A) -> Nil) }
+Consumer(A) = { ((A) -> ()) }
 
 bad = (s : Sink(Never, Consumer(Int))) -> Sink(Never, Consumer(Never)) { s }
 // Must reject: stored environments preserve exact service arguments.
@@ -843,8 +843,8 @@ Sections 3–6 of this note are the replacement **module documentation contract*
 copy their type/signature inventories, numbered behavior rules, and laws into
 the four new module documentation headers. Their future IO paragraphs must not
 appear as available exports before the corresponding IO phase. There are no
-old std/time/calendar/cli/log sections to replace. Do not renumber the spec or
-create tests/spec directories for library behavior; put it in std/test.
+old i/time/calendar/cli/log sections to replace. Do not renumber the spec or
+create tests/spec directories for library behavior; put it in i/test.
 
 The ledger’s target ruling (ledger.md:127) still applies: a target without a
 default implementation of a required host service fails compilation, even if
@@ -861,14 +861,14 @@ for later authorized implementation, not permission to modify other lanes.
 
 | File / region | Work |
 |---|---|
-| New `std/src/time.i`, entire file | T1–T3 and the 16 pure exports; later append T4/T5 wrappers and imports. |
-| New `std/src/calendar.i`, entire file | C1–C6, validated components, exact day conversion, text scan/print. Import only time’s pure operations. |
-| New `std/src/cli.i`, entire file | A1–A8, descriptor validation, scanner, buckets, typed decoders, help; later add read. |
-| New `std/src/log.i`, entire file | L1–L6 plus §7 gate; later append stderr and IO imports. No @host declaration. |
-| New `std/test/{time,calendar,cli,log}_test.i`, entire files | All tables above; laws, error ordering and boundary cases. Keep IO-fake cases in the matching second phase. |
+| New `stdlib/src/time.i`, entire file | T1–T3 and the 16 pure exports; later append T4/T5 wrappers and imports. |
+| New `stdlib/src/calendar.i`, entire file | C1–C6, validated components, exact day conversion, text scan/print. Import only time’s pure operations. |
+| New `stdlib/src/cli.i`, entire file | A1–A8, descriptor validation, scanner, buckets, typed decoders, help; later add read. |
+| New `stdlib/src/log.i`, entire file | L1–L6 plus §7 gate; later append stderr and IO imports. No @host declaration. |
+| New `stdlib/test/{time,calendar,cli,log}_test.i`, entire files | All tables above; laws, error ordering and boundary cases. Keep IO-fake cases in the matching second phase. |
 | `crates/ilang-check/src/types/solve.rs:688–714`, `:801–870`, `:950–999`; `infer.rs:2127–2156`; type-checker regression tests | Compiler owner investigates §7. These are starting regions, not a claim that all need edits. Exported generic wrappers and closed client calls need paired regression tests. |
-| `lib/i/{clock,process,stdio}.i:1`, request module and registration `crates/ilang-package/src/library.rs:7–24` | IO/runtime owners replace reservations and add the accepted request APIs. Std-2 edits none of these. |
-| `std/i.toml : 1`; `docs/spec.md` | No manifest or language-spec change required. All new imports are std or accepted i library modules. |
+| `stdlib/src/{clock,process,stdio}.i:1`, request module and registration `crates/ilang-package/src/library.rs:7–24` | IO/runtime owners replace reservations and add the accepted request APIs. Std-2 edits none of these. |
+| `stdlib/i.toml : 1`; `docs/spec.md` | No manifest or language-spec change required. All new imports are std or accepted i library modules. |
 
 1. Implement pure time first, then calendar. CLI is independent. Log needs
    time’s Instant type but no real clock. Use explicit annotations on public
@@ -1044,7 +1044,7 @@ linear CLI option lookup are documented costs, not measurements.
    before declaring full log ready, as was done for Std-1/K1. Allow the pure
    data/factories/formatter and demonstrated closed clients to proceed. Require
    both positive cases and the invariant-row negative case in §7; do not remove
-   N, erase E, capture a running Owner, or add a rule for std/log.
+   N, erase E, capture a running Owner, or add a rule for i/log.
 2. **Is the small calendar text profile the desired first format?** Recommend
    C5/C6: mandatory offset, nanoseconds, astronomical/expanded years and one
    canonical printer. It preserves the total conversion laws. Add a separately
@@ -1086,7 +1086,7 @@ These checks establish the requirements independently of generated expectations:
 | CLI token ownership and error precedence | A3: “This arity rule is independent of the read callback”; A6: “First definition validation ... then token scanning errors ... then extra positionals ... then missing/value conversion errors in descriptor order.” Tests include every pure §5.5/review-table case, stopping later callbacks, heterogeneous composition and help bytes from A8. |
 | Internal CLI bucket consumption | §5.4: “Each leaf consumes exactly one bucket; pure consumes none.” The executable test harness compiles the implementation as a temporary test module and checks empty supplied buckets, the exact unused suffix and full public parse consumption. |
 | Call-time logging and lazy suppression | L2: “write obtains the current service ... original Entry”; L3: “False calls neither message nor send.” Closed clients record entry order, replacement of an already-created producer, eager argument evaluation, lazy suppression and unchanged custom errors with exactly one delivery attempt. |
-| Sink row and generic gate | L5: “E is covariant; N is invariant through the unused `(N)->Nil` marker”; §7: “The implementation can use inferred function bodies and explicitly typed closed client calls in the meantime.” No marker, error or service parameter was removed. Both negative cases and all five waiting positive probes are executable in log_test.i. Successful generic clients must then pass runtime assertions at both optimization levels. |
+| Sink row and generic gate | L5: “E is covariant; N is invariant through the unused `(N)->()` marker”; §7: “The implementation can use inferred function bodies and explicitly typed closed client calls in the meantime.” No marker, error or service parameter was removed. Both negative cases and all five waiting positive probes are executable in log_test.i. Successful generic clients must then pass runtime assertions at both optimization levels. |
 | Log text bytes | L6: “Other U+0000..001F and U+007F..009F, plus U+2028/U+2029, become `\u{h}` with minimal lowercase hex digits.” Fixed expectations cover quote/backslash, LF/CR/tab, NUL, ESC, C1 boundaries, separators, Unicode, duplicate/empty fields and signed timestamps. |
 | Future tests stay deferred | §9: “Keep IO-fake cases in the matching second phase.” T4/T5, cli.read and L7 require the unavailable IO services. Their absence does not change any pure signature. |
 
@@ -1106,64 +1106,64 @@ annotations under the explicit §7 workaround, but their inferred public types
 retain all required errors and services. There is no semantic API difference.
 
 ```text
-std/time.nanoseconds : (count: Int) -> Duration
-std/time.milliseconds : (count: Int) -> Duration
-std/time.seconds : (count: Int) -> Duration
-std/time.minutes : (count: Int) -> Duration
-std/time.hours : (count: Int) -> Duration
-std/time.to_nanoseconds : (duration: Duration) -> Int
-std/time.add : (first: Duration, second: Duration) -> Duration
-std/time.subtract : (first: Duration, second: Duration) -> Duration
-std/time.scale : (duration: Duration, by: Int) -> Duration
-std/time.divide : (duration: Duration, by: Int) -> Result(Duration, TimeError)
-std/time.compare : (first: Duration, second: Duration) -> Order
-std/time.from_unix_nanoseconds : (count: Int) -> Instant
-std/time.unix_nanoseconds : (instant: Instant) -> Int
-std/time.shift : (instant: Instant, by: Duration) -> Instant
-std/time.between : (start: Instant, end: Instant) -> Duration
-std/time.compare_instants : (first: Instant, second: Instant) -> Order
+i/time.nanoseconds : (count: Int) -> Duration
+i/time.milliseconds : (count: Int) -> Duration
+i/time.seconds : (count: Int) -> Duration
+i/time.minutes : (count: Int) -> Duration
+i/time.hours : (count: Int) -> Duration
+i/time.to_nanoseconds : (duration: Duration) -> Int
+i/time.add : (first: Duration, second: Duration) -> Duration
+i/time.subtract : (first: Duration, second: Duration) -> Duration
+i/time.scale : (duration: Duration, by: Int) -> Duration
+i/time.divide : (duration: Duration, by: Int) -> Result(Duration, TimeError)
+i/time.compare : (first: Duration, second: Duration) -> Order
+i/time.from_unix_nanoseconds : (count: Int) -> Instant
+i/time.unix_nanoseconds : (instant: Instant) -> Int
+i/time.shift : (instant: Instant, by: Duration) -> Instant
+i/time.between : (start: Instant, end: Instant) -> Duration
+i/time.compare_instants : (first: Instant, second: Instant) -> Order
 
-std/calendar.is_leap_year : (year: Int) -> Bool
-std/calendar.days_in_month : (year: Int, month: Int) -> Result(Int, CalendarError)
-std/calendar.date : (year: Int, month: Int, day: Int) -> Result(Date, CalendarError)
-std/calendar.time_of_day : (hour: Int, minute: Int, second: Int, nanosecond: Int) -> Result(TimeOfDay, CalendarError)
-std/calendar.offset : (minutes: Int) -> Result(Offset, CalendarError)
-std/calendar.utc : () -> Offset
-std/calendar.date_parts : (date: Date) -> (Int, Int, Int)
-std/calendar.time_parts : (time: TimeOfDay) -> (Int, Int, Int, Int)
-std/calendar.offset_minutes : (offset: Offset) -> Int
-std/calendar.day_number : (date: Date) -> Int
-std/calendar.from_day_number : (day: Int) -> Date
-std/calendar.weekday : (date: Date) -> Weekday
-std/calendar.add_days : (date: Date, days: Int) -> Date
-std/calendar.days_between : (start: Date, end: Date) -> Int
-std/calendar.at : (instant: time.Instant, offset: Offset) -> Civil
-std/calendar.to_instant : (civil: Civil, offset: Offset) -> time.Instant
-std/calendar.parse : (text: String) -> Result((Civil, Offset), CalendarError)
-std/calendar.format : (civil: Civil, offset: Offset) -> String
+i/calendar.is_leap_year : (year: Int) -> Bool
+i/calendar.days_in_month : (year: Int, month: Int) -> Result(Int, CalendarError)
+i/calendar.date : (year: Int, month: Int, day: Int) -> Result(Date, CalendarError)
+i/calendar.time_of_day : (hour: Int, minute: Int, second: Int, nanosecond: Int) -> Result(TimeOfDay, CalendarError)
+i/calendar.offset : (minutes: Int) -> Result(Offset, CalendarError)
+i/calendar.utc : () -> Offset
+i/calendar.date_parts : (date: Date) -> (Int, Int, Int)
+i/calendar.time_parts : (time: TimeOfDay) -> (Int, Int, Int, Int)
+i/calendar.offset_minutes : (offset: Offset) -> Int
+i/calendar.day_number : (date: Date) -> Int
+i/calendar.from_day_number : (day: Int) -> Date
+i/calendar.weekday : (date: Date) -> Weekday
+i/calendar.add_days : (date: Date, days: Int) -> Date
+i/calendar.days_between : (start: Date, end: Date) -> Int
+i/calendar.at : (instant: time.Instant, offset: Offset) -> Civil
+i/calendar.to_instant : (civil: Civil, offset: Offset) -> time.Instant
+i/calendar.parse : (text: String) -> Result((Civil, Offset), CalendarError)
+i/calendar.format : (civil: Civil, offset: Offset) -> String
 
-std/cli.pure : (value: A) -> Parser(A)
-std/cli.flag : (names: Names, help: String) -> Parser(Bool)
-std/cli.option : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(A)
-std/cli.argument : (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(A)
-std/cli.optional : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(Option(A))
-std/cli.many : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))
-std/cli.rest : (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))
-std/cli.map : (parser: Parser(A), with: (A) -> B) -> Parser(B)
-std/cli.map2 : (first: Parser(A), second: Parser(B), with: (A, B) -> C) -> Parser(C)
-std/cli.text : (text: String) -> Result(String, String)
-std/cli.integer : (text: String) -> Result(Int, String)
-std/cli.parse : (parser: Parser(A), args: List(String)) -> Result(A, CliError)
-std/cli.help : (parser: Parser(A), program: String) -> Result(String, DefinitionError)
+i/cli.pure : (value: A) -> Parser(A)
+i/cli.flag : (names: Names, help: String) -> Parser(Bool)
+i/cli.option : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(A)
+i/cli.argument : (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(A)
+i/cli.optional : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(Option(A))
+i/cli.many : (names: Names, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))
+i/cli.rest : (name: String, help: String, read: (String) -> Result(A, String)) -> Parser(List(A))
+i/cli.map : (parser: Parser(A), with: (A) -> B) -> Parser(B)
+i/cli.map2 : (first: Parser(A), second: Parser(B), with: (A, B) -> C) -> Parser(C)
+i/cli.text : (text: String) -> Result(String, String)
+i/cli.integer : (text: String) -> Result(Int, String)
+i/cli.parse : (parser: Parser(A), args: List(String)) -> Result(A, CliError)
+i/cli.help : (parser: Parser(A), program: String) -> Result(String, DefinitionError)
 
-std/log.make : (accept: (Level) -> Bool, send: (Entry) -> Nil ^ E ! N) -> Sink(E, N)
-std/log.silent : () -> Sink(Never, A)
-std/log.filter : (sink: Sink(A, B), accept: (Level) -> Bool) -> Sink(A, B)
-std/log.minimum : (sink: Sink(A, B), level: Level) -> Sink(A, B)
-std/log.enabled : (level: Level) -> Bool ! Sink(A, B)
-std/log.write : (entry: Entry) -> Nil ^ E ! N | Sink(E, N)
-std/log.lazy : (level: Level, message: () -> String ^ E ! N) -> Nil ^ E | E2 ! N | Sink(E2, N)
-std/log.format : (entry: Entry) -> String
+i/log.make : (accept: (Level) -> Bool, send: (Entry) -> () ^ E ! N) -> Sink(E, N)
+i/log.silent : () -> Sink(Never, A)
+i/log.filter : (sink: Sink(A, B), accept: (Level) -> Bool) -> Sink(A, B)
+i/log.minimum : (sink: Sink(A, B), level: Level) -> Sink(A, B)
+i/log.enabled : (level: Level) -> Bool ! Sink(A, B)
+i/log.write : (entry: Entry) -> () ^ E ! N | Sink(E, N)
+i/log.lazy : (level: Level, message: () -> String ^ E ! N) -> () ^ E | E2 ! N | Sink(E2, N)
+i/log.format : (entry: Entry) -> String
 ```
 
 ### 12.3 Compiler gate and checking
@@ -1180,8 +1180,8 @@ still gives E0501; incompatible installed Sink error arguments give E0515.
 The smallest rejection needs no logging library:
 
 ```i
-S(N) = (() <- N -> Nil)
-use = <N>() <- (s : S(N)) -> Nil {
+S(N) = (() <- N -> ())
+use = <N>() <- (s : S(N)) -> () {
 	S(f) = s
 	f()
 }
@@ -1198,10 +1198,10 @@ All commands below run from this lane through
 | Command/check | Final result |
 |---|---|
 | `cargo build --release --locked -p ilang-cli` | Passed; exact lane compiler built with the pinned Binaryen submodule. |
-| `./scripts/checks i` | Passed: formatting of lib/std/bench/examples; std 1446 passed at both optimization levels; hello 2 and bench 12 passed at each level; WASI smoke passed. |
+| `./scripts/checks i` | Passed: formatting of `lib`, `stdlib`, `bench` and `examples`; std 1446 passed at both optimization levels; hello 2 and bench 12 passed at each level; WASI smoke passed. |
 | `target/release/i test --project std --opt 0` and `--opt 2`, as invoked by checks | Both passed, 1446 tests each. These are the runtime acceptance checks. |
 | `target/release/i fmt --check std` | Passed. |
-| `./scripts/old-syntax-check` | Passed: 1181 snippets, exact expected diagnostics, 19 unchanged future-track entries. |
+| `old-syntax-check` | Passed: 1181 snippets, exact expected diagnostics, 19 unchanged future-track entries. |
 | `target/release/i check --project std --types` | Passed; all 55 measured interfaces are listed above. |
 | Executable checker harnesses in time_test.i and calendar_test.i | Required nominal separation E0501 and hidden-constructor/update E0204 cases rejected. Each harness first requires a passing baseline and restores its file in finally. |
 | Executable internal CLI decoder harness in cli_test.i | One internal test passed at each optimization level; test file restored. |

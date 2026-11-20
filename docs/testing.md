@@ -127,7 +127,7 @@ Prior art read before implementation (paths under `.rd/ref`):
 - `tsrs/notes/fuzz-derived-variance.md`: Generator, Findings, Verdict — retain
   counterexamples even after removing an optimization. Its old fuzzer was
   removed upstream; this lane does not claim to run it.
-- `tsrs/docs/PORTING.md`: porting contract; `docs/PORT_AUTOMATION.md`: freeze
+- `tsrs/docs/PORTING.md`: porting contract; `tsrs/docs/PORT_AUTOMATION.md`: freeze
   oracle hashes, keep failed work; `AGENTS.md`: Reproductions and Performance.
   i takes provenance and repeatability, with its spec as the oracle. TypeScript
   assignability/history, widening and reference behavior do not define i.
