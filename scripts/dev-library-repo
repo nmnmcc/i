@@ -28,21 +28,25 @@ version=${3:-0.1.0}
   echo "dev-library-repo: '$version' is not X.Y.Z" >&2
   exit 2
 }
-src=$(realpath -- "$src")
-mkdir -p -- "$dest"
-dest=$(realpath -- "$dest")
+src=$(cd "$src" && pwd -P)
+mkdir -p "$dest"
+dest=$(cd "$dest" && pwd -P)
 [[ ! -e $dest/i.git ]] || {
   echo "dev-library-repo: '$dest/i.git' is already there" >&2
   exit 2
 }
 
 tree=$(mktemp -d "${TMPDIR:-/var/tmp}/i-library-tree.XXXXXX")
-trap 'rm -rf -- "$tree"' EXIT
+trap 'rm -rf "$tree"' EXIT
 mkdir -p "$tree/stdlib"
 if git -C "$src" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  (cd "$src" && git ls-files -z -- . | xargs -0 -r cp --parents -t "$tree/stdlib" --)
+  # A loop rather than `cp --parents`, which BSD cp on macOS does not have.
+  while IFS= read -r -d '' file; do
+    mkdir -p "$tree/stdlib/$(dirname "$file")"
+    cp "$src/$file" "$tree/stdlib/$file"
+  done < <(git -C "$src" ls-files -z -- .)
 else
-  cp -a -- "$src/." "$tree/stdlib/"
+  cp -R -p "$src/." "$tree/stdlib/"
 fi
 
 # No user configuration, hooks or signing: the commit is the same anywhere.
