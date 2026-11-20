@@ -122,6 +122,20 @@ jobs:
           test "$output" = "Hello, demo!"
           echo "i new + i run: $output"
 
+      # The standard library's own tests, at the cheapest optimization level.
+      # These exercise the platform paths (files, processes) that the compiler
+      # smoke test does not. A failure fails this platform leg.
+      - name: Test the standard library
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/home"
+          mkdir -p "$HOME"
+          cd "$GITHUB_WORKSPACE"
+          start=$(date +%s)
+          ./result-i/bin/i test --project stdlib --opt 0
+          echo "stdlib tests (--opt 0): $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
+
       # `i-bin` needs an archive. This run has no published release, so build
       # the archive the release workflow would upload for this platform, pin
       # it in nix/release.nix, and then build `.#i-bin` through the real
