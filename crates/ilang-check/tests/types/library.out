@@ -287,6 +287,11 @@ i/csv.parse : (String) <- (Fail(CsvError)) -> List(List(String))
 i/csv.parse_with : (String, Options) <- (Fail(CsvError)) -> List(List(String))
 i/csv.parse_header : (String, Options) <- (Fail(CsvError)) -> List(dict.Dict(String, String))
 i/csv.decode : (schema.Schema(A, B), dict.Dict(String, String)) <- (Fail(B)) -> A
+i/deferred.new : () <- (resource.Scope, task.Scheduler) -> Deferred(A, B)
+i/deferred.complete : (Deferred(A, B), Result(A, B)) <- (task.Scheduler) -> Bool
+i/deferred.poll : (Deferred(A, B)) <- (task.Scheduler) -> Option(Result(A, B))
+i/deferred.is_done : (Deferred(A, B)) <- (task.Scheduler) -> Bool
+i/deferred.await : (Deferred(A, B)) <- (Fail(B), task.Scheduler) -> A
 i/dict.new : () -> Dict(Never, Never)
 i/dict.size : (Dict(A, B)) -> Int
 i/dict.is_empty : (Dict(A, B)) -> Bool
@@ -896,6 +901,36 @@ i/property.int : (Int, Int) <- (Fail(BuildError)) -> Gen(Int)
 i/property.element : (List(A)) <- (Fail(BuildError)) -> Gen(A)
 i/property.list : (Gen(A), Int, Int) <- (Fail(BuildError)) -> Gen(List(A))
 i/property.string : (Int) <- (Fail(BuildError)) -> Gen(String)
+i/queue.without : (List(Int), Int) -> List(Int)
+i/queue.append_ticket : (List(Int), Int) -> List(Int)
+i/queue.is_head : (List(Int), Int) -> Bool
+i/queue.is_open : (Terminal(A)) -> Bool
+i/queue.has_room : (QueueState(A, B)) -> Bool
+i/queue.make : (Option(Int), Strategy) <- (Fail(Never), resource.Scope, task.Scheduler) -> Queue(A, B)
+i/queue.make_bounded : (Int, Strategy) <- (Fail(QueueError), resource.Scope, task.Scheduler) -> Queue(A, B)
+i/queue.bounded : (Int) <- (Fail(QueueError), resource.Scope, task.Scheduler) -> Queue(A, B)
+i/queue.dropping : (Int) <- (Fail(QueueError), resource.Scope, task.Scheduler) -> Queue(A, B)
+i/queue.sliding : (Int) <- (Fail(QueueError), resource.Scope, task.Scheduler) -> Queue(A, B)
+i/queue.unbounded : () <- (Fail(Never), resource.Scope, task.Scheduler) -> Queue(A, B)
+i/queue.insert : (QueueState(A, B), Strategy, A) -> (QueueState(A, B), Bool)
+i/queue.offer_first : (QueueState(A, B), Strategy, A) -> (QueueState(A, B), OfferStep)
+i/queue.offer_again : (QueueState(A, B), Strategy, Int, A) -> (QueueState(A, B), OfferStep)
+i/queue.offer_wait : (Queue(A, B), Int, A) <- (task.Scheduler) -> OfferStep
+i/queue.forget_offer : (Queue(A, B), Int) <- (task.Scheduler) -> ()
+i/queue.offer : (Queue(A, B), A) <- (Fail(QueueError), task.Scheduler) -> Bool
+i/queue.empty_answer : (QueueState(A, B), Int) -> (QueueState(A, B), TakeStep(A, B))
+i/queue.take_now : (QueueState(A, B), Int) -> (QueueState(A, B), TakeStep(A, B))
+i/queue.take_first : (QueueState(A, B)) -> (QueueState(A, B), TakeStep(A, B))
+i/queue.take_again : (QueueState(A, B), Int) -> (QueueState(A, B), TakeStep(A, B))
+i/queue.take_wait : (Queue(A, B), Int) <- (task.Scheduler) -> TakeStep(A, B)
+i/queue.forget_take : (Queue(A, B), Int) <- (task.Scheduler) -> ()
+i/queue.finish_take : (TakeStep(A, B)) <- (Fail(B)) -> Option(A)
+i/queue.take : (Queue(A, B)) <- (Fail(B), task.Scheduler) -> Option(A)
+i/queue.poll : (Queue(A, B)) <- (Fail(B), task.Scheduler) -> Option(A)
+i/queue.size : (Queue(A, B)) <- (task.Scheduler) -> Int
+i/queue.end : (Queue(A, B)) <- (task.Scheduler) -> ()
+i/queue.fail : (Queue(A, B), B) <- (task.Scheduler) -> ()
+i/queue.shutdown : (Queue(A, B)) <- (task.Scheduler) -> ()
 i/random.word_size : () -> Int
 i/random.mask : (Int) -> Int
 i/random.xor_shift : (Int, Int) -> Int
@@ -1088,6 +1123,14 @@ i/schema.read_union : (List(Schema(A, SchemaError)), json.Json) -> Result(A, Sch
 i/schema.tagged_union : (String, List((String, Schema(A, SchemaError))), (A) -> String) -> Schema(A, SchemaError)
 i/schema.decode : (Schema(A, B), json.Json) <- (Fail(B)) -> A
 i/schema.parse : (Schema(A, SchemaError), String) <- (Fail(ParseError)) -> A
+i/semaphore.new : (Int) <- (Fail(InvalidPermits), resource.Scope, task.Scheduler) -> Semaphore
+i/semaphore.with_permits : (Semaphore, Int, () <- N -> A) <- (Fail(InvalidPermits), task.Scheduler, ..N) -> A
+i/semaphore.with_permit : (Semaphore, () <- N -> A) <- (task.Scheduler, ..N) -> A
+i/semaphore.available : (Semaphore) <- (task.Scheduler) -> Int
+i/semaphore.hold : (Semaphore, Int, () <- N -> A) <- (task.Scheduler, ..N) -> A
+i/semaphore.admit : (Semaphore, Int, Int) <- (task.Scheduler) -> ()
+i/semaphore.take : (SemaphoreState, Int, Int) -> (SemaphoreState, Bool)
+i/semaphore.leave : (SemaphoreState, Int, Int) -> SemaphoreState
 i/sequence.new : () -> Sequence(Never)
 i/sequence.singleton : (A) -> Sequence(A)
 i/sequence.from_list : (List(A)) -> Sequence(A)
@@ -1530,7 +1573,8 @@ i/task.receive_event : (Channel(A)) -> Event(A, Never, Never)
 i/task.send : (Channel(A), A) <- (Scheduler) -> ()
 i/task.receive : (Channel(A)) <- (Fail(Never), Scheduler) -> A
 i/task.share : (Group(A), B) <- (Scheduler) -> Shared(B)
-i/task.get : (Shared(A)) <- (Scheduler) -> A
+i/task.get : ({ Shared(A) | B - Shared(A) } & { Ref(A) | C - Ref(A) } & { Shared(A) | Ref(A) }) <- (Scheduler) -> A
+i/task.set : (Ref(A), A) <- (Scheduler) -> ()
 i/task.keep : ((A) <- (Fail(C), Runner, Scheduler, request.Await, ..N) -> B) <- (Scheduler, ..N) -> (A) <- (Fail(C), Scheduler) -> B
 i/task.ref : (A) <- (Scheduler) -> Ref(A)
 i/task.update : (Ref(A), (A) -> (A, B)) <- (Scheduler) -> B
