@@ -40,7 +40,7 @@ temp_dir = () {
 			["-c", "d=$(mktemp -d) && printf %s \"$d\""],
 			process.Null,
 			process.Piped,
-			process.Inherit,
+			process.Piped,
 		)
 		out = process.collect(c)
 		assert(process.wait(c) == 0)
@@ -186,13 +186,16 @@ test("spawn_missing_program_test", () {
 			()
 		})
 	})
-	r |>
-		(Error(e)) {
-			assert(e.operation == "spawn")
-			assert(e.reason == process.NotFound)
-			assert(e.code == "not_found")
-		}
-		& (Ok(_)) { panic("process_test: a missing program spawned") }
+	assert(
+		r ==
+			Error(
+				process.ProcessError(
+					operation = "spawn",
+					reason = process.NotFound,
+					code = "not_found",
+				),
+			),
+	)
 	()
 })
 
@@ -211,9 +214,16 @@ test("wait_after_close_is_closed_test", () {
 		c = process.spawn("sh", ["-c", "exit 0"])
 		process.close(c)
 		r = fail.catch(() { process.wait(c) })
-		r |>
-			(Error(e)) { assert(e.reason == process.Closed) }
-			& (Ok(_)) { panic("process_test: wait after close") }
+		assert(
+			r ==
+				Error(
+					process.ProcessError(
+						operation = "wait",
+						reason = process.Closed,
+						code = "closed",
+					),
+				),
+		)
 		()
 	})
 })

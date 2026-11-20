@@ -156,7 +156,11 @@ raise_error = (operation : String, code : String) <- (
 	error : Fail(ProcessError),
 ) -> Never {
 	fail.raise(
-		ProcessError(operation = operation, reason = problem(code), code = code),
+		ProcessError(
+			operation = operation,
+			reason = problem(code),
+			code = code,
+		),
 	)
 }
 
@@ -295,7 +299,11 @@ release = (child : Child) <- (raw : Process) {
 /// ```
 spawn = (program, values) <- (_scope : resource.Scope, raw : Process) {
 	resource.acquire(
-		() { await_spawn(raw.spawn(program, encode_args(values))) },
+		() {
+			await_spawn(
+				raw.spawn(program, encode_args(values)),
+			)
+		},
 		release,
 	)
 }

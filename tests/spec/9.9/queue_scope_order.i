@@ -8,6 +8,4 @@
 	i/task
 )
 
-main = () {
-	resource.scoped(() { task.scope((g) { queue.unbounded() }) })
-}
+main = () { resource.scoped(() { task.scope((g) { queue.unbounded() }) }) }

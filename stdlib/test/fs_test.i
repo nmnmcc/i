@@ -176,7 +176,12 @@ test("fs_walk_depth_cap_test", () {
 			),
 	)
 	// Exactly 32 levels below the root is allowed.
-	assert(list.length(fs.walk(root <> string.repeat("/d", 8))) == 33)
+	assert(
+		list.length(
+			fs.walk(root <> string.repeat("/d", 8)),
+		) ==
+			33,
+	)
 	list.each(list.reverse(dirs), fs.remove)
 	fs.remove(root)
 	()
