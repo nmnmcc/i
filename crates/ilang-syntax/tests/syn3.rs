@@ -8,8 +8,7 @@ use migration_syntax::legacy;
 use ilang_syntax::syn3::ast::*;
 use ilang_syntax::syn3::{self, convert, lisp};
 
-/// Parses with no error, and checks `parse(print(t)) == t` (as the conversion
-/// compares, so up to the call of a constructor), that the
+/// Parses with no error, and checks `parse(print(t)) == t`, that the
 /// formatter gives text that reads as the same tree and is stable, and the
 /// same through the Lisp surface.
 fn ok(source: &str) -> Module {
@@ -18,19 +17,11 @@ fn ok(source: &str) -> Module {
     let printed = syn3::print_module(&module);
     let (again, diags) = syn3::parse_module(&printed);
     assert!(diags.is_empty(), "printed:\n{printed}\n{diags:#?}");
-    assert_eq!(
-        syn3::surface::ungrouped(&again),
-        syn3::surface::ungrouped(&module),
-        "printed:\n{printed}"
-    );
+    assert_eq!(again, module, "printed:\n{printed}");
     let formatted = syn3::format(source).expect("formats");
     let (again, diags) = syn3::parse_module(&formatted);
     assert!(diags.is_empty(), "formatted:\n{formatted}\n{diags:#?}");
-    assert_eq!(
-        syn3::surface::ungrouped(&again),
-        syn3::surface::ungrouped(&module),
-        "formatted:\n{formatted}"
-    );
+    assert_eq!(again, module, "formatted:\n{formatted}");
     assert_eq!(
         syn3::format(&formatted).unwrap(),
         formatted,
@@ -256,7 +247,7 @@ fn data_values() {
         "()",
         "(pair)",
         "(..ada, age = 37)",
-        "(..pair, True())",
+        "(..pair, True)",
         "User(..u, age = 37)",
         "f()",
         "f(x)",
@@ -495,8 +486,8 @@ fn p11_pipe() {
         "a |> f(..t)",
         "{ x |> g } == 2",
         "x == 1 |> core.not",
-        "opt |> (Some(v) ? empty(v)) { \"empty\" } & (Some(v)) { v } & (None()) { \"none\" }",
-        "day |> (Sat() | Sun()) { \"rest\" } & (_) { \"work\" }",
+        "opt |> (Some(v) ? empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" }",
+        "day |> (Sat | Sun) { \"rest\" } & (_) { \"work\" }",
         "p |> ((0, y)) { y } & ((x, _)) { x }",
     ] {
         assert_eq!(expr(e), e);
@@ -551,7 +542,7 @@ fn patterns() {
         "\"a\" <> rest",
         "rest <> \"z\"",
         "\"a\" <> mid <> \"z\"",
-        "None()",
+        "None",
         "Some(v)",
         "m.Some(v)",
         "User(name = n, age = a)",
@@ -616,7 +607,7 @@ fn parameters_alternatives_guards() {
     // one_annotation_boundary_for_declarations_patterns_and_function_results.
     let f = value("f = (x : { Int | y }) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 1);
-    let f = value("f = (True() | _ : Int) { 1 }");
+    let f = value("f = (True | _ : Int) { 1 }");
     assert_eq!(chain(&f)[0].params[0].choices.len(), 2);
     // the guard is after the last item and ends at `)`.
     let f = value("f = (a : Int, b : Int ? a > b) -> Int { a - b }");
@@ -810,7 +801,7 @@ fn generics() {
     assert_eq!(chain(&f)[1].generics[0].name, "B");
     // A comparison is still a comparison.
     assert_eq!(expr("a < b"), "a < b");
-    assert_eq!(expr("a < B"), "a < B()");
+    assert_eq!(expr("a < B"), "a < B");
     // The type parameters of a binding head are removed.
     bad(
         "id(A) = (x : A) { x }",
@@ -857,7 +848,7 @@ fn formatter_layout() {
     let long = "kind = day |> (Mon) { \"first day of the week\" } & (Tue) { \"second day of the week\" } & (_) { \"another day\" }\n";
     assert_eq!(
         syn3::format(long).unwrap(),
-        "kind = day |>\n\t(Mon()) { \"first day of the week\" }\n\t& (Tue()) { \"second day of the week\" }\n\t& (_) { \"another day\" }\n"
+        "kind = day |>\n\t(Mon) { \"first day of the week\" }\n\t& (Tue) { \"second day of the week\" }\n\t& (_) { \"another day\" }\n"
     );
     let gcd = "gcd = (a : Int, 0) -> Int { a } & (a : Int, b : Int) -> Int { gcd(b, a % b) } & (a : Int, b : Int, c : Int) -> Int { gcd(gcd(a, b), c) }\n";
     assert_eq!(
@@ -866,7 +857,7 @@ fn formatter_layout() {
     );
     assert_eq!(
         syn3::format("kind = day |> (Sat | Sun) { \"rest\" } & (_) { \"work\" }\n").unwrap(),
-        "kind = day |> (Sat() | Sun()) { \"rest\" } & (_) { \"work\" }\n"
+        "kind = day |> (Sat | Sun) { \"rest\" } & (_) { \"work\" }\n"
     );
     // Comments stay; literals are printed as they are written.
     let source = "// before\nf = (x) {\n\t// first\n\ta = 0xFF // trailing\n\n\t// second\n\tg(a, x)\n\t// last\n}\n";
@@ -921,7 +912,7 @@ fn lisp_rows() {
             "y = (C(p1, x = p2)) { 1 }",
             "(= y (-> (, (C p1 (= x p2))) _ 1))",
         ),
-        ("y = (C(p, ..), D) { 1 }", "(= y (-> (, (C p ..) (D)) _ 1))"),
+        ("y = (C(p, ..), D) { 1 }", "(= y (-> (, (C p ..) D) _ 1))"),
         (
             "(size = whole = (w, h)) = box",
             "(= (, (= size whole (, w h))) box)",
@@ -933,7 +924,7 @@ fn lisp_rows() {
         ("t = (a, b) = e", "(= (= t (, a b)) e)"),
         (
             "y = (Sat | Sun, x) { 1 }",
-            "(= y (-> (, (| (Sat) (Sun)) x) _ 1))",
+            "(= y (-> (, (| Sat Sun) x) _ 1))",
         ),
         // The services forms.
         (
@@ -964,17 +955,13 @@ fn lisp_rows() {
         assert_eq!(lisp_of(normal), lisp, "{normal}");
         let (read, diags) = lisp::from_lisp(lisp);
         assert!(diags.is_empty(), "{lisp}\n{diags:#?}");
-        assert_eq!(
-            syn3::surface::ungrouped(&read),
-            syn3::surface::ungrouped(&ok(normal)),
-            "{lisp}"
-        );
+        assert_eq!(read, ok(normal), "{lisp}");
     }
 }
 
 #[test]
 fn lisp_examples_of_the_note() {
-    let normal = "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\npick = (0, y) { y } & (x, _) { x }\nlabel = (opt) { opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None()) { \"none\" } }\n";
+    let normal = "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\npick = (0, y) { y } & (x, _) { x }\nlabel = (opt) { opt |> (Some(v) ? string.is_empty(v)) { \"empty\" } & (Some(v)) { v } & (None) { \"none\" } }\n";
     let lisp_text = "(= connect (-> (, (: host String) (= port (: p Int))) Conn (open host p)))\n(= pick (& (-> (, 0 y) _ y) (-> (, x _) _ x)))\n(= label (-> (, opt) _\n  (|> opt (& (-> (? (, (Some v)) ((. string is_empty) v)) _ \"empty\")\n             (-> (, (Some v)) _ v)\n             (-> (, None) _ \"none\")))))\n";
     let (read, diags) = lisp::from_lisp(lisp_text);
     assert!(diags.is_empty(), "{diags:#?}");
@@ -982,7 +969,7 @@ fn lisp_examples_of_the_note() {
     // The normal printer writes a body that is not a block in `{ }`.
     assert_eq!(
         syn3::print_module(&read),
-        "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\n\npick = (0, y) { y } & (x, _) { x }\n\nlabel = (opt) {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t& (Some(v)) { v }\n\t\t& (None()) { \"none\" }\n}\n"
+        "connect = (host : String, port = p : Int) -> Conn { open(host, p) }\n\npick = (0, y) { y } & (x, _) { x }\n\nlabel = (opt) {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t& (Some(v)) { v }\n\t\t& (None) { \"none\" }\n}\n"
     );
     let test_is = "(= text (-> (, x) _\n  (|> ((. syntax node) x)\n      (& (-> (, ((. syntax Node) ((. syntax Text) s))) _ s)\n         (-> (, _) _ (panic \"test name must be a string literal\"))))))\n(= append (-> (, xs ys) _\n  (|> xs (& (-> (, []) _ ys) (-> (, [x .. rest]) _ [x .. (append rest ys)])))))\n";
     let (read, diags) = lisp::from_lisp(test_is);
@@ -1021,19 +1008,11 @@ fn converted(old: &str) -> String {
     let text = syn3::print_with_comments(&new, old, &lexed.comments);
     let (read, diags) = syn3::parse_module(&text);
     assert!(diags.is_empty(), "{text}\n{diags:#?}");
-    assert_eq!(
-        syn3::surface::ungrouped(&read),
-        syn3::surface::ungrouped(&new),
-        "{text}"
-    );
+    assert_eq!(read, new, "{text}");
     let plain = syn3::print_module(&new);
     let (read, diags) = syn3::parse_module(&plain);
     assert!(diags.is_empty(), "{plain}\n{diags:#?}");
-    assert_eq!(
-        syn3::surface::ungrouped(&read),
-        syn3::surface::ungrouped(&new),
-        "{plain}"
-    );
+    assert_eq!(read, new, "{plain}");
     text
 }
 
@@ -1070,7 +1049,7 @@ fn convert_clauses_and_matches() {
         converted(
             "describe = (opt : Option(String)) -> String {\n\topt |> {\n\t\tSome(v) ? string.is_empty(v) -> \"empty\"\n\t\tSome(v) -> v\n\t\tNone -> \"none\"\n\t}\n}\n"
         ),
-        "describe = (opt : Option(String)) -> String {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t& (Some(v)) { v }\n\t\t& (None()) { \"none\" }\n}\n"
+        "describe = (opt : Option(String)) -> String {\n\topt |>\n\t\t(Some(v) ? string.is_empty(v)) { \"empty\" }\n\t\t& (Some(v)) { v }\n\t\t& (None) { \"none\" }\n}\n"
     );
     // A tuple pattern becomes the one item `((a, b))`.
     assert_eq!(
@@ -1081,11 +1060,11 @@ fn convert_clauses_and_matches() {
     );
     assert_eq!(
         converted("x = list.map(opts, { Some(u) -> u.name  None -> \"\" })\n"),
-        "x = list.map(opts, (Some(u)) { u.name } & (None()) { \"\" })\n"
+        "x = list.map(opts, (Some(u)) { u.name } & (None) { \"\" })\n"
     );
     assert_eq!(
         converted("k = d |> { Sat | Sun -> 1  _ -> 2 }\n"),
-        "k = d |> (Sat() | Sun()) { 1 } & (_) { 2 }\n"
+        "k = d |> (Sat | Sun) { 1 } & (_) { 2 }\n"
     );
     assert_eq!(
         converted("absurd = (x : Never) { x |> {} }\n"),
@@ -1421,7 +1400,7 @@ fn one_annotation_boundary_for_declarations_patterns_and_function_results() {
     assert_eq!(ok(&printed), rows);
     assert_eq!(
         syn3::format("x : (LongTypeNameOne, LongTypeNameTwo, LongTypeNameThree, LongTypeNameFour, LongTypeNameFive) = e").unwrap(),
-        syn3::format("x = (LongTypeNameOne, LongTypeNameTwo, LongTypeNameThree, LongTypeNameFour, LongTypeNameFive)").unwrap().replace("()", "").replace("x =", "x :").trim_end().to_string() + " = e\n"
+        syn3::format("x = (LongTypeNameOne, LongTypeNameTwo, LongTypeNameThree, LongTypeNameFour, LongTypeNameFive)").unwrap().replace("x =", "x :").trim_end().to_string() + " = e\n"
     );
 }
 
