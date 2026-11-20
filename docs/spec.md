@@ -2361,6 +2361,8 @@ These ordinary functions use the services described in §9.7; their definitions 
 | `read_file` | Read a whole file. |
 | `write_file` | Write a whole file. |
 | `read_lines` | Read a file as text lines. |
+| `copy` | Copy one file into another and give the bytes copied. |
+| `walk` | List every path under a directory, depth first in name order. |
 
 #### `i/process`
 
@@ -2380,6 +2382,7 @@ These ordinary functions use the services described in §9.7; their definitions 
 | `wait` | Wait for a child to exit. |
 | `terminate` | Terminate a child. |
 | `close` | Close a child handle. |
+| `collect` | Read the child’s piped standard output and standard error to the end, both at once. |
 
 #### `i/net`
 
