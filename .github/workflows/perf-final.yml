@@ -1,0 +1,108 @@
+# Closing pair: main before and after the list.sort cell change (d1a099c63),
+# on one runner, both opt levels. Started by a push to this file.
+name: Perf final sort cells
+
+on:
+  push:
+    branches: [ci/perf-baseline]
+    paths: [.github/workflows/perf-final.yml]
+
+permissions:
+  contents: read
+
+env:
+  BEFORE: "193ba0adcf51c0c216b974a704745b89da2bf4a3"
+  AFTER: "d1a099c63"
+  RAYON_NUM_THREADS: 1
+  REPEATS: "5"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache /usr/local/share/boost /usr/local/share/powershell \
+            /usr/share/swift /usr/local/julia* /opt/az /opt/microsoft /opt/google \
+            /usr/local/share/chromium /usr/lib/jvm
+          df -h /
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.AFTER }}
+          submodules: true
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - name: Install devenv
+        run: nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
+      - name: Build the release i
+        run: devenv shell -- cargo build --release --locked -p ilang-cli
+      - name: List the Nix store paths that i loads
+        run: |
+          devenv shell -- ldd target/release/i \
+            | grep -o '/nix/store/[a-z0-9]\{32\}-[^/ ]*' | sort -u > target/release/i.nix-paths
+          test -s target/release/i.nix-paths
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: i-release-final
+          path: |
+            target/release/i
+            target/release/i.nix-paths
+          if-no-files-found: error
+          retention-days: 7
+
+  measure:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BEFORE }}
+          path: src-before
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.AFTER }}
+          path: src-after
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        with:
+          extra-conf: |
+            always-allow-substitutes = true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: i-release-final
+          path: bin
+      - name: Fetch the libraries of i
+        run: |
+          chmod +x bin/i
+          xargs nix-store --realise < bin/i.nix-paths > /dev/null
+          bin/i --version
+          mkdir -p out
+          { uname -a; nproc; lscpu; free -g; cat /proc/loadavg; } > out/machine.txt
+          cat out/machine.txt
+      - name: Alternate before and after at both opt levels
+        run: |
+          set -x
+          for opt in 0 2; do
+            for r in $(seq 1 "$REPEATS"); do
+              cat /proc/loadavg > "out/load-$opt-$r.txt"
+              if [ $((r % 2)) -eq 1 ]; then order="before after"; else order="after before"; fi
+              for c in $order; do
+                ( cd "src-$c" && /usr/bin/time -v -o "../out/time-$opt-$r-$c.txt" \
+                    "../bin/i" test --project bench --opt "$opt" --time ) \
+                    > "out/run-$opt-$r-$c.log" 2> "out/stderr-$opt-$r-$c.log"
+                grep -hE "^pass bench/bench_test.(list_sort|list_merge|dict_insert)" "out/run-$opt-$r-$c.log"
+                cat /proc/loadavg >> "out/load-mid.txt"
+              done
+            done
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: perf-final-${{ github.run_id }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
