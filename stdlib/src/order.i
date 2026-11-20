@@ -27,7 +27,7 @@ Order = Less | Equal | Greater
 /// Turns `Less` into `Greater` and `Greater` into `Less`. `Equal` stays.
 ///
 /// ```i
-/// order.negate(Less)  // Greater
+/// order.negate(Less())  // Greater
 /// ```
 negate = (order : Order) -> Order {
 	order |>
