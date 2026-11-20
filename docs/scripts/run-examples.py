@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Execute authored examples and their i, Scheme, TOML, and data files offline."""
 import argparse
+import contextlib
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -178,6 +179,14 @@ def toml_value(value):
 LIBRARY = library_baseline.current(ROOT).root
 
 
+@contextlib.contextmanager
+def scratch_dir(prefix):
+    directory = tempfile.mkdtemp(prefix=prefix)
+    yield directory
+    if not os.environ.get('KEEP'):
+        shutil.rmtree(directory, ignore_errors=True)
+
+
 def prepare(example, project):
     name = example.package or page_name(example.page)
     testing = example.kind in ('test', 'test-fails')
@@ -265,7 +274,7 @@ def host_commands(binary, opt, project, environment):
 
 def run_example(example, binary, timeout=TIMEOUT):
     failures = []
-    with tempfile.TemporaryDirectory(prefix=f'docs-{page_name(example.page)}-') as scratch:
+    with scratch_dir(f'docs-{page_name(example.page)}-') as scratch:
         project = Path(scratch)
         try:
             main = prepare(example, project)
