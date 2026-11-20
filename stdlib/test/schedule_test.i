@@ -80,14 +80,19 @@ test("schedule_jitter_is_bounded_and_reproducible_test", () {
 
 test("schedule_retry_runs_once_per_attempt_test", () {
 	runs = task.ref(0)
-	r = fail.catch(() {
-		schedule.retry(3, fixed(1), () {
-			_ = bump(runs)
-			fail.raise("no")
+	(outcome, elapsed) = time.measure(() {
+		fail.catch(() {
+			schedule.retry(3, fixed(5), () {
+				_ = bump(runs)
+				fail.raise("no")
+			})
 		})
 	})
-	assert(r == Error("no"))
+	assert(outcome == Error("no"))
 	assert(task.get(runs) == 4)
+	// Three 5 ms sleeps cannot take less than 15 ms. The upper bound is left
+	// out: this machine's load makes elapsed-time ceilings flaky.
+	assert(time.to_nanoseconds(elapsed) >= 15000000)
 	()
 })
 

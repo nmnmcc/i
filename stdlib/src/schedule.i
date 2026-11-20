@@ -22,7 +22,9 @@
 //// Exact delays. Every delay is computed in whole nanoseconds of `i/time`
 //// with integer arithmetic only: nothing is rounded to milliseconds and no
 //// floats are used. The sleep goes through `clock.sleep_ns` with exactly
-//// that count.
+//// that count. `delay_at` gives the delay for one attempt, so a program can
+//// log what a schedule will wait, or run its own loop with the same policy
+//// (for example retrying until a deadline instead of a fixed count).
 ////
 //// Jitter. With `spread > 0`, the delay before attempt `a` (0-based: `a = 0`
 //// is the sleep after the first failure) is `base + offset`, where
@@ -148,7 +150,12 @@ _sleep_before = (delay : Delay, attempt : Int) {
 	)
 }
 
-_retry_from = (left : Int, attempt : Int, delay : Delay, step) {
+_retry_from = <A, E, N>(
+	left : Int,
+	attempt : Int,
+	delay : Delay,
+	step : () <- (Fail(E), ..N) -> A
+) <- (error : Fail(E), ..env : N) -> A {
 	fail.catch(step) |>
 		(Ok(value)) { value }
 		& (Error(error)) {

@@ -35,7 +35,7 @@ fn library_resolves_cleanly() {
     all.extend(stdlib_paths());
     all.sort();
     assert_eq!(parsed_paths, all);
-    assert_eq!(all.len(), 1 + 52);
+    assert_eq!(all.len(), 1 + 53);
     let checked = parsed
         .into_iter()
         .filter(|p| p.path != "i/test")
@@ -51,7 +51,7 @@ fn library_resolves_cleanly() {
     want.extend(stdlib_paths().into_iter().filter(|p| p != "i/test"));
     want.sort();
     assert_eq!(paths, want);
-    assert_eq!(want.len() + 1, 1 + 52);
+    assert_eq!(want.len() + 1, 1 + 53);
     // The modules that the compiler names are all there.
     for path in ilang_package::library::RUNTIME
         .iter()
@@ -106,7 +106,7 @@ fn library_modules_have_sources() {
         count += 1;
     }
     assert_eq!(package.modules.len(), count);
-    assert_eq!(count, 52);
+    assert_eq!(count, 53);
 }
 
 /// The exported names of each library module.
