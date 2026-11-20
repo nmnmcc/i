@@ -69,6 +69,10 @@ acquire = <A, E, N>(
 /// `panic("resource: scope is not open")`; a release that needs a resource
 /// opens a new scope.
 ///
+/// A `Scope` belongs to the task that made it: a child task does not share
+/// it (spec §9.5) and opens its own `resource.scoped`. Attaching to a scope
+/// from another task stops with `panic("control: boundary is not active")`.
+///
 /// The `Scope` is closed after `scoped` has ended and stays closed.
 scoped = <A, N>(body : () <- (..N, Scope) -> A) <- (..env : N) -> A {
 	control.boundary((b) {

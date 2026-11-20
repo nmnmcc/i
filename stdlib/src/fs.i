@@ -14,6 +14,10 @@
 //// closed when the scope ends, also on an error or a cancel. The `File`
 //// constructor is private; only `open` makes one. Using a `File` after its
 //// scope has ended raises an `FsError` whose `reason` is `Closed`.
+////
+//// The scope belongs to the task that made it: a child task opens its own
+//// `resource.scoped` before it opens a file (spec §9.5); attaching to a
+//// scope from another task stops.
 (
 	i/request
 	i/resource

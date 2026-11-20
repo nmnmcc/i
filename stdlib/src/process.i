@@ -19,6 +19,10 @@
 ////
 //// Errors are `ProcessError` values. `reason` is the host code mapped once
 //// to a `ProcessProblem`; `code` keeps the host's code for diagnostics.
+////
+//// The scope belongs to the task that made it: a child task opens its own
+//// `resource.scoped` before it spawns (spec §9.5); attaching to a scope
+//// from another task stops.
 (
 	i/request
 	i/resource

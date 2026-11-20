@@ -55,12 +55,22 @@ main = () {
 	)
 	assert(
 		fail.catch(() { process.env("MISSING") }) ==
-			Error(process.ProcessError(operation = "env", code = "not_found")),
+			Error(
+				process.ProcessError(
+					operation = "env",
+					reason = process.NotFound,
+					code = "not_found",
+				),
+			),
 	)
 	assert(
 		fail.catch(() { process.entropy(-1) }) ==
 			Error(
-				process.ProcessError(operation = "entropy", code = "invalid"),
+				process.ProcessError(
+					operation = "entropy",
+					reason = process.Invalid,
+					code = "invalid",
+				),
 			),
 	)
 	assert(
@@ -69,6 +79,7 @@ main = () {
 				fs.FsError(
 					operation = "open",
 					path = "/outside/no-preopen",
+					reason = fs.Denied,
 					code = "denied",
 				),
 			),
