@@ -1,0 +1,2 @@
+src/main.i:4:2: error[E0239]: `x` is already bound in this scope: a block binds a name once
+src/main.i:10:3: error[E0239]: `n` is already bound in this scope: a block binds a name once

@@ -2480,7 +2480,8 @@ impl<'a, 't> NativeResolver<'a, 't> {
 
     /// The statements of a block; a provide that ends it is environment
     /// statements before the rest of the block.
-    fn flatten_block<'x>(&self, b: &'x n::Block, out: &mut Vec<VStmt<'x>>) {
+    fn flatten_block<'x>(&mut self, b: &'x n::Block, out: &mut Vec<VStmt<'x>>) {
+        self.block_binds_once(b);
         let mut local = Vec::new();
         for (i, s) in b.stmts.iter().enumerate() {
             match s {
@@ -2500,7 +2501,7 @@ impl<'a, 't> NativeResolver<'a, 't> {
     /// are several and one is not a name, each is bound to a fresh local
     /// first, so that no service sees another.
     fn flatten_provide<'x>(
-        &self,
+        &mut self,
         target: &'x n::Expr,
         services: &'x n::Expr,
         out: &mut Vec<VStmt<'x>>,
@@ -2547,6 +2548,34 @@ impl<'a, 't> NativeResolver<'a, 't> {
                 services: more,
             } => self.flatten_provide(inner, more, out),
             _ => out.push(VStmt::Expr(target)),
+        }
+    }
+
+    /// A block is one scope: a name may be bound by only one of its
+    /// statements. A nested block, a branch of a chain or an arm is a scope
+    /// of its own and may bind the name again. A name bound twice by one
+    /// pattern is reported by `bind`.
+    fn block_binds_once(&mut self, b: &n::Block) {
+        let mut seen: HashSet<NameKey> = HashSet::new();
+        for s in &b.stmts {
+            let n::Stmt::Bind(binding) = s else { continue };
+            let mut names = Vec::new();
+            self.binders(&binding.pattern, &mut names);
+            let mut here: Vec<NameKey> = Vec::new();
+            for (name, span) in names {
+                let key = self.name_key(&name, span);
+                if seen.contains(&key) {
+                    self.error(
+                        code::BOUND_TWICE_IN_BLOCK,
+                        span,
+                        format!(
+                            "`{name}` is already bound in this scope: a block binds a name once"
+                        ),
+                    );
+                }
+                here.push(key);
+            }
+            seen.extend(here);
         }
     }
 

@@ -1043,7 +1043,7 @@ connection_loop = (stream, handler, buffer) {
 }
 
 write_server_reply = (stream, res : Response, closing : Bool) {
-	hs = header(res.headers, "content-length") |>
+	sized = header(res.headers, "content-length") |>
 		(Some(_)) { res.headers }
 		& (None()) {
 			header(res.headers, "transfer-encoding") |>
@@ -1057,8 +1057,8 @@ write_server_reply = (stream, res : Response, closing : Bool) {
 				}
 		}
 	hs = { closing } |>
-		(True()) { add_header(hs, "Connection", "close") }
-		& (False()) { hs }
+		(True()) { add_header(sized, "Connection", "close") }
+		& (False()) { sized }
 	net.write(
 		stream,
 		serialize_response(
@@ -1655,8 +1655,8 @@ redirect_headers = (
 	changed = uri.parts(base).authority != uri.parts(resolved).authority
 	RawHeaders(
 		list.filter(raw_pairs(hs), (pair) {
-			(name, _) = pair
-			name = lowercase(name)
+			(written, _) = pair
+			name = lowercase(written)
 			{
 				changed &&
 					{

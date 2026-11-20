@@ -675,30 +675,30 @@ test("hash_collision_map_as_key_test", () {
 })
 
 test("hash_collision_after_delete_size_test", () {
-	d = dict.new()
+	both = dict.new()
 		|> dict.insert(CollidingKey1(), 1)
 		|> dict.insert(CollidingKey2(), 2)
-	d = dict.delete(d, CollidingKey1())
+	d = dict.delete(both, CollidingKey1())
 
 	assert(dict.size(d) == 1)
 	()
 })
 
 test("hash_collision_after_delete_get_first_test", () {
-	d = dict.new()
+	both = dict.new()
 		|> dict.insert(CollidingKey1(), 1)
 		|> dict.insert(CollidingKey2(), 2)
-	d = dict.delete(d, CollidingKey1())
+	d = dict.delete(both, CollidingKey1())
 
 	assert(dict.get(d, CollidingKey1()) == None())
 	()
 })
 
 test("hash_collision_after_delete_get_second_test", () {
-	d = dict.new()
+	both = dict.new()
 		|> dict.insert(CollidingKey1(), 1)
 		|> dict.insert(CollidingKey2(), 2)
-	d = dict.delete(d, CollidingKey1())
+	d = dict.delete(both, CollidingKey1())
 
 	assert(dict.get(d, CollidingKey2()) == Some(2))
 	()

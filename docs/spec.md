@@ -969,7 +969,7 @@ So `(u) { u.name }` needs a type, `(u : User) { u.name }`, but with `opt : Optio
 - A top-level name may be used anywhere in its module (§2.5).
 - A local name may be used from the next statement to the end of its block. When the value of its binding is a direct value, it may also be used inside the function bodies in that value (§6.10). The names of a parameter group, and of a service pattern, may be used in the guard and the body of their branch. `( )` makes no scope: the items of data are worked out in the scope around it, and a label is not a name.
 - A type parameter of a function (§4.7) may be used in that function, or in the rest of that function type. A type parameter of a type definition may be used in that definition (§4.3). An alias pattern has no type parameters; its binders are types of the module.
-- A local name may cover an outer name with the same name, and an earlier binding in the same block.
+- A block is a scope, as a module is: in one block, a name is bound by one statement only, and a second statement that binds it is a compile error. A local name may cover an outer name with the same name: a name of an enclosing block, of the module, or a parameter. A nested block, and each branch of a chain, is a scope of its own.
 - A `discard` makes no name.
 
 

@@ -1309,7 +1309,7 @@ trig_reduce = (x : Float) -> (Int, Float, Float) {
 	tail_magnitude = { tail_negative } |>
 		(True()) { -tail }
 		& (False()) { tail }
-	ft = { tail_magnitude == 0 } |>
+	tail_float = { tail_magnitude == 0 } |>
 		(True()) { 0.0 }
 		& (False()) {
 			tb = ratio_bits(tail_magnitude, denominator) |>
@@ -1317,15 +1317,17 @@ trig_reduce = (x : Float) -> (Int, Float, Float) {
 				& (Error(_)) { panic("trig: tail overflow") }
 			core.float_from_bits(tb)
 		}
-	ft = { tail_negative } |> (True()) { -.ft } & (False()) { ft }
-	f = { negative } |> (True()) { -.f } & (False()) { f }
-	ft = { negative } |> (True()) { -.ft } & (False()) { ft }
-	hi = f *. 1.5707963267948966
-	fh = without_low(f)
-	fl = f -. fh
+	tail_signed = { tail_negative } |>
+		(True()) { -.tail_float }
+		& (False()) { tail_float }
+	signed = { negative } |> (True()) { -.f } & (False()) { f }
+	ft = { negative } |> (True()) { -.tail_signed } & (False()) { tail_signed }
+	hi = signed *. 1.5707963267948966
+	fh = without_low(signed)
+	fl = signed -. fh
 	lo = { fh *. 1.5707963267341256 -. hi } +.
 		fl *. 1.5707963267341256 +.
-		f *. 6.077100506506192e-11 +.
+		signed *. 6.077100506506192e-11 +.
 		ft *. 1.5707963267948966
 	(n % 4, hi, lo)
 }
@@ -1426,21 +1428,21 @@ trig_tan = (input : Float, tail : Float, odd : Bool) -> Float {
 		}
 		& (False()) { (input, tail) }
 	z = x *. x
-	w = z *. z
-	r = 1.33333333333201242699e-1 +.
-		w *.
+	zz = z *. z
+	rp = 1.33333333333201242699e-1 +.
+		zz *.
 			{
 				2.18694882948595424599e-2 +.
-					w *.
+					zz *.
 						{
 							3.59207910759131235356e-3 +.
-								w *.
+								zz *.
 									{
 										5.88041240820264096874e-4 +.
-											w *.
+											zz *.
 												{
 													7.81794442939557092300e-5 +.
-														w *.
+														zz *.
 															-.1.85586374855275456654e-5
 												}
 									}
@@ -1449,19 +1451,19 @@ trig_tan = (input : Float, tail : Float, odd : Bool) -> Float {
 	v = z *.
 		{
 			5.39682539762260521377e-2 +.
-				w *.
+				zz *.
 					{
 						8.86323982359930005737e-3 +.
-							w *.
+							zz *.
 								{
 									1.45620945432529025516e-3 +.
-										w *.
+										zz *.
 											{
 												2.46463134818469906812e-4 +.
-													w *.
+													zz *.
 														{
 															7.14072491382608190305e-5 +.
-																w *.
+																zz *.
 																	2.59073051863633712884e-5
 														}
 											}
@@ -1469,7 +1471,7 @@ trig_tan = (input : Float, tail : Float, odd : Bool) -> Float {
 					}
 		}
 	s = z *. x
-	r = y +. z *. { s *. { r +. v } +. y } +. s *. 3.33333333333334091986e-1
+	r = y +. z *. { s *. { rp +. v } +. y } +. s *. 3.33333333333334091986e-1
 	w = x +. r
 	{ big } |>
 		(True()) {

@@ -1087,15 +1087,15 @@ record_task = (
 	count = s.active_count +
 		{ added |> (True()) { 1 } & (False()) { 0 } } -
 		{ became_clean |> (True()) { 1 } & (False()) { 0 } }
-	size = s.active_size + { added |> (True()) { 1 } & (False()) { 0 } }
-	active = added |>
+	grown = s.active_size + { added |> (True()) { 1 } & (False()) { 0 } }
+	listed = added |>
 		(True()) { [ActiveTask(id = t.serial, alive = t.alive), ..s.active] }
 		& (False()) { s.active }
-	compact = size > count * 2
+	compact = grown > count * 2
 	active = compact |>
-		(True()) { filter(active, active_live) }
-		& (False()) { active }
-	size = compact |> (True()) { count } & (False()) { size }
+		(True()) { filter(listed, active_live) }
+		& (False()) { listed }
+	size = compact |> (True()) { count } & (False()) { grown }
 	ended = t.status |> (Ended()) { True() } & (_) { False() }
 	was_ended = previous.status |> (Ended()) { True() } & (_) { False() }
 	unclean = {
@@ -2654,7 +2654,7 @@ retire_scope = (s : State, scope : ScopeState) -> State {
 	{ worker_enabled() } |>
 		(True()) { drop_shares(s, scope.owned_shares) }
 		& (False()) { () }
-	next = State(
+	dropped = State(
 		..s,
 		scopes = drop_children(s.scopes, [address_index(scope.address)]),
 		channels = drop_children(
@@ -2664,9 +2664,9 @@ retire_scope = (s : State, scope : ScopeState) -> State {
 		shares = drop_children(s.shares, owned_indices(scope.owned_shares)),
 		tasks = drop_children(s.tasks, scope.children),
 	)
-	body = find_task(next.tasks, scope.body)
-	body = TaskState(..body, open_scopes = body.open_scopes - 1)
-	next = set_task(next, body)
+	found = find_task(dropped.tasks, scope.body)
+	body = TaskState(..found, open_scopes = found.open_scopes - 1)
+	next = set_task(dropped, body)
 	body.status |>
 		(WaitingScope(k, id) ? id == scope.address) {
 			queue(
@@ -3015,17 +3015,17 @@ do_command = (
 				senders = no_waiters,
 				receivers = no_waiters,
 			)
-			next = set_task(s, TaskState(..t, handles = t.handles + 1))
-			next = State(
-				..next,
-				channels = store_add(next.channels, address_index(id), row),
+			counted = set_task(s, TaskState(..t, handles = t.handles + 1))
+			added = State(
+				..counted,
+				channels = store_add(counted.channels, address_index(id), row),
 			)
 			next = row.owner |>
-				(Absent()) { next }
+				(Absent()) { added }
 				& (Present(owner)) {
-					scope = find_scope(next.scopes, owner)
+					scope = find_scope(added.scopes, owner)
 					set_scope(
-						next,
+						added,
 						ScopeState(
 							..scope,
 							owned_channels = [id, ..scope.owned_channels],
@@ -3058,12 +3058,12 @@ do_command = (
 				owner = Present(read(address_key, info.id)),
 				value = value,
 			)
-			next = set_task(s, TaskState(..t, handles = t.handles + 1))
-			scope = find_scope(next.scopes, read(address_key, info.id))
+			counted = set_task(s, TaskState(..t, handles = t.handles + 1))
+			scope = find_scope(counted.scopes, read(address_key, info.id))
 			next = set_scope(
 				State(
-					..next,
-					shares = store_add(next.shares, address_index(id), row),
+					..counted,
+					shares = store_add(counted.shares, address_index(id), row),
 				),
 				ScopeState(..scope, owned_shares = [id, ..scope.owned_shares]),
 			)
@@ -3080,7 +3080,7 @@ do_command = (
 			id = new_address(t)
 			owner = head_scope(t.chain)
 			row = ShareState(id = id, owner = owner, value = value)
-			next = set_task(
+			added = set_task(
 				State(
 					..s,
 					shares = store_add(s.shares, address_index(id), row),
@@ -3088,11 +3088,11 @@ do_command = (
 				TaskState(..t, handles = t.handles + 1),
 			)
 			next = owner |>
-				(Absent()) { next }
+				(Absent()) { added }
 				& (Present(owner)) {
-					scope = find_scope(next.scopes, owner)
+					scope = find_scope(added.scopes, owner)
 					set_scope(
-						next,
+						added,
 						ScopeState(
 							..scope,
 							owned_shares = [id, ..scope.owned_shares],

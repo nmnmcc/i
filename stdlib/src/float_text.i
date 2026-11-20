@@ -55,7 +55,7 @@ positive = (encoded : Int, fraction : Int) -> List(String) {
 			(m, m * 4, low, 2, encoded - 1077)
 		}
 	inclusive = mantissa % 2 == 0
-	(r, s, minus, plus) = { e < 0 } |>
+	(r2, s2, minus2, plus2) = { e < 0 } |>
 		(True()) { (r, core.shift_left(1, -e), minus, plus) }
 		& (False()) {
 			(
@@ -70,15 +70,29 @@ positive = (encoded : Int, fraction : Int) -> List(String) {
 	// just below log10(2); the binary exponent of v is at least `low`.
 	low = { encoded == 0 } |> (True()) { -1075 } & (False()) { encoded - 1023 }
 	j = floor_divide(low * 78913, 262144) - 1
-	(r, s, minus, plus) = { j >= 0 } |>
-		(True()) { (r, s * power_of_ten(j), minus, plus) }
+	(r10, s10, minus10, plus10) = { j >= 0 } |>
+		(True()) { (r2, s2 * power_of_ten(j), minus2, plus2) }
 		& (False()) {
 			t = power_of_ten(-j)
-			(r * t, s, minus * t, plus * t)
+			(r2 * t, s2, minus2 * t, plus2 * t)
 		}
-	(s, k) = grow(r, s, j + 1)
-	(r, minus, plus, k) = shrink(r, s, minus, plus, k)
-	(reversed, k) = generate(r, s, minus, plus, inclusive, [], k)
+	(s_grown, k_grown) = grow(r10, s10, j + 1)
+	(r_shrunk, minus_shrunk, plus_shrunk, k_shrunk) = shrink(
+		r10,
+		s_grown,
+		minus10,
+		plus10,
+		k_grown,
+	)
+	(reversed, k) = generate(
+		r_shrunk,
+		s_grown,
+		minus_shrunk,
+		plus_shrunk,
+		inclusive,
+		[],
+		k_shrunk,
+	)
 	digits = reverse_onto(trim(reversed), [])
 	// 1076 is the exponent field of 2^53, the first Float whose whole
 	// digits imply more precision than a Float has.

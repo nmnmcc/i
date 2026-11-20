@@ -28,11 +28,11 @@ test("sequence_examples", () {
 		sequence.push_back(sequence.push_back(empty, 1), 2),
 		3,
 	)
-	Some((a, tail)) = sequence.pop_front(fifo)
-	Some((b, tail)) = sequence.pop_front(tail)
-	Some((c, tail)) = sequence.pop_front(tail)
+	Some((a, after_a)) = sequence.pop_front(fifo)
+	Some((b, after_b)) = sequence.pop_front(after_a)
+	Some((c, after_c)) = sequence.pop_front(after_b)
 	assert((a, b, c) == (1, 2, 3))
-	assert(sequence.pop_front(tail) == None())
+	assert(sequence.pop_front(after_c) == None())
 	Some((x, rest)) = sequence.pop_back(
 		sequence.push_front(sequence.from_list([2, 3]), 1),
 	)
