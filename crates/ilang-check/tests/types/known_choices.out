@@ -7,10 +7,10 @@ in_tuple : ((T, Int)) -> Never
 subject : (T) -> Never
 both : (Result(T, T)) -> T
 both_subject : (U) -> Int
-10:34: error[E0512]: not every constructor of `B` has a field with the label `f`
-15:36: error[E0501]: `B` is not a subtype of `A`
-20:34: error[E0512]: not every constructor of `B` has a field with the label `f`
-24:38: error[E0512]: not every constructor of `B` has a field with the label `f`
+10:36: error[E0512]: not every constructor of `B` has a field with the label `f`
+15:38: error[E0501]: `B` is not a subtype of `A`
+20:36: error[E0512]: not every constructor of `B` has a field with the label `f`
+24:40: error[E0512]: not every constructor of `B` has a field with the label `f`
 28:38: error[E0512]: not every constructor of `B` has a field with the label `f`
-32:44: error[E0512]: not every constructor of `B` has a field with the label `f`
-37:30: error[E0512]: not every constructor of `B` has a field with the label `f`
+32:46: error[E0512]: not every constructor of `B` has a field with the label `f`
+37:32: error[E0512]: not every constructor of `B` has a field with the label `f`
