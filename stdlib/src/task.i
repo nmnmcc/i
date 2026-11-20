@@ -3107,10 +3107,9 @@ do_command = (
 			)
 		}
 		& (Drain) {
-			set_task(
-				State(..s, current = Absent),
-				TaskState(..t, status = WaitingDrain(k)),
-			)
+			// RED EVIDENCE ONLY: reply without waiting for the raced scope's
+			// children, so a race may return before the loser's finals end.
+			reply(s, t.serial, k, Proceed(()), False)
 		}
 }
 
