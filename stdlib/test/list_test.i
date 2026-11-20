@@ -137,7 +137,7 @@ test("first_ok_test", () {
 })
 
 test("first_error_test", () {
-	assert(list.first([]) == None)
+	assert(list.first([]) == None())
 	()
 })
 
@@ -152,7 +152,7 @@ test("rest_single_test", () {
 })
 
 test("rest_error_test", () {
-	assert(list.rest([]) == None)
+	assert(list.rest([]) == None())
 	()
 })
 
@@ -184,12 +184,12 @@ test("group_modulo_test", () {
 })
 
 test("filter_empty_test", () {
-	assert(list.filter([], (_) { True }) == [])
+	assert(list.filter([], (_) { True() }) == [])
 	()
 })
 
 test("filter_all_true_test", () {
-	assert(list.filter([0, 4, 5, 7, 3], (_) { True }) == [0, 4, 5, 7, 3])
+	assert(list.filter([0, 4, 5, 7, 3], (_) { True() }) == [0, 4, 5, 7, 3])
 	()
 })
 
@@ -216,7 +216,7 @@ test("filter_map_ok_test", () {
 })
 
 test("filter_map_error_test", () {
-	assert(list.filter_map([2, 4, 6, 1], (_) { None }) == [])
+	assert(list.filter_map([2, 4, 6, 1], (_) { None() }) == [])
 	()
 })
 
@@ -298,8 +298,8 @@ test("map_fold_tco_test", () {
 test("try_map_ok_test", () {
 	fun = (x) {
 		{ x == 6 || x == 5 || x == 4 } |>
-			(True) { Ok(x * 2) }
-			& (False) { Error(x) }
+			(True()) { Ok(x * 2) }
+			& (False()) { Error(x) }
 	}
 
 	assert(list.try_map([5, 6, 5, 6], fun) == Ok([10, 12, 10, 12]))
@@ -309,8 +309,8 @@ test("try_map_ok_test", () {
 test("try_map_error_test", () {
 	fun = (x) {
 		{ x == 6 || x == 5 || x == 4 } |>
-			(True) { Ok(x * 2) }
-			& (False) { Error(x) }
+			(True()) { Ok(x * 2) }
+			& (False()) { Error(x) }
 	}
 
 	assert(list.try_map([4, 6, 5, 7, 3], fun) == Error(7))
@@ -320,8 +320,8 @@ test("try_map_error_test", () {
 test("try_map_tco_test", () {
 	fun = (x) {
 		{ x == 6 || x == 5 || x == 4 } |>
-			(True) { Ok(x * 2) }
-			& (False) { Error(x) }
+			(True()) { Ok(x * 2) }
+			& (False()) { Error(x) }
 	}
 
 	// TCO test
@@ -506,8 +506,8 @@ test("fold_until_test", () {
 	assert(
 		list.fold_until([1, 2, 3, 4], 0, (acc, n) {
 			{ n < 4 } |>
-				(True) { list.Continue(acc + n) }
-				& (False) { list.Stop(acc) }
+				(True()) { list.Continue(acc + n) }
+				& (False()) { list.Stop(acc) }
 		}) ==
 			6,
 	)
@@ -516,7 +516,7 @@ test("fold_until_test", () {
 
 test("fold_until_tco_test", () {
 	r = list.fold_until(list.range(1, big), 0, (acc, x) {
-		{ x > 10 } |> (True) { Stop(acc) } & (False) { Continue(acc + x) }
+		{ x > 10 } |> (True()) { Stop(acc) } & (False()) { Continue(acc + x) }
 	})
 	assert(r == 55)
 	assert(
@@ -530,7 +530,7 @@ test("fold_until_tco_test", () {
 test("try_fold_ok_test", () {
 	assert(
 		list.try_fold([1, 2, 3], 0, (acc, i) {
-			{ i < 4 } |> (True) { Ok(acc + i) } & (False) { Error(()) }
+			{ i < 4 } |> (True()) { Ok(acc + i) } & (False()) { Error(()) }
 		}) ==
 			Ok(6),
 	)
@@ -540,7 +540,7 @@ test("try_fold_ok_test", () {
 test("try_fold_error_test", () {
 	assert(
 		list.try_fold([1, 2, 3], 0, (acc, i) {
-			{ i < 3 } |> (True) { Ok(acc + i) } & (False) { Error(()) }
+			{ i < 3 } |> (True()) { Ok(acc + i) } & (False()) { Error(()) }
 		}) ==
 			Error(()),
 	)
@@ -555,23 +555,23 @@ test("try_fold_tco_test", () {
 })
 
 test("find_map_found_test", () {
-	f = (x) { x |> (2) { Some(4) } & (_) { None } }
+	f = (x) { x |> (2) { Some(4) } & (_) { None() } }
 
 	assert(list.find_map([1, 2, 3], f) == Some(4))
 	()
 })
 
 test("find_map_found_different_order_test", () {
-	f = (x) { x |> (2) { Some(4) } & (_) { None } }
+	f = (x) { x |> (2) { Some(4) } & (_) { None() } }
 
 	assert(list.find_map([1, 3, 2], f) == Some(4))
 	()
 })
 
 test("find_map_not_found_test", () {
-	f = (x) { x |> (2) { Some(4) } & (_) { None } }
+	f = (x) { x |> (2) { Some(4) } & (_) { None() } }
 
-	assert(list.find_map([1, 3], f) == None)
+	assert(list.find_map([1, 3], f) == None())
 	()
 })
 
@@ -580,8 +580,8 @@ test("find_map_tco_test", () {
 	int.range(recursion_test_cycles, -1, [], list.prepend)
 		|> list.find_map((x) {
 			{ x == recursion_test_cycles } |>
-				(True) { Some(recursion_test_cycles) }
-				& (False) { None }
+				(True()) { Some(recursion_test_cycles) }
+				& (False()) { None() }
 		})
 	()
 })
@@ -603,7 +603,7 @@ test("find_found_different_order_test", () {
 test("find_not_found_test", () {
 	is_two = (x) { x == 2 }
 
-	assert(list.find([1, 3], is_two) == None)
+	assert(list.find([1, 3], is_two) == None())
 	()
 })
 
@@ -627,7 +627,7 @@ test("all_false_test", () {
 })
 
 test("all_empty_test", () {
-	assert(list.all([], (_) { False }))
+	assert(list.all([], (_) { False() }))
 	()
 })
 
@@ -635,8 +635,8 @@ test("all_short_circuit_test", () {
 	[1, 2, 3]
 		|> list.all((x) {
 			x |>
-				(1) { True }
-				& (2) { False }
+				(1) { True() }
+				& (2) { False() }
 				// Crash if no short-circuit
 				& (_) { panic("unreachable") }
 		})
@@ -646,7 +646,7 @@ test("all_short_circuit_test", () {
 test("all_tco_test", () {
 	// TCO test
 	list.repeat(0, recursion_test_cycles)
-		|> list.all((x) { x |> (0) { True } & (_) { False } })
+		|> list.all((x) { x |> (0) { True() } & (_) { False() } })
 	()
 })
 
@@ -664,7 +664,7 @@ test("any_false_test", () {
 
 test("any_empty_test", () {
 	assert(
-		core.not(list.any([], (_) { False })),
+		core.not(list.any([], (_) { False() })),
 	)
 	()
 })
@@ -673,8 +673,8 @@ test("any_short_circuit_test", () {
 	[1, 2, 3]
 		|> list.any((x) {
 			x |>
-				(1) { False }
-				& (2) { True }
+				(1) { False() }
+				& (2) { True() }
 				// Crash if no short-circuit
 				& (_) { panic("unreachable") }
 		})
@@ -926,7 +926,7 @@ test("sort_stability_many_test", () {
 	expected = list.concat(
 		list.map(list.range(0, 3), (k) {
 			list.filter_map(list.range(0, 39), (i) {
-				{ i % 4 == k } |> (True) { Some(i) } & (False) { None }
+				{ i % 4 == k } |> (True()) { Some(i) } & (False()) { None() }
 			})
 		}),
 	)
@@ -1085,7 +1085,7 @@ test("key_find_second_test", () {
 test("key_find_not_found_test", () {
 	proplist = [(0, "1"), (1, "2")]
 
-	assert(list.key_find(proplist, 2) == None)
+	assert(list.key_find(proplist, 2) == None())
 	()
 })
 
@@ -1128,7 +1128,7 @@ test("key_pop_b_test", () {
 })
 
 test("key_pop_not_found_test", () {
-	assert(list.key_pop([("a", 0), ("b", 1)], "c") == None)
+	assert(list.key_pop([("a", 0), ("b", 1)], "c") == None())
 	()
 })
 
@@ -1435,7 +1435,7 @@ test("sized_chunk_tco_test", () {
 })
 
 test("reduce_empty_test", () {
-	assert(list.reduce([], (x, y) { x + y }) == None)
+	assert(list.reduce([], (x, y) { x + y }) == None())
 	()
 })
 
@@ -1460,8 +1460,8 @@ test("scan_list_test", () {
 	assert(
 		list.scan([1, 2, 3, 4], [], (acc, i) {
 			int.is_even(i) |>
-				(True) { ["Even", ..acc] }
-				& (False) { ["Odd", ..acc] }
+				(True()) { ["Even", ..acc] }
+				& (False()) { ["Odd", ..acc] }
 		}) ==
 			[
 				["Odd"],
@@ -1483,7 +1483,7 @@ test("scan_tco_test", () {
 })
 
 test("last_empty_test", () {
-	assert(list.last([]) == None)
+	assert(list.last([]) == None())
 	()
 })
 
@@ -1612,7 +1612,7 @@ test("transpose_leftover_mixed_test", () {
 })
 
 test("max_empty_test", () {
-	assert(list.max([], int.compare) == None)
+	assert(list.max([], int.compare) == None())
 	()
 })
 
@@ -1638,9 +1638,9 @@ big = 1_000_000
 test("at_test", () {
 	assert(list.at([10, 20, 30], 0) == Some(10))
 	assert(list.at([10, 20, 30], 2) == Some(30))
-	assert(list.at([10, 20, 30], 3) == None)
-	assert(list.at([10, 20, 30], -1) == None)
-	assert(list.at([], 0) == None)
+	assert(list.at([10, 20, 30], 3) == None())
+	assert(list.at([10, 20, 30], -1) == None())
+	assert(list.at([], 0) == None())
 })
 
 test("at_tco_test", () {
@@ -1651,8 +1651,8 @@ test("at_tco_test", () {
 
 test("index_of_test", () {
 	assert(list.index_of(["a", "b", "c", "b"], "b") == Some(1))
-	assert(list.index_of(["a", "b"], "z") == None)
-	assert(list.index_of([], 1) == None)
+	assert(list.index_of(["a", "b"], "z") == None())
+	assert(list.index_of([], 1) == None())
 })
 
 test("index_of_tco_test", () {
@@ -1775,7 +1775,7 @@ test("map_effects_test", () {
 test("min_max_test", () {
 	assert(list.max([3, 1, 4, 1, 5], int.compare) == Some(5))
 	assert(list.min([3, 1, 4, 1, 5], int.compare) == Some(1))
-	assert(list.max([], int.compare) == None)
+	assert(list.max([], int.compare) == None())
 	assert(list.min(["b", "a", "c"], string.compare) == Some("a"))
 	// The first of equal elements is given.
 	by_first = (a : (Int, String), b : (Int, String)) { int.compare(a.0, b.0) }
@@ -1820,7 +1820,7 @@ test("any_all_tco_test", () {
 test("key_find_tco_test", () {
 	pairs = list.map(list.range(1, big), (i) { (i, i * 2) })
 	assert(list.key_find(pairs, big) == Some(2 * big))
-	assert(list.key_find(pairs, 0) == None)
+	assert(list.key_find(pairs, 0) == None())
 })
 
 test("key_filter_test", () {

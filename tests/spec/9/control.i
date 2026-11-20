@@ -11,8 +11,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -41,8 +41,8 @@ emit = <A>(x) <- (y : Yield(A)) { y.emit(x) }
 
 count = (from, to) {
 	{ from > to } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			emit(from)
 			count(from + 1, to)
 		}
@@ -250,8 +250,8 @@ numbers = (from, to) {
 	control.boundary((b) {
 		each = (n) {
 			{ n > to } |>
-				(True) { Done }
-				& (False) {
+				(True()) { Done() }
+				& (False()) {
 					control.suspend(b, (k) { More(n, k) })
 					each(n + 1)
 				}
@@ -265,7 +265,7 @@ take = (step, n, acc) {
 		(0) { acc }
 		& (_) {
 			step |>
-				(Done) { acc }
+				(Done()) { acc }
 				& (More(v, k)) {
 					take(control.resume(k, ()), n - 1, [v, ..acc])
 				}
@@ -274,7 +274,7 @@ take = (step, n, acc) {
 
 sum = (step, acc) {
 	step |>
-		(Done) { acc }
+		(Done()) { acc }
 		& (More(v, k)) { sum(control.resume(k, ()), acc + v) }
 }
 
@@ -299,7 +299,7 @@ test("pulled", () {
 				"()",
 			)
 		}
-		& (Done) { panic("no value") }
+		& (Done()) { panic("no value") }
 })
 
 loop = (n, acc) { n |> (0) { acc } & (_) { loop(n - 1, acc + 1) } }
@@ -348,7 +348,7 @@ test("in_branches", () {
 				z + 1
 			}
 			& (_) { 0 }
-		w = x == 10 && control.suspend(b, (k) { control.resume(k, True) })
+		w = x == 10 && control.suspend(b, (k) { control.resume(k, True()) })
 		(x, y, w)
 	})
 	check(show(r), "(10, 21, True)")
@@ -448,7 +448,7 @@ assertions_in_generators = () {
 	r = collect(() {
 		a = assertion.catch(() {
 			emit(1)
-			assert(False)
+			assert(False())
 		})
 		emit(show(a) == "Error(AssertionFailure(message = \"assert\"))")
 	})
@@ -456,7 +456,7 @@ assertions_in_generators = () {
 	c = assertion.catch(() {
 		collect(() {
 			emit(1)
-			assert(False)
+			assert(False())
 			emit(2)
 		})
 	})

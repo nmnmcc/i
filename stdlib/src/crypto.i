@@ -52,7 +52,7 @@ rotate = (x : Int, n : Int, width : Int) -> Int {
 nth = (xs : List(Int), n : Int) -> Int {
 	list.at(xs, n) |>
 		(Some(x)) { x }
-		& (None) { panic("crypto: schedule index") }
+		& (None()) { panic("crypto: schedule index") }
 }
 
 Words = (Int, Int, Int, Int, Int, Int, Int, Int)
@@ -434,8 +434,8 @@ key_pad = (
 	hash : (BitArray) -> BitArray
 ) -> BitArray {
 	k = { bit_array.byte_size(key) > block } |>
-		(True) { hash(key) }
-		& (False) { key }
+		(True()) { hash(key) }
+		& (False()) { key }
 	<<k:bytes, 0:u({ block - bit_array.byte_size(k) } * 8)>>
 }
 
@@ -472,8 +472,8 @@ hmac = (
 	hash : (BitArray) -> BitArray
 ) -> Result(BitArray, CryptoError) {
 	aligned([key, input]) |>
-		(False) { Error(UnalignedInput) }
-		& (True) { Ok(authenticate(prepare(key, block, hash), input)) }
+		(False()) { Error(UnalignedInput()) }
+		& (True()) { Ok(authenticate(prepare(key, block, hash), input)) }
 }
 
 _hmac_sha256_result = (key : BitArray, input : BitArray) -> Result(
@@ -505,23 +505,23 @@ expand = (
 	hash : (BitArray) -> BitArray
 ) -> Result(BitArray, CryptoError) {
 	{ length < 0 || length > 255 * size || bit_array.byte_size(prk) < size } |>
-		(True) { Error(InvalidLength) }
-		& (False) {
+		(True()) { Error(InvalidLength()) }
+		& (False()) {
 			aligned([prk, info]) |>
-				(False) { Error(UnalignedInput) }
-				& (True) {
+				(False()) { Error(UnalignedInput()) }
+				& (True()) {
 					mac = prepare(prk, block, hash)
 					go = (left, counter, previous, acc) {
 						{ left <= 0 } |>
-							(True) { bit_array.concat(list.reverse(acc)) }
-							& (False) {
+							(True()) { bit_array.concat(list.reverse(acc)) }
+							& (False()) {
 								t = authenticate(
 									mac,
 									<<previous:bytes, info:bytes, counter>>,
 								)
 								n = { left < size } |>
-									(True) { left }
-									& (False) { size }
+									(True()) { left }
+									& (False()) { size }
 								go(
 									left - n,
 									counter + 1,
@@ -585,19 +585,19 @@ _pbkdf2_sha256_result = (
 	length : Int
 ) -> Result(BitArray, CryptoError) {
 	{ iterations <= 0 } |>
-		(True) { Error(InvalidIterations) }
-		& (False) {
+		(True()) { Error(InvalidIterations()) }
+		& (False()) {
 			{ length < 0 || length > 0xffff_ffff * 32 } |>
-				(True) { Error(InvalidLength) }
-				& (False) {
+				(True()) { Error(InvalidLength()) }
+				& (False()) {
 					aligned([password, salt]) |>
-						(False) { Error(UnalignedInput) }
-						& (True) {
+						(False()) { Error(UnalignedInput()) }
+						& (True()) {
 							mac = prepare(password, 64, sha256)
 							iterate = (n, previous, acc) {
 								{ n == 0 } |>
-									(True) { acc }
-									& (False) {
+									(True()) { acc }
+									& (False()) {
 										next = authenticate(mac, previous)
 										iterate(
 											n - 1,
@@ -608,10 +608,10 @@ _pbkdf2_sha256_result = (
 							}
 							go = (left, index, acc) {
 								{ left <= 0 } |>
-									(True) {
+									(True()) {
 										bit_array.concat(list.reverse(acc))
 									}
-									& (False) {
+									& (False()) {
 										first = authenticate(
 											mac,
 											<<salt:bytes, index:u(32)>>,
@@ -622,8 +622,8 @@ _pbkdf2_sha256_result = (
 											first,
 										)
 										n = { left < 32 } |>
-											(True) { left }
-											& (False) { 32 }
+											(True()) { left }
+											& (False()) { 32 }
 										go(
 											left - n,
 											index + 1,
@@ -641,8 +641,8 @@ _pbkdf2_sha256_result = (
 /// Length is public. This source-level timing property is not a host timing guarantee.
 constant_time_equal = (a : BitArray, b : BitArray) -> Bool {
 	{ core.bit_size(a) != core.bit_size(b) } |>
-		(True) { False }
-		& (False) {
+		(True()) { False() }
+		& (False()) {
 			go = (x, y, diff) {
 				(x, y) |>
 					((<<>>, <<>>)) { diff == 0 }
@@ -668,8 +668,8 @@ constant_time_equal = (a : BitArray, b : BitArray) -> Bool {
 
 _random_bytes_result = (length : Int) -> Result(BitArray, CryptoError) {
 	{ length < 0 } |>
-		(True) { Error(InvalidLength) }
-		& (False) { Ok(process.entropy(length)) }
+		(True()) { Error(InvalidLength()) }
+		& (False()) { Ok(process.entropy(length)) }
 }
 
 /// RFC 4231 HMAC-SHA-256: `hmac_sha256(<<1>>, <<2>>)`.

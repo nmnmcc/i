@@ -10,7 +10,7 @@ Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
 
-f = (Some(0)) { "zero" } & (Some(n)) { n } & (None) { "none" }
+f = (Some(0)) { "zero" } & (Some(n)) { n } & (None()) { "none" }
 
 show = (n : Int) -> String { core.inspect(n) } & (s : String) -> Int { 7 }
 

@@ -39,7 +39,7 @@ _to_string_result = (bits : BitArray) -> Result(String, ()) {
 
 /// `True` when the bits are whole bytes of correct UTF-8.
 is_utf8 = (bits : BitArray) -> Bool {
-	core.bit_array_to_string(bits) |> (Ok(_)) { True } & (Error(_)) { False }
+	core.bit_array_to_string(bits) |> (Ok(_)) { True() } & (Error(_)) { False() }
 }
 
 /// The number of bits.
@@ -79,11 +79,11 @@ _slice_result = (from : BitArray, at : Int, take : Int) -> Result(
 	(),
 ) {
 	(start, length) = { take < 0 } |>
-		(True) { (at + take, -take) }
-		& (False) { (at, take) }
+		(True()) { (at + take, -take) }
+		& (False()) { (at, take) }
 	{ start < 0 || { start + length } * 8 > core.bit_size(from) } |>
-		(True) { Error(()) }
-		& (False) {
+		(True()) { Error(()) }
+		& (False()) {
 			from |>
 				(<<_:bytes(start), part:bytes(length), _:bits>>) { Ok(part) }
 				& (_) { Error(()) }
@@ -93,7 +93,7 @@ _slice_result = (from : BitArray, at : Int, take : Int) -> Result(
 /// `True` when the bit array starts with the bits of `prefix`.
 starts_with = (bits : BitArray, prefix : BitArray) -> Bool {
 	n = core.bit_size(prefix)
-	bits |> (<<start:bits(n), _:bits>>) { start == prefix } & (_) { False }
+	bits |> (<<start:bits(n), _:bits>>) { start == prefix } & (_) { False() }
 }
 
 /// The bit array with zero bits after it, up to a whole number of bytes.
@@ -114,12 +114,12 @@ compare = (a : BitArray, with : BitArray) -> Order {
 	(a, with) |>
 		((<<x, xs:bits>>, <<y, ys:bits>>)) {
 			{ x == y } |>
-				(True) { compare(xs, ys) }
-				& (False) { int_order(x, y) }
+				(True()) { compare(xs, ys) }
+				& (False()) { int_order(x, y) }
 		}
-		& ((<<>>, <<>>)) { Equal }
-		& ((_, <<>>)) { Greater }
-		& ((<<>>, _)) { Less }
+		& ((<<>>, <<>>)) { Equal() }
+		& ((_, <<>>)) { Greater() }
+		& ((<<>>, _)) { Less() }
 		& (_) {
 			m = core.bit_size(a)
 			n = core.bit_size(with)
@@ -131,8 +131,8 @@ compare = (a : BitArray, with : BitArray) -> Order {
 
 int_order = (a : Int, b : Int) -> Order {
 	{ a == b } |>
-		(True) { Equal }
-		& (False) { { a < b } |> (True) { Less } & (False) { Greater } }
+		(True()) { Equal() }
+		& (False()) { { a < b } |> (True()) { Less() } & (False()) { Greater() } }
 }
 
 /// The text form of the bit array.
@@ -173,14 +173,14 @@ base16_encode = (bits : BitArray) -> String {
 
 hex_value = (byte : Int) -> Int {
 	{ byte >= 48 && byte <= 57 } |>
-		(True) { byte - 48 }
-		& (False) {
+		(True()) { byte - 48 }
+		& (False()) {
 			{ byte >= 65 && byte <= 70 } |>
-				(True) { byte - 55 }
-				& (False) {
+				(True()) { byte - 55 }
+				& (False()) {
 					{ byte >= 97 && byte <= 102 } |>
-						(True) { byte - 87 }
-						& (False) { -1 }
+						(True()) { byte - 87 }
+						& (False()) { -1 }
 				}
 		}
 }
@@ -193,8 +193,8 @@ _base16_decode_result = (input : String) -> Result(BitArray, ()) {
 				x = hex_value(a)
 				y = hex_value(b)
 				{ x >= 0 && y >= 0 } |>
-					(True) { go(more, [<<{ x * 16 + y }>>, ..acc]) }
-					& (False) { Error(()) }
+					(True()) { go(more, [<<{ x * 16 + y }>>, ..acc]) }
+					& (False()) { Error(()) }
 			}
 			& (_) { Error(()) }
 	}
@@ -206,7 +206,7 @@ standard = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 url_safe = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
 encode64 = (bits : BitArray, alphabet : String, padding : Bool) -> String {
-	pad = padding |> (True) { "=" } & (False) { "" }
+	pad = padding |> (True()) { "=" } & (False()) { "" }
 	c = (i) { char_at(alphabet, i) }
 	go = (rest, acc) {
 		rest |>
@@ -248,20 +248,20 @@ base64_url_encode = (input : BitArray, padding : Bool) -> String {
 // for 62 and 63 in this alphabet.
 value64 = (byte : Int, c62 : Int, c63 : Int) -> Int {
 	{ byte >= 65 && byte <= 90 } |>
-		(True) { byte - 65 }
-		& (False) {
+		(True()) { byte - 65 }
+		& (False()) {
 			{ byte >= 97 && byte <= 122 } |>
-				(True) { byte - 71 }
-				& (False) {
+				(True()) { byte - 71 }
+				& (False()) {
 					{ byte >= 48 && byte <= 57 } |>
-						(True) { byte + 4 }
-						& (False) {
+						(True()) { byte + 4 }
+						& (False()) {
 							{ byte == c62 } |>
-								(True) { 62 }
-								& (False) {
+								(True()) { 62 }
+								& (False()) {
 									{ byte == c63 } |>
-										(True) { 63 }
-										& (False) { -1 }
+										(True()) { 63 }
+										& (False()) { -1 }
 								}
 						}
 				}
@@ -277,21 +277,21 @@ decode64 = (input : String, c62 : Int, c63 : Int) -> Result(BitArray, ()) {
 			& (<<a, b, c, d, more:bytes>> ? c != 61 && d != 61) {
 				(w, x, y, z) = (v(a), v(b), v(c), v(d))
 				{ ok(w, x) && ok(y, z) } |>
-					(True) { go(more, [<<w:u6, x:u6, y:u6, z:u6>>, ..acc]) }
-					& (False) { Error(()) }
+					(True()) { go(more, [<<w:u6, x:u6, y:u6, z:u6>>, ..acc]) }
+					& (False()) { Error(()) }
 			}
 			// The end, with or without `=`: 3 or 2 characters for 2 or 1 bytes.
 			& (<<a, b, c>> | <<a, b, c, 61>> ? c != 61) {
 				(w, x, y) = (v(a), v(b), v(c))
 				{ ok(w, x) && y >= 0 } |>
-					(True) { go(<<>>, [<<w:u6, x:u6, { y / 4 }:u4>>, ..acc]) }
-					& (False) { Error(()) }
+					(True()) { go(<<>>, [<<w:u6, x:u6, { y / 4 }:u4>>, ..acc]) }
+					& (False()) { Error(()) }
 			}
 			& (<<a, b>> | <<a, b, 61, 61>>) {
 				(w, x) = (v(a), v(b))
 				ok(w, x) |>
-					(True) { go(<<>>, [<<w:u6, { x / 16 }:u2>>, ..acc]) }
-					& (False) { Error(()) }
+					(True()) { go(<<>>, [<<w:u6, { x / 16 }:u2>>, ..acc]) }
+					& (False()) { Error(()) }
 			}
 			& (_) { Error(()) }
 	}

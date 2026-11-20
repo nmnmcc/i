@@ -22,4 +22,4 @@ shared = (r) { r |> (Ok(1)) { 0 } & (Ok("a")) { 1 } & (Error(e)) { e } }
 
 shared_list = (xs) { xs |> ([1]) { 0 } & (["a", ..]) { 1 } & ([]) { 2 } }
 
-shared_tuple = (p) { p |> ((1, True)) { 0 } & (("a", False)) { 1 } }
+shared_tuple = (p) { p |> ((1, True())) { 0 } & (("a", False())) { 1 } }

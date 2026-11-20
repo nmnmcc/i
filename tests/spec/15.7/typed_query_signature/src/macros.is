@@ -6,7 +6,7 @@
     (-> (, value) _
       {(= s ((. syntax signature)))
        (|> ((. syntax subtype) s s)
-           (& (-> (, (. syntax Yes)) _ value)
+           (& (-> (, ((. syntax Yes))) _ value)
              (-> (, _) _
                ((. fail raise)
                 ((. syntax SyntaxError)

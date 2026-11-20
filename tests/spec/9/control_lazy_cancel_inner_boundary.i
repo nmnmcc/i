@@ -9,8 +9,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -48,13 +48,13 @@ main = () {
 			control.suspend(outer, (k) { Paused(k, inner) })
 			0
 		})
-		Done
+		Done()
 	})
 	p |>
 		(Paused(k, inner)) {
 			control.cancel(k)
 			control.suspend(inner, (k2) { 1 })
 		}
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 	()
 }

@@ -98,26 +98,26 @@ CodecError = BadEscape | NonAscii | InvalidUtf8 | UnalignedBits
 _parse_result = (text : String) -> Result(Uri, UriError) {
 	fail.catch(() {
 		raw = bytes(text)
-		lexical(raw, WholePart)
+		lexical(raw, WholePart())
 		(before_fragment, fragment_bytes, fragment_present) = cut(raw, 35)
 		fragment_start = list.length(before_fragment) + 1
 		(hier, query_bytes, query_present) = cut(before_fragment, 63)
 		query_start = list.length(hier) + 1
 		(prefix, after_colon, colon) = cut(hier, 58)
 		(scheme, rest, start) = { colon && valid_scheme(prefix) } |>
-			(True) {
+			(True()) {
 				(Some(text_bytes(prefix)), after_colon, list.length(prefix) + 1)
 			}
-			& (False) { (None, hier, 0) }
+			& (False()) { (None(), hier, 0) }
 		(authority, path_bytes, path_start, locations) = rest |>
 			([47, 47, ..xs]) {
 				(a, path_tail, slash) = cut(xs, 47)
 				astart = start + 2
 				(value, offsets) = read_authority(a, astart)
-				path = slash |> (True) { [47, ..path_tail] } & (False) { [] }
+				path = slash |> (True()) { [47, ..path_tail] } & (False()) { [] }
 				(Some(value), path, astart + list.length(a), offsets)
 			}
-			& (_) { (None, rest, start, []) }
+			& (_) { (None(), rest, start, []) }
 		p = Parts(
 			scheme = scheme,
 			authority = authority,
@@ -128,20 +128,20 @@ _parse_result = (text : String) -> Result(Uri, UriError) {
 		offsets = list.append(
 			locations,
 			[
-				(SchemePart, 0),
-				(PathPart, path_start),
-				(QueryPart, query_start),
-				(FragmentPart, fragment_start),
+				(SchemePart(), 0),
+				(PathPart(), path_start),
+				(QueryPart(), query_start),
+				(FragmentPart(), fragment_start),
 			],
 		)
-		validated(p, True) |>
+		validated(p, True()) |>
 			(Ok(u)) { u }
 			& (
 				Error(UriError(part = part, offset = offset, problem = problem))
 			) {
 				origin = list.fold(offsets, 0, (acc, pair) {
 					(kind, at) = pair
-					{ kind == part } |> (True) { at } & (False) { acc }
+					{ kind == part } |> (True()) { at } & (False()) { acc }
 				})
 				fail.raise(
 					UriError(
@@ -155,7 +155,7 @@ _parse_result = (text : String) -> Result(Uri, UriError) {
 }
 
 _build_result = (parts : Parts) -> Result(Uri, UriError) {
-	validated(parts, False)
+	validated(parts, False())
 }
 
 /// Projects the original raw fields in constant field work.
@@ -168,7 +168,7 @@ parts = (uri : Uri) -> Parts {
 to_string = (uri : Uri) -> String {
 	p = parts(uri)
 	authority = p.authority |>
-		(None) { "" }
+		(None()) { "" }
 		& (Some(a)) {
 			host = a.host |>
 				(RegName(h)) { h }
@@ -193,21 +193,21 @@ to_string = (uri : Uri) -> String {
 	)
 }
 
-has_scheme = (uri : Uri) -> Bool { parts(uri).scheme != None }
+has_scheme = (uri : Uri) -> Bool { parts(uri).scheme != None() }
 
 _resolve_result = (base : Uri, reference : Uri) -> Result(Uri, UriError) {
 	b = parts(base)
 	r = parts(reference)
 	b.scheme |>
-		(None) {
+		(None()) {
 			Error(
-				UriError(part = WholePart, offset = 0, problem = RelativeBase),
+				UriError(part = WholePart(), offset = 0, problem = RelativeBase()),
 			)
 		}
 		& (Some(_)) {
 			candidate = r.scheme |>
 				(Some(_)) { Parts(..r, path = remove_dots(r.path)) }
-				& (None) {
+				& (None()) {
 					r.authority |>
 						(Some(_)) {
 							Parts(
@@ -216,13 +216,13 @@ _resolve_result = (base : Uri, reference : Uri) -> Result(Uri, UriError) {
 								path = remove_dots(r.path),
 							)
 						}
-						& (None) {
+						& (None()) {
 							(path, query) = r.path |>
 								("") {
 									(
 										b.path,
 										r.query |>
-											(None) { b.query }
+											(None()) { b.query }
 											& (q) { q },
 									)
 								}
@@ -248,21 +248,21 @@ _resolve_result = (base : Uri, reference : Uri) -> Result(Uri, UriError) {
 
 /// UTF-8 percent encoding, preserving only the unreserved ASCII alphabet.
 encode_component = (text : String) -> String {
-	encode_octets(bytes(text), False)
+	encode_octets(bytes(text), False())
 }
 
 _encode_bytes_result = (bytes : BitArray) -> Result(String, CodecError) {
 	{ bit_array.bit_size(bytes) % 8 == 0 } |>
-		(True) { Ok(encode_octets(octets(bytes), False)) }
-		& (False) { Error(UnalignedBits) }
+		(True()) { Ok(encode_octets(octets(bytes), False())) }
+		& (False()) { Error(UnalignedBits()) }
 }
 
 _decode_component_result = (text : String) -> Result(String, CodecError) {
-	fail.catch(() { decode_text(text, False) })
+	fail.catch(() { decode_text(text, False()) })
 }
 
 _decode_bytes_result = (text : String) -> Result(BitArray, CodecError) {
-	fail.catch(() { decode_raw(bytes(text), False) })
+	fail.catch(() { decode_raw(bytes(text), False()) })
 }
 
 _parse_query_result = (query : String) -> Result(
@@ -277,12 +277,12 @@ _parse_query_result = (query : String) -> Result(
 		) -> List((String, String)) {
 			(piece, tail, more) = cut(rest, 38)
 			next = { piece == [] } |>
-				(True) { acc }
-				& (False) {
+				(True()) { acc }
+				& (False()) {
 					(key, value, equal) = cut(piece, 61)
 					decode_at = (input, origin) {
 						fail.catch(() {
-							decode_text(text_bytes(input), True)
+							decode_text(text_bytes(input), True())
 						}) |>
 							(Ok(x)) { x }
 							& (Error(BadEscape(offset = offset))) {
@@ -296,13 +296,13 @@ _parse_query_result = (query : String) -> Result(
 					k = decode_at(key, offset)
 					vstart = offset + list.length(key) + 1
 					v = equal |>
-						(True) { decode_at(value, vstart) }
-						& (False) { "" }
+						(True()) { decode_at(value, vstart) }
+						& (False()) { "" }
 					[(k, v), ..acc]
 				}
 			more |>
-				(True) { go(tail, offset + list.length(piece) + 1, next) }
-				& (False) { list.reverse(next) }
+				(True()) { go(tail, offset + list.length(piece) + 1, next) }
+				& (False()) { list.reverse(next) }
 		}
 		go(bytes(query), 0, [])
 	})
@@ -315,9 +315,9 @@ build_query = (pairs : List((String, String))) -> String {
 			(key, value) = pair
 			string.concat(
 				[
-					encode_octets(bytes(key), True),
+					encode_octets(bytes(key), True()),
 					"=",
-					encode_octets(bytes(value), True),
+					encode_octets(bytes(value), True()),
 				],
 			)
 		}),
@@ -335,47 +335,47 @@ validated = (p : Parts, parsing : Bool) -> Result(Uri, UriError) {
 // Parse validates complete components in order after its whole-input scan.
 // Build scans all fields, then checks their grammar, then cross-field rules.
 validate = (p : Parts, parsing : Bool) -> () {
-	scan_option(p.scheme, SchemePart)
+	scan_option(p.scheme, SchemePart())
 	p.authority |>
-		(None) { () }
+		(None()) { () }
 		& (Some(a)) {
-			scan_option(a.userinfo, UserInfoPart)
+			scan_option(a.userinfo, UserInfoPart())
 			lexical(
 				bytes(host_text(a.host)),
-				HostPart,
+				HostPart(),
 			)
-			scan_option(a.port, PortPart)
+			scan_option(a.port, PortPart())
 		}
-	lexical(bytes(p.path), PathPart)
-	scan_option(p.query, QueryPart)
-	scan_option(p.fragment, FragmentPart)
+	lexical(bytes(p.path), PathPart())
+	scan_option(p.query, QueryPart())
+	scan_option(p.fragment, FragmentPart())
 	p.scheme |>
-		(None) { () }
+		(None()) { () }
 		& (Some(s)) {
 			xs = bytes(s)
 			xs |>
-				([]) { problem(SchemePart, 0, BadScheme) }
+				([]) { problem(SchemePart(), 0, BadScheme()) }
 				& ([x, ..tail]) {
-					require(alpha(x), SchemePart, 0, BadScheme)
-					grammar(tail, SchemePart, BadScheme, scheme_char, 1)
+					require(alpha(x), SchemePart(), 0, BadScheme())
+					grammar(tail, SchemePart(), BadScheme(), scheme_char, 1)
 				}
 		}
 	p.authority |>
-		(None) { () }
+		(None()) { () }
 		& (Some(a)) {
-			grammar_option(a.userinfo, UserInfoPart, BadAuthority, user_char)
+			grammar_option(a.userinfo, UserInfoPart(), BadAuthority(), user_char)
 			a.host |>
 				(RegName(h)) {
-					grammar(bytes(h), HostPart, BadHost, reg_char, 0)
+					grammar(bytes(h), HostPart(), BadHost(), reg_char, 0)
 				}
-				& (IpLiteral(h)) { require(valid_ip(h), HostPart, 0, BadHost) }
-			grammar_option(a.port, PortPart, BadPort, digit)
+				& (IpLiteral(h)) { require(valid_ip(h), HostPart(), 0, BadHost()) }
+			grammar_option(a.port, PortPart(), BadPort(), digit)
 		}
-	parsing |> (True) { path_constraints(p) } & (False) { () }
-	grammar(bytes(p.path), PathPart, BadPath, path_char, 0)
-	grammar_option(p.query, QueryPart, BadCharacter, query_char)
-	grammar_option(p.fragment, FragmentPart, BadCharacter, query_char)
-	parsing |> (True) { () } & (False) { path_constraints(p) }
+	parsing |> (True()) { path_constraints(p) } & (False()) { () }
+	grammar(bytes(p.path), PathPart(), BadPath(), path_char, 0)
+	grammar_option(p.query, QueryPart(), BadCharacter(), query_char)
+	grammar_option(p.fragment, FragmentPart(), BadCharacter(), query_char)
+	parsing |> (True()) { () } & (False()) { path_constraints(p) }
 }
 
 path_constraints = (p : Parts) -> () {
@@ -385,17 +385,17 @@ path_constraints = (p : Parts) -> () {
 			path_bytes |>
 				([]) { () }
 				& ([47, .._]) { () }
-				& (_) { problem(PathPart, 0, BadPath) }
+				& (_) { problem(PathPart(), 0, BadPath()) }
 		}
-		& (None) {
+		& (None()) {
 			path_bytes |>
-				([47, 47, .._]) { problem(PathPart, 0, BadPath) }
+				([47, 47, .._]) { problem(PathPart(), 0, BadPath()) }
 				& (_) { () }
 			p.scheme |>
 				(Some(_)) { () }
-				& (None) {
+				& (None()) {
 					(first, _, _) = cut(path_bytes, 47)
-					grammar(first, PathPart, BadPath, no_colon, 0)
+					grammar(first, PathPart(), BadPath(), no_colon, 0)
 				}
 		}
 }
@@ -405,11 +405,11 @@ problem = (part : UriPart, offset : Int, why : UriProblem) -> Never {
 }
 
 require = (ok : Bool, part : UriPart, offset : Int, why : UriProblem) -> () {
-	ok |> (True) { () } & (False) { problem(part, offset, why) }
+	ok |> (True()) { () } & (False()) { problem(part, offset, why) }
 }
 
 scan_option = (s : Option(String), part : UriPart) -> () {
-	s |> (None) { () } & (Some(text)) { lexical(bytes(text), part) }
+	s |> (None()) { () } & (Some(text)) { lexical(bytes(text), part) }
 }
 
 lexical = (xs : List(Int), part : UriPart) -> () {
@@ -418,21 +418,21 @@ lexical = (xs : List(Int), part : UriPart) -> () {
 			([]) { () }
 			& ([x, ..tail]) {
 				{ x == 37 } |>
-					(True) {
+					(True()) {
 						tail |>
 							([a, b, ..after]) {
 								require(
 									hex(a) >= 0 && hex(b) >= 0,
 									part,
 									at,
-									BadPercent,
+									BadPercent(),
 								)
 								go(after, at + 3)
 							}
-							& (_) { problem(part, at, BadPercent) }
+							& (_) { problem(part, at, BadPercent()) }
 					}
-					& (False) {
-						require(uri_char(x), part, at, BadCharacter)
+					& (False()) {
+						require(uri_char(x), part, at, BadCharacter())
 						go(tail, at + 1)
 					}
 			}
@@ -447,7 +447,7 @@ grammar_option = (
 	allowed : (Int) -> Bool
 ) -> () {
 	text |>
-		(None) { () }
+		(None()) { () }
 		& (Some(s)) { grammar(bytes(s), part, why, allowed, 0) }
 }
 
@@ -463,7 +463,7 @@ grammar = (
 		& ([x, ..tail]) {
 			require(allowed(x), part, at, why)
 			{ x == 37 } |>
-				(True) {
+				(True()) {
 					tail |>
 						([a, b, ..after]) {
 							require(hex(a) >= 0 && hex(b) >= 0, part, at, why)
@@ -471,7 +471,7 @@ grammar = (
 						}
 						& (_) { problem(part, at, why) }
 				}
-				& (False) { grammar(tail, part, why, allowed, at + 1) }
+				& (False()) { grammar(tail, part, why, allowed, at + 1) }
 		}
 }
 
@@ -482,13 +482,13 @@ read_authority = (raw : List(Int), start : Int) -> (
 ) {
 	(before_at, after_at, at) = cut(raw, 64)
 	(userinfo, hostport, hstart) = at |>
-		(True) {
+		(True()) {
 			(before_second, _, second) = cut(after_at, 64)
 			require(
-				second == False,
-				AuthorityPart,
+				second == False(),
+				AuthorityPart(),
 				start + list.length(before_at) + 1 + list.length(before_second),
-				BadAuthority,
+				BadAuthority(),
 			)
 			(
 				Some(text_bytes(before_at)),
@@ -496,10 +496,10 @@ read_authority = (raw : List(Int), start : Int) -> (
 				start + list.length(before_at) + 1,
 			)
 		}
-		& (False) { (None, raw, start) }
+		& (False()) { (None(), raw, start) }
 	// Structure selects the components; userinfo grammar precedes host grammar.
 	fail.map_error(
-		() { grammar_option(userinfo, UserInfoPart, BadAuthority, user_char) },
+		() { grammar_option(userinfo, UserInfoPart(), BadAuthority(), user_char) },
 		(e : UriError) {
 			UriError(
 				part = e.part,
@@ -511,18 +511,18 @@ read_authority = (raw : List(Int), start : Int) -> (
 	(host, port, host_start, port_start) = hostport |>
 		([91, ..inside]) {
 			(h, after, closed) = cut(inside, 93)
-			require(closed, HostPart, start + list.length(raw), BadHost)
+			require(closed, HostPart(), start + list.length(raw), BadHost())
 			end = hstart + list.length(h) + 2
 			p = after |>
-				([]) { None }
+				([]) { None() }
 				& ([58, ..ps]) { Some(text_bytes(ps)) }
-				& (_) { problem(HostPart, end, BadHost) }
+				& (_) { problem(HostPart(), end, BadHost()) }
 			(IpLiteral(text_bytes(h)), p, hstart + 1, end + 1)
 		}
 		& (_) {
 			(h, p, colon) = cut(hostport, 58)
 			fail.map_error(
-				() { grammar(h, HostPart, BadHost, reg_char, 0) },
+				() { grammar(h, HostPart(), BadHost(), reg_char, 0) },
 				(e : UriError) {
 					UriError(
 						part = e.part,
@@ -533,10 +533,10 @@ read_authority = (raw : List(Int), start : Int) -> (
 			)
 			(extra, _, again) = cut(p, 58)
 			require(
-				again == False,
-				HostPart,
+				again == False(),
+				HostPart(),
 				hstart + list.length(h) + 1 + list.length(extra),
-				BadHost,
+				BadHost(),
 			)
 			(
 				RegName(text_bytes(h)),
@@ -547,7 +547,7 @@ read_authority = (raw : List(Int), start : Int) -> (
 		}
 	(
 		Authority(userinfo = userinfo, host = host, port = port),
-		[(UserInfoPart, start), (HostPart, host_start), (PortPart, port_start)],
+		[(UserInfoPart(), start), (HostPart(), host_start), (PortPart(), port_start)],
 	)
 }
 
@@ -583,7 +583,7 @@ scheme_char = (x : Int) -> Bool {
 
 valid_scheme = (xs : List(Int)) -> Bool {
 	xs |>
-		([]) { False }
+		([]) { False() }
 		& ([x, ..tail]) { alpha(x) && list.all(tail, scheme_char) }
 }
 
@@ -608,13 +608,13 @@ valid_ip = (s : String) -> Bool {
 		& (_) {
 			halves = string.split(s, "::")
 			halves |>
-				([whole]) { groups(whole, True) == Some(8) }
+				([whole]) { groups(whole, True()) == Some(8) }
 				& ([left, right]) {
-					(groups(left, False), groups(right, True)) |>
+					(groups(left, False()), groups(right, True())) |>
 						((Some(a), Some(b))) { a + b < 8 }
-						& (_) { False }
+						& (_) { False() }
 				}
-				& (_) { False }
+				& (_) { False() }
 		}
 }
 
@@ -637,19 +637,19 @@ groups = (s : String, allow_ipv4 : Bool) -> Option(Int) {
 					& ([part, ..tail]) {
 						xs = bytes(part)
 						{ allow_ipv4 && tail == [] && list.contains(xs, 46) } |>
-							(True) {
+							(True()) {
 								{ ipv4(part) } |>
-									(True) { Some(count + 2) }
-									& (False) { None }
+									(True()) { Some(count + 2) }
+									& (False()) { None() }
 							}
-							& (False) {
+							& (False()) {
 								{
 									xs != [] &&
 										list.length(xs) <= 4 &&
 										list.all(xs, (x) { hex(x) >= 0 })
 								} |>
-									(True) { go(tail, count + 1) }
-									& (False) { None }
+									(True()) { go(tail, count + 1) }
+									& (False()) { None() }
 							}
 					}
 			}
@@ -662,7 +662,7 @@ ipv4 = (s : String) -> Bool {
 	list.length(pieces) == 4 &&
 		list.all(pieces, (part) {
 			xs = bytes(part)
-			no_zero = xs |> ([48, _, .._]) { False } & (_) { True }
+			no_zero = xs |> ([48, _, .._]) { False() } & (_) { True() }
 			xs != [] &&
 				list.length(xs) <= 3 &&
 				no_zero &&
@@ -695,19 +695,19 @@ text_bytes = (xs : List(Int)) -> String {
 cut = (xs : List(Int), delimiter : Int) -> (List(Int), List(Int), Bool) {
 	go = (rest, acc) {
 		rest |>
-			([]) { (list.reverse(acc), [], False) }
-			& ([x, ..tail] ? x == delimiter) { (list.reverse(acc), tail, True) }
+			([]) { (list.reverse(acc), [], False()) }
+			& ([x, ..tail] ? x == delimiter) { (list.reverse(acc), tail, True()) }
 			& ([x, ..tail]) { go(tail, [x, ..acc]) }
 	}
 	go(xs, [])
 }
 
 optional_text = (xs : List(Int), present : Bool) -> Option(String) {
-	present |> (True) { Some(text_bytes(xs)) } & (False) { None }
+	present |> (True()) { Some(text_bytes(xs)) } & (False()) { None() }
 }
 
 delimited = (s : Option(String), before : String, after : String) -> String {
-	s |> (None) { "" } & (Some(text)) { string.concat([before, text, after]) }
+	s |> (None()) { "" } & (Some(text)) { string.concat([before, text, after]) }
 }
 
 // The output is a reversed stack of complete path segments, including each
@@ -729,7 +729,7 @@ remove_dots = (path : String) -> String {
 					([47, ..tail]) { ([47], tail) }
 					& (_) { ([], rest) }
 				(segment, tail, slash) = cut(remaining, 47)
-				next = slash |> (True) { [47, ..tail] } & (False) { [] }
+				next = slash |> (True()) { [47, ..tail] } & (False()) { [] }
 				go(
 					next,
 					[text_bytes(list.append(leading, segment)), ..out],
@@ -744,9 +744,9 @@ pop_segment = (out : List(String)) -> List(String) {
 }
 
 merge_path = (base : Parts, relative : String) -> String {
-	{ base.authority != None && base.path == "" } |>
-		(True) { string.concat(["/", relative]) }
-		& (False) {
+	{ base.authority != None() && base.path == "" } |>
+		(True()) { string.concat(["/", relative]) }
+		& (False()) {
 			go = (rest, prefix, segment) {
 				rest |>
 					([]) {
@@ -764,17 +764,17 @@ merge_path = (base : Parts, relative : String) -> String {
 }
 
 hex_digit = (n : Int) -> Int {
-	{ n < 10 } |> (True) { 48 + n } & (False) { 55 + n }
+	{ n < 10 } |> (True()) { 48 + n } & (False()) { 55 + n }
 }
 
 encode_octets = (xs : List(Int), form : Bool) -> String {
 	fragments = list.map(xs, (x) {
 		{ form && x == 32 } |>
-			(True) { <<43>> }
-			& (False) {
+			(True()) { <<43>> }
+			& (False()) {
 				unreserved(x) |>
-					(True) { <<x>> }
-					& (False) { <<37, hex_digit(x / 16), hex_digit(x % 16)>> }
+					(True()) { <<x>> }
+					& (False()) { <<37, hex_digit(x / 16), hex_digit(x % 16)>> }
 			}
 	})
 	{
@@ -791,30 +791,30 @@ decode_raw = (xs : List(Int), form : Bool) -> BitArray {
 			([]) { bit_array.concat(list.reverse(acc)) }
 			& ([x, ..tail]) {
 				{ x == 37 } |>
-					(True) {
+					(True()) {
 						tail |>
 							([a, b, ..after]) {
 								{ hex(a) >= 0 && hex(b) >= 0 } |>
-									(True) {
+									(True()) {
 										go(
 											after,
 											at + 3,
 											[<<hex(a) * 16 + hex(b)>>, ..acc],
 										)
 									}
-									& (False) {
+									& (False()) {
 										fail.raise(BadEscape(offset = at))
 									}
 							}
 							& (_) { fail.raise(BadEscape(offset = at)) }
 					}
-					& (False) {
+					& (False()) {
 						{ x >= 128 } |>
-							(True) { fail.raise(NonAscii(offset = at)) }
-							& (False) {
+							(True()) { fail.raise(NonAscii(offset = at)) }
+							& (False()) {
 								value = { form && x == 43 } |>
-									(True) { 32 }
-									& (False) { x }
+									(True()) { 32 }
+									& (False()) { x }
 								go(tail, at + 1, [<<value>>, ..acc])
 							}
 					}
@@ -829,7 +829,7 @@ decode_text = (text : String, form : Bool) -> String {
 		fail.catch(() { bit_array.to_string(e4_call_arg_0) })
 	} |>
 		(Ok(s)) { s }
-		& (Error(_)) { fail.raise(InvalidUtf8) }
+		& (Error(_)) { fail.raise(InvalidUtf8()) }
 }
 
 /// Parses without repairing, decoding or normalizing any component.

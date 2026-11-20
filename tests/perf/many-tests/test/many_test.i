@@ -2,7 +2,7 @@
 	testlib = (test, each) = i/test
 )
 
-test("single", () { assert(True) })
+test("single", () { assert(True()) })
 each("group 0", [
 	("case 0", 0),
 	("case 1", 1),

@@ -6,7 +6,7 @@
     (-> (, value) _
       {(= t ((. syntax type_of) value))
        (|> ((. syntax subtype) t `Int)
-           (& (-> (, (. syntax Yes)) _ `7)
+           (& (-> (, ((. syntax Yes))) _ `7)
              (-> (, _) _
                ((. fail raise)
                 ((. syntax SyntaxError)

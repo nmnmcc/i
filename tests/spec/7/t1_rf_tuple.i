@@ -3,6 +3,6 @@
 strict = (s : String - "a") {
 	s |> ("b") { 1 } & (_ : String - "a" - "b") { 2 }
 }
-f = (p : (String, Bool)) { p |> (("a", True)) { 0 } & ((t, _)) { strict(t) } }
+f = (p : (String, Bool)) { p |> (("a", True())) { 0 } & ((t, _)) { strict(t) } }
 
-main = () { f(("a", False)) }
+main = () { f(("a", False())) }

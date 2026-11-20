@@ -26,7 +26,7 @@ spawn = (depth : Int) {
 		child = task.go(s, () { value |> (Tip(_)) { 0 } & (Node(_, _)) { 1 } })
 		assert(task.join(child) == 1)
 		shared = task.share(s, value)
-		task.get(shared) |> (Tip(_)) { assert(False) } & (Node(_, _)) { () }
+		task.get(shared) |> (Tip(_)) { assert(False()) } & (Node(_, _)) { () }
 	})
 	assert(core.portable((value, value, [value, value])))
 	assert(core.portable(value))

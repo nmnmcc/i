@@ -10,8 +10,8 @@ walk = (t : pbt.Tree((Int, Int)), depth : Int) -> () {
 	(n, k) = t.value
 	assert(k >= 0 && k <= n)
 	{ depth > 0 } |>
-		(True) { list.each(t.children(), (c) { walk(c, depth - 1) }) }
-		& (False) { () }
+		(True()) { list.each(t.children(), (c) { walk(c, depth - 1) }) }
+		& (False()) { () }
 }
 
 test("dependent", () {
@@ -20,12 +20,12 @@ test("dependent", () {
 	})
 	go = (seed : Int) -> () {
 		{ seed < 20 } |>
-			(True) {
+			(True()) {
 				Some(t) = pbt.sample(gen, 10, random.from_seed(seed))
 				walk(t, 4)
 				go(seed + 1)
 			}
-			& (False) { () }
+			& (False()) { () }
 	}
 	go(0)
 })
@@ -42,7 +42,7 @@ test("zero_budget", () {
 	(v, path, checked) = pbt.shrink(pbt.Tree(
 		value = 1,
 		children = () { never() },
-	), 0, (_) { True })
+	), 0, (_) { True() })
 	assert(v == 1)
 	assert(path == [])
 	assert(checked == 0)
@@ -52,7 +52,7 @@ test("cyclic_budget", () {
 	cyclic = () -> pbt.Tree(Int) {
 		pbt.Tree(value = 1, children = () { [cyclic()] })
 	}
-	(v, path, checked) = pbt.shrink(cyclic(), 10, (_) { True })
+	(v, path, checked) = pbt.shrink(cyclic(), 10, (_) { True() })
 	assert(v == 1)
 	assert(list.length(path) == 10)
 	assert(checked == 10)
@@ -62,7 +62,7 @@ test("map_has_no_numeric_smaller_law", () {
 	original = pbt.make((_, _) { Some(pbt.int_tree(10, 0)) })
 	mapped = pbt.map(original, (n) { 100 - n })
 	Some(t) = pbt.sample(mapped, 0, random.from_seed(0))
-	(v, _, _) = pbt.shrink(t, 100, (_) { True })
+	(v, _, _) = pbt.shrink(t, 100, (_) { True() })
 	assert(t.value == 90)
 	assert(v == 100)
 })

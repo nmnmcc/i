@@ -30,7 +30,7 @@ lookup_or_zero = (key : String) -> Int {
 }
 
 int_or_raise = (bad : Bool) -> Int {
-	bad |> (True) { fail.raise(1) } & (False) { 5 }
+	bad |> (True()) { fail.raise(1) } & (False()) { 5 }
 }
 
 deep = (n : Int) -> Int {
@@ -40,11 +40,11 @@ deep = (n : Int) -> Int {
 test("raise_reaches_catch_test", () {
 	assert(fail.catch(() { fail.raise("no") }) == Error("no"))
 	assert(fail.catch(() { deep(3) }) == Error("bottom"))
-	assert(fail.catch(() { int_or_raise(True) }) == Error(1))
+	assert(fail.catch(() { int_or_raise(True()) }) == Error(1))
 })
 
 test("catch_ok_passthrough_test", () {
-	assert(fail.catch(() { int_or_raise(False) }) == Ok(5))
+	assert(fail.catch(() { int_or_raise(False()) }) == Ok(5))
 	assert(fail.catch(() { [1, 2] }) == Ok([1, 2]))
 })
 
@@ -65,14 +65,14 @@ test("from_result_test", () {
 test("map_error_test", () {
 	r = fail.catch(() {
 		fail.map_error(
-			() { int_or_raise(True) },
+			() { int_or_raise(True()) },
 			(e) { "e" <> core.inspect(e) },
 		)
 	})
 	assert(r == Error("e1"))
 	ok = fail.catch(() {
 		fail.map_error(
-			() { int_or_raise(False) },
+			() { int_or_raise(False()) },
 			(e) { "e" <> core.inspect(e) },
 		)
 	})
@@ -83,12 +83,12 @@ test("fail_catch_does_not_take_assert_test", () {
 	// `fail.catch` lets the `Assert` failure through to `assertion.catch`.
 	outer : Result(Result(Int, String), AssertionFailure) = assertion.catch(() {
 		inner : Result(Int, String) = fail.catch(() {
-			assert(False)
+			assert(False())
 			1
 		})
 		inner
 	})
-	assert(outer |> (Error(_)) { True } & (Ok(_)) { False })
+	assert(outer |> (Error(_)) { True() } & (Ok(_)) { False() })
 })
 
 test("assertion_catch_does_not_take_fail_test", () {

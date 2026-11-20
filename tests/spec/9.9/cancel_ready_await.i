@@ -36,9 +36,9 @@ main = () {
 	// §9.9: "Timing may choose ... which failures precede cancellation"; when
 	// the await completed before the failure, it took the answer.
 	after = request.state(borrowed)
-	assert(after == request.Ready(()) || after == request.Taken)
+	assert(after == request.Ready(()) || after == request.Taken())
 	owned = request.ready(())
 	probe(() { request.await_owned(owned) })
 	settled = request.state(owned)
-	assert(settled == request.Cancelled || settled == request.Taken)
+	assert(settled == request.Cancelled() || settled == request.Taken())
 }

@@ -20,12 +20,12 @@ H = ()
 
 both = (m.mk(1), T("s"))
 
-shown = Shown
+shown = Shown()
 
 far = m.far()
 
 // §2.4: the inferred type of an exported binding may not use a type of
 // this module that is not exported.
-hidden = () { H }
+hidden = () { H() }
 
-local = () { H }
+local = () { H() }

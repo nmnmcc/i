@@ -81,7 +81,7 @@ test("time_arithmetic", () {
 			e4_call_arg_1 = 0
 			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Error(time.DivisionByZero),
+			Error(time.DivisionByZero()),
 	)
 	assert(
 		{
@@ -89,7 +89,7 @@ test("time_arithmetic", () {
 			e4_call_arg_1 = 0
 			fail.catch(() { time.divide(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Error(time.DivisionByZero),
+			Error(time.DivisionByZero()),
 	)
 	assert(
 		{
@@ -122,13 +122,13 @@ test("time_arithmetic", () {
 		})
 	})
 	assert(
-		time.compare(time.nanoseconds(-1), time.nanoseconds(0)) == Less,
+		time.compare(time.nanoseconds(-1), time.nanoseconds(0)) == Less(),
 	)
 	assert(
-		time.compare(time.seconds(1), time.milliseconds(1000)) == Equal,
+		time.compare(time.seconds(1), time.milliseconds(1000)) == Equal(),
 	)
 	assert(
-		time.compare(time.seconds(1), time.nanoseconds(1)) == Greater,
+		time.compare(time.seconds(1), time.nanoseconds(1)) == Greater(),
 	)
 	()
 })
@@ -165,13 +165,13 @@ test("time_instants", () {
 		})
 	})
 	assert(
-		time.compare_instants(time.from_unix_nanoseconds(-1), epoch) == Less,
+		time.compare_instants(time.from_unix_nanoseconds(-1), epoch) == Less(),
 	)
 	assert(
-		time.compare_instants(epoch, time.from_unix_nanoseconds(0)) == Equal,
+		time.compare_instants(epoch, time.from_unix_nanoseconds(0)) == Equal(),
 	)
 	assert(
-		time.compare_instants(time.from_unix_nanoseconds(1), epoch) == Greater,
+		time.compare_instants(time.from_unix_nanoseconds(1), epoch) == Greater(),
 	)
 	()
 })

@@ -100,8 +100,8 @@ encode_items =
 		bytes = <<s:utf8>>
 		n = core.bit_size(bytes) / 8
 		{ n <= 4294967295 } |>
-			(True) { () }
-			& (False) {
+			(True()) { () }
+			& (False()) {
 				fail.raise(ProcessError(operation = "spawn", code = "invalid"))
 			}
 		core.bit_array_concat([u32(n), bytes, encode_items(rest)])
@@ -110,8 +110,8 @@ encode_items =
 encode_args = (values) {
 	n = length(values)
 	{ n <= 4294967295 } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			fail.raise(ProcessError(operation = "spawn", code = "invalid"))
 		}
 	core.bit_array_concat([u32(n), encode_items(values)])
@@ -215,7 +215,7 @@ close = (Child(number)) <- (raw : Process) {
 	request.await_owned(raw.close(number))
 }
 
-stdio_mode = (Inherit) { "inherit" } & (Null) { "null" } & (Piped) { "piped" }
+stdio_mode = (Inherit()) { "inherit" } & (Null()) { "null" } & (Piped()) { "piped" }
 
 spawn_piped = (program, values, input, output, errors) <- (raw : Process) {
 	r = raw.spawn_piped(
@@ -261,7 +261,7 @@ spawn_config = (
 		(InheritEnvironment(entries)) { ("inherit", entries) }
 		& (ReplaceEnvironment(entries)) { ("replace", entries) }
 	(cwd_mode, path) = directory |>
-		(InheritDirectory) { ("inherit", "") }
+		(InheritDirectory()) { ("inherit", "") }
 		& (Directory(path)) { ("set", path) }
 	r = raw.spawn_config(
 		program,

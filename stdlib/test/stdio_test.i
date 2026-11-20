@@ -20,22 +20,22 @@ test("stdio_fake", () {
 			read = (n) {
 				request.ready(
 					{ n > 0 } |>
-						(True) { Ok(<<>>) }
-						& (False) { Error("invalid") },
+						(True()) { Ok(<<>>) }
+						& (False()) { Error("invalid") },
 				)
 			},
 			write = (bytes) {
 				request.ready(
 					{ bytes == <<"hello\n":utf8>> } |>
-						(True) { Ok(()) }
-						& (False) { Error("wrong_bytes") },
+						(True()) { Ok(()) }
+						& (False()) { Error("wrong_bytes") },
 				)
 			},
 			write_error = (bytes) {
 				request.ready(
 					{ bytes == <<"error\n":utf8>> } |>
-						(True) { Ok(()) }
-						& (False) { Error("wrong_bytes") },
+						(True()) { Ok(()) }
+						& (False()) { Error("wrong_bytes") },
 				)
 			},
 			flush = () { request.ready(Ok(())) },

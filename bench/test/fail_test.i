@@ -8,7 +8,7 @@
 rounds = 3_000_000
 
 check = (ok : Bool, what : String) -> () {
-	ok |> (True) { () } & (False) { panic(what) }
+	ok |> (True()) { () } & (False()) { panic(what) }
 }
 
 caught = (i : Int, acc : Int) -> Int {

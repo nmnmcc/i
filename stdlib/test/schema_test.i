@@ -28,13 +28,13 @@ user_schema = () {
 	role = schema.tagged_union(
 		"kind",
 		[
-			("admin", schema.map(schema.object(()), (_) { Admin }, (_) { () })),
+			("admin", schema.map(schema.object(()), (_) { Admin() }, (_) { () })),
 			(
 				"member",
-				schema.map(schema.object(()), (_) { Member }, (_) { () }),
+				schema.map(schema.object(()), (_) { Member() }, (_) { () }),
 			),
 		],
-		(r) { r |> (Admin) { "admin" } & (Member) { "member" } },
+		(r) { r |> (Admin()) { "admin" } & (Member()) { "member" } },
 	)
 	address = schema.field(
 		schema.object(Address(city = "")),
@@ -43,7 +43,7 @@ user_schema = () {
 		(a) { a.city },
 		(_, city) { Address(city = city) },
 	)
-	start = schema.object(User(name = "", addresses = [], role = Member))
+	start = schema.object(User(name = "", addresses = [], role = Member()))
 	names = schema.field(
 		start,
 		"name",
@@ -101,14 +101,14 @@ test("string_empty", () { assert(round(schema.string, "")) })
 
 test("string_wrong", () {
 	assert(
-		fail.catch(() { schema.decode(schema.string, json.Null) }) ==
+		fail.catch(() { schema.decode(schema.string, json.Null()) }) ==
 			Error(schema.SchemaError(path = [], expected = "string")),
 	)
 })
 
-test("bool_true", () { assert(round(schema.bool, True)) })
+test("bool_true", () { assert(round(schema.bool, True())) })
 
-test("bool_false", () { assert(round(schema.bool, False)) })
+test("bool_false", () { assert(round(schema.bool, False())) })
 
 test("bool_wrong", () {
 	assert(
@@ -127,7 +127,7 @@ test("null_wrong", () {
 	assert(
 		{
 			e4_call_arg_0 = schema.null
-			e4_call_arg_1 = json.Boolean(False)
+			e4_call_arg_1 = json.Boolean(False())
 			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Error(schema.SchemaError(path = [], expected = "null")),
@@ -176,7 +176,7 @@ test("nullable_some", () {
 
 test("nullable_none", () {
 	assert(
-		round(schema.nullable(schema.int), None),
+		round(schema.nullable(schema.int), None()),
 	)
 })
 
@@ -188,7 +188,7 @@ test("optional_some", () {
 
 test("optional_none", () {
 	assert(
-		round(schema.optional(schema.string), None),
+		round(schema.optional(schema.string), None()),
 	)
 })
 
@@ -233,7 +233,7 @@ test("dict_path", () {
 	assert(
 		{
 			e4_call_arg_0 = schema.dict(schema.bool)
-			e4_call_arg_1 = json.Object([("x", json.Null)])
+			e4_call_arg_1 = json.Object([("x", json.Null())])
 			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Error(
@@ -255,7 +255,7 @@ test("tuple_path", () {
 	assert(
 		{
 			e4_call_arg_0 = schema.tuple(schema.int, schema.string)
-			e4_call_arg_1 = json.Array([json.Integer(1), json.Null])
+			e4_call_arg_1 = json.Array([json.Integer(1), json.Null()])
 			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Error(
@@ -332,7 +332,7 @@ test("union_failure", () {
 	assert(
 		{
 			e4_call_arg_0 = schema.union([schema.int], (_) { 0 })
-			e4_call_arg_1 = json.Null
+			e4_call_arg_1 = json.Null()
 			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Error(schema.SchemaError(path = [], expected = "union")),
@@ -346,8 +346,8 @@ test("parse_ok", () {
 test("parse_bad_syntax", () {
 	assert(
 		fail.catch(() { schema.parse(schema.int, "[") }) |>
-			(Error(schema.Syntax(_))) { True }
-			& (_) { False },
+			(Error(schema.Syntax(_))) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -379,7 +379,7 @@ test("nested_round", () {
 			User(
 				name = "Ada",
 				addresses = [Address(city = "HK"), Address(city = "Paris")],
-				role = Admin,
+				role = Admin(),
 			),
 		),
 	)
@@ -394,7 +394,7 @@ test("nested_path", () {
 					("name", json.Text("Ada")),
 					(
 						"addresses",
-						json.Array([json.Object([("city", json.Null)])]),
+						json.Array([json.Object([("city", json.Null())])]),
 					),
 					("role", json.Object([("kind", json.Text("admin"))])),
 				],
@@ -441,7 +441,7 @@ user = user_schema()
 Schema(DecodedUser, _) = user
 
 test("alias_type", () {
-	x : DecodedUser = User(name = "A", addresses = [], role = Admin)
+	x : DecodedUser = User(name = "A", addresses = [], role = Admin())
 	assert(round(user, x))
 })
 
@@ -476,7 +476,7 @@ test("recursive_round", () {
 
 optional_schema = () {
 	schema.optional_field(
-		schema.object(None),
+		schema.object(None()),
 		"value",
 		schema.int,
 		(x) { x },
@@ -492,7 +492,7 @@ test("optional_field_some", () {
 
 test("optional_field_none", () {
 	assert(
-		round(optional_schema(), None),
+		round(optional_schema(), None()),
 	)
 })
 
@@ -500,7 +500,7 @@ test("optional_field_path", () {
 	assert(
 		{
 			e4_call_arg_0 = optional_schema()
-			e4_call_arg_1 = json.Object([("value", json.Null)])
+			e4_call_arg_1 = json.Object([("value", json.Null())])
 			fail.catch(() { schema.decode(e4_call_arg_0, e4_call_arg_1) })
 		} ==
 			Error(

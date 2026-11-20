@@ -20,7 +20,7 @@ main = () {
 	kept = control.keep((b) {
 		control.suspend(b, (k) { Paused(k) })
 		fail.raise("resumed")
-		Done
+		Done()
 	})
 	first = fail.catch(() { control.boundary((b) { kept(b) }) })
 	first |>
@@ -34,7 +34,7 @@ main = () {
 		resource.ensure(
 			() {
 				control.suspend(b, (k) { Paused(k) })
-				Done
+				Done()
 			},
 			// A final may not raise errors (§9.5); observe that it ran instead.
 			() { print("cancelled") },
@@ -59,13 +59,13 @@ main = () {
 			fail.raise("inside")
 		})
 		answer |>
-			(Error("inside")) { Done }
+			(Error("inside")) { Done() }
 			& (_) { panic("lost the inner handler") }
 	})
 	third = fail.catch(() { control.boundary((b) { inner_catch(b) }) })
 	third |>
 		(Ok(Paused(k))) {
-			assert(fail.catch(() { control.resume(k, ()) }) == Ok(Done))
+			assert(fail.catch(() { control.resume(k, ()) }) == Ok(Done()))
 		}
 		& (_) { panic("expected a paused inner catch") }
 }

@@ -19,11 +19,11 @@ run = <A, N>(body : () <- N -> A) { body() }
 forward = <A, E, N>(x : A) <- (s : S(A, E, N)) { run(() { use(x) }) }
 
 left = <N>(b : Bool) <- (s : S(Int, Never, N)) {
-	b |> (True) { right(False) } & (False) { use(1) }
+	b |> (True()) { right(False()) } & (False()) { use(1) }
 }
 
 right = <N>(b : Bool) <- (s : S(Int, Never, N)) {
-	b |> (True) { left(False) } & (False) { use(1) }
+	b |> (True()) { left(False()) } & (False()) { use(1) }
 }
 
 test("integer", () {
@@ -56,7 +56,7 @@ test("error", () {
 
 test("mutual", () {
 	_syn3_3 : S(Int, Never, Dep) = S((x : Int) { x + get() }, (_ : Dep) { () })
-	left(True) |> (8) { () } & (other) { panic("wrong result") } <- (
+	left(True()) |> (8) { () } & (other) { panic("wrong result") } <- (
 		Dep(value = 7),
 		_syn3_3,
 	)

@@ -9,7 +9,7 @@ status = () { "ok" }
 
 main = () {
 	x = 1
-	assert({ x == 2 } == False)
-	assert({ status() == "error" } == False)
-	assert(list.map(["a"], (x) { x == "b" }) == [False])
+	assert({ x == 2 } == False())
+	assert({ status() == "error" } == False())
+	assert(list.map(["a"], (x) { x == "b" }) == [False()])
 }

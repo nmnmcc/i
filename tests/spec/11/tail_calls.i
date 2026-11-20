@@ -7,8 +7,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -25,8 +25,8 @@ pong = (n) { n |> (0) { "pong" } & (_) { ping(n - 1) } }
 loop_block = (n, acc) {
 	next = acc + 2
 	{ n == 0 } |>
-		(True) { acc }
-		& (False) {
+		(True()) { acc }
+		& (False()) {
 			m = n - 1
 			loop_block(m, next)
 		}

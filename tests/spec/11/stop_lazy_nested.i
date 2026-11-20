@@ -58,7 +58,7 @@ resume = (p) {
 			x = control.resume(k, ())
 			x
 		}
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 }
 
 // A stop inside a resume inside a resumed computation shows the frames
@@ -66,11 +66,11 @@ resume = (p) {
 main = () {
 	first = control.boundary((b) {
 		a1(b)
-		Done
+		Done()
 	})
 	second = control.boundary((c) {
 		b1(c, first)
-		Done
+		Done()
 	})
 	resume(second)
 	()

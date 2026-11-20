@@ -53,8 +53,8 @@ test("path_parts_examples", () {
 	assert(path.extension("é.猫") == ".猫")
 	assert(path.is_absolute("/a"))
 	assert(path.is_absolute("//"))
-	assert(path.is_absolute("C:/a") == False)
-	assert(path.is_absolute("") == False)
+	assert(path.is_absolute("C:/a") == False())
+	assert(path.is_absolute("") == False())
 	()
 })
 
@@ -64,22 +64,22 @@ test("path_relative_examples", () {
 	assert(fail.catch(() { path.relative("..", "../a") }) == Ok("a"))
 	assert(
 		fail.catch(() { path.relative("..", ".") }) ==
-			Error(path.UnknownParent),
+			Error(path.UnknownParent()),
 	)
 	assert(
 		fail.catch(() { path.relative("a", "/a") }) ==
-			Error(path.DifferentRoots),
+			Error(path.DifferentRoots()),
 	)
 	assert(
 		fail.catch(() { path.relative("/a", "a") }) ==
-			Error(path.DifferentRoots),
+			Error(path.DifferentRoots()),
 	)
 	assert(fail.catch(() { path.relative("/a/./", "/a") }) == Ok("."))
 	assert(fail.catch(() { path.relative("", "") }) == Ok("."))
 	assert(fail.catch(() { path.relative(".", "../é") }) == Ok("../é"))
 	assert(
 		fail.catch(() { path.relative("../../a", "../a") }) ==
-			Error(path.UnknownParent),
+			Error(path.UnknownParent()),
 	)
 	()
 })

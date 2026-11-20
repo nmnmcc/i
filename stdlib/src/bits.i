@@ -35,18 +35,18 @@ read_int = (
 	little : Bool
 ) -> Int {
 	value = little |>
-		(True) { read_little(bits, start, width, 0, 1) }
-		& (False) { read_big(bits, start, width, 0) }
+		(True()) { read_little(bits, start, width, 0, 1) }
+		& (False()) { read_big(bits, start, width, 0) }
 	{ signed && width > 0 && value >= core.shift_left(1, width - 1) } |>
-		(True) { value - core.shift_left(1, width) }
-		& (False) { value }
+		(True()) { value - core.shift_left(1, width) }
+		& (False()) { value }
 }
 
 // Big endian: the bits in chunks, most significant first.
 read_big = (bits : BitArray, start : Int, left : Int, acc : Int) -> Int {
 	{ left == 0 } |>
-		(True) { acc }
-		& (False) {
+		(True()) { acc }
+		& (False()) {
 			n = min(left, 14)
 			read_big(
 				bits,
@@ -67,8 +67,8 @@ read_little = (
 	scale : Int
 ) -> Int {
 	{ left == 0 } |>
-		(True) { acc }
-		& (False) {
+		(True()) { acc }
+		& (False()) {
 			n = min(left, 8)
 			read_little(
 				bits,
@@ -85,16 +85,16 @@ from_int = (value : Int, width : Int, little : Bool) -> BitArray {
 	u = core.bit_and(value, core.shift_left(1, width) - 1)
 	core.bit_array_concat(
 		little |>
-			(True) { write_little(u, width, []) }
-			& (False) { write_big(u, width, []) },
+			(True()) { write_little(u, width, []) }
+			& (False()) { write_big(u, width, []) },
 	)
 }
 
 // Big endian: chunks from the least significant one, each put in front.
 write_big = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 	{ left == 0 } |>
-		(True) { acc }
-		& (False) {
+		(True()) { acc }
+		& (False()) {
 			n = min(left, 14)
 			low = core.bit_and(u, core.shift_left(1, n) - 1)
 			write_big(
@@ -109,8 +109,8 @@ write_big = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 // order; the last group has the bits that are left.
 write_little = (u : Int, left : Int, acc : List(BitArray)) -> List(BitArray) {
 	{ left == 0 } |>
-		(True) { reverse(acc, []) }
-		& (False) {
+		(True()) { reverse(acc, []) }
+		& (False()) {
 			n = min(left, 8)
 			low = core.bit_and(u, core.shift_left(1, n) - 1)
 			write_little(
@@ -125,4 +125,4 @@ reverse = (list : List(BitArray), acc : List(BitArray)) -> List(BitArray) {
 	list |> ([]) { acc } & ([x, ..xs]) { reverse(xs, [x, ..acc]) }
 }
 
-min = (a : Int, b : Int) -> Int { { a < b } |> (True) { a } & (False) { b } }
+min = (a : Int, b : Int) -> Int { { a < b } |> (True()) { a } & (False()) { b } }

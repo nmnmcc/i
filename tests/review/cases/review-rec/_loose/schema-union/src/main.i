@@ -2,10 +2,10 @@
 Schema(A) = (decode = () -> A)
 make = (c : Bool) {
 	c |>
-		(True) { Schema(decode = () { (a = 1) }) }
-		& (False) { Schema(decode = () { (a = "x") }) }
+		(True()) { Schema(decode = () { (a = 1) }) }
+		& (False()) { Schema(decode = () { (a = "x") }) }
 }
-schema = make(True)
+schema = make(True())
 Schema(Row) = schema
 // Row denotes (a: 1) | (a: "x").
 read = (r : Row) { r.a } // Both alternatives provide a.

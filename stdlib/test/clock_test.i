@@ -20,7 +20,7 @@ test("clock_fake", () {
 		assert(calendar.format_now() == "1969-12-31T23:59:59.999999993Z")
 		entry = log.timestamped(
 			log.Entry(
-				level = log.Info,
+				level = log.Info(),
 				message = "clock",
 				fields = [],
 				at = Some(time.from_unix_nanoseconds(0)),
@@ -49,8 +49,8 @@ test("clock_fake", () {
 			sleep_ns = (n) {
 				request.ready(
 					{ n < 0 } |>
-						(True) { Error("invalid") }
-						& (False) { Ok(()) },
+						(True()) { Error("invalid") }
+						& (False()) { Ok(()) },
 				)
 			},
 		),

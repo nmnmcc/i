@@ -9,5 +9,5 @@ test = <N>() <- (s : S(N)) {
 	{
 		local : () <- (S(N), ..N) -> () = () { use() }
 		run(local)
-	} <- (D)
+	} <- (D())
 }

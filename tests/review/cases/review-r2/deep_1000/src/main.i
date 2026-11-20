@@ -10,8 +10,8 @@
 )
 deep = (n : Int) -> () {
 	{ n == 0 } |>
-		(True) { task.yield() }
-		& (False) {
+		(True()) { task.yield() }
+		& (False()) {
 			task.scope((s) {
 				task.go(s, () { () })
 				deep(n - 1)

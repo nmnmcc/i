@@ -7,7 +7,7 @@ Target = Js | NodeJS | Wasi | Native | Host
 f = (t : Target) {
 	case
 	t
-	(Js(j)) { () } & (Wasi(w)) { () } & (Host) { () }
+	(Js(j)) { () } & (Wasi(w)) { () } & (Host()) { () }
 }
 
-main = () { f(Host) }
+main = () { f(Host()) }

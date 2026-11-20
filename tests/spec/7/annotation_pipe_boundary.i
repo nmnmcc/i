@@ -9,7 +9,7 @@ Clock = (now = () -> Int)
 
 same = (x : Int | x) { x }
 union = (x : { Int | String }) { x }
-last = (True | _ : Int) { 42 }
+last = (True() | _ : Int) { 42 }
 unbox = (Box(value = x : { Int | String })) { x }
 f : (Int) -> { Int | String } = (n) { n }
 remaining = (deadline) <- (clock : Clock) {
@@ -22,7 +22,7 @@ test("annotation pipe boundary", () {
 	assert(same("other") == "other")
 	assert(union(7) == 7)
 	assert(union("other") == "other")
-	assert(last(True) == 42)
+	assert(last(True()) == 42)
 	assert(last(9) == 42)
 	assert(unbox(Box(value = 7)) == 7)
 	assert(unbox(Box(value = "other")) == "other")

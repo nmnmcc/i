@@ -8,11 +8,11 @@ Some(A) = (A)
 None = ()
 Option(A) = Some(A) | None
 
-both = (b : Bool) -> Option(Int) { b |> (True) { Some(1) } & (False) { None } }
+both = (b : Bool) -> Option(Int) { b |> (True()) { Some(1) } & (False()) { None() } }
 
 main = () {
-	Some(p) = both(True)
+	Some(p) = both(True())
 	assert(p == 1)
-	Some(q) = both(False)
+	Some(q) = both(False())
 	assert(q == 2)
 }

@@ -1,3 +1,3 @@
 Box(A) = (A)
-v = True |> (True) { Box(1) } & (False) { Box("s") }
+v = True() |> (True()) { Box(1) } & (False()) { Box("s") }
 Box(Item) = v

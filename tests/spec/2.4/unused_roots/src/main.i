@@ -1,3 +1,3 @@
 main = () { helper() }
 
-helper = () { assert(True) }
+helper = () { assert(True()) }

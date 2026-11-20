@@ -7,7 +7,7 @@ No = ()
 Yes = (Int)
 Choice = No | Yes
 pair = (
-	No,
+	No(),
 	() {
 		(Yes(n), _) = pair
 		n

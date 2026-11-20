@@ -31,7 +31,7 @@ Empty = ()
 // With a type parameter: the field has the argument of the pattern type.
 Box(V) = Full(V) | Empty
 
-item = (b) { b |> (Full(..)) { b.item } & (Empty) { 0 } }
+item = (b) { b |> (Full(..)) { b.item } & (Empty()) { 0 } }
 
 use_item = () { item(Full(item = 2)) + 1 }
 

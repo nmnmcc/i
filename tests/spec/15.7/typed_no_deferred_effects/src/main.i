@@ -2,4 +2,4 @@
 (
 	m = spec/macros
 )
-main = () { m.m(assert(True)) }
+main = () { m.m(assert(True())) }

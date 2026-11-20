@@ -10,11 +10,11 @@ Options = (name = String, count = Int)
 
 options = () {
 	cli.map2(cli.option(
-		cli.Names(long = "name", short = None),
+		cli.Names(long = "name", short = None()),
 		"Name to greet",
 		cli.text,
 	), cli.option(
-		cli.Names(long = "count", short = None),
+		cli.Names(long = "count", short = None()),
 		"Number of greetings",
 		cli.integer,
 	), (name, count) { Options(name = name, count = count) })
@@ -22,11 +22,11 @@ options = () {
 
 greet = (name, count) {
 	{ count > 0 } |>
-		(True) {
+		(True()) {
 			stdio.print("hello " <> name)
 			greet(name, count - 1)
 		}
-		& (False) { () }
+		& (False()) { () }
 }
 
 main = () {
@@ -35,10 +35,10 @@ main = () {
 			log.write(
 				log.timestamped(
 					log.Entry(
-						level = log.Info,
+						level = log.Info(),
 						message = "greeting",
 						fields = [],
-						at = None,
+						at = None(),
 					),
 				),
 			)

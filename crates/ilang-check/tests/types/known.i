@@ -49,7 +49,7 @@ no_field = (s : Shape) { s |> (Square(..)) { s.radius } & (_) { 0.0 } }
 
 choice_field = (s : Shape) {
 	s |>
-		(Circle(..) = c | Square(..) = c ? True) { c.radius }
+		(Circle(..) = c | Square(..) = c ? True()) { c.radius }
 		& (_) { panic("unreachable") }
 }
 // Syntax three §6.7: Circle(..s, radius = ...) is a constructor call with a

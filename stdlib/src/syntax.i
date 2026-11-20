@@ -225,8 +225,8 @@ build_metadata = (
 
 item_result = (result : ItemResult) -> () {
 	raw_items_ok(result) |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			fail.raise(
 				SyntaxError(
 					message = raw_items_message(result),
@@ -277,8 +277,8 @@ _definitions = () -> Definitions {
 		definition = (of) -> Syntax {
 			result = raw_definition(of)
 			raw_definition_ok(result) |>
-				(True) { raw_definition_value(result) }
-				& (False) {
+				(True()) { raw_definition_value(result) }
+				& (False()) {
 					fail.raise(
 						SyntaxError(
 							message = raw_definition_message(result),
@@ -394,8 +394,8 @@ match_children = (
 	result : List(Syntax)
 ) -> List(Syntax) {
 	{ index == end } |>
-		(True) { reverse(result, []) }
-		& (False) {
+		(True()) { reverse(result, []) }
+		& (False()) {
 			match_children(
 				match,
 				capture,
@@ -431,8 +431,8 @@ children = (
 	result : List(Syntax)
 ) -> List(Syntax) {
 	{ index == end } |>
-		(True) { reverse(result, []) }
-		& (False) {
+		(True()) { reverse(result, []) }
+		& (False()) {
 			children(
 				syntax,
 				index + 1,
@@ -533,8 +533,8 @@ make = (node : Node, like : Syntax) -> Syntax {
 		& (Node(Splice(item))) { raw_make_one(13, item, like) }
 		& (Node(TypeView(_))) { panic("TypeView make invariant") }
 	raw_syntax_ok(result) |>
-		(True) { raw_syntax_value(result) }
-		& (False) {
+		(True()) { raw_syntax_value(result) }
+		& (False()) {
 			fail.raise(
 				SyntaxError(message = raw_syntax_error(result), at = like),
 			)
@@ -549,28 +549,28 @@ show = (syntax : Syntax) -> String { raw_show(syntax) }
 
 position_id = (position : Position) -> Int {
 	position |>
-		(ImportItem) { 0 }
-		& (ExportItem) { 1 }
-		& (Item) { 2 }
-		& (Attribute) { 3 }
-		& (Type) { 4 }
-		& (TypeItem) { 5 }
-		& (FunctionResult) { 6 }
-		& (Expression) { 7 }
-		& (ValueItem) { 8 }
-		& (Statement) { 9 }
-		& (Pattern) { 10 }
-		& (PatternItem) { 11 }
-		& (Segment) { 12 }
-		& (Format) { 13 }
+		(ImportItem()) { 0 }
+		& (ExportItem()) { 1 }
+		& (Item()) { 2 }
+		& (Attribute()) { 3 }
+		& (Type()) { 4 }
+		& (TypeItem()) { 5 }
+		& (FunctionResult()) { 6 }
+		& (Expression()) { 7 }
+		& (ValueItem()) { 8 }
+		& (Statement()) { 9 }
+		& (Pattern()) { 10 }
+		& (PatternItem()) { 11 }
+		& (Segment()) { 12 }
+		& (Format()) { 13 }
 }
 
 /// Writes syntax in the normal surface at the requested position.
 show_as = (syntax : Syntax, position : Position) -> String {
 	result = raw_show_as(syntax, position_id(position))
 	raw_text_ok(result) |>
-		(True) { raw_text_value(result) }
-		& (False) {
+		(True()) { raw_text_value(result) }
+		& (False()) {
 			fail.raise(
 				SyntaxError(
 					message = raw_text_error(result),
@@ -633,8 +633,8 @@ raw_type_at : (TypeResult) -> Syntax
 
 type_result = (r : TypeResult) -> Syntax {
 	raw_type_ok(r) |>
-		(True) { raw_type_value(r) }
-		& (False) {
+		(True()) { raw_type_value(r) }
+		& (False()) {
 			fail.raise(
 				SyntaxError(message = raw_type_message(r), at = raw_type_at(r)),
 			)
@@ -643,8 +643,8 @@ type_result = (r : TypeResult) -> Syntax {
 
 type_members = (r : TypeResult, index : Int, count : Int) -> List(Syntax) {
 	{ index >= count } |>
-		(True) { [] }
-		& (False) {
+		(True()) { [] }
+		& (False()) {
 			[raw_type_child(r, index), ..type_members(r, index + 1, count)]
 		}
 }
@@ -656,7 +656,7 @@ _types = () -> Types {
 		subtype = (a, b) -> Truth {
 			r = raw_subtype(a, b)
 			raw_type_ok(r) |>
-				(False) {
+				(False()) {
 					fail.raise(
 						SyntaxError(
 							message = raw_type_message(r),
@@ -664,17 +664,17 @@ _types = () -> Types {
 						),
 					)
 				}
-				& (True) {
+				& (True()) {
 					raw_type_truth(r) |>
-						(0) { Yes }
-						& (1) { No }
-						& (_) { NotKnown }
+						(0) { Yes() }
+						& (1) { No() }
+						& (_) { NotKnown() }
 				}
 		},
 		members = (s) -> List(Syntax) {
 			r = raw_members(s)
 			raw_type_ok(r) |>
-				(False) {
+				(False()) {
 					fail.raise(
 						SyntaxError(
 							message = raw_type_message(r),
@@ -682,7 +682,7 @@ _types = () -> Types {
 						),
 					)
 				}
-				& (True) { type_members(r, 0, raw_type_len(r)) }
+				& (True()) { type_members(r, 0, raw_type_len(r)) }
 		},
 	)
 }

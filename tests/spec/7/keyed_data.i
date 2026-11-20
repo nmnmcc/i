@@ -14,7 +14,7 @@ choose = (data : (name = String, age = Int)) {
 shape = (data : { (a = Int) | (b = String) }) {
 	data |>
 		((a = n)) { n }
-		& ((b = s)) { { s == "yes" } |> (True) { 1 } & (False) { 0 } }
+		& ((b = s)) { { s == "yes" } |> (True()) { 1 } & (False()) { 0 } }
 }
 
 main = () {
@@ -25,7 +25,7 @@ main = () {
 	assert(choose((name = "Ada", age = 36)) == "Ada")
 	assert(choose((age = 0, name = "Bea")) == "Bea baby")
 	(outer = (right = Box(value = v), left = [first, ..rest]), skip = _) = (
-		skip = False,
+		skip = False(),
 		outer = (left = [2, 3], right = Box(value = 7)),
 	)
 	assert((v, first, rest) == (7, 2, [3]))

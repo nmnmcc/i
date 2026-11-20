@@ -9,8 +9,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -20,7 +20,7 @@ End = ()
 Gen = More | End
 
 // Not a tail call, so the frame stays.
-keep = (t) { t |> (End) { End } & (t) { t } }
+keep = (t) { t |> (End()) { End() } & (t) { t } }
 
 // One new frame per round.
 g = (b, i) {
@@ -31,7 +31,7 @@ g = (b, i) {
 // Resumes `n` times from a loop, then cancels.
 drive = (step, n) {
 	step |>
-		(End) { () }
+		(End()) { () }
 		& (More(k)) {
 			n |>
 				(0) { control.cancel(k) }
@@ -53,7 +53,7 @@ Step = (Continuation((), StepSum, Fail(Int)))
 Fin = ()
 StepSum = Step | Fin
 
-keep2 = (t) { t |> (Fin) { Fin } & (t) { t } }
+keep2 = (t) { t |> (Fin()) { Fin() } & (t) { t } }
 
 // `n` frames, then a suspend; after the last of `left` resumes, an error.
 deep = (b, n, left) {
@@ -66,7 +66,7 @@ deep = (b, n, left) {
 }
 
 run = (step) {
-	step |> (Fin) { Fin } & (Step(k)) { run(control.resume(k, ())) }
+	step |> (Fin()) { Fin() } & (Step(k)) { run(control.resume(k, ())) }
 }
 
 // 50 steps of 200 frames each: the error goes through 10,000 frames that

@@ -3,9 +3,9 @@ Stop = ()
 Token = Stop
 send = (x) { x }
 
-f = () { send(Stop) }
+f = () { send(Stop()) }
 
 main = () {
-	assert(f() == Stop)
+	assert(f() == Stop())
 	()
 }

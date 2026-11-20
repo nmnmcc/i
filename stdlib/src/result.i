@@ -34,12 +34,12 @@
 
 /// `True` for `Ok`.
 is_ok = <A, E>(result : Result(A, E)) -> Bool {
-	result |> (Ok(_)) { True } & (Error(_)) { False }
+	result |> (Ok(_)) { True() } & (Error(_)) { False() }
 }
 
 /// `True` for `Error`.
 is_error = <A, E>(result : Result(A, E)) -> Bool {
-	result |> (Ok(_)) { False } & (Error(_)) { True }
+	result |> (Ok(_)) { False() } & (Error(_)) { True() }
 }
 
 /// Changes the value of an `Ok` with a function. An `Error` stays.

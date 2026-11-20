@@ -57,10 +57,10 @@ Fs = (
 )
 
 mode_string =
-	(ReadOnly) { "read" }
-	& (WriteTruncate) { "truncate" }
-	& (Append) { "append" }
-	& (ReadWrite) { "read_write" }
+	(ReadOnly()) { "read" }
+	& (WriteTruncate()) { "truncate" }
+	& (Append()) { "append" }
+	& (ReadWrite()) { "read_write" }
 
 open = (path, mode) <- (raw : Fs) {
 	r = raw.open(path, mode_string(mode))
@@ -193,14 +193,14 @@ read_chunks = (file) {
 
 read_file = (path) {
 	resource.scoped(() {
-		f = resource.acquire(() { open(path, ReadOnly) }, (f) { close(f) })
+		f = resource.acquire(() { open(path, ReadOnly()) }, (f) { close(f) })
 		read_chunks(f)
 	})
 }
 
 write_file = (path, bytes) {
 	resource.scoped(() {
-		f = resource.acquire(() { open(path, WriteTruncate) }, (f) { close(f) })
+		f = resource.acquire(() { open(path, WriteTruncate()) }, (f) { close(f) })
 		write(f, bytes)
 	})
 }
@@ -213,8 +213,8 @@ line_parts = (text : String, start : Int) -> List(String) {
 		& (Error(_)) {
 			done = start == core.byte_size(text)
 			done |>
-				(True) { [] }
-				& (False) { [slice(text, start, core.byte_size(text) - start)] }
+				(True()) { [] }
+				& (False()) { [slice(text, start, core.byte_size(text) - start)] }
 		}
 }
 

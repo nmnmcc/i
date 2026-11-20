@@ -44,7 +44,7 @@
 Sequence(A) = (Tree(A))
 
 /// An empty sequence. This function may be used at any element type.
-new = <A>() -> Sequence(A) { Sequence(EmptyTree) }
+new = <A>() -> Sequence(A) { Sequence(EmptyTree()) }
 
 /// A sequence of one item, in O(1) work.
 ///
@@ -72,7 +72,7 @@ is_empty = <A>(sequence : Sequence(A)) -> Bool { length(sequence) == 0 }
 first = <A>(sequence : Sequence(A)) -> Option(A) {
 	Sequence(tree) = sequence
 	tree |>
-		(EmptyTree) { None }
+		(EmptyTree()) { None() }
 		& (Single(x)) { Some(leaf_value(x)) }
 		& (Deep(_, [x, .._], _, _)) { Some(leaf_value(x)) }
 		& (Deep(_, [], _, _)) { panic("sequence: empty front digit") }
@@ -82,12 +82,12 @@ first = <A>(sequence : Sequence(A)) -> Option(A) {
 last = <A>(sequence : Sequence(A)) -> Option(A) {
 	Sequence(tree) = sequence
 	tree |>
-		(EmptyTree) { None }
+		(EmptyTree()) { None() }
 		& (Single(x)) { Some(leaf_value(x)) }
 		& (Deep(_, _, _, right)) {
 			list.last(right) |>
 				(Some(x)) { Some(leaf_value(x)) }
-				& (None) { panic("sequence: empty back digit") }
+				& (None()) { panic("sequence: empty back digit") }
 		}
 }
 
@@ -107,7 +107,7 @@ push_back = <A>(to : Sequence(A), item : A) -> Sequence(A) {
 pop_front = <A>(from : Sequence(A)) -> Option((A, Sequence(A))) {
 	Sequence(tree) = from
 	view_left(tree) |>
-		(None) { None }
+		(None()) { None() }
 		& (Some((x, rest))) { Some((leaf_value(x), Sequence(rest))) }
 }
 
@@ -115,7 +115,7 @@ pop_front = <A>(from : Sequence(A)) -> Option((A, Sequence(A))) {
 pop_back = <A>(from : Sequence(A)) -> Option((A, Sequence(A))) {
 	Sequence(tree) = from
 	view_right(tree) |>
-		(None) { None }
+		(None()) { None() }
 		& (Some((x, rest))) { Some((leaf_value(x), Sequence(rest))) }
 }
 
@@ -123,16 +123,16 @@ pop_back = <A>(from : Sequence(A)) -> Option((A, Sequence(A))) {
 at = <A>(sequence : Sequence(A), index : Int) -> Option(A) {
 	Sequence(tree) = sequence
 	{ index < 0 || index >= tree_size(tree) } |>
-		(True) { None }
-		& (False) { Some(find_tree(tree, index)) }
+		(True()) { None() }
+		& (False()) { Some(find_tree(tree, index)) }
 }
 
 /// Replaces one item, preserving length. Invalid indices give `None`.
 set = <A>(in : Sequence(A), index : Int, value : A) -> Option(Sequence(A)) {
 	Sequence(tree) = in
 	{ index < 0 || index >= tree_size(tree) } |>
-		(True) { None }
-		& (False) { Some(Sequence(set_tree(tree, index, value))) }
+		(True()) { None() }
+		& (False()) { Some(Sequence(set_tree(tree, index, value))) }
 }
 
 /// Concatenates two sequences by joining their fringes and sharing subtrees.
@@ -232,7 +232,7 @@ node_size = <A>(node : Node(A)) -> Int {
 
 tree_size = <A>(tree : Tree(A)) -> Int {
 	tree |>
-		(EmptyTree) { 0 }
+		(EmptyTree()) { 0 }
 		& (Single(x)) { node_size(x) }
 		& (Deep(n, ..)) { n }
 }
@@ -276,18 +276,18 @@ leaf_value = <A>(node : Node(A)) -> A {
 // This helper is only given a bounded digit, never a whole sequence.
 shallow = <A>(nodes : List(Node(A))) -> Tree(A) {
 	nodes |>
-		([]) { EmptyTree }
+		([]) { EmptyTree() }
 		& ([x]) { Single(x) }
-		& ([a, b]) { deep([a], EmptyTree, [b]) }
-		& ([a, b, c]) { deep([a, b], EmptyTree, [c]) }
-		& ([a, b, c, d]) { deep([a, b], EmptyTree, [c, d]) }
+		& ([a, b]) { deep([a], EmptyTree(), [b]) }
+		& ([a, b, c]) { deep([a, b], EmptyTree(), [c]) }
+		& ([a, b, c, d]) { deep([a, b], EmptyTree(), [c, d]) }
 		& (_) { panic("sequence: oversized digit") }
 }
 
 push_left = <A>(tree : Tree(A), node : Node(A)) -> Tree(A) {
 	tree |>
-		(EmptyTree) { Single(node) }
-		& (Single(x)) { deep([node], EmptyTree, [x]) }
+		(EmptyTree()) { Single(node) }
+		& (Single(x)) { deep([node], EmptyTree(), [x]) }
 		& (Deep(_, [a, b, c, d], middle, right)) {
 			deep(
 				[node, a],
@@ -300,8 +300,8 @@ push_left = <A>(tree : Tree(A), node : Node(A)) -> Tree(A) {
 
 push_right = <A>(tree : Tree(A), node : Node(A)) -> Tree(A) {
 	tree |>
-		(EmptyTree) { Single(node) }
-		& (Single(x)) { deep([x], EmptyTree, [node]) }
+		(EmptyTree()) { Single(node) }
+		& (Single(x)) { deep([x], EmptyTree(), [node]) }
 		& (Deep(_, left, middle, [a, b, c, d])) {
 			deep(
 				left,
@@ -322,7 +322,7 @@ left_deep = <A>(
 	left |>
 		([]) {
 			view_left(middle) |>
-				(None) { shallow(right) }
+				(None()) { shallow(right) }
 				& (Some((node, rest))) { deep(children(node), rest, right) }
 		}
 		& (_) { deep(left, middle, right) }
@@ -336,7 +336,7 @@ right_deep = <A>(
 	right |>
 		([]) {
 			view_right(middle) |>
-				(None) { shallow(left) }
+				(None()) { shallow(left) }
 				& (Some((node, rest))) { deep(left, rest, children(node)) }
 		}
 		& (_) { deep(left, middle, right) }
@@ -344,8 +344,8 @@ right_deep = <A>(
 
 view_left = <A>(tree : Tree(A)) -> Option((Node(A), Tree(A))) {
 	tree |>
-		(EmptyTree) { None }
-		& (Single(x)) { Some((x, EmptyTree)) }
+		(EmptyTree()) { None() }
+		& (Single(x)) { Some((x, EmptyTree())) }
 		& (Deep(_, [x, ..xs], middle, right)) {
 			Some((x, left_deep(xs, middle, right)))
 		}
@@ -354,8 +354,8 @@ view_left = <A>(tree : Tree(A)) -> Option((Node(A), Tree(A))) {
 
 view_right = <A>(tree : Tree(A)) -> Option((Node(A), Tree(A))) {
 	tree |>
-		(EmptyTree) { None }
-		& (Single(x)) { Some((x, EmptyTree)) }
+		(EmptyTree()) { None() }
+		& (Single(x)) { Some((x, EmptyTree())) }
 		& (Deep(_, left, middle, right)) {
 			list.reverse(right) |>
 				([x, ..xs]) {
@@ -387,17 +387,17 @@ join_trees = <A>(
 	right : Tree(A)
 ) -> Tree(A) {
 	(left, right) |>
-		((EmptyTree, _)) {
+		((EmptyTree(), _)) {
 			list.fold(list.reverse(between), right, (t, x) { push_left(t, x) })
 		}
-		& ((_, EmptyTree)) {
+		& ((_, EmptyTree())) {
 			list.fold(between, left, (t, x) { push_right(t, x) })
 		}
 		& ((Single(x), _)) {
-			push_left(join_trees(EmptyTree, between, right), x)
+			push_left(join_trees(EmptyTree(), between, right), x)
 		}
 		& ((_, Single(x))) {
-			push_right(join_trees(left, between, EmptyTree), x)
+			push_right(join_trees(left, between, EmptyTree()), x)
 		}
 		& ((Deep(_, a, m, b), Deep(_, c, n, d))) {
 			deep(
@@ -419,7 +419,7 @@ build_tree = <A>(nodes : List(Node(A))) -> Tree(A) {
 		(count ? count <= 4) { shallow(nodes) }
 		& (count ? count <= 8) {
 			(left, right) = list.split(nodes, count / 2)
-			deep(left, EmptyTree, right)
+			deep(left, EmptyTree(), right)
 		}
 		& (_) {
 			(left, rest) = list.split(nodes, 2)
@@ -444,8 +444,8 @@ split_nodes = <A>(nodes : List(Node(A)), index : Int) -> (
 			([]) { panic("sequence: missing pivot") }
 			& ([x, ..xs]) {
 				{ offset < node_size(x) } |>
-					(True) { (list.reverse(before), x, offset, xs) }
-					& (False) { go(xs, offset - node_size(x), [x, ..before]) }
+					(True()) { (list.reverse(before), x, offset, xs) }
+					& (False()) { go(xs, offset - node_size(x), [x, ..before]) }
 			}
 	}
 	go(nodes, index, [])
@@ -458,8 +458,8 @@ split_tree = <A>(tree : Tree(A), index : Int) -> (
 	Tree(A),
 ) {
 	tree |>
-		(EmptyTree) { panic("sequence: split of empty tree") }
-		& (Single(x)) { (EmptyTree, x, index, EmptyTree) }
+		(EmptyTree()) { panic("sequence: split of empty tree") }
+		& (Single(x)) { (EmptyTree(), x, index, EmptyTree()) }
 		& (Deep(_, left, middle, right)) {
 			l = digit_size(left)
 			m = tree_size(middle)
@@ -504,8 +504,8 @@ find_nodes = <A>(nodes : List(Node(A)), index : Int) -> A {
 		([]) { panic("sequence: missing lookup node") }
 		& ([x, ..xs]) {
 			{ index < node_size(x) } |>
-				(True) { find_node(x, index) }
-				& (False) { find_nodes(xs, index - node_size(x)) }
+				(True()) { find_node(x, index) }
+				& (False()) { find_nodes(xs, index - node_size(x)) }
 		}
 }
 
@@ -514,8 +514,8 @@ find_node = <A>(node : Node(A), index : Int) -> A {
 		(Leaf(x)) { x }
 		& (Branch2(_, a, b)) {
 			{ index < node_size(a) } |>
-				(True) { find_node(a, index) }
-				& (False) { find_node(b, index - node_size(a)) }
+				(True()) { find_node(a, index) }
+				& (False()) { find_node(b, index - node_size(a)) }
 		}
 		& (Branch3(_, a, b, c)) {
 			index |>
@@ -529,7 +529,7 @@ find_node = <A>(node : Node(A), index : Int) -> A {
 
 find_tree = <A>(tree : Tree(A), index : Int) -> A {
 	tree |>
-		(EmptyTree) { panic("sequence: lookup of empty tree") }
+		(EmptyTree()) { panic("sequence: lookup of empty tree") }
 		& (Single(x)) { find_node(x, index) }
 		& (Deep(_, left, middle, right)) {
 			l = digit_size(left)
@@ -553,8 +553,8 @@ set_node = <A>(node : Node(A), index : Int, value : A) -> Node(A) {
 		(Leaf(_)) { Leaf(value) }
 		& (Branch2(n, a, b)) {
 			{ index < node_size(a) } |>
-				(True) { Branch2(n, set_node(a, index, value), b) }
-				& (False) {
+				(True()) { Branch2(n, set_node(a, index, value), b) }
+				& (False()) {
 					Branch2(n, a, set_node(b, index - node_size(a), value))
 				}
 		}
@@ -579,7 +579,7 @@ set_node = <A>(node : Node(A), index : Int, value : A) -> Node(A) {
 
 set_tree = <A>(tree : Tree(A), index : Int, value : A) -> Tree(A) {
 	tree |>
-		(EmptyTree) { panic("sequence: update of empty tree") }
+		(EmptyTree()) { panic("sequence: update of empty tree") }
 		& (Single(x)) { Single(set_node(x, index, value)) }
 		& (Deep(n, left, middle, right)) {
 			l = digit_size(left)
@@ -608,7 +608,7 @@ reverse_node = <A>(node : Node(A)) -> Node(A) {
 
 reverse_tree = <A>(tree : Tree(A)) -> Tree(A) {
 	tree |>
-		(EmptyTree) { EmptyTree }
+		(EmptyTree()) { EmptyTree() }
 		& (Single(x)) { Single(reverse_node(x)) }
 		& (Deep(n, left, middle, right)) {
 			Deep(
@@ -631,7 +631,7 @@ map_node = <A, B, N>(node : Node(A), f : (A) <- N -> B) -> Node(B) {
 
 map_tree = <A, B, N>(tree : Tree(A), f : (A) <- N -> B) -> Tree(B) {
 	tree |>
-		(EmptyTree) { EmptyTree }
+		(EmptyTree()) { EmptyTree() }
 		& (Single(x)) { Single(map_node(x, f)) }
 		& (Deep(n, left, middle, right)) {
 			a = list.map(left, (x) { map_node(x, f) })
@@ -664,7 +664,7 @@ fold_tree = <A, Acc, N>(
 	f : (Acc, A) <- N -> Acc
 ) -> Acc {
 	tree |>
-		(EmptyTree) { acc }
+		(EmptyTree()) { acc }
 		& (Single(x)) { fold_node(x, acc, f) }
 		& (Deep(_, left, middle, right)) {
 			a = list.fold(left, acc, (s, x) { fold_node(x, s, f) })

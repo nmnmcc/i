@@ -76,8 +76,7 @@ Options:
   --manifest PATH where `--write` records unparsed and ambiguous files
   --lib PATH      the library package (default: `<root>/stdlib`, else `<root>/std`)
   --prelude PATH  the prelude source (default: `<root>/lib/prelude.i` when present)
-  --skip PATH     leave this tracked file alone (repeatable); `list.i` and
-                  `list_test.i` of `stdlib/` (or `std/`) are always skipped
+  --skip PATH     leave this tracked file alone (repeatable)
   --quiet         only the totals and the problem files
 """
 
@@ -90,14 +89,8 @@ import sys
 import tomllib
 
 PROG = "constructor-call-migrate"
-# The list module and its test belong to a parallel change; the package
-# lives at `stdlib/` or, after the rename, at `std/`.
-DEFAULT_SKIP = (
-    "stdlib/src/list.i",
-    "stdlib/test/list_test.i",
-    "std/src/list.i",
-    "std/test/list_test.i",
-)
+# Nothing is skipped by default: the constructor rule covers every source.
+DEFAULT_SKIP = ()
 BUILTIN_ZERO = ("True", "False")
 
 

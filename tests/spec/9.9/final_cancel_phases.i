@@ -54,8 +54,8 @@ probe = (phase : Int, typed : Bool) {
 								}
 								& (_) { () }
 							typed |>
-								(True) { fail.raise("child") }
-								& (False) { () }
+								(True()) { fail.raise("child") }
+								& (False()) { () }
 						},
 						() {
 							print("start")
@@ -87,10 +87,10 @@ probe = (phase : Int, typed : Bool) {
 }
 
 main = () {
-	probe(0, False)
-	probe(1, False)
-	probe(2, False)
-	probe(0, True)
-	probe(1, True)
-	probe(2, True)
+	probe(0, False())
+	probe(1, False())
+	probe(2, False())
+	probe(0, True())
+	probe(1, True())
+	probe(2, True())
 }

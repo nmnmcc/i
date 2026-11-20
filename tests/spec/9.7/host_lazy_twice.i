@@ -22,7 +22,7 @@ Paused = (
 Done = (Int)
 Step = Paused | Done
 
-check = (ok) { ok |> (True) { () } & (False) { panic("async resume") } }
+check = (ok) { ok |> (True()) { () } & (False()) { panic("async resume") } }
 
 leaf = (b) <- (later : Later) {
 	control.suspend(b, (k) { Paused(k) })

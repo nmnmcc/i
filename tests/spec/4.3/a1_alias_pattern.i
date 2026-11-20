@@ -8,6 +8,6 @@ User = ()
 Schema(User, _) = Int
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

@@ -23,7 +23,7 @@ main = () {
 	fs.remove(moved)
 	fs.remove(dir)
 	assert(
-		fail.catch(() { fs.open(moved, fs.ReadOnly) }) ==
+		fail.catch(() { fs.open(moved, fs.ReadOnly()) }) ==
 			Error(
 				fs.FsError(
 					operation = "open",

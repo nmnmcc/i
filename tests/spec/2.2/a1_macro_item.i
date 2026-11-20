@@ -6,6 +6,6 @@
 make(1)
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

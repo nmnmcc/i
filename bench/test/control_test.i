@@ -16,7 +16,7 @@ More = (Int, Continuation((), Step, Never))
 Step = Done | More
 
 check = (ok : Bool, what : String) -> () {
-	ok |> (True) { () } & (False) { panic(what) }
+	ok |> (True()) { () } & (False()) { panic(what) }
 }
 
 // Suspends once for each number from `n` down to 1. The call after the

@@ -2,7 +2,7 @@ export(
 	Stream,
 	Listener,
 	NetError,
-	Net,
+	Net(),
 	read,
 	write,
 	accept,

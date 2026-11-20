@@ -52,9 +52,9 @@ test("http_incremental", () {
 						assert(left == <<>>)
 						assert(req.body == <<"test":utf8>>)
 					}
-					& (http.Invalid(_)) { assert(False) }
+					& (http.Invalid(_)) { assert(False()) }
 			}
-			& (_) { assert(False) }
+			& (_) { assert(False()) }
 	}
 	go(input, <<>>)
 })
@@ -78,8 +78,8 @@ test("http_rejects", () {
 	list.each(bad, (s) {
 		assert(
 			http.feed_request(<<>>, <<s:utf8>>) |>
-				(http.Invalid(_)) { True }
-				& (_) { False },
+				(http.Invalid(_)) { True() }
+				& (_) { False() },
 		)
 	})
 })
@@ -150,9 +150,9 @@ test("http_incremental_chunked_response", () {
 						assert(res.body == <<"a":utf8>>)
 						assert(http.header(res.trailers, "x") == Some("y"))
 					}
-					& (http.Invalid(_)) { assert(False) }
+					& (http.Invalid(_)) { assert(False()) }
 			}
-			& (_) { assert(False) }
+			& (_) { assert(False()) }
 	}
 	go(input, <<>>)
 })
@@ -494,32 +494,32 @@ test("http_responses_14_http_1_1_200_ok_r_ncontent_length_2_", () {
 test("http_bad_0_get_http_1_0_r_n_r_n", () {
 	assert(
 		http.feed_request(<<>>, <<"GET / HTTP/1.0\r\n\r\n":utf8>>) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
 test("http_bad_1_get_http_1_1_r_n_r_n", () {
 	assert(
 		http.feed_request(<<>>, <<"GET  / HTTP/1.1\r\n\r\n":utf8>>) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
 test("http_bad_2_g_t_http_1_1_r_n_r_n", () {
 	assert(
 		http.feed_request(<<>>, <<"G@T / HTTP/1.1\r\n\r\n":utf8>>) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
 test("http_bad_3_get_http_1_1_n_n", () {
 	assert(
 		http.feed_request(<<>>, <<"GET / HTTP/1.1\n\n":utf8>>) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -529,8 +529,8 @@ test("http_bad_4_get_http_1_1_r_n_fold_x_r_n_r_n", () {
 			<<>>,
 			<<"GET / HTTP/1.1\r\n Fold: x\r\n\r\n":utf8>>,
 		) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -540,16 +540,16 @@ test("http_bad_5_get_http_1_1_r_nbad_header_x_r_n_r_n", () {
 			<<>>,
 			<<"GET / HTTP/1.1\r\nBad Header: x\r\n\r\n":utf8>>,
 		) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
 test("http_bad_6_get_http_1_1_r_nnocolon_r_n_r_n", () {
 	assert(
 		http.feed_request(<<>>, <<"GET / HTTP/1.1\r\nNoColon\r\n\r\n":utf8>>) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -559,8 +559,8 @@ test("http_bad_7_get_http_1_1_r_ncontent_length_1_r_n", () {
 			<<>>,
 			<<"GET / HTTP/1.1\r\nContent-Length: -1\r\n\r\n":utf8>>,
 		) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -570,8 +570,8 @@ test("http_bad_8_get_http_1_1_r_ncontent_length_x_r_n", () {
 			<<>>,
 			<<"GET / HTTP/1.1\r\nContent-Length: x\r\n\r\n":utf8>>,
 		) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -583,8 +583,8 @@ test("http_bad_9_get_http_1_1_r_ncontent_length_0_r_n", () {
 				"GET / HTTP/1.1\r\nContent-Length: 0\r\nTransfer-Encoding: chunked\r\n\r\n":utf8,
 			>>,
 		) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -594,8 +594,8 @@ test("http_bad_10_get_http_1_1_r_ntransfer_encoding_gz", () {
 			<<>>,
 			<<"GET / HTTP/1.1\r\nTransfer-Encoding: gzip\r\n\r\n":utf8>>,
 		) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -607,8 +607,8 @@ test("http_bad_11_get_http_1_1_r_ntransfer_encoding_ch", () {
 				"GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\nG\r\n":utf8,
 			>>,
 		) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -620,8 +620,8 @@ test("http_bad_12_get_http_1_1_r_ntransfer_encoding_ch", () {
 				"GET / HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nxXX":utf8,
 			>>,
 		) |>
-			(http.Invalid(_)) { True }
-			& (_) { False },
+			(http.Invalid(_)) { True() }
+			& (_) { False() },
 	)
 })
 
@@ -631,14 +631,14 @@ test("http_close_delimited", () {
 		<<>>,
 		input,
 		http.Method("GET"),
-		False,
+		False(),
 		1024,
 	)
 	http.Complete(res, <<>>) = http.feed_response_for(
 		buffer,
 		<<>>,
 		http.Method("GET"),
-		True,
+		True(),
 		1024,
 	)
 	assert(res.body == <<"abc":utf8>>)
@@ -650,7 +650,7 @@ test("http_response_head_method", () {
 		<<>>,
 		input,
 		http.Method("HEAD"),
-		False,
+		False(),
 		1024,
 	)
 	assert(res.body == <<>>)
@@ -663,7 +663,7 @@ test("http_response_connect", () {
 		<<>>,
 		input,
 		http.Method("CONNECT"),
-		False,
+		False(),
 		1024,
 	)
 	assert(res.body == <<>>)
@@ -770,14 +770,14 @@ test("http_response_transfer_close", () {
 		<<>>,
 		input,
 		http.Method("GET"),
-		False,
+		False(),
 		100,
 	)
 	http.Complete(res, <<>>) = http.feed_response_for(
 		buffer,
 		<<>>,
 		http.Method("GET"),
-		True,
+		True(),
 		100,
 	)
 	assert(res.body == <<"abc":utf8>>)
@@ -820,6 +820,6 @@ test("provider_and_route", () {
 			"/users/:id",
 			http.request(http.Method("GET"), "/users/42"),
 		) ==
-			None,
+			None(),
 	)
 })

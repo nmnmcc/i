@@ -3,6 +3,6 @@
 	forgotten
 )
 
-used = () { assert(True) }
+used = () { assert(True()) }
 
-forgotten = () { assert(True) }
+forgotten = () { assert(True()) }

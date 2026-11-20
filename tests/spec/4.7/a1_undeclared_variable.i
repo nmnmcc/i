@@ -6,6 +6,6 @@
 id = (x : Missing) { x }
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

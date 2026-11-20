@@ -9,6 +9,6 @@ Shape = Circle | Square
 bad = (s : Shape) { s |> (Circle(..)) { s.r } }
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

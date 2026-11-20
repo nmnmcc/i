@@ -10,6 +10,6 @@ main = () {
 	alias = r
 	request.cancel(request.ticket(r))
 	request.cancel(request.ticket(r))
-	assert(request.state(alias) == request.Cancelled)
+	assert(request.state(alias) == request.Cancelled())
 	request.take(alias)
 }

@@ -33,17 +33,17 @@ valid_offset = (minutes : Int) -> calendar.Offset {
 // validate in component order, without normalization.
 test("calendar_validation", () {
 	list.each([
-		(1900, False),
-		(2000, True),
-		(0, True),
-		(-100, False),
-		(-400, True),
+		(1900, False()),
+		(2000, True()),
+		(0, True()),
+		(-100, False()),
+		(-400, True()),
 	], (pair) {
 		(year, expected) = pair
 		assert(calendar.is_leap_year(year) == expected)
 	})
 	assert(
-		fail.catch(() { calendar.date(1900, 2, 29) }) == Error(calendar.BadDay),
+		fail.catch(() { calendar.date(1900, 2, 29) }) == Error(calendar.BadDay()),
 	)
 	assert(
 		fail.catch(() { calendar.date(2000, 2, 29) }) ==
@@ -51,49 +51,49 @@ test("calendar_validation", () {
 	)
 	assert(
 		fail.catch(() { calendar.date(2024, 13, 0) }) ==
-			Error(calendar.BadMonth),
+			Error(calendar.BadMonth()),
 	)
 	assert(
 		fail.catch(() { calendar.date(2024, 0, 1) }) ==
-			Error(calendar.BadMonth),
+			Error(calendar.BadMonth()),
 	)
 	assert(
-		fail.catch(() { calendar.date(2024, 1, 0) }) == Error(calendar.BadDay),
+		fail.catch(() { calendar.date(2024, 1, 0) }) == Error(calendar.BadDay()),
 	)
 	assert(
-		fail.catch(() { calendar.date(2024, 4, 31) }) == Error(calendar.BadDay),
+		fail.catch(() { calendar.date(2024, 4, 31) }) == Error(calendar.BadDay()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(24, 0, 0, 0) }) ==
-			Error(calendar.BadHour),
+			Error(calendar.BadHour()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(-1, 60, 60, -1) }) ==
-			Error(calendar.BadHour),
+			Error(calendar.BadHour()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(0, -1, 60, -1) }) ==
-			Error(calendar.BadMinute),
+			Error(calendar.BadMinute()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(0, 60, 60, -1) }) ==
-			Error(calendar.BadMinute),
+			Error(calendar.BadMinute()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(0, 0, 60, 0) }) ==
-			Error(calendar.BadSecond),
+			Error(calendar.BadSecond()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(0, 0, -1, -1) }) ==
-			Error(calendar.BadSecond),
+			Error(calendar.BadSecond()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(0, 0, 0, -1) }) ==
-			Error(calendar.BadNanosecond),
+			Error(calendar.BadNanosecond()),
 	)
 	assert(
 		fail.catch(() { calendar.time_of_day(0, 0, 0, 1000000000) }) ==
-			Error(calendar.BadNanosecond),
+			Error(calendar.BadNanosecond()),
 	)
 	assert(
 		calendar.time_parts(valid_time(23, 59, 59, 999999999)) ==
@@ -104,7 +104,7 @@ test("calendar_validation", () {
 	)
 	list.each([-1440, 1440], (n) {
 		assert(
-			fail.catch(() { calendar.offset(n) }) == Error(calendar.BadOffset),
+			fail.catch(() { calendar.offset(n) }) == Error(calendar.BadOffset()),
 		)
 	})
 	list.each([-1439, 0, 1439], (n) {
@@ -122,11 +122,11 @@ test("calendar_validation", () {
 	})
 	assert(
 		fail.catch(() { calendar.days_in_month(2000, -1) }) ==
-			Error(calendar.BadMonth),
+			Error(calendar.BadMonth()),
 	)
 	assert(
 		fail.catch(() { calendar.days_in_month(2000, 13) }) ==
-			Error(calendar.BadMonth),
+			Error(calendar.BadMonth()),
 	)
 	()
 })
@@ -134,17 +134,17 @@ test("calendar_validation", () {
 // The independent day table uses the same epoch and weekday origin.
 test("calendar_known_days", () {
 	cases = [
-		(-400, 2, 29, -865566, calendar.Tuesday),
-		(-100, 3, 1, -755993, calendar.Thursday),
-		(-1, 1, 1, -719893, calendar.Friday),
-		(0, 1, 1, -719528, calendar.Saturday),
-		(0, 2, 29, -719469, calendar.Tuesday),
-		(1, 1, 1, -719162, calendar.Monday),
-		(1900, 3, 1, -25508, calendar.Thursday),
-		(2000, 3, 1, 11017, calendar.Wednesday),
-		(10000, 1, 1, 2932897, calendar.Saturday),
-		(1970, 1, 1, 0, calendar.Thursday),
-		(1969, 12, 31, -1, calendar.Wednesday),
+		(-400, 2, 29, -865566, calendar.Tuesday()),
+		(-100, 3, 1, -755993, calendar.Thursday()),
+		(-1, 1, 1, -719893, calendar.Friday()),
+		(0, 1, 1, -719528, calendar.Saturday()),
+		(0, 2, 29, -719469, calendar.Tuesday()),
+		(1, 1, 1, -719162, calendar.Monday()),
+		(1900, 3, 1, -25508, calendar.Thursday()),
+		(2000, 3, 1, 11017, calendar.Wednesday()),
+		(10000, 1, 1, 2932897, calendar.Saturday()),
+		(1970, 1, 1, 0, calendar.Thursday()),
+		(1969, 12, 31, -1, calendar.Wednesday()),
 	]
 	list.each(cases, (item) {
 		(year, month, day, number, expected_weekday) = item
@@ -154,7 +154,7 @@ test("calendar_known_days", () {
 		assert(calendar.weekday(date) == expected_weekday)
 	})
 	assert(
-		calendar.weekday(calendar.from_day_number(-4)) == calendar.Sunday,
+		calendar.weekday(calendar.from_day_number(-4)) == calendar.Sunday(),
 	)
 	assert(
 		calendar.days_between(
@@ -193,7 +193,7 @@ oracle_day = (year : Int, month : Int, day : Int) -> Int {
 		& (11) { 304 }
 		& (_) { 334 }
 	leap = year % 400 == 0 || { year % 4 == 0 && year % 100 != 0 }
-	extra = { month > 2 && leap } |> (True) { 1 } & (False) { 0 }
+	extra = { month > 2 && leap } |> (True()) { 1 } & (False()) { 0 }
 	before_year(year) - before_year(1970) + before_month + extra + day - 1
 }
 
@@ -376,7 +376,7 @@ test("calendar_text", () {
 	]
 	list.each(invalid, (text) {
 		assert(
-			fail.catch(() { calendar.parse(text) }) == Error(calendar.BadText),
+			fail.catch(() { calendar.parse(text) }) == Error(calendar.BadText()),
 		)
 	})
 	()

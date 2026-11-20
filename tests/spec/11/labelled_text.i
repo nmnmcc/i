@@ -24,7 +24,7 @@ main = () {
 			"Mixed(7, a = 2, z = \"last\")",
 	)
 	assert(core.inspect(Pair(1, "two")) == "Pair(1, \"two\")")
-	assert(core.inspect(Empty) == "Empty")
+	assert(core.inspect(Empty()) == "Empty")
 	assert(
 		core.inspect(Wrapper(z = 9, value = User(name = "ada", age = 36))) ==
 			"Wrapper(value = User(age = 36, name = \"ada\"), z = 9)",

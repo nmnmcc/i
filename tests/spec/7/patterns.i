@@ -7,8 +7,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -104,18 +104,18 @@ test("constructors", () {
 	}
 	Point(1, 2, label = "p") |> (Point(1, _, ..)) { () } & (_) { panic("no") }
 	Some(Some(3)) |>
-		(Some(None)) { panic("no") }
+		(Some(None())) { panic("no") }
 		& (Some(Some(n))) { check(show(n), "3") }
-		& (None) { panic("no") }
+		& (None()) { panic("no") }
 	res : Result(List(Int), String) = Ok([1])
 	res |>
 		(Error(_)) { panic("no") }
 		& (Ok([])) { panic("no") }
 		& (Ok([x])) { check(show(x), "1") }
 		& (Ok(_)) { panic("no") }
-	(True, False, ()) |>
-		((True, True, _)) { panic("no") }
-		& ((True, False, ())) { () }
+	(True(), False(), ()) |>
+		((True(), True(), _)) { panic("no") }
+		& ((True(), False(), ())) { () }
 		& (_) { panic("no") }
 })
 
@@ -145,7 +145,7 @@ test("type_tests", () {
 	check(kind([]), "list")
 	check(kind((1, 2)), "pair 3")
 	check(kind(()), "nil")
-	check(kind(False), "bool False")
+	check(kind(False()), "bool False")
 	check(kind(1.5), "float 1.5")
 })
 
@@ -204,14 +204,14 @@ guarded = (x : Option(Int)) {
 		(Some(n) ? n > 0) { "positive" }
 		& (Some(0)) { "zero" }
 		& (Some(_)) { "negative" }
-		& (None) { "none" }
+		& (None()) { "none" }
 }
 
 test("guards", () {
 	check(guarded(Some(3)), "positive")
 	check(guarded(Some(0)), "zero")
 	check(guarded(Some(-3)), "negative")
-	check(guarded(None), "none")
+	check(guarded(None()), "none")
 })
 
 either = (v : Result(Int, String | ())) {
@@ -229,7 +229,7 @@ test("narrowing", () {
 
 test("nested_case", () {
 	v = [1, 2] |>
-		([a, b]) { { a < b } |> (True) { "lt" } & (False) { "ge" } }
+		([a, b]) { { a < b } |> (True()) { "lt" } & (False()) { "ge" } }
 		& (_) { "no" }
 	check(v, "lt")
 })

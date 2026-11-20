@@ -130,9 +130,9 @@ cancel : (Ticket) -> ()
 state = <A>(r : Request(A)) -> RequestState(A) {
 	read_state(r) |>
 		(Ok(value)) { Ready(value) }
-		& (Error(0)) { Waiting }
-		& (Error(1)) { Cancelled }
-		& (Error(2)) { Taken }
+		& (Error(0)) { Waiting() }
+		& (Error(1)) { Cancelled() }
+		& (Error(2)) { Taken() }
 		& (Error(_)) { panic("request: invalid state") }
 }
 
@@ -140,7 +140,7 @@ state = <A>(r : Request(A)) -> RequestState(A) {
 await = (r) <- (waiter : Await) {
 	waiter.wait(ticket(r))
 	state(r) |>
-		(Waiting) { panic("request: wait returned early") }
+		(Waiting()) { panic("request: wait returned early") }
 		& (_) { take(r) }
 }
 

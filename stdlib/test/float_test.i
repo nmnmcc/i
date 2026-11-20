@@ -162,62 +162,62 @@ test("clamp_inverted_range_test", () {
 })
 
 test("compare_equal_zero_test", () {
-	assert(float.compare(0.0, 0.0) == order.Equal)
+	assert(float.compare(0.0, 0.0) == order.Equal())
 	()
 })
 
 test("compare_equal_test", () {
-	assert(float.compare(0.1, 0.1) == order.Equal)
+	assert(float.compare(0.1, 0.1) == order.Equal())
 	()
 })
 
 test("compare_lt_test", () {
-	assert(float.compare(0.0, 0.1) == order.Less)
+	assert(float.compare(0.0, 0.1) == order.Less())
 	()
 })
 
 test("compare_negative_lt_test", () {
-	assert(float.compare(-.2.0, -.1.9) == order.Less)
+	assert(float.compare(-.2.0, -.1.9) == order.Less())
 	()
 })
 
 test("compare_gt_test", () {
-	assert(float.compare(2.0, 1.9) == order.Greater)
+	assert(float.compare(2.0, 1.9) == order.Greater())
 	()
 })
 
 test("compare_negative_gt_test", () {
-	assert(float.compare(-.1.9, -.2.0) == order.Greater)
+	assert(float.compare(-.1.9, -.2.0) == order.Greater())
 	()
 })
 
 test("loosely_compare_lt_no_tolerance_test", () {
-	assert(float.loosely_compare(10.2, 10.5, 0.0) == order.Less)
+	assert(float.loosely_compare(10.2, 10.5, 0.0) == order.Less())
 	()
 })
 
 test("loosely_compare_eq_with_tolerance_test", () {
-	assert(float.loosely_compare(10.2, 10.5, 0.31) == order.Equal)
+	assert(float.loosely_compare(10.2, 10.5, 0.31) == order.Equal())
 	()
 })
 
 test("loosely_compare_eq_reversed_test", () {
-	assert(float.loosely_compare(10.5, 10.2, 0.31) == order.Equal)
+	assert(float.loosely_compare(10.5, 10.2, 0.31) == order.Equal())
 	()
 })
 
 test("loosely_compare_lt_insufficient_tolerance_test", () {
-	assert(float.loosely_compare(10.2, 10.5, 0.29) == order.Less)
+	assert(float.loosely_compare(10.2, 10.5, 0.29) == order.Less())
 	()
 })
 
 test("loosely_compare_gt_insufficient_tolerance_test", () {
-	assert(float.loosely_compare(10.5, 10.2, 0.29) == order.Greater)
+	assert(float.loosely_compare(10.5, 10.2, 0.29) == order.Greater())
 	()
 })
 
 test("loosely_compare_negative_eq_test", () {
-	assert(float.loosely_compare(-.10.2, -.10.5, 0.31) == order.Equal)
+	assert(float.loosely_compare(-.10.2, -.10.5, 0.31) == order.Equal())
 	()
 })
 
@@ -1040,7 +1040,7 @@ test("round_more_test", () {
 })
 
 test("compare_zero_test", () {
-	assert(float.compare(0.0, -.0.0) == Equal)
+	assert(float.compare(0.0, -.0.0) == Equal())
 	assert(float.min(1.0, 2.0) == 1.0)
 	assert(float.max(1.0, 2.0) == 2.0)
 	assert(float.clamp(5.0, 1.0, 3.0) == 3.0)
@@ -1055,7 +1055,7 @@ test("loosely_huge_test", () {
 	)
 	assert(
 		float.loosely_compare(float.max_finite, -.float.max_finite, 1.0) ==
-			Greater,
+			Greater(),
 	)
 })
 
@@ -1918,62 +1918,62 @@ test("atan2_quadrants_property", () {
 })
 
 test("sign_bit_reference_0_test", () {
-	assert(float.sign_bit(0.0) == False)
+	assert(float.sign_bit(0.0) == False())
 	()
 })
 
 test("sign_bit_reference_1_test", () {
-	assert(float.sign_bit(-.0.0) == True)
+	assert(float.sign_bit(-.0.0) == True())
 	()
 })
 
 test("sign_bit_reference_2_test", () {
-	assert(float.sign_bit(1.0) == False)
+	assert(float.sign_bit(1.0) == False())
 	()
 })
 
 test("sign_bit_reference_3_test", () {
-	assert(float.sign_bit(-.1.0) == True)
+	assert(float.sign_bit(-.1.0) == True())
 	()
 })
 
 test("sign_bit_reference_4_test", () {
-	assert(float.sign_bit(1.0e-300) == False)
+	assert(float.sign_bit(1.0e-300) == False())
 	()
 })
 
 test("sign_bit_reference_5_test", () {
-	assert(float.sign_bit(-.1.0e-300) == True)
+	assert(float.sign_bit(-.1.0e-300) == True())
 	()
 })
 
 test("sign_bit_reference_6_test", () {
-	assert(float.sign_bit(1.0e300) == False)
+	assert(float.sign_bit(1.0e300) == False())
 	()
 })
 
 test("sign_bit_reference_7_test", () {
-	assert(float.sign_bit(-.1.0e300) == True)
+	assert(float.sign_bit(-.1.0e300) == True())
 	()
 })
 
 test("sign_bit_reference_8_test", () {
-	assert(float.sign_bit(float.min_positive) == False)
+	assert(float.sign_bit(float.min_positive) == False())
 	()
 })
 
 test("sign_bit_reference_9_test", () {
-	assert(float.sign_bit(-.float.min_positive) == True)
+	assert(float.sign_bit(-.float.min_positive) == True())
 	()
 })
 
 test("sign_bit_reference_10_test", () {
-	assert(float.sign_bit(float.max_finite) == False)
+	assert(float.sign_bit(float.max_finite) == False())
 	()
 })
 
 test("sign_bit_reference_11_test", () {
-	assert(float.sign_bit(-.float.max_finite) == True)
+	assert(float.sign_bit(-.float.max_finite) == True())
 	()
 })
 

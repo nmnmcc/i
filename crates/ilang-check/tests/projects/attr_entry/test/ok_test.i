@@ -1,6 +1,6 @@
 // test-macro-migrate: reject
 @test
-works = () { assert(True) }
+works = () { assert(True()) }
 
 @test
 args = (n) { () }

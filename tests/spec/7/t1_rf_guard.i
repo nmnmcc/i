@@ -5,4 +5,4 @@ strict = (s : String - "a") {
 }
 f = (s : String, c : Bool) { s |> ("a" ? c) { 0 } & (t) { strict(t) } }
 
-main = () { f("a", False) }
+main = () { f("a", False()) }

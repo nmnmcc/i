@@ -14,8 +14,8 @@
 // boundary go through it, and finals run on the way.
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -52,8 +52,8 @@ first_over = (xs : List(Int), limit : Int) -> Int {
 				([]) { -1 }
 				& ([y, ..rest]) {
 					{ y > limit } |>
-						(True) { b |> control.escape(y) }
-						& (False) { each(rest) }
+						(True()) { b |> control.escape(y) }
+						& (False()) { each(rest) }
 				}
 		}
 		each(xs)
@@ -228,7 +228,7 @@ test("many catches in a row", () {
 			(0) { acc }
 			& (_) {
 				r = fail.catch(() {
-					{ i % 2 == 0 } |> (True) { fail.raise(i) } & (False) { i }
+					{ i % 2 == 0 } |> (True()) { fail.raise(i) } & (False()) { i }
 				}) |>
 					(Ok(v)) { v }
 					& (Error(e)) { e * 10 }

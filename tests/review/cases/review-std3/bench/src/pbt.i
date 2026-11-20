@@ -24,7 +24,7 @@ sample = <A>(gen : Gen(A), size : Int, g : random.Generator) -> Option(
 	Tree(A),
 ) {
 	Gen(f) = gen
-	f({ size < 0 } |> (True) { 0 } & (False) { size }, g)
+	f({ size < 0 } |> (True()) { 0 } & (False()) { size }, g)
 }
 constant = <A>(a : A) -> Gen(A) {
 	Gen((_, _) { Some(Tree(value = a, children = () { [] })) })
@@ -38,7 +38,7 @@ map_tree = <A, B>(t : Tree(A), f : (A) -> B) -> Tree(B) {
 map = <A, B>(gen : Gen(A), f : (A) -> B) -> Gen(B) {
 	Gen((s, g) {
 		sample(gen, s, g) |>
-			(None) { None }
+			(None()) { None() }
 			& (Some(t)) { Some(map_tree(t, f)) }
 	})
 }
@@ -67,14 +67,14 @@ bind_outer = <A, B>(
 	g : random.Generator
 ) -> Option(Tree(B)) {
 	sample(f(outer.value), s, g) |>
-		(None) { None }
+		(None()) { None() }
 		& (Some(inner)) { Some(bind_node(outer, inner, f, s, g)) }
 }
 flat_map = <A, B>(gen : Gen(A), f : (A) -> Gen(B)) -> Gen(B) {
 	Gen((s, g) {
 		(left, right) = random.split(g)
 		sample(gen, s, left) |>
-			(None) { None }
+			(None()) { None() }
 			& (Some(t)) { bind_outer(t, f, s, right) }
 	})
 }
@@ -83,8 +83,8 @@ int_tree = (x : Int, t : Int) -> Tree(Int) {
 		value = x,
 		children = () {
 			{ x == t } |>
-				(True) { [] }
-				& (False) {
+				(True()) { [] }
+				& (False()) {
 					go = (q : Int, acc : List(Int)) -> List(Int) {
 						q |>
 							(0) { list.reverse(acc) }
@@ -99,11 +99,11 @@ int_tree = (x : Int, t : Int) -> Tree(Int) {
 int = (lo : Int, hi : Int) -> Gen(Int) {
 	Gen((_, g) {
 		fail.catch(() { random.int(g, hi - lo + 1) }) |>
-			(Error(_)) { None }
+			(Error(_)) { None() }
 			& (Ok((v, _))) {
 				target = { lo > 0 } |>
-					(True) { lo }
-					& (False) { { hi < 0 } |> (True) { hi } & (False) { 0 } }
+					(True()) { lo }
+					& (False()) { { hi < 0 } |> (True()) { hi } & (False()) { 0 } }
 				Some(int_tree(v + lo, target))
 			}
 	})
@@ -121,8 +121,8 @@ descend = <A>(
 	f : (A) -> Bool
 ) -> (A, List(Int), Int) {
 	{ left == 0 } |>
-		(True) { (current.value, list.reverse(path), count) }
-		& (False) { scan(current, current.children(), left, path, count, 0, f) }
+		(True()) { (current.value, list.reverse(path), count) }
+		& (False()) { scan(current, current.children(), left, path, count, 0, f) }
 }
 scan = <A>(
 	current : Tree(A),
@@ -134,16 +134,16 @@ scan = <A>(
 	f : (A) -> Bool
 ) -> (A, List(Int), Int) {
 	{ left == 0 } |>
-		(True) { (current.value, list.reverse(path), count) }
-		& (False) {
+		(True()) { (current.value, list.reverse(path), count) }
+		& (False()) {
 			children |>
 				([]) { (current.value, list.reverse(path), count) }
 				& ([c, ..cs]) {
 					f(c.value) |>
-						(True) {
+						(True()) {
 							descend(c, left - 1, [index, ..path], count + 1, f)
 						}
-						& (False) {
+						& (False()) {
 							scan(
 								current,
 								cs,

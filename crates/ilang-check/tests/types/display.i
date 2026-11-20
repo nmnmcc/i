@@ -9,7 +9,7 @@ Ref(A) = (get = () -> A, set = (A) -> ())
 read = <A>(r : Ref(A)) { r.get() }
 
 either = <A, B>(r1 : Ref(A), r2 : Ref(B), c : Bool) {
-	c |> (True) { r1 } & (False) { r2 }
+	c |> (True()) { r1 } & (False()) { r2 }
 }
 
 make_int = (x) {

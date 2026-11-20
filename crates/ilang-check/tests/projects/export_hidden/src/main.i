@@ -44,14 +44,14 @@ PrivHidden = List(Hidden)
 
 via_hidden_alias : PrivHidden = []
 
-named = inner : Hidden = Hidden
+named = inner : Hidden = Hidden()
 
 // Only the exported names count.
-(a : Hidden, b : Int) = (Hidden, 1)
+(a : Hidden, b : Int) = (Hidden(), 1)
 
-(c : Hidden, d : Int) = (Hidden, 1)
+(c : Hidden, d : Int) = (Hidden(), 1)
 
-private : Hidden = Hidden
+private : Hidden = Hidden()
 
 // An inferred type is checked by type inference (tests/types/qualified), not here.
-inferred = Hidden
+inferred = Hidden()

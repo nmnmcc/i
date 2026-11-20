@@ -6,6 +6,6 @@
 Box(Int) = (Int)
 
 main = () {
-	assert(True)
+	assert(True())
 	()
 }

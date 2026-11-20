@@ -34,20 +34,20 @@ defer_message : (log.Level, () <- (Fail(String), Capture) -> String) <- (
 ) -> () = log.lazy
 
 capture_sink = () -> log.Sink(String, Capture) {
-	log.make((_ : log.Level) { True }, (entry) { record(Sent(entry)) })
+	log.make((_ : log.Level) { True() }, (entry) { record(Sent(entry)) })
 }
 
 // A pure divergent predicate detects an unwanted call without adding effects.
 unreachable = (level : log.Level) -> Bool { unreachable(level) }
 
 entry = (level : log.Level) -> log.Entry {
-	log.Entry(level = level, message = "hello", fields = [], at = None)
+	log.Entry(level = level, message = "hello", fields = [], at = None())
 }
 
 // Entry fields and timestamps remain data through sequential service calls.
 test("log_delivery", () {
 	original = log.Entry(
-		level = log.Info,
+		level = log.Info(),
 		message = "hello",
 		fields = [("", ""), ("k", "1"), ("k", "2")],
 		at = Some(time.from_unix_nanoseconds(-1)),
@@ -58,9 +58,9 @@ test("log_delivery", () {
 			producer()
 			{
 				{
-					assert(query(log.Info))
+					assert(query(log.Info()))
 					producer()
-					deliver(entry(log.Warning))
+					deliver(entry(log.Warning()))
 				} <- (capture_sink())
 			}
 			producer()
@@ -73,7 +73,7 @@ test("log_delivery", () {
 			),
 		)
 	})
-	assert(trace == [Sent(original), Sent(entry(log.Warning))])
+	assert(trace == [Sent(original), Sent(entry(log.Warning()))])
 	()
 })
 
@@ -81,22 +81,22 @@ test("log_delivery", () {
 test("log_lazy", () {
 	trace = control.boundary((b) {
 		{
-			assert(query(log.Info) == False)
-			defer_message(log.Info, () { fail.raise("must not run") })
+			assert(query(log.Info()) == False())
+			defer_message(log.Info(), () { fail.raise("must not run") })
 			deliver({
-				record(Message)
-				entry(log.Info)
+				record(Message())
+				entry(log.Info())
 			})
 			{
 				{
-					defer_message(log.Info, () {
-						record(Message)
+					defer_message(log.Info(), () {
+						record(Message())
 						"built"
 					})
 					assert(
 						fail.catch(() {
-							defer_message(log.Info, () {
-								record(Message)
+							defer_message(log.Info(), () {
+								record(Message())
 								fail.raise("bad")
 							})
 						}) ==
@@ -116,17 +116,17 @@ test("log_lazy", () {
 	assert(
 		trace ==
 			[
-				Message,
-				Message,
+				Message(),
+				Message(),
 				Sent(
 					log.Entry(
-						level = log.Info,
+						level = log.Info(),
 						message = "built",
 						fields = [],
-						at = None,
+						at = None(),
 					),
 				),
-				Message,
+				Message(),
 			],
 	)
 	()
@@ -134,12 +134,12 @@ test("log_lazy", () {
 
 // L4 and both filter laws: thresholds follow the four explicitly ordered levels.
 test("log_filters", () {
-	levels = [log.Debug, log.Info, log.Warning, log.Failure]
+	levels = [log.Debug(), log.Info(), log.Warning(), log.Failure()]
 	cases = [
-		(log.Debug, levels),
-		(log.Info, [log.Info, log.Warning, log.Failure]),
-		(log.Warning, [log.Warning, log.Failure]),
-		(log.Failure, [log.Failure]),
+		(log.Debug(), levels),
+		(log.Info(), [log.Info(), log.Warning(), log.Failure()]),
+		(log.Warning(), [log.Warning(), log.Failure()]),
+		(log.Failure(), [log.Failure()]),
 	]
 	list.each(cases, (case) {
 		(threshold, expected) = case
@@ -192,7 +192,7 @@ test("log_filters", () {
 		{
 			list.each(levels, (level) { deliver(entry(level)) })
 			[]
-		} <- (log.filter(capture_sink(), (_ : log.Level) { True })) <- (
+		} <- (log.filter(capture_sink(), (_ : log.Level) { True() })) <- (
 			Capture(
 				record = (event) {
 					control.suspend(b, (k) { [event, ..control.resume(k, ())] })
@@ -203,12 +203,12 @@ test("log_filters", () {
 	assert(trace == list.map(levels, (level) { Sent(entry(level)) }))
 	// Filter composition requires new_accept before old_accept and short-circuiting.
 	{
-		assert(query(log.Info) == False)
+		assert(query(log.Info()) == False())
 		()
 	} <- (
 		log.filter(log.make(unreachable, (_ : log.Entry) -> () { () }), (
 			_ : log.Level
-		) { False }),
+		) { False() }),
 	)
 })
 
@@ -225,13 +225,13 @@ test("log_errors", () {
 	trace = control.boundary((b) {
 		{
 			assert(
-				fail.catch(() { broken_deliver(entry(log.Info)) }) ==
+				fail.catch(() { broken_deliver(entry(log.Info())) }) ==
 					Error(DeliveryError("hello")),
 			)
 			[]
 		} <- (
 			log.make(
-				(_ : log.Level) { True },
+				(_ : log.Level) { True() },
 				(event) {
 					record(Sent(event))
 					fail.raise(DeliveryError(event.message))
@@ -245,7 +245,7 @@ test("log_errors", () {
 			),
 		)
 	})
-	assert(trace == [Sent(entry(log.Info))])
+	assert(trace == [Sent(entry(log.Info()))])
 	()
 })
 
@@ -254,10 +254,10 @@ test("log_format", () {
 	assert(
 		log.format(
 			log.Entry(
-				level = log.Info,
+				level = log.Info(),
 				message = "a\nb",
 				fields = [("k", "v"), ("k", "")],
-				at = None,
+				at = None(),
 			),
 		) ==
 			"info \"a\\nb\" \"k\"=\"v\" \"k\"=\"\"",
@@ -265,7 +265,7 @@ test("log_format", () {
 	assert(
 		log.format(
 			log.Entry(
-				level = log.Debug,
+				level = log.Debug(),
 				message = "\"\\\r\t",
 				fields = [("\n", "\u{0}\u{1b}\u{2028}\u{2029}")],
 				at = Some(time.from_unix_nanoseconds(-1)),
@@ -276,7 +276,7 @@ test("log_format", () {
 	assert(
 		log.format(
 			log.Entry(
-				level = log.Warning,
+				level = log.Warning(),
 				message = "é漢🙂",
 				fields = [("", "\u{7f}\u{80}\u{9f}\u{a0}")],
 				at = Some(time.from_unix_nanoseconds(0)),
@@ -285,11 +285,11 @@ test("log_format", () {
 			"warning \"é漢🙂\" @0 \"\"=\"\\u{7f}\\u{80}\\u{9f}\u{a0}\"",
 	)
 	assert(
-		log.format(entry(log.Failure)) == "failure \"hello\"",
+		log.format(entry(log.Failure())) == "failure \"hello\"",
 	)
 	assert(
 		log.format(
-			log.Entry(level = log.Info, message = "", fields = [], at = None),
+			log.Entry(level = log.Info(), message = "", fields = [], at = None()),
 		) ==
 			"info \"\"",
 	)
@@ -304,7 +304,7 @@ GateSink(E, N) = (
 
 gate_write = <E, N>(event : log.Entry) <- (sink : GateSink(E, N)) -> () {
 	GateSink(accept, send, _) = sink
-	accept(event.level) |> (True) { send(event) } & (False) { () }
+	accept(event.level) |> (True()) { send(event) } & (False()) { () }
 }
 
 GateS(N) = (() <- N -> (), (N) -> ())
@@ -318,11 +318,11 @@ gate_run = <N>(body : () <- N -> ()) { body() }
 
 test("gate_annotated_write", () {
 	{
-		assert(fail.catch(() { gate_write(entry(log.Info)) }) == Error("hello"))
+		assert(fail.catch(() { gate_write(entry(log.Info())) }) == Error("hello"))
 		()
 	} <- (
 		GateSink(
-			(_ : log.Level) { True },
+			(_ : log.Level) { True() },
 			(e) { fail.raise(e.message) },
 			(_ : Never) { () },
 		),
@@ -335,16 +335,16 @@ test("gate_annotated_service", () {
 
 test("gate_generic_write", () {
 	{
-		assert(fail.catch(() { log.write(entry(log.Info)) }) == Error("hello"))
+		assert(fail.catch(() { log.write(entry(log.Info())) }) == Error("hello"))
 		()
-	} <- (log.make((_ : log.Level) { True }, (e) { fail.raise(e.message) }))
+	} <- (log.make((_ : log.Level) { True() }, (e) { fail.raise(e.message) }))
 })
 
 test("gate_generic_lazy", () {
 	{
 		assert(
 			fail.catch(() {
-				log.lazy(log.Info, () -> String { fail.raise("bad") })
+				log.lazy(log.Info(), () -> String { fail.raise("bad") })
 			}) ==
 				Ok(()),
 		)
@@ -359,7 +359,7 @@ test("gate_invariant_client", () {
 test("stderr_sink_reports_failures", () {
 	{
 		assert(
-			fail.catch(() { log.write(entry(log.Info)) }) ==
+			fail.catch(() { log.write(entry(log.Info())) }) ==
 				Error(
 					stdio.StdioError(
 						operation = "write_error",

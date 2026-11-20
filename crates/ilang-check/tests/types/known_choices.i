@@ -7,21 +7,21 @@ A = (f = Int)
 B = (g = String)
 T = A | B
 catch_all = (v : T) {
-	v |> (A(..) = x | x ? True) { x.f } & (_) { panic("unreachable") }
+	v |> (A(..) = x | x ? True()) { x.f } & (_) { panic("unreachable") }
 }
 
 named_discard = (v : T) {
 	v |>
-		(A(..) = x | _ = x ? True) { A(..x, f = 3) }
+		(A(..) = x | _ = x ? True()) { A(..x, f = 3) }
 		& (_) { panic("unreachable") }
 }
 
 first_catch_all = (v : T) {
-	v |> (x | A(..) = x ? True) { x.f } & (_) { panic("unreachable") }
+	v |> (x | A(..) = x ? True()) { x.f } & (_) { panic("unreachable") }
 }
 
 type_test = (v : T) {
-	v |> (A(..) = x | x : T ? True) { x.f } & (_) { panic("unreachable") }
+	v |> (A(..) = x | x : T ? True()) { x.f } & (_) { panic("unreachable") }
 }
 
 nested = (r : Result(T, T)) {
@@ -29,12 +29,12 @@ nested = (r : Result(T, T)) {
 }
 
 in_tuple = (p : (T, Int)) {
-	p |> ((A(..) = x, 1) | (x, _) ? True) { x.f } & (_) { panic("unreachable") }
+	p |> ((A(..) = x, 1) | (x, _) ? True()) { x.f } & (_) { panic("unreachable") }
 }
 
 // The subject name, with a choice that does not have `A` at its top.
 subject = (v : T) {
-	v |> (A(..) | _ ? True) { v.f } & (_) { panic("unreachable") }
+	v |> (A(..) | _ ? True()) { v.f } & (_) { panic("unreachable") }
 }
 
 // Every choice binds `x` through `x = A(…)`: known.

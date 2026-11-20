@@ -7,8 +7,8 @@
 
 check = (got : Result(Int, ()), want : Result(Int, ())) {
 	{ got == want } |>
-		(True) { () }
-		& (False) {
+		(True()) { () }
+		& (False()) {
 			panic(core.inspect(got) <> " is not " <> core.inspect(want))
 		}
 }

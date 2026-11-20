@@ -174,7 +174,7 @@ byte_range = (string : String, start : Int, end : Int) -> String {
 /// ```
 split_once = (string : String, on : String) -> Option((String, String)) {
 	on |>
-		("") { None }
+		("") { None() }
 		& (_) {
 			core.index_of(string, on, 0) |>
 				(Ok(at)) {
@@ -189,7 +189,7 @@ split_once = (string : String, on : String) -> Option((String, String)) {
 						),
 					)
 				}
-				& (Error(_)) { None }
+				& (Error(_)) { None() }
 		}
 }
 
@@ -200,7 +200,7 @@ split_once = (string : String, on : String) -> Option((String, String)) {
 /// ```
 lines = (string : String) -> List(String) {
 	list.map(split(string, "\n"), (line) {
-		ends_with(line, "\r") |> (True) { drop_end(line, 1) } & (False) { line }
+		ends_with(line, "\r") |> (True()) { drop_end(line, 1) } & (False()) { line }
 	})
 }
 
@@ -257,7 +257,7 @@ ends_with = (string : String, suffix : String) -> Bool {
 /// string.contains("theory", "ory")  // True
 /// ```
 contains = (does : String, contain : String) -> Bool {
-	core.index_of(does, contain, 0) |> (Ok(_)) { True } & (Error(_)) { False }
+	core.index_of(does, contain, 0) |> (Ok(_)) { True() } & (Error(_)) { False() }
 }
 
 /// Puts `with` in the place of every `each` in the string. When `each` is
@@ -280,15 +280,15 @@ replace = (in : String, each : String, with : String) -> String {
 /// ```
 slice = (string : String, at_index : Int, length : Int) -> String {
 	{ length <= 0 } |>
-		(True) { "" }
-		& (False) {
+		(True()) { "" }
+		& (False()) {
 			codepoints = core.codepoints(string)
 			start = { at_index < 0 } |>
-				(True) { list.length(codepoints) + at_index }
-				& (False) { at_index }
+				(True()) { list.length(codepoints) + at_index }
+				& (False()) { at_index }
 			{ start < 0 } |>
-				(True) { "" }
-				& (False) {
+				(True()) { "" }
+				& (False()) {
 					core.from_codepoints(
 						list.take(list.drop(codepoints, start), length),
 					)
@@ -316,7 +316,7 @@ drop_end = (from : String, up_to : Int) -> String {
 /// The first codepoint, as a string, or `None` for `""`.
 first = (string : String) -> Option(String) {
 	core.codepoints(string) |>
-		([]) { None }
+		([]) { None() }
 		& ([c, ..]) { Some(core.from_codepoints([c])) }
 }
 
@@ -324,7 +324,7 @@ first = (string : String) -> Option(String) {
 last = (string : String) -> Option(String) {
 	list.last(core.codepoints(string)) |>
 		(Some(c)) { Some(core.from_codepoints([c])) }
-		& (None) { None }
+		& (None()) { None() }
 }
 
 /// The first codepoint, as a string, and the rest, or `None` for `""`.
@@ -334,7 +334,7 @@ last = (string : String) -> Option(String) {
 /// ```
 pop_codepoint = (string : String) -> Option((String, String)) {
 	core.codepoints(string) |>
-		([]) { None }
+		([]) { None() }
 		& ([c, ..cs]) {
 			Some((core.from_codepoints([c]), core.from_codepoints(cs)))
 		}
@@ -361,12 +361,12 @@ crop = (from : String, before : String) -> String {
 remove_prefix = (from : String, matching : String) -> String {
 	n = core.byte_size(matching)
 	starts_with(from, matching) |>
-		(True) {
+		(True()) {
 			core.byte_slice(from, n, core.byte_size(from) - n) |>
 				(Ok(rest)) { rest }
 				& (Error(_)) { from }
 		}
-		& (False) { from }
+		& (False()) { from }
 }
 
 /// The string without `suffix` at its end. When it does not end with
@@ -374,12 +374,12 @@ remove_prefix = (from : String, matching : String) -> String {
 remove_suffix = (from : String, matching : String) -> String {
 	n = core.byte_size(from) - core.byte_size(matching)
 	ends_with(from, matching) |>
-		(True) {
+		(True()) {
 			core.byte_slice(from, 0, n) |>
 				(Ok(rest)) { rest }
 				& (Error(_)) { from }
 		}
-		& (False) { from }
+		& (False()) { from }
 }
 
 /// The string with every codepoint in upper case, by the simple uppercase
@@ -408,7 +408,7 @@ to_lower = (string : String) -> String { core.to_lower(string) }
 capitalise = (string : String) -> String {
 	pop_codepoint(string) |>
 		(Some((head, tail))) { to_upper(head) <> to_lower(tail) }
-		& (None) { "" }
+		& (None()) { "" }
 }
 
 /// The codepoints in the other order.
@@ -426,8 +426,8 @@ padding = (length : Int, with : String) -> String {
 		& (_) {
 			go = (n, rest, acc) {
 				{ n <= 0 } |>
-					(True) { from_reversed(acc) }
-					& (False) {
+					(True()) { from_reversed(acc) }
+					& (False()) {
 						rest |>
 							([]) { go(n, pad, acc) }
 							& ([c, ..cs]) { go(n - 1, cs, [c, ..acc]) }
@@ -491,20 +491,20 @@ utf_codepoint_to_int = (codepoint : UtfCodepoint) -> Int {
 /// ```
 compare = (a : String, b : String) -> Order {
 	{ a == b } |>
-		(True) { Equal }
-		& (False) { compare_bytes(<<a:utf8>>, <<b:utf8>>) }
+		(True()) { Equal() }
+		& (False()) { compare_bytes(<<a:utf8>>, <<b:utf8>>) }
 }
 
 compare_bytes = (a : BitArray, b : BitArray) -> Order {
 	(a, b) |>
 		((<<x, xs:bytes>>, <<y, ys:bytes>>)) {
 			{ x == y } |>
-				(True) { compare_bytes(xs, ys) }
-				& (False) { { x < y } |> (True) { Less } & (False) { Greater } }
+				(True()) { compare_bytes(xs, ys) }
+				& (False()) { { x < y } |> (True()) { Less() } & (False()) { Greater() } }
 		}
-		& ((<<>>, <<>>)) { Equal }
-		& ((<<>>, _)) { Less }
-		& (_) { Greater }
+		& ((<<>>, <<>>)) { Equal() }
+		& ((<<>>, _)) { Less() }
+		& (_) { Greater() }
 }
 
 /// The text form of any value, as i source.
@@ -517,16 +517,16 @@ inspect = <A>(term : A) -> String { core.inspect(term) }
 
 /// `None` for `""`, and `Some(string)` for any other string.
 to_option = (string : String) -> Option(String) {
-	string |> ("") { None } & (_) { Some(string) }
+	string |> ("") { None() } & (_) { Some(string) }
 }
 
 /// One scalar as a string. Negative indexes count from the end; indexes
 /// outside the string, including very negative ones, give None.
 at = (string : String, index : Int) -> Option(String) {
 	cs = core.codepoints(string)
-	i = { index < 0 } |> (True) { list.length(cs) + index } & (False) { index }
+	i = { index < 0 } |> (True()) { list.length(cs) + index } & (False()) { index }
 	list.at(cs, i) |>
-		(None) { None }
+		(None()) { None() }
 		& (Some(c)) { Some(core.from_codepoints([c])) }
 }
 
@@ -535,10 +535,10 @@ scalar_prefix = (
 	needle : List(UtfCodepoint)
 ) -> Bool {
 	needle |>
-		([]) { True }
+		([]) { True() }
 		& ([c, ..rest]) {
 			haystack |>
-				([]) { False }
+				([]) { False() }
 				& ([h, ..tail]) { h == c && scalar_prefix(tail, rest) }
 		}
 }
@@ -551,8 +551,8 @@ search_scalars = (
 ) -> Option(Int) {
 	n = list.length(cs)
 	{ from < 0 || from > n } |>
-		(True) { None }
-		& (False) {
+		(True()) { None() }
+		& (False()) {
 			needle |>
 				([]) { Some(from) }
 				& (_) {
@@ -562,16 +562,16 @@ search_scalars = (
 						found : Option(Int)
 					) -> Option(Int) {
 						{ last && i > from } |>
-							(True) { found }
-							& (False) {
+							(True()) { found }
+							& (False()) {
 								hit = { last || i >= from } &&
 									scalar_prefix(rest, needle)
 								{ hit && core.not(last) } |>
-									(True) { Some(i) }
-									& (False) {
+									(True()) { Some(i) }
+									& (False()) {
 										next = hit |>
-											(True) { Some(i) }
-											& (False) { found }
+											(True()) { Some(i) }
+											& (False()) { found }
 										rest |>
 											([]) { next }
 											& ([_, ..tail]) {
@@ -580,7 +580,7 @@ search_scalars = (
 									}
 							}
 					}
-					go(cs, 0, None)
+					go(cs, 0, None())
 				}
 		}
 }
@@ -588,13 +588,13 @@ search_scalars = (
 /// Least full starting scalar index >= from; bounds must be in [0,length].
 /// Empty find matches from. Overlaps are eligible.
 index_of = (string : String, find : String, from : Int) -> Option(Int) {
-	search_scalars(core.codepoints(string), core.codepoints(find), from, False)
+	search_scalars(core.codepoints(string), core.codepoints(find), from, False())
 }
 
 /// Greatest full starting scalar index <= from; the match may end after from.
 /// Empty find matches from; negative or past-end bounds give None.
 last_index_of = (string : String, find : String, from : Int) -> Option(Int) {
-	search_scalars(core.codepoints(string), core.codepoints(find), from, True)
+	search_scalars(core.codepoints(string), core.codepoints(find), from, True())
 }
 
 /// Left-to-right nonoverlapping matches. Empty find has count zero.
@@ -609,8 +609,8 @@ count = (string : String, find : String) -> Int {
 					([]) { n }
 					& ([_, ..tail]) {
 						scalar_prefix(rest, needle) |>
-							(True) { go(list.drop(rest, width), n + 1) }
-							& (False) { go(tail, n) }
+							(True()) { go(list.drop(rest, width), n + 1) }
+							& (False()) { go(tail, n) }
 					}
 			}
 			go(core.codepoints(string), 0)
@@ -639,11 +639,11 @@ take_end = (from : String, up_to : Int) -> String {
 split_once_last = (string : String, on : String) -> Option((String, String)) {
 	needle = core.codepoints(on)
 	needle |>
-		([]) { None }
+		([]) { None() }
 		& (_) {
 			cs = core.codepoints(string)
-			search_scalars(cs, needle, list.length(cs), True) |>
-				(None) { None }
+			search_scalars(cs, needle, list.length(cs), True()) |>
+				(None()) { None() }
 				& (Some(i)) {
 					Some(
 						(
@@ -661,8 +661,8 @@ split_once_last = (string : String, on : String) -> Option((String, String)) {
 /// no-op, and inserted text is never searched. Collects and concatenates once.
 replace_n = (in : String, each : String, with : String, up_to : Int) -> String {
 	{ up_to <= 0 || each == "" } |>
-		(True) { in }
-		& (False) {
+		(True()) { in }
+		& (False()) {
 			needle = core.codepoints(each)
 			width = list.length(needle)
 			go = (
@@ -671,26 +671,26 @@ replace_n = (in : String, each : String, with : String, up_to : Int) -> String {
 				fragments : List(String)
 			) -> String {
 				{ left == 0 } |>
-					(True) {
+					(True()) {
 						core.concat(
 							list.reverse(
 								[core.from_codepoints(rest), ..fragments],
 							),
 						)
 					}
-					& (False) {
+					& (False()) {
 						rest |>
 							([]) { core.concat(list.reverse(fragments)) }
 							& ([c, ..tail]) {
 								scalar_prefix(rest, needle) |>
-									(True) {
+									(True()) {
 										go(
 											list.drop(rest, width),
 											left - 1,
 											[with, ..fragments],
 										)
 									}
-									& (False) {
+									& (False()) {
 										go(
 											tail,
 											left,
@@ -725,8 +725,8 @@ split_when = <N>(string : String, on : (UtfCodepoint) <- N -> Bool) -> List(
 			}
 			& ([c, ..tail]) {
 				on(c) |>
-					(False) { go(tail, [c, ..piece], acc) }
-					& (True) {
+					(False()) { go(tail, [c, ..piece], acc) }
+					& (True()) {
 						piece |>
 							([]) { go(tail, [], acc) }
 							& (_) {

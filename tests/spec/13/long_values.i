@@ -22,8 +22,8 @@ test("inspect_long_list", () {
 
 test("hash_long_list", () {
 	{ core.hash(build(300000, [])) == core.hash(build(300000, [])) } |>
-		(True) { () }
-		& (False) { panic("hash") }
+		(True()) { () }
+		& (False()) { panic("hash") }
 })
 
 test("inspect_nested", () {

@@ -205,32 +205,32 @@ test("to_float_negative_test", () {
 })
 
 test("compare_equal_zero_test", () {
-	assert(int.compare(0, 0) == order.Equal)
+	assert(int.compare(0, 0) == order.Equal())
 	()
 })
 
 test("compare_equal_one_test", () {
-	assert(int.compare(1, 1) == order.Equal)
+	assert(int.compare(1, 1) == order.Equal())
 	()
 })
 
 test("compare_lt_test", () {
-	assert(int.compare(0, 1) == order.Less)
+	assert(int.compare(0, 1) == order.Less())
 	()
 })
 
 test("compare_negative_lt_test", () {
-	assert(int.compare(-2, -1) == order.Less)
+	assert(int.compare(-2, -1) == order.Less())
 	()
 })
 
 test("compare_gt_test", () {
-	assert(int.compare(2, 1) == order.Greater)
+	assert(int.compare(2, 1) == order.Greater())
 	()
 })
 
 test("compare_negative_gt_test", () {
-	assert(int.compare(-1, -2) == order.Greater)
+	assert(int.compare(-1, -2) == order.Greater())
 	()
 })
 
@@ -980,7 +980,7 @@ test("division_more_test", () {
 test("big_numbers_test", () {
 	big = 100000000000000000000
 	assert(int.abs(-big) == big)
-	assert(int.compare(big, big + 1) == Less)
+	assert(int.compare(big, big + 1) == Less())
 	assert(int.max(big, -big) == big)
 	assert(int.sum([big, big]) == 2 * big)
 	assert(int.to_string(-big) == "-100000000000000000000")

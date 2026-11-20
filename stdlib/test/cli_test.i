@@ -39,7 +39,7 @@ test("cli_options", () {
 			e4_call_arg_1 = ["--verbose", "--jobs=4"]
 			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Ok(Options(jobs = 4, verbose = True)),
+			Ok(Options(jobs = 4, verbose = True())),
 	)
 	assert(
 		{
@@ -47,7 +47,7 @@ test("cli_options", () {
 			e4_call_arg_1 = ["-j", "4"]
 			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Ok(Options(jobs = 4, verbose = False)),
+			Ok(Options(jobs = 4, verbose = False())),
 	)
 	list.each([["--jobs=-2"], ["--jobs", "-2"], ["-j", "-2"]], (args) {
 		assert(
@@ -133,7 +133,7 @@ test("cli_options", () {
 			e4_call_arg_1 = []
 			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Ok(False),
+			Ok(False()),
 	)
 	()
 })
@@ -147,8 +147,8 @@ test("cli_definition_errors", () {
 		panic("reader called during validation")
 	}
 	dup = cli.map2(
-		cli.option(cli.Names(long = "jobs", short = None), "", stop_int),
-		cli.option(cli.Names(long = "jobs", short = None), "", stop_text),
+		cli.option(cli.Names(long = "jobs", short = None()), "", stop_int),
+		cli.option(cli.Names(long = "jobs", short = None()), "", stop_text),
 		Pair,
 	)
 	assert(
@@ -251,7 +251,7 @@ test("cli_definition_errors", () {
 				e4_call_arg_1 = ["-Z"]
 				fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
 			} ==
-				Ok(True),
+				Ok(True()),
 		)
 	})
 	pos = cli.argument("input", "", cli.text)
@@ -270,7 +270,7 @@ test("cli_definition_errors", () {
 			e4_call_arg_1 = "app"
 			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Error(cli.MisplacedRest),
+			Error(cli.MisplacedRest()),
 	)
 	assert(
 		{
@@ -282,7 +282,7 @@ test("cli_definition_errors", () {
 			e4_call_arg_1 = "app"
 			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Error(cli.MisplacedRest),
+			Error(cli.MisplacedRest()),
 	)
 	with_option = cli.map2(remaining, verbose(), (a, _) { a })
 	assert(
@@ -295,7 +295,7 @@ test("cli_definition_errors", () {
 			e4_call_arg_1 = "app"
 			fail.catch(() { cli.help(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Error(cli.MisplacedRest),
+			Error(cli.MisplacedRest()),
 	)
 	// Option long/short names and positional names have independent namespaces.
 	assert(
@@ -408,7 +408,7 @@ test("cli_token_ownership", () {
 			e4_call_arg_1 = ["--name", "--verbose"]
 			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Ok(("--verbose", False)),
+			Ok(("--verbose", False())),
 	)
 	list.each([
 		"--jo",
@@ -452,11 +452,11 @@ test("cli_token_ownership", () {
 	) { (f, v) })
 	assert(
 		fail.catch(() { cli.parse(interspersed, ["input", "--verbose"]) }) ==
-			Ok(("input", True)),
+			Ok(("input", True())),
 	)
 	assert(
 		fail.catch(() { cli.parse(interspersed, ["-", "-v"]) }) ==
-			Ok(("-", True)),
+			Ok(("-", True())),
 	)
 	assert(
 		{
@@ -585,7 +585,7 @@ test("cli_error_order", () {
 	assert(
 		{
 			e4_call_arg_0 = cli.option(
-				cli.Names(long = "jobs", short = None),
+				cli.Names(long = "jobs", short = None()),
 				"",
 				stop,
 			)
@@ -594,14 +594,14 @@ test("cli_error_order", () {
 		} ==
 			Error(cli.ExtraArgument(index = 1, token = "extra")),
 	)
-	first = cli.option(cli.Names(long = "first", short = None), "", (
+	first = cli.option(cli.Names(long = "first", short = None()), "", (
 		_ : String
 	) -> Result(Int, String) { Error("first") })
-	second = cli.option(cli.Names(long = "second", short = None), "", (
+	second = cli.option(cli.Names(long = "second", short = None()), "", (
 		_ : String
 	) -> Result(Int, String) { panic("later reader called") })
 	p = cli.map2(first, second, (a, b) { a + b })
-	second_error = cli.option(cli.Names(long = "second", short = None), "", (
+	second_error = cli.option(cli.Names(long = "second", short = None()), "", (
 		_ : String
 	) -> Result(Int, String) { Error("second") })
 	assert(
@@ -638,7 +638,7 @@ test("cli_error_order", () {
 		fail.catch(() { cli.parse(p, ["--first=bad", "--unknown"]) }) ==
 			Error(cli.UnknownOption(index = 1, token = "--unknown")),
 	)
-	failing_many = cli.many(cli.Names(long = "num", short = None), "", (
+	failing_many = cli.many(cli.Names(long = "num", short = None()), "", (
 		value : String
 	) -> Result(Int, String) {
 		value |>
@@ -686,9 +686,9 @@ test("cli_allocation", () {
 		"",
 		cli.integer,
 	)
-	assert(fail.catch(() { cli.parse(o, []) }) == Ok(None))
+	assert(fail.catch(() { cli.parse(o, []) }) == Ok(None()))
 	assert(fail.catch(() { cli.parse(o, ["-j", "2"]) }) == Ok(Some(2)))
-	defaults = cli.map(o, (value) { value |> (None) { 4 } & (Some(n)) { n } })
+	defaults = cli.map(o, (value) { value |> (None()) { 4 } & (Some(n)) { n } })
 	assert(fail.catch(() { cli.parse(defaults, []) }) == Ok(4))
 	assert(fail.catch(() { cli.parse(defaults, ["--jobs=2"]) }) == Ok(2))
 	p = cli.map2(cli.argument("first", "", cli.text), cli.rest(
@@ -838,12 +838,12 @@ test("cli_composition_laws", () {
 	// Each leaf consumes one bucket; pure consumes none even within map2 trees.
 	mixed = cli.map2(
 		cli.map2(cli.pure("prefix"), jobs(), (s, n) { (s, n) }),
-		cli.map2(cli.pure(False), verbose(), (_, v) { v }),
+		cli.map2(cli.pure(False()), verbose(), (_, v) { v }),
 		(pair : (String, Int), v) { Triple(pair.1, pair.0, v) },
 	)
 	assert(
 		fail.catch(() { cli.parse(mixed, ["--jobs=3", "-v"]) }) ==
-			Ok(Triple(3, "prefix", True)),
+			Ok(Triple(3, "prefix", True())),
 	)
 	()
 })
@@ -889,7 +889,7 @@ test("cli_help", () {
 	assert(
 		{
 			e4_call_arg_0 = cli.many(
-				cli.Names(long = "name", short = None),
+				cli.Names(long = "name", short = None()),
 				"Names",
 				cli.text,
 			)
@@ -916,7 +916,7 @@ test("cli_help", () {
 	)
 	stop = (_ : String) -> Result(Int, String) { panic("help called reader") }
 	stopping = cli.map(cli.option(
-		cli.Names(long = "jobs", short = None),
+		cli.Names(long = "jobs", short = None()),
 		"Workers\n\tverbatim",
 		stop,
 	), (_) -> String { panic("help called mapper") })
@@ -924,7 +924,7 @@ test("cli_help", () {
 		fail.catch(() { cli.help(stopping, "app\n--raw") }) ==
 			Ok("Usage: app\n--raw\n  --jobs VALUE\tWorkers\n\tverbatim\n"),
 	)
-	stopping2 = cli.map2(stopping, cli.pure(False), (_, _) -> Int {
+	stopping2 = cli.map2(stopping, cli.pure(False()), (_, _) -> Int {
 		panic("help called map2")
 	})
 	assert(
@@ -960,22 +960,22 @@ test("cli_help", () {
 	)
 	assert(
 		{
-			e4_call_arg_0 = cli.flag(cli.Names(long = "help", short = None), "")
+			e4_call_arg_0 = cli.flag(cli.Names(long = "help", short = None()), "")
 			e4_call_arg_1 = ["--help"]
 			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Ok(True),
+			Ok(True()),
 	)
 	assert(
 		{
 			e4_call_arg_0 = cli.flag(
-				cli.Names(long = "version", short = None),
+				cli.Names(long = "version", short = None()),
 				"",
 			)
 			e4_call_arg_1 = ["--version"]
 			fail.catch(() { cli.parse(e4_call_arg_0, e4_call_arg_1) })
 		} ==
-			Ok(True),
+			Ok(True()),
 	)
 	()
 })
@@ -997,7 +997,7 @@ test("cli_long_inputs", () {
 	assert(
 		{
 			e4_call_arg_0 = cli.many(
-				cli.Names(long = "name", short = None),
+				cli.Names(long = "name", short = None()),
 				"",
 				cli.text,
 			)

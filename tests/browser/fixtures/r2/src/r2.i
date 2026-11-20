@@ -96,8 +96,8 @@ cancel_probe = (owned : Bool) <- (gates : Gates, control : Control) {
 			task.go(s, () {
 				task.send(armed, ())
 				{ owned } |>
-					(True) { request.await_owned(r) }
-					& (False) { request.await(r) }
+					(True()) { request.await_owned(r) }
+					& (False()) { request.await(r) }
 			})
 			task.go(s, () {
 				task.receive(armed)
@@ -108,21 +108,21 @@ cancel_probe = (owned : Bool) <- (gates : Gates, control : Control) {
 	})
 	assert(answer == Error("cancel"))
 	{ owned } |>
-		(True) {
-			assert(request.state(r) == request.Cancelled)
+		(True()) {
+			assert(request.state(r) == request.Cancelled())
 			control.check(1)
 		}
-		& (False) {
-			assert(request.state(r) == request.Waiting)
+		& (False()) {
+			assert(request.state(r) == request.Waiting())
 			control.check(2)
 		}
 	request.cancel(request.ticket(r))
 	control.check(1)
 }
 
-cancel_owned = () { cancel_probe(True) }
+cancel_owned = () { cancel_probe(True()) }
 
-cancel_borrowed = () { cancel_probe(False) }
+cancel_borrowed = () { cancel_probe(False()) }
 
 ready_wait = <A>(r : Request(A)) <- (await : request.Await) {
 	await.wait(request.ticket(r))
@@ -149,7 +149,7 @@ race_read = () <- (gates : Gates, control : Control) {
 			control.check(3)
 			value = request.await_owned(b)
 			assert(value == 2)
-			assert(request.state(a) == request.Waiting)
+			assert(request.state(a) == request.Waiting())
 			value
 		})
 	})

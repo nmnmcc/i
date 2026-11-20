@@ -8,6 +8,6 @@
 r = (x : Bool) -> Int { x |> (True()) { 1 } & (False()) { 0 } }
 
 main = () {
-	assert(r(True) == 1)
+	assert(r(True()) == 1)
 	()
 }

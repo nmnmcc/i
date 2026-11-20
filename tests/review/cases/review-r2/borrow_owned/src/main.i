@@ -15,7 +15,7 @@ main = () <- (later : Later) {
 			),
 		)
 	})
-	assert(request.state(a) == request.Waiting)
+	assert(request.state(a) == request.Waiting())
 	control.boundary((exit) {
 		request.await_owned(b) <- (
 			request.Await(
@@ -23,6 +23,6 @@ main = () <- (later : Later) {
 			),
 		)
 	})
-	assert(request.state(b) == request.Cancelled)
+	assert(request.state(b) == request.Cancelled())
 	assert(request.await(a) == "borrow")
 }

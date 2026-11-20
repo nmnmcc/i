@@ -8,5 +8,5 @@ D = ()
 forward = <N>() <- (s : S(N)) { run(() { use() }) }
 f = () {
 	_syn3_0 : S(D) = S(() <- (d : D) { () }, (_ : D) { () })
-	forward() <- (D, _syn3_0)
+	forward() <- (D(), _syn3_0)
 }

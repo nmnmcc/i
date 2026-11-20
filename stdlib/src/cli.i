@@ -122,7 +122,7 @@ pure = <A>(value : A) -> Parser(A) {
 
 flag = (names : Names, help : String) -> Parser(Bool) {
 	Parser([
-		Field(name = names.long, short = names.short, help = help, kind = Flag),
+		Field(name = names.long, short = names.short, help = help, kind = Flag()),
 	], (buckets) {
 		buckets |>
 			([values, ..tail]) { Ok((values != [], tail)) }
@@ -176,7 +176,7 @@ option = <A>(
 			name = names.long,
 			short = names.short,
 			help = help,
-			kind = Required,
+			kind = Required(),
 		),
 		"--" <> names.long,
 		read,
@@ -189,7 +189,7 @@ argument = <A>(
 	read : (String) -> Result(A, String)
 ) -> Parser(A) {
 	required(
-		Field(name = name, short = None, help = help, kind = Positional),
+		Field(name = name, short = None(), help = help, kind = Positional()),
 		name,
 		read,
 	)
@@ -205,12 +205,12 @@ optional = <A>(
 			name = names.long,
 			short = names.short,
 			help = help,
-			kind = Optional,
+			kind = Optional(),
 		),
 	], (buckets) {
 		buckets |>
 			([]) { panic("cli: missing optional bucket") }
-			& ([[], ..tail]) { Ok((None, tail)) }
+			& ([[], ..tail]) { Ok((None(), tail)) }
 			& ([[token, .._], ..tail]) {
 				convert(token, "--" <> names.long, read) |>
 					(Error(error)) { Error(error) }
@@ -262,7 +262,7 @@ many = <A>(
 			name = names.long,
 			short = names.short,
 			help = help,
-			kind = Repeated,
+			kind = Repeated(),
 		),
 		"--" <> names.long,
 		read,
@@ -275,7 +275,7 @@ rest = <A>(
 	read : (String) -> Result(A, String)
 ) -> Parser(List(A)) {
 	repeated(
-		Field(name = name, short = None, help = help, kind = Remaining),
+		Field(name = name, short = None(), help = help, kind = Remaining()),
 		name,
 		read,
 	)
@@ -322,7 +322,7 @@ ascii_letter = (c : Int) -> Bool { ascii_lower(c) || { c >= 65 && c <= 90 } }
 
 valid_name = (name : String) -> Bool {
 	list.map(string.to_codepoints(name), string.utf_codepoint_to_int) |>
-		([]) { False }
+		([]) { False() }
 		& ([first, ..tail]) {
 			ascii_lower(first) &&
 				list.all(tail, (c) {
@@ -334,10 +334,10 @@ valid_name = (name : String) -> Bool {
 valid_short = (name : String) -> Bool {
 	list.map(string.to_codepoints(name), string.utf_codepoint_to_int) |>
 		([c]) { ascii_letter(c) }
-		& (_) { False }
+		& (_) { False() }
 }
 
-positional = (kind : Kind) -> Bool { kind == Positional || kind == Remaining }
+positional = (kind : Kind) -> Bool { kind == Positional() || kind == Remaining() }
 
 validate = (fields : List(Field)) -> Result((), DefinitionError) {
 	go = (
@@ -353,30 +353,30 @@ validate = (fields : List(Field)) -> Result((), DefinitionError) {
 				short_error = field.short |>
 					(Some(name)) {
 						{ valid_short(name) } |>
-							(True) { None }
-							& (False) { Some(InvalidName(name)) }
+							(True()) { None() }
+							& (False()) { Some(InvalidName(name)) }
 					}
-					& (None) { None }
+					& (None()) { None() }
 				{ valid_name(field.name) } |>
-					(False) { Error(InvalidName(field.name)) }
-					& (True) {
+					(False()) { Error(InvalidName(field.name)) }
+					& (True()) {
 						short_error |>
 							(Some(error)) { Error(error) }
-							& (None) {
+							& (None()) {
 								{ positional(field.kind) } |>
-									(True) {
+									(True()) {
 										{
 											list.contains(positions, field.name)
 										} |>
-											(True) {
+											(True()) {
 												Error(DuplicateName(field.name))
 											}
-											& (False) {
+											& (False()) {
 												{ had_rest } |>
-													(True) {
-														Error(MisplacedRest)
+													(True()) {
+														Error(MisplacedRest())
 													}
-													& (False) {
+													& (False()) {
 														go(
 															tail,
 															longs,
@@ -386,21 +386,21 @@ validate = (fields : List(Field)) -> Result((), DefinitionError) {
 																..positions,
 															],
 															field.kind ==
-																Remaining,
+																Remaining(),
 														)
 													}
 											}
 									}
-									& (False) {
+									& (False()) {
 										{ list.contains(longs, field.name) } |>
-											(True) {
+											(True()) {
 												Error(
 													DuplicateName(
 														"--" <> field.name,
 													),
 												)
 											}
-											& (False) {
+											& (False()) {
 												field.short |>
 													(
 														Some(name)
@@ -427,7 +427,7 @@ validate = (fields : List(Field)) -> Result((), DefinitionError) {
 															had_rest,
 														)
 													}
-													& (None) {
+													& (None()) {
 														go(
 															tail,
 															[
@@ -445,7 +445,7 @@ validate = (fields : List(Field)) -> Result((), DefinitionError) {
 					}
 			}
 	}
-	go(fields, [], [], [], False)
+	go(fields, [], [], [], False())
 }
 
 lookup = (fields : List(Field), name : String, short : Bool) -> Option(
@@ -453,14 +453,14 @@ lookup = (fields : List(Field), name : String, short : Bool) -> Option(
 ) {
 	go = (remaining : List(Field), index : Int) -> Option((Int, Field)) {
 		remaining |>
-			([]) { None }
+			([]) { None() }
 			& ([field, ..tail]) {
 				matches = { short } |>
-					(True) { field.short == Some(name) }
-					& (False) { field.name == name }
-				{ positional(field.kind) == False && matches } |>
-					(True) { Some((index, field)) }
-					& (False) { go(tail, index + 1) }
+					(True()) { field.short == Some(name) }
+					& (False()) { field.name == name }
+				{ positional(field.kind) == False() && matches } |>
+					(True()) { Some((index, field)) }
+					& (False()) { go(tail, index + 1) }
 			}
 	}
 	go(fields, 0)
@@ -471,8 +471,8 @@ bucket_at = (buckets : List(List(Token)), index : Int) -> List(Token) {
 		([]) { panic("cli: bucket index out of range") }
 		& ([head, ..tail]) {
 			{ index == 0 } |>
-				(True) { head }
-				& (False) { bucket_at(tail, index - 1) }
+				(True()) { head }
+				& (False()) { bucket_at(tail, index - 1) }
 		}
 }
 
@@ -483,8 +483,8 @@ put = (buckets : List(List(Token)), index : Int, token : Token) -> List(
 		([]) { panic("cli: bucket index out of range") }
 		& ([head, ..tail]) {
 			{ index == 0 } |>
-				(True) { [[token, ..head], ..tail] }
-				& (False) { [head, ..put(tail, index - 1, token)] }
+				(True()) { [[token, ..head], ..tail] }
+				& (False()) { [head, ..put(tail, index - 1, token)] }
 		}
 }
 
@@ -494,11 +494,11 @@ option_token = (token : String) -> Option((String, Bool, Option(String))) {
 		(["-", "-", ..tail]) {
 			name = string.concat(tail)
 			string.split_once(name, "=") |>
-				(Some((before, value))) { Some((before, False, Some(value))) }
-				& (None) { Some((name, False, None)) }
+				(Some((before, value))) { Some((before, False(), Some(value))) }
+				& (None()) { Some((name, False(), None())) }
 		}
-		& (["-", name]) { Some((name, True, None)) }
-		& (_) { None }
+		& (["-", name]) { Some((name, True(), None())) }
+		& (_) { None() }
 }
 
 scan = (fields : List(Field), args : List(String)) -> Result(
@@ -518,14 +518,14 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 			}
 			& ([raw, ..tail]) {
 				{ options && raw == "--" } |>
-					(True) { go(tail, index + 1, False, buckets, positions) }
-					& (False) {
+					(True()) { go(tail, index + 1, False(), buckets, positions) }
+					& (False()) {
 						{
 							options &&
 								raw != "-" &&
 								string.starts_with(raw, "-")
 						} |>
-							(False) {
+							(False()) {
 								go(
 									tail,
 									index + 1,
@@ -537,9 +537,9 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 									],
 								)
 							}
-							& (True) {
+							& (True()) {
 								option_token(raw) |>
-									(None) {
+									(None()) {
 										Error(
 											UnknownOption(
 												index = index,
@@ -549,7 +549,7 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 									}
 									& (Some((name, short, attached))) {
 										lookup(fields, name, short) |>
-											(None) {
+											(None()) {
 												Error(
 													UnknownOption(
 														index = index,
@@ -560,14 +560,14 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 											& (Some((slot, field))) {
 												canonical = "--" <> field.name
 												{
-													field.kind != Repeated &&
+													field.kind != Repeated() &&
 														bucket_at(
 															buckets,
 															slot,
 														) !=
 															[]
 												} |>
-													(True) {
+													(True()) {
 														Error(
 															RepeatedOption(
 																index = index,
@@ -575,9 +575,9 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 															),
 														)
 													}
-													& (False) {
+													& (False()) {
 														field.kind |>
-															(Flag) {
+															(Flag()) {
 																attached |>
 																	(Some(_)) {
 																		Error(
@@ -587,7 +587,7 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 																			),
 																		)
 																	}
-																	& (None) {
+																	& (None()) {
 																		go(
 																			tail,
 																			index +
@@ -628,7 +628,7 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 																			positions,
 																		)
 																	}
-																	& (None) {
+																	& (None()) {
 																		tail |>
 																			(
 																				[]
@@ -685,7 +685,7 @@ scan = (fields : List(Field), args : List(String)) -> Result(
 					}
 			}
 	}
-	go(args, 0, True, list.map(fields, (_) { [] }), [])
+	go(args, 0, True(), list.map(fields, (_) { [] }), [])
 }
 
 allocate = (
@@ -714,14 +714,14 @@ allocate = (
 			}
 			& (([field, ..tail], [bucket, ..rest])) {
 				field.kind |>
-					(Positional) {
+					(Positional()) {
 						args |>
 							([]) { go(tail, rest, [], [[], ..acc]) }
 							& ([token, ..more]) {
 								go(tail, rest, more, [[token], ..acc])
 							}
 					}
-					& (Remaining) { go(tail, rest, [], [args, ..acc]) }
+					& (Remaining()) { go(tail, rest, [], [args, ..acc]) }
 					& (_) { go(tail, rest, args, [bucket, ..acc]) }
 			}
 			& (_) { panic("cli: field and bucket counts differ") }
@@ -757,14 +757,14 @@ _parse_result = <A>(parser : Parser(A), args : List(String)) -> Result(
 show_field = (field : Field) -> String {
 	base = "--" <>
 		field.name <>
-		{ field.short |> (Some(short)) { ", -" <> short } & (None) { "" } }
+		{ field.short |> (Some(short)) { ", -" <> short } & (None()) { "" } }
 	field.kind |>
-		(Flag) { "[\(base)]" }
-		& (Required) { base <> " VALUE" }
-		& (Optional) { "[\(base) VALUE]" }
-		& (Repeated) { "[\(base) VALUE...]" }
-		& (Positional) { "<\(field.name)>" }
-		& (Remaining) { "[<\(field.name)>...]" }
+		(Flag()) { "[\(base)]" }
+		& (Required()) { base <> " VALUE" }
+		& (Optional()) { "[\(base) VALUE]" }
+		& (Repeated()) { "[\(base) VALUE...]" }
+		& (Positional()) { "<\(field.name)>" }
+		& (Remaining()) { "[<\(field.name)>...]" }
 }
 
 _help_result = <A>(parser : Parser(A), program : String) -> Result(

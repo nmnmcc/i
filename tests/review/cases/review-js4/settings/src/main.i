@@ -14,8 +14,8 @@ main = () {
 		assert(use() == <<1, 2>>)
 		assert(use() == <<>>) <- (fallback())
 	} <- (Fs(read = () { <<3>> })) <- (filesystem()) <- (
-		Await,
-		Owner,
+		Await(),
+		Owner(),
 		Fs(read = () { <<1, 2>> }),
 	)
 }

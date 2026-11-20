@@ -31,7 +31,7 @@ prefix = (m : { "ab" | "b" }) { m |> ("a" <> _) { 1 } & ("b") { 2 } }
 non_empty = (s : String) {
 	s |>
 		("") { 0 }
-		& ("a" <> rest) { { rest == "a" } |> (True) { 1 } & (False) { 2 } }
+		& ("a" <> rest) { { rest == "a" } |> (True()) { 1 } & (False()) { 2 } }
 		& (_) { 3 }
 }
 
@@ -44,7 +44,7 @@ test("narrowing_runs", () {
 	assert(choices("c") == 7)
 	assert(nested(Ok("b")) == 7)
 	assert(nested(Error(())) == 1)
-	assert(tuple(("b", False)) == 7)
+	assert(tuple(("b", False())) == 7)
 	assert(list(["b", "a"]) == 7)
 	assert(except("a") == 8)
 	assert(finite("a") == 1)

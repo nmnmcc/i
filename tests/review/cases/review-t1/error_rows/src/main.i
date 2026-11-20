@@ -1,7 +1,7 @@
 (
 	fail = i/fail
 )
-f = (b : Bool) { b |> (True) { fail.raise("a") } & (False) { fail.raise("b") } }
+f = (b : Bool) { b |> (True()) { fail.raise("a") } & (False()) { fail.raise("b") } }
 g = (b : Bool) {
 	fail.catch(() { f(b) }) |>
 		(Error("a")) { 1 }
@@ -13,6 +13,6 @@ g = (b : Bool) {
 }
 
 main = () {
-	assert(g(False) == 2)
+	assert(g(False()) == 2)
 	()
 }

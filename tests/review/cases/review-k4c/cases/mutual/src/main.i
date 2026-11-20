@@ -1,10 +1,10 @@
 S(N) = (() <- N -> ())
 a = <N>(b : Bool) <- (s : S(N)) {
 	b |>
-		(True) {
+		(True()) {
 			S(f) = s
 			f()
 		}
-		& (False) { z(True) }
+		& (False()) { z(True()) }
 }
 z = (b : Bool) { a(b) }

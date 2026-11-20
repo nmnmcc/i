@@ -11,8 +11,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -49,8 +49,8 @@ outer = (b) {
 main = () {
 	p = control.boundary((b) {
 		outer(b)
-		Done
+		Done()
 	})
-	p |> (Paused(k)) { control.resume(k, ()) } & (Done) { panic("not paused") }
+	p |> (Paused(k)) { control.resume(k, ()) } & (Done()) { panic("not paused") }
 	()
 }

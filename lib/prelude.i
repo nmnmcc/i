@@ -36,6 +36,6 @@ panic : (String) -> Never
 /// Reports a failure to `Assert` when `c` is `False`.
 assert = (c : Bool) <- (a : Assert) {
 	c |>
-		(True) { () }
-		& (False) { a.fail(AssertionFailure(message = "assert")) }
+		(True()) { () }
+		& (False()) { a.fail(AssertionFailure(message = "assert")) }
 }

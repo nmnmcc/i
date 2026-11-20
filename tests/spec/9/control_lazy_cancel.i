@@ -9,8 +9,8 @@
 
 check = (got : String, want : String) {
 	{ got == want } |>
-		(True) { () }
-		& (False) { panic(got <> " is not " <> want) }
+		(True()) { () }
+		& (False()) { panic(got <> " is not " <> want) }
 }
 
 show = (x) { core.inspect(x) }
@@ -63,22 +63,22 @@ test("cancel_deep", () {
 		held = control.boundary((hold) {
 			p = control.boundary((b) {
 				layer(log, hold, b, 100)
-				Done
+				Done()
 			})
 			p |>
 				(Paused(k)) { control.cancel(k) }
-				& (Done) { panic("not paused") }
+				& (Done()) { panic("not paused") }
 			note(log, "cancelled")
-			Over
+			Over()
 		})
 		held |>
 			(Held(k2)) {
 				note(log, "resume")
 				{ control.resume(k2, ()) } |>
-					(Over) { "end" }
+					(Over()) { "end" }
 					& (Held(_)) { "held again" }
 			}
-			& (Over) { "not held" }
+			& (Over()) { "not held" }
 	})
 	check(r, "final 10 final 50 resume final 50 again final 90 cancelled end")
 })

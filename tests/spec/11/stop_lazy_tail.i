@@ -34,13 +34,13 @@ last = (n) { n |> (0) { panic("after") } & (_) { last(n - 1) } }
 main = () {
 	p = control.boundary((b) {
 		w1(b)
-		Done
+		Done()
 	})
 	p |>
 		(Paused(k)) {
 			x = control.resume(k, ())
 			x
 		}
-		& (Done) { panic("not paused") }
+		& (Done()) { panic("not paused") }
 	()
 }

@@ -4,7 +4,7 @@ f = (x : Int) {
 	y
 }
 g = () {
-	x : Bool = True
-	y : x = False
+	x : Bool = True()
+	y : x = False()
 	y
 }
