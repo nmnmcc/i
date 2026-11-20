@@ -12,12 +12,22 @@ use crate::{Code, Diagnostic};
 /// A converted file, and the spans of the comments that have no place in it.
 pub type Converted = Result<(String, Vec<Span>), Vec<Diagnostic>>;
 
-/// The tree without expression groups and with interpolation lowered to
-/// concatenation. These are the surface differences before the core
-/// tree is compared.
+/// The tree without expression groups, with interpolation lowered to
+/// concatenation, and with a constructor called with no arguments read as
+/// the constructor (`True()` and `True`, the pattern `True()` and `True`):
+/// the printers write both with the call. These are the surface differences
+/// before the core tree is compared.
 pub fn ungrouped(module: &Module) -> Module {
     struct Ungroup;
     impl Visitor for Ungroup {
+        fn pattern(&mut self, p: &mut Pattern, enter: bool) {
+            if !enter
+                && let PatternKind::Ctor { args, .. } = &mut p.kind
+                && args.as_ref().is_some_and(Vec::is_empty)
+            {
+                *args = None;
+            }
+        }
         fn expr(&mut self, e: &mut Expr, enter: bool) {
             if enter {
                 return;
@@ -48,6 +58,16 @@ pub fn ungrouped(module: &Module) -> Module {
                         span.0,
                     )
                 });
+            }
+            if let ExprKind::Call { callee, args } = &mut e.kind
+                && args.is_empty()
+                && let ExprKind::Name { name, .. } = &callee.kind
+                && name.name.starts_with(char::is_uppercase)
+            {
+                *e = std::mem::replace(
+                    callee.as_mut(),
+                    Expr::new(ExprKind::Data(Vec::new()), span.0),
+                );
             }
             if let ExprKind::Block(b) = &mut e.kind
                 && let [Stmt::Expr(_)] = b.stmts.as_slice()
