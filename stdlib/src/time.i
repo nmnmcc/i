@@ -66,6 +66,7 @@
 	sleep
 	measure
 	Timeout(..)
+	BadDeadline(..)
 	timeout
 )
 
@@ -169,20 +170,36 @@ divide = (duration : Duration, by : Int) -> Duration {
 /// own errors.
 Timeout = (after = Duration)
 
+/// `timeout` was given a deadline the clock cannot hold: more than
+/// `max_timeout` of about 292 years. The body is not started.
+BadDeadline = (after = Duration)
+
+/// The largest deadline `timeout` accepts, in nanoseconds: 2^63 - 1.
+max_timeout = (9223372036854775807)
+
+/// What the race below gives: the body's value, the deadline, or a clock
+/// that could not install the timer.
+Outcome(A) = Ran(A) | Expired | ClockFailed(clock.ClockError)
+
 /// Runs `body` and gives its value, or raises `Timeout(after = after)` when
 /// `after` passes first. A zero or negative `after` raises at once and does
 /// not start the body.
+///
+/// The deadline must fit the clock: an `after` above `max_timeout` (2^63 - 1
+/// nanoseconds, about 292 years) raises `BadDeadline(after = after)` before
+/// the body starts, rather than failing later inside the timer.
 ///
 /// The body runs in a task of its own and is cancelled when the deadline
 /// passes; `timeout` returns only after that task has finished its cleanup,
 /// so a body must be safe to cancel. A body error comes back unchanged.
 ///
+/// If the clock cannot install the timer, `timeout` cancels the body and
+/// raises the clock's error once the body has unwound; it never waits for a
+/// blocked body to finish on its own.
+///
 /// Needs `Scheduler`, `Runner` and `clock.Clock`.
-/// Errors: the body's own `E`, `Timeout(after = after)`, and
-/// `clock.ClockError` when the clock fails. A clock failure is a failure of
-/// the timer's child, so it is reported only after the body has unwound, as
-/// a race reports a failure (spec §9.9 R2); a body that does not respond to
-/// cancellation delays that report.
+/// Errors: the body's own `E`, `Timeout(after = after)`,
+/// `BadDeadline(after = after)`, and `clock.ClockError`.
 ///
 /// ```i
 /// task.run(() {
@@ -193,15 +210,27 @@ Timeout = (after = Duration)
 /// ```
 timeout = (after : Duration, body) {
 	Duration(nanoseconds) = after
+	{ nanoseconds > max_timeout } |>
+		(True) { fail.raise(BadDeadline(after = after)) }
+		& (False) { () }
 	{ nanoseconds <= 0 } |>
 		(True) { fail.raise(Timeout(after = after)) }
 		& (False) {
-			task.race(
-				() { body() },
+			// The timer reports a clock failure as a value, not as a child
+			// failure: a failure would let the race wait for the body (R2),
+			// which may never end. As a value it commits the race, cancels
+			// the body and returns after the body's finals.
+			outcome = task.race(
+				() { Ran(body()) },
 				() {
-					clock.sleep_ns(nanoseconds)
-					fail.raise(Timeout(after = after))
+					fail.catch(() { clock.sleep_ns(nanoseconds) }) |>
+						(Ok(_)) { Expired }
+						& (Error(error)) { ClockFailed(error) }
 				},
 			)
+			outcome |>
+				(Ran(value)) { value }
+				& (Expired) { fail.raise(Timeout(after = after)) }
+				& (ClockFailed(error)) { fail.raise(error) }
 		}
 }
