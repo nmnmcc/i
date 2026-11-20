@@ -163,7 +163,7 @@ def generate():
             else:
                 break
         banner = (f'> Documents `{TAG}`, the version `i new` writes.'
-                  if VERSION else '> Documents the working-tree standard library: the unreleased 0.2.0. '
+                  if VERSION else '> **Unpublished.** The working-tree standard library: the unreleased 0.2.0. '
                   'No released compiler builds it yet, so `i new` still writes the released version.')
         output = ['---', 'title: ' + json.dumps(module), '---', '', banner, '', *([safe('\n'.join(opening)), ''] if any(line.strip() for line in opening) else [])]
         exports = next(groups(source), [])
