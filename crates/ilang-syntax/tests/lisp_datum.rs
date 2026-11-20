@@ -497,7 +497,7 @@ fn without_spans(d: &ilang_syntax::lisp::Datum) -> ilang_syntax::lisp::Datum {
 /// text: the macro engine can use either.
 #[test]
 fn tree_datums_are_the_datums_of_their_text() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../stdlib/src");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/src");
     let mut files = 0;
     for entry in std::fs::read_dir(root).unwrap() {
         let path = entry.unwrap().path();

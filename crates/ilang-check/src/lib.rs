@@ -220,6 +220,19 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
             }
         }
     }
+    // A program that declares a host service in the standard Io namespace
+    // needs the library's `i/io` present to detect the conflict.
+    if graph.packages[root]
+        .modules
+        .iter()
+        .any(|m| graph.sources.get(m.source).text.contains("i:io/"))
+    {
+        for package in 0..graph.packages.len() {
+            if let Some(&i) = index.get(&(package, "i/io")) {
+                queue.push_back((package, i));
+            }
+        }
+    }
     let pkg = &graph.packages[root];
     for e in pkg
         .wasm_exports
@@ -293,7 +306,7 @@ pub fn parse(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
 
 /// Library modules that code generation and macro expansion call by path,
 /// whether or not the program imports them.
-pub const CODEGEN_LIBRARY: &[&str] = &["i/fail", "i/request", "i/task", "i/syntax", "i/io"];
+pub const CODEGEN_LIBRARY: &[&str] = &["i/fail", "i/request", "i/task", "i/syntax"];
 
 /// Parses every module of the graph, also those that no import reaches.
 pub fn parse_all(graph: &PackageGraph) -> (Vec<Parsed>, Vec<Diagnostic>) {
