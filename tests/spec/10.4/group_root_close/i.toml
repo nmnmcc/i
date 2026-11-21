@@ -1,0 +1,8 @@
+# spec: 10.4
+# expect: pass
+# host-boundary §5.3: closing a group's Root closes the group.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

@@ -1,0 +1,8 @@
+# spec: 10.4
+# expect: stop "panic: hostcall: group closed"
+# host-boundary §5.4 row 5: `call_in` a closed group panics with the exact text.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

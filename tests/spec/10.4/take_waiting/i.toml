@@ -1,0 +1,8 @@
+# spec: 10.4
+# expect: stop "panic: hostcall: not ready"
+# host-boundary §5.4 row 9: `take` of a waiting Call panics.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

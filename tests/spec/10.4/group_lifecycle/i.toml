@@ -1,0 +1,8 @@
+# spec: 10.4
+# expect: pass
+# host-boundary §5.3: a group is open until `close`; `close` is idempotent.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

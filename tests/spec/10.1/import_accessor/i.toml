@@ -1,0 +1,9 @@
+# spec: 10.1
+# expect: compile-error E0501
+# host-boundary §3.2: `make_svc` is exported from the type's module and its
+# result is `Svc`; using it as `Int` is a type mismatch, which proves the
+# accessor resolves from another module with the service type.
+name = "app"
+
+[dependencies]
+i = { path = "../../../../stdlib" }
