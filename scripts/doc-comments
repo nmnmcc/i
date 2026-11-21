@@ -584,6 +584,13 @@ def cmd_check(args):
     counts, hits = inventory()
     for path, no, text in hits:
         print(f"{path}:{no}: {text}")
+    if hits:
+        if any(re.match(r"[A-Z][0-9]{1,2}[a-z]?(?:/[A-Z][0-9]{1,2})*:\s", text, re.I) for _, _, text in hits):
+            print('hint: a line like "R5: ..." reads as a process reference; '
+                  'cite the rule at the end of the sentence instead: "... (R5)."')
+        if any(REF.search(text) for _, _, text in hits):
+            print('hint: a section mark or a spec path in a source comment is a reference; '
+                  'write the fact and, if needed, "... (R5)."')
     print(f"comment policy: {len(hits)} unapproved reference or stale-comment lines")
     problems = len(hits)
     if args.proof:
