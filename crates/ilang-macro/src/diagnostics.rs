@@ -1,7 +1,7 @@
 //! Turns expansion failures into ordinary, source-located compiler diagnostics.
 use crate::{body_engine::Error, session::Failure};
 use ilang_host::syntax::DefinitionAbort;
-use ilang_package::{Diagnostic, SourceId};
+use ilang_package::{Diagnostic, DiagnosticNote, SourceId};
 
 pub fn body(source: SourceId, error: Error) -> Vec<Diagnostic> {
     let code = ilang_check::code::MACRO_RESERVED;
@@ -45,8 +45,25 @@ pub fn body(source: SourceId, error: Error) -> Vec<Diagnostic> {
             invocation_span,
             ..
         } => {
+            let mut related = Vec::new();
             let (location, span, message) = match failure {
                 Failure::Syntax(error) => (source, error.span, error.message),
+                // A form error in a result belongs to the call; a template
+                // node, from another module or made by this run, is a note.
+                // Its span is only meaningful in the template's own file.
+                Failure::Expansion(error) => {
+                    let scope = error.at.scope();
+                    if scope.module != source.0 || !scope.marks.is_empty() {
+                        related.push(DiagnosticNote {
+                            source: SourceId(scope.module),
+                            span: error.at.span(),
+                            message: "expanded from this template".into(),
+                        });
+                        (source, invocation_span, error.message)
+                    } else {
+                        (source, error.at.span(), error.message)
+                    }
+                }
                 Failure::Aborted(DefinitionAbort::Deferred { at }) => (
                     SourceId(at.scope().module),
                     at.span(),
@@ -68,7 +85,7 @@ pub fn body(source: SourceId, error: Error) -> Vec<Diagnostic> {
                 }
                 Failure::Host(error) => (source, invocation_span, format!("{error:#}")),
             };
-            vec![Diagnostic::error(
+            let mut diagnostic = Diagnostic::error(
                 if message.starts_with("E0546:") {
                     ilang_check::code::TYPE_RESOURCE_LIMIT
                 } else {
@@ -77,7 +94,9 @@ pub fn body(source: SourceId, error: Error) -> Vec<Diagnostic> {
                 Some(location),
                 span,
                 format!("macro `{macro_name}`: {message}"),
-            )]
+            );
+            diagnostic.related = related;
+            vec![diagnostic]
         }
     }
 }
