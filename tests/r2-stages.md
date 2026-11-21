@@ -784,7 +784,7 @@ gate. The direct Rust R2 matrix (four tests, including all 200 repeats at O0/O2)
 also passed after the merge.
 
 The nested-interest host probe now contains both an inner CPU-yielding sibling
-and an outer one. This explicitly exercises Runner.poll forwarding while the
+and an outer one. This explicitly exercises Runner.poll_work forwarding while the
 nested loop is runnable, rather than proving only idle Runner.wait forwarding.
 Its inner CPU branch stops after 32 unanswered turns, so a missing route fails
 without a timer or an indefinitely hung test. The expected answer still comes
