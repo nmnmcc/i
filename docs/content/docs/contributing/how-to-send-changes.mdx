@@ -51,6 +51,8 @@ A language change includes its spec text, `tests/spec` case, and an account of i
 
 ## Submission
 
+A branch must be up to date with `main` before it can merge; branch protection refuses the merge otherwise. Two branches that are each green can still fail together: one may use a form the other changed, as when a language change and a new library module written in the old form merge in either order. Sync before merging (`git merge origin/main`, or rebase) and run `i check --project stdlib`, which catches a language change that reaches the standard library.
+
 Before merging, confirm that the head commit of the pull request has one complete, successful run. Do not put `[skip ci]` on a pull request head: it starts no run, but it enters the same concurrency group and cancels the run that was still going, so the merged tree is never checked by the full gate. To add documentation, rebase it into the code commit or accept one new complete run.
 
 Do not commit acceptance reports, proofs or run logs; keep them in the pull request description or git history.

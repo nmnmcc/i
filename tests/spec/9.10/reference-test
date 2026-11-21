@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Counterexamples for the UPDATE=1 write of the §9.10 vectors."""
+import contextlib
+import importlib.util
+import io
+import os
+from pathlib import Path
+import tempfile
+import unittest
+
+REFERENCE = Path(__file__).resolve().with_name('reference.py')
+loader = importlib.util.spec_from_file_location('reference_vectors', REFERENCE)
+reference = importlib.util.module_from_spec(loader)
+loader.loader.exec_module(reference)
+
+
+class AtomicVectorWrite(unittest.TestCase):
+    def test_failed_run_keeps_the_old_vectors_and_reports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'vectors.i'
+            target.write_bytes(b'(old)\n')
+            errors = io.StringIO()
+            old = os.environ.get('UPDATE')
+            os.environ['UPDATE'] = '1'
+            try:
+                with contextlib.redirect_stderr(errors):
+                    self.assertFalse(reference.commit(target, '(new)\n', False))
+            finally:
+                if old is None:
+                    del os.environ['UPDATE']
+                else:
+                    os.environ['UPDATE'] = old
+            self.assertEqual(target.read_bytes(), b'(old)\n')
+            self.assertIn(f'not updated: {target}', errors.getvalue())
+
+    def test_successful_update_replaces_the_vectors_completely(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / 'vectors.i'
+            target.write_bytes(b'(old)\n')
+            text = '(new)\n' * 200
+            self.assertTrue(reference.commit(target, text, True))
+            self.assertEqual(target.read_bytes(), text.encode())
+            self.assertEqual([entry.name for entry in Path(directory).iterdir()], ['vectors.i'])
+
+
+if __name__ == '__main__':
+    unittest.main()

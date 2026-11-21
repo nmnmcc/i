@@ -16,21 +16,23 @@ echo = (stream) {
 		}
 }
 
-handle = (stream) {
-	resource.ensure(() { echo(stream) }, () { net.close_stream(stream) })
-}
-
+// Accept one connection; keep accepting in a child of the same task scope and
+// echo on this connection inside the resource scope that owns its stream.
 serve = (listener, scope) {
-	stream = net.accept(listener)
-	task.go(scope, () { handle(stream) })
-	serve(listener, scope)
+	resource.scoped(() {
+		stream = net.accept(listener)
+		task.go(scope, () { serve(listener, scope) })
+		echo(stream)
+	})
 }
 
 // Program entry.
 main = () {
-	listener = net.listen("127.0.0.1", 0)
-	port = net.local_port(listener)
-	stdio.print("listening " <> core.inspect(port))
-	server = () { task.scope((scope) { serve(listener, scope) }) }
-	task.run(server)
+	resource.scoped(() {
+		listener = net.listen("127.0.0.1", 0)
+		port = net.local_port(listener)
+		stdio.print("listening " <> core.inspect(port))
+		server = () { task.scope((scope) { serve(listener, scope) }) }
+		task.run(server)
+	})
 }

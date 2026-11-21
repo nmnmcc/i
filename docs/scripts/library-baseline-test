@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Counterexamples for library_baseline: the three consumers read one value."""
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+DOCS = ROOT / 'docs' / 'scripts'
+CHECK = ROOT / 'scripts' / 'check-doc-modules'
+
+
+def env_with(tag=None, export=None):
+    env = dict(os.environ)
+    for key in ('LIBRARY_TAG', 'LIBRARY_ROOT', 'LIBRARY_EXPORT'):
+        env.pop(key, None)
+    if tag:
+        env['LIBRARY_TAG'] = tag
+    if export:
+        env['LIBRARY_EXPORT'] = str(export)
+    return env
+
+
+def consumer(script, attribute, env):
+    code = (
+        "import importlib.util, sys\n"
+        # Running a script puts its directory first on the path; do the same.
+        f"sys.path.insert(0, {str(script.parent)!r})\n"
+        f"spec = importlib.util.spec_from_file_location('m', {str(script)!r})\n"
+        "m = importlib.util.module_from_spec(spec)\n"
+        "spec.loader.exec_module(m)\n"
+        f"print(m.{attribute})\n"
+    )
+    result = subprocess.run([sys.executable, '-I', '-c', code],
+                            capture_output=True, text=True, env=env)
+    assert result.returncode == 0, result.stderr
+    return result.stdout.strip()
+
+
+def check(env):
+    return subprocess.run([sys.executable, '-I', str(CHECK)],
+                          capture_output=True, text=True, env=env)
+
+
+def main():
+    generate = DOCS / 'generate-library.py'
+    examples = DOCS / 'run-examples.py'
+
+    # Default: one baseline, the working tree, for all three.
+    env = env_with()
+    library = str(ROOT / 'stdlib')
+    assert consumer(generate, 'LIBRARY', env) == library
+    assert consumer(examples, 'LIBRARY', env) == library
+    assert consumer(generate, 'TAG', env) == 'None'
+    assert consumer(generate, 'VERSION', env) == 'None'
+    result = check(env)
+    assert 'against the working tree' in result.stdout, result.stdout + result.stderr
+
+    # A tag: all three switch together, and read the tag's files.
+    with tempfile.TemporaryDirectory() as directory:
+        env = env_with('stdlib-v0.1.0', directory)
+        library = str(Path(directory) / 'i-stdlib-v0.1.0' / 'stdlib')
+        assert consumer(generate, 'LIBRARY', env) == library
+        assert consumer(examples, 'LIBRARY', env) == library
+        assert consumer(generate, 'TAG', env) == 'stdlib-v0.1.0'
+        assert consumer(generate, 'VERSION', env) == '0.1.0'
+        assert (Path(library) / 'src' / 'clock.i').is_file()
+        assert not (Path(library) / 'src' / 'queue.i').exists()
+        result = check(env)
+        # In CI the generated pages claim modules the tag lacks, so the check
+        # fails; the label is then in "not in <tag>". Locally it may pass and
+        # say "against <tag>". Either way the baseline is the tag.
+        combined = result.stdout + result.stderr
+        assert ('against stdlib-v0.1.0' in combined
+                or 'not in stdlib-v0.1.0' in combined), combined
+
+    print('library baseline counterexamples pass.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

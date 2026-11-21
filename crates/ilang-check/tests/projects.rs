@@ -33,11 +33,13 @@ fn projects() {
     dirs.sort();
     assert!(!dirs.is_empty());
     let mut failed = Vec::new();
+    let mut updates = common::golden::Staged::default();
     for dir in &dirs {
         let actual = run(dir);
         let path = dir.join("expected.out");
         if update {
-            fs::write(&path, &actual).unwrap();
+            // Keep every new file in memory; a panic below publishes none.
+            updates.push(path, actual);
             continue;
         }
         let expected = fs::read_to_string(&path).unwrap_or_default();
@@ -46,10 +48,21 @@ fn projects() {
             failed.push(dir.file_name().unwrap().to_string_lossy().into_owned());
         }
     }
+    if update {
+        updates.commit(failed.is_empty()).unwrap();
+    }
     assert!(
         failed.is_empty(),
         "projects differ: {failed:?} (run with UPDATE=1 to bless)"
     );
+}
+
+/// The counterexample for the atomic write: with `UPDATE=1`, a failed run
+/// leaves `expected.out` byte for byte and reports it, and a successful run
+/// replaces it completely.
+#[test]
+fn a_failed_update_leaves_the_golden_unchanged() {
+    common::golden::counterexample("a_failed_update_leaves_the_golden_unchanged");
 }
 
 /// The `ok_*` projects resolve with no diagnostics at all.

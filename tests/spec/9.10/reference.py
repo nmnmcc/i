@@ -9,6 +9,7 @@ The model uses Python integers, strings for tree addresses, and tuple states.
 """
 import os
 from pathlib import Path
+import sys
 
 W = 1 << 64
 MASK = W - 1
@@ -171,14 +172,47 @@ def generate():
     return '\n'.join(out)
 
 
+def atomic_write(path, text):
+    """Replace `path` through a temporary file in the same directory.
+
+    A killed run leaves either the old vectors or all of the new ones. The
+    temporary name does not end in `.i`, so the spec runner cannot collect it.
+    """
+    temporary = path.with_name(f'{path.name}.tmp-{os.getpid()}')
+    try:
+        with open(temporary, 'w') as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def commit(target, text, ok):
+    """Replace the vectors only after the whole generation succeeded."""
+    if not ok:
+        print(f'not updated: {target}', file=sys.stderr)
+        return False
+    atomic_write(target, text)
+    return True
+
+
 def main():
-    cases = check_reference()
     target = Path(__file__).with_name('vectors.i')
-    text = generate()
     if os.environ.get('UPDATE') == '1':
-        target.write_text(text)
+        try:
+            cases = check_reference()
+            text = generate()
+        except BaseException:
+            print(f'not updated: {target}', file=sys.stderr)
+            raise
+        commit(target, text, True)
         print(f'Generated {target}')
     else:
+        cases = check_reference()
+        text = generate()
         # Formatting is performed by the repository formatter when generating.
         # Whitespace does not affect any generated expectation or its source.
         assert ''.join(target.read_text().split()).replace(',', '') == ''.join(text.split()).replace(',', '')

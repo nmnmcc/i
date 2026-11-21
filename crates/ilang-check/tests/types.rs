@@ -140,9 +140,16 @@ fn render(graph: &PackageGraph, d: &Diagnostic, short: bool) -> String {
     )
 }
 
-fn compare(path: &Path, actual: &str, failed: &mut Vec<String>) {
+fn compare(
+    path: &Path,
+    actual: &str,
+    updates: &mut common::golden::Staged,
+    failed: &mut Vec<String>,
+) {
     if std::env::var_os("UPDATE").is_some() {
-        fs::write(path, actual).unwrap();
+        // Keep every new file in memory; the caller publishes them only
+        // after the whole run succeeded.
+        updates.push(path.to_path_buf(), actual.to_string());
         return;
     }
     let expected = fs::read_to_string(path).unwrap_or_default();
@@ -161,6 +168,7 @@ fn types() {
         .collect();
     entries.sort();
     let mut failed = Vec::new();
+    let mut updates = common::golden::Staged::default();
     let mut count = 0;
     for path in &entries {
         if path.extension().is_some_and(|e| e == "i") {
@@ -171,21 +179,42 @@ fn types() {
             let (graph, diags) = ilang_package::load(dir.path());
             assert!(diags.is_empty());
             let actual = output(&graph, true, false);
-            compare(&path.with_extension("out"), &actual, &mut failed);
+            compare(
+                &path.with_extension("out"),
+                &actual,
+                &mut updates,
+                &mut failed,
+            );
             count += 1;
         } else if path.join("i.toml").exists() {
             let (graph, diags) = ilang_package::load(path);
             assert!(diags.is_empty());
             let actual = output(&graph, false, false);
-            compare(&path.join("expected.out"), &actual, &mut failed);
+            compare(
+                &path.join("expected.out"),
+                &actual,
+                &mut updates,
+                &mut failed,
+            );
             count += 1;
         }
     }
     assert!(count > 0);
+    if std::env::var_os("UPDATE").is_some() {
+        updates.commit(failed.is_empty()).unwrap();
+    }
     assert!(
         failed.is_empty(),
         "types differ: {failed:#?} (run with UPDATE=1 to bless)"
     );
+}
+
+/// The counterexample for the atomic write: with `UPDATE=1`, a failed run
+/// leaves a `.out` golden byte for byte and reports it, and a successful run
+/// replaces it completely.
+#[test]
+fn a_failed_update_leaves_the_golden_unchanged() {
+    common::golden::counterexample("a_failed_update_leaves_the_golden_unchanged");
 }
 
 /// The library graph of the snapshot: an empty app that depends on the
@@ -230,8 +259,12 @@ fn library() {
         "definitions have no type scheme: {missing:#?}"
     );
     let mut failed = Vec::new();
+    let mut updates = common::golden::Staged::default();
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/types/library.out");
-    compare(&path, &actual, &mut failed);
+    compare(&path, &actual, &mut updates, &mut failed);
+    if std::env::var_os("UPDATE").is_some() {
+        updates.commit(failed.is_empty()).unwrap();
+    }
     assert!(
         failed.is_empty(),
         "library types differ (run with UPDATE=1 to bless)"

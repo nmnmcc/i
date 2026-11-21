@@ -254,7 +254,7 @@ timeout = (after : Duration, body) {
 					// race cancel a child that never ran.
 					task.yield()
 					fail.catch(() { clock.sleep_ns(nanoseconds) }) |>
-						(Ok(_)) { Expired }
+						(Ok(_)) { Expired() }
 						& (Error(error)) { ClockFailed(error) }
 				},
 			)

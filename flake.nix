@@ -29,9 +29,23 @@
 
       forAllSystems = f: lib.genAttrs systems (system: f system);
 
+      # tzdata 2026f, the version the locked nixpkgs has, checks in `now.ck`
+      # that no two zones of `zonenow.tab` have the same timestamps after the
+      # current time. From 2026-11-01 on they do: `America/Vancouver` became
+      # a copy of `America/Phoenix`, `America/Mexico_City` of
+      # `America/Edmonton` and `America/Jamaica` of `America/Winnipeg` (the
+      # "temporary hack" in `northamerica` ends on that date), and 2026f was
+      # cut on 2026-10-27. Its other checks do not read the clock, so run
+      # those and leave `now.ck` out until a tzdata that knows fixes it.
+      tzdataFix = _final: prev: {
+        tzdata = prev.tzdata.overrideAttrs (_old: {
+          checkTarget = "check_mild back.ck";
+        });
+      };
+
       pkgsFor = system: import nixpkgs {
         inherit system;
-        overlays = [ (import rust-overlay) ];
+        overlays = [ (import rust-overlay) tzdataFix ];
       };
 
       # The version in Cargo.toml is the version the compiler reports and the

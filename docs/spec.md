@@ -426,6 +426,9 @@ util = { path = "../util" }                    # a directory on this computer, r
 [dev-dependencies]                             # packages that only the tests of this package use
 check = "github.com/carol/check@2.1.0"
 
+[test]                                         # the package's tests (§10.2)
+collection = "i/test.tests"
+
 [wasm]
 exports = ["app/math.add"]                     # host exports (§10.2): module path, ".", function name
 ```
@@ -438,6 +441,7 @@ exports = ["app/math.add"]                     # host exports (§10.2): module p
 - `{ path = "…" }` is a package in a directory on this computer. Only the package that is compiled, and the packages that it gets by path, may have path dependencies. A package that is got by location may not have them.
 - The packages that a package uses, directly or through other packages, may not be in a circle.
 - The `dev-dependencies` of a package are only used when its own tests are compiled. The `dev-dependencies` of other packages are not used.
+- `[test] collection` names the collection whose entries are the package's tests (§10.2, §14.5). `i new` writes `i/test.tests`.
 
 
 The optional `[entries]` table maps entry names (ordinary `name`s) to
@@ -460,7 +464,7 @@ exclude both the default entry and every declared entry.
 
 ### 2.6.1 Entries and the platform
 
-At an entry (the program entry, a test, a host export) the target's platform gives its own services: the host services of the target's table (§9.7), `Assert`, a top-level `Fail` (§9.3), and `Root`, `Owner`, `Await`, `Runner` and `Scheduler`. Every other service is given in the entry by i code. The need of an entry may only contain services of the platform of the target; any other service is the compile error "`T` is not provided by the target `t`" (E0523). A program built for targets that need different choices has one entry per target (`[entries]`).
+At an entry (the program entry, a test, a host export) the target's platform gives its own services (§9.7): the host services of its table, `Assert`, `Scope`, `Root`, `Owner`, `Await`, `Runner`, `Scheduler`, `Target`, and a top-level `Fail` (§9.3). The `Fail` takes any error for the program entry and tests, and only an error the host can take for a host export, which the host receives (§10.2). Every other service is given in the entry by i code. The need of an entry may only contain services of the platform of the target; any other service is the compile error "`T` is not provided by the target `t`" (E0523). A program built for targets that need different choices has one entry per target (`[entries]`).
 
 The entry stub binds the platform's host services that the entry needs; when the entry needs `Root`, `Owner`, `Await`, `Runner` or `Scheduler`, it opens the request root and binds `Root`, `Owner` and `Await`; when it needs `Runner` or `Scheduler`, it binds the initial `Runner` and runs the entry inside `task.run`. There is no `providers` key in the package file.
 
@@ -684,7 +688,7 @@ A type definition has one form, `Name [ (params) ] = right side`. Its kind is de
 - `_` in an alias pattern skips a part and binds nothing; it is not an inference hole. For a new read after source completion, the whole source type must first be closed (§4.7); a skip cannot hide an open argument from that check. Elsewhere in a type, `_` remains a hole. Shared type variables remain shared even if one occurrence is skipped.
 - A named pattern with arguments, or a qualified named pattern, requires exactly one member with that type constructor and matches its arguments. A data pattern requires one member that is data of the same shape and matches its parts at their keys. No union member is discarded to make a match. A mismatch is a compile error. Function, literal, union, intersection, difference, value-type and macro-call patterns are compile errors.
 - Every pattern and every value-dependent name is checked, also when unused. Its demands are processed at the completion of their source (§4.7), and its results are assembled after its name dependencies are complete. A new read after source completion follows the closed-source rule in §4.7. A definition read may not choose an instance of a generalized variable to make its pattern fit.
-- Blocks have no type definitions. An item beginning with `(` or `{` is a value binding; `m.T(…) = v` is also a value binding under §2.2. Import `T` to use it as an alias-pattern head.
+- Blocks have no type definitions. An item beginning with `(` is a value binding; `m.T(…) = v` is also a value binding under §2.2. Import `T` to use it as an alias-pattern head.
 
 ```i
 Some(A) = (A)
@@ -724,7 +728,7 @@ both = (a : Bool, b : Bool) -> Bool {
 }
 x = True()
 y : Bool = both(x, True())
-bad : Bool = True
+bad : Bool = True()
 ```
 
 `x` and `y` are values of `Bool`. `bad` is a compile error: `True` is the constructor, of type `() -> True`, and a function is not in `Bool`. The error is the ordinary type mismatch, with a hint to write `True()`.
@@ -847,7 +851,7 @@ Types are worked out by inference with subtypes (algebraic subtyping).
 - A function expression may begin with `<A, N, …>` before its parameter group (§6.8), and a function type may begin with it before its parameter part (§3). The names are distinct unqualified `UpName`s that do not name a type that may be written with no module name in the module (a type of the module, an imported `UpName`, or a built-in type). A type definition declares type parameters in its head (§4.3). The parts of an alias pattern are not type parameters: its bare UpNames define names.
 - On a function expression, the type parameters may be used in its parameter group, its service pattern, its `->` part and its body, also in nested functions and annotations there. On a function type, they may be used in the rest of that type.
 - A type parameter used where a need is written (`<- N`, `<- (..N, …)`) is a **row variable**: it stands for a whole set of services. Any other use makes it an ordinary type variable. Using one name both ways is a compile error.
-- On a function expression, a type parameter is a type variable of that function, and it is generalized with it. Inference may make it more exact: `id = <A>(x : A) -> A { 1 }` is correct.
+- On a function expression, a type parameter is a type variable of that function, and it is generalized with it. Inference may add to the result type: `id = <A>(x : A) -> A { 1 }` is correct, and a call `id("s")` has the known type `"s" | 1`.
 - A written function type with type parameters in a parameter, in the data of a type, in a type definition, or in an annotation is a **polymorphic type**, as `Show = (write = <A>(A) -> ())`. Its comparisons and quantified lattice operations use §4.6; each use instantiates it again. Inference never guesses a polymorphic type: a parameter gets one only from a written type.
 - An `UpName` in a type that is neither a type nor a type parameter in scope is a compile error. The message says how to declare it.
 - A bound on a type variable is written as an intersection where it is used, as `x : A & Show`. Capabilities are passed as parameters or as services; none is passed implicitly.
@@ -1450,7 +1454,7 @@ safe = (id) {
 
 - To handle only some errors, take all of them with `fail.catch`, then match with type tests. A later catch-all gets the rest of the union (§4.8 rule 12), which may be raised again, as in `safe` above.
 - An error goes out through the calls to the `catch` that provided its `Fail`. The computation that is jumped over is unwound first (§9.5).
-- A `Fail` value that is used after the `catch` that made it has ended, because it was returned, stored, or captured by a function that runs later, stops the program with the message `boundary not active` (§9.4). The compiler warns when a `Fail` bound in a service pattern is captured by a function value or put into data.
+- A `Fail` value that is used after the `catch` that made it has ended, because it was returned, stored, or captured by a function that runs later, stops the program with the message `control: boundary is not active` (§9.4). The compiler warns when a `Fail` bound in a service pattern is captured by a function value or put into data.
 - `Assert` is a separate service (§9.6), so `catch` does not take assertion failures.
 - At an entry, the platform provides a top-level `Fail` (§10.2): an error that reaches it from the program entry or a test stops the program or fails the test, and one that reaches it from a host export is given to the host.
 
@@ -1472,7 +1476,7 @@ The module `i/control` pauses a computation and goes on with it later:
 2. `suspend(b, f)` pauses the computation from this point back to the boundary `b`. That paused part is a **continuation** `k`. Then `f(k)` is done in the place of the boundary, with the services of that place, and its value is the value of `boundary`. If `b` is not active, the program stops.
 3. `resume(k, v)` goes on with the paused computation, with `v` as the value of `suspend`. It goes on on top of the place where `resume` is called, and the value that the computation has when it gets to the boundary is the value of `resume`. The paused part keeps the services provided inside it; for the rest, it gets the services of the place where `resume` is called. So an error raised after `resume` goes to the `Fail` of the place of `resume`, unless the paused part provided its own. The services that a function made by `keep` keeps (below) count, for the code inside that function, like services provided inside the paused part.
 4. `cancel(k)` unwinds the paused computation (§9.5) and gives `()`. While it unwinds, the boundary stays not active, and the final functions get the services as in rule 3, from the place where `cancel` is called; inside a function made by `keep`, they get the kept services.
-5. `escape(b, v)` ends the computation back to the boundary `b` at once, unwinding it (§9.5), and `v` is the value of `boundary`. It is `suspend(b, (k) { cancel(k)  v })` with no continuation made. The boundary becomes inactive before unwinding starts and stays inactive if cleanup is paused and resumed. If `b` is not active, the program stops with the message `boundary not active`.
+5. `escape(b, v)` ends the computation back to the boundary `b` at once, unwinding it (§9.5), and `v` is the value of `boundary`. It is `suspend(b, (k) { cancel(k)  v })` with no continuation made. The boundary becomes inactive before unwinding starts and stays inactive if cleanup is paused and resumed. If `b` is not active, the program stops with the message `control: boundary is not active`.
 6. **One use only**: `resume` and `cancel` together may be used one time for a continuation. A second use stops the program.
 7. If a continuation is never resumed or cancelled, its final functions are not run.
 8. A boundary and a continuation stay on the worker that made them (§11.9). They are not portable.
@@ -2042,7 +2046,7 @@ loop, in a retained frame. Tasks keep Root and their go-site Owner. Custom
 within groups remain registered to that root. The run closes the entire root
 after all tasks/finals end, not just its default group.
 Only the runtime-created entry run
-is eligible for future multicore execution; v1 has one worker throughout.
+is eligible for future multicore execution. `I_WORKERS` sets its worker count when it is set; unset or `auto` uses the available cores, at most one per GiB of available memory (§11.9).
 
 A nested loop owns fresh run identity and FIFO state on the caller task's stack.
 Nested children do not execute an outer task's channel commands: all handle
@@ -2415,21 +2419,21 @@ An entry that needs a service its target does not give is the compile error
 
 | Function | What it does |
 |---|---|
-| `bind` | Bind a UDP datagram socket to an address and port (0 selects a port). |
+| `bind` | Bind a UDP datagram socket to an address and port (0 selects a port). The socket belongs to the current resource scope. |
 | `send_to` | Send one datagram to an address and port. |
 | `receive_from` | Receive one datagram and its sender address and port. |
 | `local_address` | Read a datagram socket's numeric local address. |
-| `close_datagram` | Close a datagram socket. |
-| `listen` | Listen for TCP connections. |
+| `close_datagram` | Close a datagram socket. Closing a closed socket does nothing; the owning scope calls this. |
+| `listen` | Listen for TCP connections. The listener belongs to the current resource scope. |
 | `local_port` | Read a listener or datagram socket’s local port. |
-| `accept` | Accept a TCP connection. |
-| `connect` | Connect to a host and port. |
+| `accept` | Accept a TCP connection. The stream belongs to the current resource scope. |
+| `connect` | Connect to a host and port. The stream belongs to the current resource scope. |
 | `resolve` | Resolve a host name to addresses. |
 | `read` | Read bytes from a stream. |
 | `write` | Write bytes to a stream. |
 | `shutdown_write` | Shut down the stream’s write side. |
-| `close_stream` | Close a stream. |
-| `close_listener` | Close a listener. |
+| `close_stream` | Close a stream. Closing a closed stream does nothing; the owning scope calls this. |
+| `close_listener` | Close a listener. Closing a closed listener does nothing; the owning scope calls this. |
 | `stream_number` | Return the underlying stream number. |
 | `byte_stream` | Make a byte stream interface for a connection. |
 
@@ -2439,15 +2443,37 @@ An entry that needs a service its target does not give is the compile error
 |---|---|
 | `options` | Make default TLS options. |
 | `identity` | Make a certificate and key identity. |
-| `connect` | Establish client TLS on a connected stream. |
-| `accept` | Establish server TLS on a connected stream. |
-| `dial` | Connect to a host and establish client TLS. |
+| `connect` | Establish client TLS on a connected stream. The TLS stream belongs to the current resource scope. |
+| `accept` | Establish server TLS on a connected stream. The TLS stream belongs to the current resource scope. |
+| `dial` | Connect to a host and establish client TLS. The TCP and TLS streams both belong to the current resource scope. |
 | `alpn` | Read the negotiated ALPN protocol. |
 | `read` | Read bytes from a TLS stream. |
 | `write` | Write bytes to a TLS stream. |
 | `shutdown_write` | Shut down the TLS stream’s write side. |
-| `close` | Close a TLS stream. |
+| `close` | Close a TLS stream. Closing a closed stream does nothing; the owning scope calls this. |
 | `byte_stream` | Make a byte stream interface for a TLS stream. |
+
+#### Parsing and conversion errors
+
+`i/int`, `i/float` and `i/bit_array` are ordinary libraries, not host
+service libraries. Their text parsing and byte decoding report a failure
+with a record that names the position. Offsets are UTF-8 byte offsets into
+the input text; `reason` is one of the strings listed.
+
+| Function | Type | Reasons |
+|---|---|---|
+| `int.parse` | `(text: String) <- (Fail(int.IntError)) -> Int` | `"empty"`, `"missing digits"`, `"invalid digit"`, `"digit out of range for base"` |
+| `int.parse_base` | `(text: String, base: Int) <- (Fail(int.IntError)) -> Int` | the `int.parse` reasons and `"base out of range"` |
+| `float.parse` | `(text: String) <- (Fail(float.FloatError)) -> Float` | `"empty"`, `"missing digits"`, `"missing point"`, `"invalid character"`, `"overflow"` |
+| `bit_array.base16_decode` | `(input: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid digit"`, `"missing digit"` |
+| `bit_array.base64_decode` | `(encoded: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid character"`, `"incomplete group"`, `"bad padding"` |
+| `bit_array.base64_url_decode` | `(encoded: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid character"`, `"incomplete group"`, `"bad padding"` |
+
+`int.IntError`, `float.FloatError` and `bit_array.BitArrayError` all have the
+data `(offset = Int, reason = String)`. Arithmetic domain failures in `int` and
+`float`, and `bit_array.to_string`, `bit_array.slice` and `list.strict_zip`,
+keep `()`: the operation itself names the domain and there is no input
+position to report.
 
 ## 10. The host boundary
 
@@ -2529,7 +2555,7 @@ These functions are **entry points**:
 
 The need of an entry, after what the entry's own code provides, may contain only services that the platform of the target provides. Otherwise it is the compile error "`T` is not provided by the target `t`", also when the program catches every error of the operations that need `T`. Checking with no target checks the entry's shape and types, but not its need.
 
-On targets using the asynchronous entry protocol, an entry is **async** exactly when its need has a host service whose declaration is `"async"`, or `Runner`. `Await`, `Owner` and `Root` alone do not make it async. A requested synchronous export that is async is a compile error (§2.6.2). The host waits through Appendix B's protocol. WASI instead keeps blocking imports, synchronous metadata and no async hand-off (§B.7). When the need of an entry has `Scheduler`, `Runner`, `Await`, `Owner` or `Root`, the entry runs in a fresh task run (§9.9) that provides them.
+On targets using the asynchronous entry protocol, an entry is **async** exactly when its need has a host service whose declaration is `"async"`, or `Runner` or `Scheduler`. `Await`, `Owner` and `Root` alone do not make it async. A requested synchronous export that is async is a compile error (§2.6.2). The host waits through Appendix B's protocol. WASI instead keeps blocking imports, synchronous metadata and no async hand-off (§B.7). When the need of an entry has `Scheduler`, `Runner`, `Await`, `Owner` or `Root`, the entry runs in a fresh task run (§9.9) that provides them.
 
 The entry context is opened before the entry runs, and closed on every exit, after structured cleanup and before the result or error is delivered. A stop runs no i finals. A synchronous context cannot hand off: a low-level wait needing hand-off or poll stops with `request: no active entry`. An async entry may return status 0 on its first call; scheduler switches alone do not yield to the host.
 
@@ -2629,7 +2655,7 @@ A JS bridge call that does not expose exceptions uses `panic("js: call threw")` 
 
 Before the program stops, the host gets a **stop message**, in one call of `panic` (Appendix B): the reason, then one line for each source position, with a line feed between lines. The first position is that of the innermost expression in the program source that was being worked out: a call, an operator, a `<<`, or a binding. Then come the positions of the calls in the program source that were running, the innermost first. Calls that were replaced by tail calls are gone, but the first position is always given, also when that expression is a call in tail position: in `f = (n) { assert(n > 0) }`, the stop shows the position of `assert(n > 0)`. A call of a library function, such as `fail.catch` or `resource.ensure`, counts as a tail call when it is in tail position. For an error at an entry point, there is only the position of the entry point's binding.
 
-A **source position** is written `module path:line:column`, for example `app/users : 12 : 5`, with the module path as its own package names it. For a module of a package with a location, the location, `@`, the major version, and a space come first: `github.com/alice/json@1 json/decode : 12 : 5`. Lines and columns count from 1; a column counts Unicode scalar values. The position of an expression is the position of its first token.
+A **source position** is written `module path:line:column`, for example `app/users:12:5`, with the module path as its own package names it. For a module of a package with a location, the location, `@`, the major version, and a space come first: `github.com/alice/json@1 json/decode:12:5`. Lines and columns count from 1; a column counts Unicode scalar values. The position of an expression is the position of its first token.
 
 
 A function with no need may still stop for these reasons, and it may never end.
@@ -2669,7 +2695,7 @@ The text form of a function, a key or a keyed value never depends on which worke
 
 ### 11.9 Workers
 
-A program may run on one or more **workers** at the same time. Which worker does which part of the work cannot be seen. Tasks that run at the same time take their steps (sends and receives, joins, host calls, failures and stops) one after another, in an order that the program does not fix; this order may differ from run to run and with the number of workers. Every run gives a result that some order of the steps gives, and each step does what it would do if the steps were taken one at a time in that order. The number of workers only changes which order happens. So anything that depends on the order of steps may change, for example which sender a receive pairs with, which event of a `choose` commits, whether a step comes before or after the end of a scope, which tasks fail before a cancel reaches them, which of two stops is first, and the order of output. A program whose results do not depend on the order of its steps gives one result. Running out of memory or stack (§11.7) is not covered by this rule. The host chooses the number of workers, subject to the top-level rule below.
+A program may run on one or more **workers** at the same time. Which worker does which part of the work cannot be seen. Tasks that run at the same time take their steps (sends and receives, joins, host calls, failures and stops) one after another, in an order that the program does not fix; this order may differ from run to run and with the number of workers. Every run gives a result that some order of the steps gives, and each step does what it would do if the steps were taken one at a time in that order. The number of workers only changes which order happens. So anything that depends on the order of steps may change, for example which sender a receive pairs with, which event of a `choose` commits, whether a step comes before or after the end of a scope, which tasks fail before a cancel reaches them, which of two stops is first, and the order of output. A program whose results do not depend on the order of its steps gives one result. Running out of memory or stack (§11.7) is not covered by this rule. The host chooses the number of workers, subject to the top-level rule below. Without a choice, the available cores are used, at most one per GiB of available memory; `I_WORKERS` overrides both.
 
 Top-level initialization happens once semantically. If any initialized top-level value is not portable, the program runs on one worker. Otherwise an implementation may repeat initialization on workers only when every worker obtains equal values and the repetition has no observable effect. A portable function can refer to a nonportable top-level value without capturing it; that value still forces the program to use one worker.
 

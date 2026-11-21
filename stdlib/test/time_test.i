@@ -243,7 +243,10 @@ test("timeout_timer_wins_test", () {
 	(r, elapsed) = time.measure(() {
 		fail.catch(() {
 			time.timeout(time.milliseconds(20), () {
-				resource.ensure(() { late() }, () { task.set(released, True) })
+				resource.ensure(
+					() { late() },
+					() { task.set(released, True()) },
+				)
 			})
 		})
 	})
@@ -259,20 +262,20 @@ test("timeout_expired_test", () {
 	{
 		zero = fail.catch(() {
 			time.timeout(time.nanoseconds(0), () {
-				task.set(ran, True)
+				task.set(ran, True())
 				1
 			})
 		})
 		assert(zero == Error(time.Timeout(after = time.nanoseconds(0))))
 		negative = fail.catch(() {
 			time.timeout(time.nanoseconds(-5), () {
-				task.set(ran, True)
+				task.set(ran, True())
 				1
 			})
 		})
 		assert(negative == Error(time.Timeout(after = time.nanoseconds(-5))))
 		// A zero or negative duration never starts the body and never sleeps.
-		assert(task.get(ran) == False)
+		assert(task.get(ran) == False())
 		()
 	} <- (unused_clock)
 })
@@ -296,13 +299,13 @@ test("timeout_bad_deadline_test", () {
 	{
 		r = fail.catch(() {
 			time.timeout(too_big, () {
-				task.set(ran, True)
+				task.set(ran, True())
 				1
 			})
 		})
 		assert(r == Error(time.BadDeadline(after = too_big)))
 		// The body never starts.
-		assert(task.get(ran) == False)
+		assert(task.get(ran) == False())
 		()
 	} <- (unused_clock)
 })
