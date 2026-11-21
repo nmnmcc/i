@@ -1534,7 +1534,21 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                     canon.insert(canonical.clone());
                     format!("@external(\"{module}\", \"{function}\") ")
                 }
-                DefKind::Binding { .. } => String::new(),
+                // Only the library `i` declares runtime operations; they are
+                // listed like externals if one is ever in the root.
+                DefKind::Runtime {
+                    module, function, ..
+                } => {
+                    let (shown, canon) = host
+                        .entry(format!("runtime \"{module}\" \"{function}\""))
+                        .or_default();
+                    shown.insert(ty.to_string());
+                    canon.insert(canonical.clone());
+                    format!("@runtime(\"{module}\", \"{function}\") ")
+                }
+                // `make_<type>` is an ordinary exported value (§3.3): its
+                // service's imports are listed with the service type.
+                DefKind::Binding { .. } | DefKind::ServiceAccessor { .. } => String::new(),
             };
             if !d.exported {
                 continue;

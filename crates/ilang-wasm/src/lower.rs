@@ -36,6 +36,7 @@
 //!
 //! The calls that may suspend are found and split afterwards (`control.rs`).
 
+use crate::ir::Import;
 use crate::ir::Stmt;
 use crate::ir::{self, *};
 use ilang_check::hir::{self, *};
@@ -916,6 +917,15 @@ struct Lowerer<'a> {
     /// The function of each external function outside the library,
     /// or `None` when it has a problem, which is told one time.
     external_funcs: HashMap<DefId, Option<FuncId>>,
+    /// The import function of each field of a host service, or `None` when
+    /// it has a problem, which is told one time. One function per field, so
+    /// every record of the service has the same field values.
+    service_fields: HashMap<(TypeId, u32), Option<FuncId>>,
+    /// The function of the accessor `make_<type>` of each `@import` type.
+    accessor_funcs: HashMap<TypeId, FuncId>,
+    /// The function that starts an async import and gives its request cell
+    /// without awaiting it (`hostcall.call`).
+    start_funcs: HashMap<(ImportId, AbiType), FuncId>,
     /// The content hash of each package that declares an import, computed
     /// once: hashing every source of the package per import was measured at
     /// a twentieth of a test build.
@@ -968,6 +978,9 @@ impl<'a> Lowerer<'a> {
             import_sites: Vec::new(),
             bindings: Vec::new(),
             external_funcs: HashMap::new(),
+            service_fields: HashMap::new(),
+            accessor_funcs: HashMap::new(),
+            start_funcs: HashMap::new(),
             package_hashes: HashMap::new(),
             module_hashes: HashMap::new(),
             lazy_candidates: HashSet::new(),
@@ -981,7 +994,8 @@ impl<'a> Lowerer<'a> {
         l
     }
 
-    fn install_stubs(&mut self, stubs: std::collections::BTreeMap<DefId, Stub>) {
+    fn install_stubs(&mut self, mut stubs: std::collections::BTreeMap<DefId, Stub>) {
+        self.link_later_imports(&mut stubs);
         self.stubs = stubs;
         // The stub gives services that the source may not name.
         let mut given: Vec<TypeId> = platform::request_types(self.program)
@@ -996,6 +1010,59 @@ impl<'a> Lowerer<'a> {
             self.services.entry(TypeRef::Custom(t)).or_insert(next);
         }
         self.out.services = self.services.len() as u32;
+    }
+
+    /// An entry that reaches a `"later"` import without naming its service
+    /// in its need (through an accessor `make_<type>` of a `"later"` service,
+    /// or a raw `@import(…, "later")` declaration) waits for the host: it is
+    /// async and opens the request root. Reachability is by reference from
+    /// the entry and the top-level initializers.
+    fn link_later_imports(&self, stubs: &mut std::collections::BTreeMap<DefId, Stub>) {
+        if self.options.target == ir::Target::Wasi {
+            return;
+        }
+        let program = self.program;
+        let mut later = HashSet::new();
+        for (mi, m) in program.modules.iter().enumerate() {
+            for (di, d) in m.defs.iter().enumerate() {
+                let id = DefId {
+                    module: ModuleId(mi as u32),
+                    index: di as u32,
+                };
+                let waits = match d.kind {
+                    DefKind::ServiceAccessor { ty } => program
+                        .ty(ty)
+                        .host
+                        .as_ref()
+                        .is_some_and(|h| h.mode != HostMode::Now),
+                    DefKind::External { .. } => {
+                        program.import_modes.get(&id) == Some(&ImportMode::Later)
+                    }
+                    _ => false,
+                };
+                if waits {
+                    later.insert(id);
+                }
+            }
+        }
+        if later.is_empty() {
+            return;
+        }
+        for (entry, stub) in stubs.iter_mut() {
+            if stub.is_async && stub.requests() {
+                continue;
+            }
+            if self
+                .tool_reachable(*entry)
+                .iter()
+                .any(|d| later.contains(d))
+            {
+                stub.is_async = true;
+                stub.root = true;
+                stub.owner = true;
+                stub.await_ = true;
+            }
+        }
     }
 
     /// One dense id for each service type constructor of the program:
@@ -1307,6 +1374,7 @@ impl<'a> Lowerer<'a> {
                 };
                 if matches!(d.kind, DefKind::External { .. })
                     && !self.program.typed_macros.contains(&id)
+                    && !self.program.js_values.contains(&id)
                     && reachable.as_ref().is_none_or(|set| set.contains(&id))
                 {
                     self.external_func(id);
@@ -1873,7 +1941,7 @@ impl<'a> Lowerer<'a> {
     /// Whether a host service is async in the module: on the WASI target
     /// every host function is a blocking call.
     fn host_is_async(&self, host: &hir::Host) -> bool {
-        host.is_async && self.options.target != ir::Target::Wasi
+        host.mode != HostMode::Now && self.options.target != ir::Target::Wasi
     }
 
     /// The body of an async entry point inside its root boundary: a
@@ -1916,9 +1984,8 @@ impl<'a> Lowerer<'a> {
         {
             return;
         }
-        let program = self.program;
-        let def = program.ty(t);
-        let (Some(host), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
+        let def = self.program.ty(t);
+        let (Some(_), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
             return;
         };
         let [c] = ctors.as_slice() else {
@@ -1931,9 +1998,29 @@ impl<'a> Lowerer<'a> {
         let CtorRepr::Record { ctor, ty } = self.ctors[&CtorRef { ty: t, index: 0 }].repr else {
             return;
         };
-        let kind = if self.host_is_async(host) {
+        let mut fields = Vec::new();
+        for i in 0..c.fields.len() as u32 {
+            match self.service_field_func(t, i) {
+                Some(f) => fields.push(f),
+                None => return,
+            }
+        }
+        self.out.host_services.push(HostService {
+            service,
+            ctor,
+            ty,
+            fields,
+        });
+    }
+
+    /// How the fields of the host service `t` are imported, from its mode
+    /// (`@host` or `@import`): `"now"` is a call, `"later"` and `"request"`
+    /// are starts, except on the WASI target, where every call blocks.
+    fn service_import_kind(&self, t: TypeId, host: &hir::Host) -> ImportKind {
+        let def = self.program.ty(t);
+        if self.host_is_async(host) {
             ImportKind::AsyncService
-        } else if self.options.target == ir::Target::Wasi && is_standard_service(program, t) {
+        } else if self.options.target == ir::Target::Wasi && is_standard_service(self.program, t) {
             ImportKind::WasiStdout
         } else if self.options.target == ir::Target::Wasi
             && self.graph.packages[self.program.module(def.module).package].name == "i"
@@ -1950,43 +2037,187 @@ impl<'a> Lowerer<'a> {
             ImportKind::WasiAdapter
         } else {
             ImportKind::Service
+        }
+    }
+
+    /// The import function of field `index` of the host service `t`: one
+    /// top-level value per field, shared by the entry's provider leaf, the
+    /// accessor `make_<type>`, and `hostcall.call`, so they have one
+    /// identity and one import.
+    fn service_field_func(&mut self, t: TypeId, index: u32) -> Option<FuncId> {
+        if let Some(&f) = self.service_fields.get(&(t, index)) {
+            return f;
+        }
+        let f = self.make_service_field_func(t, index);
+        self.service_fields.insert((t, index), f);
+        f
+    }
+
+    fn make_service_field_func(&mut self, t: TypeId, index: u32) -> Option<FuncId> {
+        let program = self.program;
+        let def = program.ty(t);
+        let (Some(host), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
+            return None;
         };
-        let mut fields = Vec::new();
-        for (i, f) in c.fields.iter().enumerate() {
-            let (Some(label), Some(hf)) = (&f.label, program.host_fns.get(&(t, i as u32))) else {
-                return;
-            };
-            let abi = host_abi(hf);
-            let site = (def.module, label.span);
-            match self.import(
-                &host.namespace,
-                &label.name,
-                abi,
-                kind,
-                site,
-                &format!("{}.{}", def.name, label.name),
-            ) {
-                Ok(import) => {
-                    self.out.imports[import as usize].request = host.is_request;
-                    self.out.imports[import as usize].request_result = hf.request_result
-                        || (host.is_async && !host.is_request && !hf.errors.is_empty());
-                    self.out.imports[import as usize].awaited = host.is_async;
-                    let f = self.import_func(import, hf.result);
-                    self.constants.insert(f);
-                    fields.push(f);
-                }
-                Err((module, span, message)) => {
-                    self.error(module, span, message);
-                    return;
-                }
+        let [c] = ctors.as_slice() else {
+            return None;
+        };
+        let field = c.fields.get(index as usize)?;
+        let (Some(label), Some(hf)) = (&field.label, program.host_fns.get(&(t, index))) else {
+            return None;
+        };
+        let kind = self.service_import_kind(t, host);
+        let later = host.mode != HostMode::Now;
+        let request = host.mode == HostMode::Request;
+        match self.import(
+            &host.namespace,
+            &label.name,
+            host_abi(hf),
+            kind,
+            (def.module, label.span),
+            &format!("{}.{}", def.name, label.name),
+        ) {
+            Ok(import) => {
+                let x = &mut self.out.imports[import as usize];
+                x.request = request;
+                x.request_result =
+                    hf.request_result || (later && !request && !hf.errors.is_empty());
+                x.awaited = later;
+                let f = self.import_func(import, hf.result);
+                self.constants.insert(f);
+                Some(f)
+            }
+            Err((module, span, message)) => {
+                self.error(module, span, message);
+                None
             }
         }
-        self.out.host_services.push(HostService {
-            service,
-            ctor,
-            ty,
-            fields,
+    }
+
+    /// The import behind the function of field `index` of `t`, when it is
+    /// a start that `hostcall.call` may leave unawaited.
+    fn service_field_start(&mut self, t: TypeId, index: u32) -> Option<(FuncId, FuncId)> {
+        let field = self.service_field_func(t, index)?;
+        let (&(import, result), _) = self.import_funcs.iter().find(|(_, f)| **f == field)?;
+        let x = &self.out.imports[import as usize];
+        // A field with errors answers a `Result` that its function unwraps;
+        // a `Call` of it would hold the `Result`, so it is awaited now.
+        if x.kind != ImportKind::AsyncService || x.request || x.request_result {
+            return None;
+        }
+        Some((field, self.start_func(import, result)))
+    }
+
+    /// A function that starts an async import and gives its request cell,
+    /// registered with the `Owner` of its environment.
+    fn start_func(&mut self, import: ImportId, result: AbiType) -> FuncId {
+        if let Some(&f) = self.start_funcs.get(&(import, result)) {
+            return f;
+        }
+        let x = &self.out.imports[import as usize];
+        let n = x.abi.params.len() as u32;
+        let name = format!("start {} {}", x.module, x.name);
+        let body = vec![
+            Stmt::Let {
+                dst: n,
+                value: Value::HostStart {
+                    import,
+                    args: (0..n).map(Atom::Local).collect(),
+                    result,
+                },
+                site: None,
+            },
+            Stmt::Return(Atom::Local(n)),
+        ];
+        let f = self.new_func();
+        self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
+            name,
+            arity: n,
+            budget_frame: n + 1,
+            locals: vec![LocalType::Value; n as usize + 1],
+            body,
+            frame: true,
         });
+        self.start_funcs.insert((import, result), f);
+        f
+    }
+
+    /// `make_<type>` of an `@import` service type: the service of the
+    /// caller's environment when it has one (a provided value, a fake, or
+    /// the platform's), else the record of the type's import functions.
+    /// Every record has the same field values.
+    fn accessor_func(&mut self, t: TypeId) -> FuncId {
+        if let Some(&f) = self.accessor_funcs.get(&t) {
+            return f;
+        }
+        let f = self.new_func();
+        self.accessor_funcs.insert(t, f);
+        let def = self.program.ty(t);
+        let mut fx = Fx::new(def.module, false);
+        let mut body = Vec::new();
+        if let Some(&slot) = self.services.get(&TypeRef::Custom(t)) {
+            let raw = let_value(
+                &mut fx,
+                &mut body,
+                Value::ServiceRaw(Env::Param, slot),
+                None,
+            );
+            let given = fx.local(LocalType::Value);
+            body.push(Stmt::If {
+                cond: Cond::Not(Box::new(Cond::Tag(raw, 0))),
+                then: vec![
+                    Stmt::Let {
+                        dst: given,
+                        value: Value::Service(Env::Param, slot),
+                        site: None,
+                    },
+                    Stmt::Return(Atom::Local(given)),
+                ],
+                otherwise: vec![],
+            });
+        }
+        let n = match &def.body {
+            TypeBody::Custom(ctors) if ctors.len() == 1 => ctors[0].fields.len() as u32,
+            _ => 0,
+        };
+        let mut fields = Vec::new();
+        for i in 0..n {
+            match self.service_field_func(t, i) {
+                Some(f) => fields.push(Atom::Func(f)),
+                None => fields.push(Atom::Unit),
+            }
+        }
+        let value = match self.ctors.get(&CtorRef { ty: t, index: 0 }).map(|c| c.repr) {
+            Some(CtorRepr::Record { ctor, ty }) if fields.is_empty() => Atom::Ctor { ctor, ty },
+            Some(CtorRepr::Record { ctor, ty }) => {
+                let_value(&mut fx, &mut body, Value::Record { ctor, ty, fields }, None)
+            }
+            _ => {
+                self.error(
+                    def.module,
+                    def.span,
+                    format!(
+                        "`{}` is not a record service, so it has no accessor",
+                        def.name
+                    ),
+                );
+                Atom::Unit
+            }
+        };
+        body.push(Stmt::Return(value));
+        self.out.funcs[f.0 as usize] = FuncKind::Code(Func {
+            name: format!(
+                "{}.{}",
+                self.program.module(def.module).path,
+                accessor_name(&def.name)
+            ),
+            arity: 0,
+            budget_frame: 1 + fx.locals.len() as u32,
+            locals: fx.locals,
+            body,
+            frame: true,
+        });
+        f
     }
 
     /// The function of an external function outside the library,
@@ -2002,9 +2233,7 @@ impl<'a> Lowerer<'a> {
 
     fn make_external_func(&mut self, d: DefId) -> Option<FuncId> {
         let def = self.program.def(d);
-        let DefKind::External {
-            module, function, ..
-        } = &def.kind
+        let (DefKind::External { .. }, Some((module, function))) = (&def.kind, def.kind.foreign())
         else {
             return None;
         };
@@ -2016,16 +2245,31 @@ impl<'a> Lowerer<'a> {
             );
             return None;
         };
+        if self.program.js_values.contains(&d) {
+            self.error(
+                d.module,
+                def.span,
+                "`@import(\"js\", …)` value declarations are not supported yet",
+            );
+            return None;
+        }
         let site = (d.module, def.span);
-        match self.import(
-            module,
-            function,
-            host_abi(hf),
-            ImportKind::External,
-            site,
-            &def.name,
-        ) {
+        // `@import("ns", "label", "later")` starts its call and waits for
+        // the answer; `"now"` (and `@external`) calls it.
+        let later = self.program.import_modes.get(&d) == Some(&ImportMode::Later)
+            && self.options.target != ir::Target::Wasi;
+        let kind = if later {
+            ImportKind::AsyncService
+        } else {
+            ImportKind::External
+        };
+        match self.import(module, function, host_abi(hf), kind, site, &def.name) {
             Ok(import) => {
+                if later {
+                    let x = &mut self.out.imports[import as usize];
+                    x.awaited = true;
+                    x.request_result = hf.request_result || !hf.errors.is_empty();
+                }
                 // Each declaration is one value, so two declarations
                 // of one import have two functions, which call the same
                 // import.
@@ -2329,10 +2573,12 @@ impl<'a> Lowerer<'a> {
 
     fn def_callee(&mut self, d: DefId) -> Callee {
         match self.program.def(d).kind {
-            DefKind::External { .. } if self.is_library(d.module) => {
+            DefKind::External { .. } | DefKind::Runtime { .. } if self.is_library(d.module) => {
                 let (op, arity) = self.external_op(d).expect("checked library operation");
                 Callee::Direct(self.op_func(op, arity))
             }
+            DefKind::Runtime { .. } => unreachable!("`@runtime` is only in the library"),
+            DefKind::ServiceAccessor { ty } => Callee::Direct(self.accessor_func(ty)),
             DefKind::External { .. } => Callee::Direct(
                 self.external_func(d)
                     .expect("entry imports were checked before plan application"),
@@ -2596,25 +2842,20 @@ impl<'a> Lowerer<'a> {
 
     /// The operation of an external function of the library.
     fn external_op(&self, d: DefId) -> Result<(Op, u32), String> {
-        let DefKind::External {
-            module,
-            function,
-            ty,
-            ..
-        } = &self.program.def(d).kind
-        else {
+        let kind = &self.program.def(d).kind;
+        let (Some((module, function)), Some((ty, _))) = (kind.foreign(), kind.declared()) else {
             unreachable!()
         };
         let arity = match &ty.kind {
             TypeKind::Fn { params, .. } => params.len() as u32,
             _ => 0,
         };
-        match module.as_str() {
+        match module {
             "ilang:prelude" if function == "panic" => Ok((Op::Panic, arity)),
             // The private primitives of `lib/i/bits.i`.
             "ilang:bits" => Ok((
                 Op::Runtime {
-                    name: match function.as_str() {
+                    name: match function {
                         "read_unsigned" => "bits_read_unsigned",
                         "from_unsigned" => "bits_from_unsigned",
                         _ => return Err(format!("`bits.{function}` is not known")),
@@ -2626,7 +2867,7 @@ impl<'a> Lowerer<'a> {
             // The private primitives of `lib/i/big.i`.
             "ilang:big" => Ok((
                 Op::Runtime {
-                    name: match function.as_str() {
+                    name: match function {
                         "sign" => "big_sign",
                         "digits" => "big_digits",
                         "from_digits" => "big_from_digits",
@@ -2645,7 +2886,7 @@ impl<'a> Lowerer<'a> {
                 },
                 arity,
             )),
-            "ilang:core" => match CORE.iter().position(|n| n == function) {
+            "ilang:core" => match CORE.iter().position(|n| *n == function) {
                 Some(i) => Ok((
                     Op::Runtime {
                         name: CORE_FUNCS[i],
@@ -2656,11 +2897,11 @@ impl<'a> Lowerer<'a> {
                 None => Err(format!("`core.{function}` is not known")),
             },
             "ilang:request" => {
-                let op = match function.as_str() {
+                let op = match function {
                     "wait_any" => Op::WaitRequests,
                     "poll" => Op::PollRequests,
                     _ => Op::Runtime {
-                        name: match function.as_str() {
+                        name: match function {
                             "open_root" => "request_open_root",
                             "close_root" => "request_close_root",
                             "open_owner" => "request_open_owner",
@@ -2688,7 +2929,7 @@ impl<'a> Lowerer<'a> {
                 };
                 Ok((op, arity))
             }
-            "ilang:key" => match function.as_str() {
+            "ilang:key" => match function {
                 "new" => Ok((
                     Op::Runtime {
                         name: "key_new",
@@ -2713,7 +2954,7 @@ impl<'a> Lowerer<'a> {
                 _ => Err(format!("`key.{function}` is not known")),
             },
             "ilang:worker" => {
-                let name = match function.as_str() {
+                let name = match function {
                     "enabled" => "worker_enabled",
                     "publish" => "worker_publish",
                     "claim" => "worker_claim",
@@ -2732,8 +2973,37 @@ impl<'a> Lowerer<'a> {
                 };
                 Ok((Op::Runtime { name, arity }, arity))
             }
+            // `i/hostcall`: `call` and `call_in` are lowered at their call
+            // (`hostcall_call`); the others are request table operations.
+            "ilang:hostcall" => match function {
+                "group_live" => Ok((
+                    Op::Runtime {
+                        name: "request_group_live",
+                        arity,
+                    },
+                    arity,
+                )),
+                "root_live" => Ok((
+                    Op::Runtime {
+                        name: "request_root_live",
+                        arity,
+                    },
+                    arity,
+                )),
+                "adopt" => Ok((
+                    Op::Runtime {
+                        name: "request_adopt",
+                        arity,
+                    },
+                    arity,
+                )),
+                "call" | "call_in" => Err(format!(
+                    "`hostcall.{function}` is called directly with its operation; it is not a value"
+                )),
+                _ => Err(format!("`hostcall.{function}` is not known")),
+            },
             "ilang:resource" if function == "ensure" => Ok((Op::Ensure, arity)),
-            "ilang:control" => match function.as_str() {
+            "ilang:control" => match function {
                 "boundary" => Ok((Op::Boundary, arity)),
                 "suspend" => Ok((Op::Suspend, arity)),
                 "escape" => Ok((Op::Escape, arity)),
@@ -2777,13 +3047,18 @@ impl<'a> Lowerer<'a> {
                         None => Atom::Unit,
                     }
                 }
-                DefKind::External { .. } => match self.external_op(d) {
+                DefKind::External { .. } | DefKind::Runtime { .. } => match self.external_op(d) {
                     Ok((op, arity)) => Atom::Func(self.op_func(op, arity)),
                     Err(message) => {
                         self.error(fx.module, e.span, message);
                         Atom::Unit
                     }
                 },
+                DefKind::ServiceAccessor { ty } => {
+                    let f = self.accessor_func(ty);
+                    self.constants.insert(f);
+                    Atom::Func(f)
+                }
                 DefKind::Binding { .. } => {
                     if self.known.contains_key(&d) {
                         let f = self.def_func(d);
@@ -3374,6 +3649,7 @@ impl<'a> Lowerer<'a> {
             {
                 self.external_op(d).ok().map(|(op, _)| op)
             }
+            DefKind::Runtime { .. } => self.external_op(d).ok().map(|(op, _)| op),
             _ => None,
         }
     }
@@ -3662,7 +3938,10 @@ impl<'a> Lowerer<'a> {
                         None => Target::Op(Op::Panic),
                     }
                 }
-                DefKind::External { .. } => match self.external_op(*d) {
+                DefKind::ServiceAccessor { ty } => {
+                    Target::Callee(Callee::Direct(self.accessor_func(ty)))
+                }
+                DefKind::External { .. } | DefKind::Runtime { .. } => match self.external_op(*d) {
                     Ok((op, _)) => Target::Op(op),
                     Err(message) => {
                         self.error(fx.module, callee.span, message);
@@ -3760,6 +4039,9 @@ impl<'a> Lowerer<'a> {
         if let Some(a) = self.light_boundary(fx, out, span, callee, first, args, tail) {
             return a;
         }
+        if let Some(a) = self.hostcall_call(fx, out, span, callee, first, args, tail) {
+            return a;
+        }
         let mut written = Vec::new();
         if let Some(a) = first {
             written.push(self.expr(fx, out, a));
@@ -3793,6 +4075,192 @@ impl<'a> Lowerer<'a> {
             _ => written,
         };
         self.finish_call(fx, out, span, target, args, tail)
+    }
+
+    /// `hostcall.call(op)` and `hostcall.call_in(g, op)`: `op` runs in
+    /// no-wait mode. When it is a function literal whose body is one call of
+    /// a field of an imported `"later"` service, the field value is tested
+    /// at run time: the service's own import function (its import tag) is
+    /// started under the ambient `Owner`, or `g`, and the request cell is the
+    /// `Call`; any other value (a fake) is called now and its result is a
+    /// ready `Call`. Any other `op` is called now the same way. `call_in`
+    /// first panics `hostcall: group closed` when `g` is closed.
+    #[allow(clippy::too_many_arguments)]
+    fn hostcall_call(
+        &mut self,
+        fx: &mut Fx,
+        out: &mut Vec<Stmt>,
+        span: Span,
+        callee: &Expr,
+        first: Option<&Expr>,
+        args: &[&Expr],
+        tail: bool,
+    ) -> Option<Option<Atom>> {
+        let ExprKind::Name(ValueRef::Def(d)) = callee.kind else {
+            return None;
+        };
+        if !self.is_library(d.module) {
+            return None;
+        }
+        let in_group = match self.program.def(d).kind.foreign() {
+            Some(("ilang:hostcall", "call")) => false,
+            Some(("ilang:hostcall", "call_in")) => true,
+            _ => return None,
+        };
+        let written: Vec<&Expr> = first.into_iter().chain(args.iter().copied()).collect();
+        let (group, op) = match (in_group, written.as_slice()) {
+            (false, [op]) => (None, *op),
+            (true, [g, op]) => (Some(*g), *op),
+            _ => return None,
+        };
+        let site = self.site(fx, span.start);
+        let mut env = fx.env;
+        if let Some(g) = group {
+            let g = self.expr(fx, out, g);
+            let open = self.library_callee("i/hostcall", "open_group");
+            let_value(
+                fx,
+                out,
+                Value::Call {
+                    callee: open,
+                    args: vec![g.clone()],
+                    env: fx.env,
+                },
+                site,
+            );
+            let Some(owner) = self.out.request_owner else {
+                self.error(
+                    fx.module,
+                    span,
+                    "`hostcall.call_in` needs the request Owner",
+                );
+                return Some(finish(out, tail, Atom::Unit));
+            };
+            let dst = fx.local(LocalType::Env);
+            out.push(Stmt::LetEnv {
+                dst,
+                env: fx.env,
+                service: owner,
+                value: g,
+                in_place: false,
+            });
+            env = Env::Local(dst);
+        }
+        let result = fx.local(LocalType::Value);
+        let ready = |value: Atom| Stmt::Let {
+            dst: result,
+            value: Value::Op(
+                Op::Runtime {
+                    name: "request_ready",
+                    arity: 1,
+                },
+                vec![value],
+            ),
+            site: None,
+        };
+        match self.field_start(fx.module, op) {
+            Some((target, list, field_args, field, start)) => {
+                let t = self.expr(fx, out, target);
+                let value = self.field(fx, out, t, list);
+                let mut values = Vec::new();
+                for a in field_args {
+                    values.push(self.expr(fx, out, a));
+                }
+                let answer = fx.local(LocalType::Value);
+                out.push(Stmt::If {
+                    cond: Cond::Equal(value.clone(), Atom::Func(field)),
+                    then: vec![Stmt::Let {
+                        dst: result,
+                        value: Value::Call {
+                            callee: Callee::Direct(start),
+                            args: values.clone(),
+                            env,
+                        },
+                        site,
+                    }],
+                    otherwise: vec![
+                        Stmt::Let {
+                            dst: answer,
+                            value: Value::Call {
+                                callee: Callee::Value(value),
+                                args: values,
+                                env,
+                            },
+                            site,
+                        },
+                        ready(Atom::Local(answer)),
+                    ],
+                });
+            }
+            None => {
+                let f = self.expr(fx, out, op);
+                let answer = let_value(
+                    fx,
+                    out,
+                    Value::Call {
+                        callee: Callee::Value(f),
+                        args: vec![],
+                        env,
+                    },
+                    site,
+                );
+                out.push(ready(answer));
+            }
+        }
+        Some(finish(out, tail, Atom::Local(result)))
+    }
+
+    /// The parts of `() { x.f(args) }` when `f` is a field of an imported
+    /// service whose calls are starts: `x`, the field access, the arguments,
+    /// the field's import function and its start function.
+    #[allow(clippy::type_complexity)]
+    fn field_start<'e>(
+        &mut self,
+        module: ModuleId,
+        op: &'e Expr,
+    ) -> Option<(
+        &'e Expr,
+        &'a [(CtorRef, u32)],
+        Vec<&'e Expr>,
+        FuncId,
+        FuncId,
+    )> {
+        let ExprKind::Fn(f) = &ungroup(op).kind else {
+            return None;
+        };
+        let ([], [hir::Stmt::Expr(body)]) = (f.params.as_slice(), f.body.stmts.as_slice()) else {
+            return None;
+        };
+        let ExprKind::Call { callee, args } = &ungroup(body).kind else {
+            return None;
+        };
+        if args.iter().any(|a| a.label.is_some()) {
+            return None;
+        }
+        let ExprKind::Field { target, .. } = &callee.kind else {
+            return None;
+        };
+        let typed: &'a Typed = self.typed;
+        let Some(Access::Field(list)) = typed.access.get(&(module, callee.span)) else {
+            return None;
+        };
+        let (c, index) = *list.first()?;
+        if list
+            .iter()
+            .any(|&(other, i)| other.ty != c.ty || i != index)
+        {
+            return None;
+        }
+        self.program.ty(c.ty).import.as_ref()?;
+        let (field, start) = self.service_field_start(c.ty, index)?;
+        let written: Vec<&Expr> = args.iter().map(|a| &a.value).collect();
+        let ordered = match typed.args.get(&(module, body.span)) {
+            Some(order) if order.len() == written.len() => {
+                order.iter().map(|&i| written[i as usize]).collect()
+            }
+            _ => written,
+        };
+        Some((target, list.as_slice(), ordered, field, start))
     }
 
     /// The call of a worked-out callee with its arguments in order.
