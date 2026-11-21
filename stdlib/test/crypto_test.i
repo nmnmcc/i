@@ -1364,7 +1364,7 @@ test("random_bytes_fake", () {
 		assert(fail.catch(() { crypto.random_bytes(3) }) == Ok(<<0, 0, 7>>))
 		assert(fail.catch(() { crypto.random_bytes(0) }) == Ok(<<>>))
 		()
-	} <- (process.Entropy(entropy = (n) { request.ready(Ok(<<7:u(n * 8)>>)) }))
+	} <- (process.Entropy(entropy = (n) { Ok(<<7:u(n * 8)>>) }))
 })
 
 test("random_bytes_negative", () {
@@ -1396,7 +1396,7 @@ test("random_bytes_service_error", () {
 		()
 	} <- (
 		process.Entropy(
-			entropy = (_) { request.ready(Error("entropy failed")) },
+			entropy = (_) { Error("entropy failed") },
 		),
 	)
 })

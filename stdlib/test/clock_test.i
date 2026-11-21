@@ -44,14 +44,12 @@ test("clock_fake", () {
 		()
 	} <- (
 		clock.Clock(
-			monotonic_ns = () { request.ready(Ok(42)) },
-			unix_ns = () { request.ready(Ok(-7)) },
+			monotonic_ns = () { Ok(42) },
+			unix_ns = () { Ok(-7) },
 			sleep_ns = (n) {
-				request.ready(
-					{ n < 0 } |>
-						(True()) { Error("invalid") }
-						& (False()) { Ok(()) },
-				)
+				{ n < 0 } |>
+					(True()) { Error("invalid") }
+					& (False()) { Ok(()) }
 			},
 		),
 	)
