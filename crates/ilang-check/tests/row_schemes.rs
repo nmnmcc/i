@@ -441,7 +441,7 @@ fn a_directed_handler_restriction_without_a_stated_entry_is_hidden() {
 
 #[test]
 fn a_rigid_row_without_a_stated_entry_cannot_take_a_one_form_provide() {
-    // §9.2 Row variables: in (..N, C(…)), N has no entry for C. A rigid row
+    // Row variables: in (..N, C(…)), N has no entry for C. A rigid row
     // variable that reaches a provide of C without a stated C entry is a
     // compile error, also when C has one form and so no same-form obligation.
     let source = "Clock = (now = () -> Int)\nwrap : <N>(() <- N -> Int) <- N -> Int = (body) { body() <- (Clock(now = () { 1 })) }\nmain = () { wrap(() { 2 }) }\n";
@@ -478,7 +478,7 @@ fn a_rigid_row_with_a_stated_entry_takes_a_one_form_provide() {
 
 #[test]
 fn an_inferred_need_takes_a_one_form_provide() {
-    // §9.2: only a rigid row variable rejects a provide of a key it does not
+    // Only a rigid row variable rejects a provide of a key it does not
     // state. A function with no written need has an inferred row, which
     // simply gains the entry from the provide. The second program reaches
     // the row through a continuation's row argument, as in

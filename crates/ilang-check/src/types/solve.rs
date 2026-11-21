@@ -84,7 +84,7 @@ pub(crate) struct VarState {
     /// Services with one form (no type arguments) provided over this need
     /// row. They carry no same-form obligation, but a written row that does
     /// not state their key would hide that the provide replaces a service
-    /// that its caller passes in the row (§9.2, row variables).
+    /// that its caller passes in the row.
     pub shadowed: Vec<Ty>,
     /// A deferred need meet, with the service forms used for E0515.
     pub need_meet: Option<(Ty, Ty)>,
@@ -969,8 +969,8 @@ impl Solver {
     /// A written need row over which a one-form service was provided, and
     /// whose shown scheme does not state that service's key: in
     /// `(..N, C(…))`, `N` has no entry for `C`, so a rigid row variable that
-    /// reaches a provide of `C` without a stated `C` entry is a compile error
-    /// (§9.2). Each item is the row variable seen in the scheme and the key.
+    /// reaches a provide of `C` without a stated `C` entry is a compile error.
+    /// Each item is the row variable seen in the scheme and the key.
     pub fn hidden_shadows(&self, t: &Ty, level: u32) -> Vec<(V, Ty)> {
         if !self.has_shadows {
             return Vec::new();
