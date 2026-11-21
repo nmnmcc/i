@@ -26,16 +26,14 @@ test("fake_capabilities", () {
 				{
 					assert(process.cwd() == "/fake")
 					()
-				} <- (
-					process.WorkingDirectory(
-						cwd = () { Ok("/fake") },
-					),
-				)
+				} <- (process.WorkingDirectory(cwd = () { Ok("/fake") }))
 			} <- (process.Entropy(entropy = (n) { Ok(<<n>>) }))
 		} <- (process.Environment(env = (name) { Error(name) }))
 	} <- (
 		process.Arguments(
-			args = () { Ok(<<2, 0, 0, 0, 1, 0, 0, 0, 97, 2, 0, 0, 0, 98, 99>>) },
+			args = () {
+				Ok(<<2, 0, 0, 0, 1, 0, 0, 0, 97, 2, 0, 0, 0, 98, 99>>)
+			},
 		),
 	)
 })
