@@ -595,7 +595,7 @@ unique = <A>(list : List(A)) -> List(A) {
 		rest |>
 			([]) { reverse(acc) }
 			& ([x, ..xs]) {
-				dict.has(seen, x) |>
+				dict.contains(seen, x) |>
 					(True()) { go(xs, seen, acc) }
 					& (False()) { go(xs, dict.insert(seen, x, ()), [x, ..acc]) }
 			}

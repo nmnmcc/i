@@ -354,7 +354,10 @@ parse_group = (p : Parser) -> (Ast, Parser) {
 						}
 						& (False()) {
 							(name, end) = read_name(start, [])
-							{ digit(peek(start)) || dict.has(p.names, name) } |>
+							{
+								digit(peek(start)) ||
+									dict.contains(p.names, name)
+							} |>
 								(True()) {
 									syntax_error(
 										start,
@@ -719,7 +722,7 @@ closure = (
 		([]) { list.reverse(acc) }
 		& ([thread, ..rest]) {
 			Thread(pc, slots) = thread
-			dict.has(seen, pc) |>
+			dict.contains(seen, pc) |>
 				(True()) { closure(re, rest, i, seen, acc) }
 				& (False()) {
 					visited = dict.insert(seen, pc, True())

@@ -5,6 +5,7 @@
 	dict = i/dict
 	int = i/int
 	list = i/list
+	set = i/set
 	string = i/string
 	option = (Some, None) = i/option
 )
@@ -29,28 +30,58 @@ test("from_list_inequality_key_test", () {
 	()
 })
 
-test("has_key_empty_test", () {
+test("contains_key_empty_test", () {
 	assert(
-		core.not([] |> dict.from_list |> dict.has(1)),
+		core.not([] |> dict.from_list |> dict.contains(1)),
 	)
 	()
 })
 
-test("has_key_present_test", () {
-	assert([(1, 0)] |> dict.from_list |> dict.has(1))
+test("contains_key_present_test", () {
+	assert([(1, 0)] |> dict.from_list |> dict.contains(1))
 	()
 })
 
-test("has_key_present_multiple_test", () {
-	assert([(4, 0), (1, 0)] |> dict.from_list |> dict.has(1))
+test("contains_key_present_multiple_test", () {
+	assert([(4, 0), (1, 0)] |> dict.from_list |> dict.contains(1))
 	()
 })
 
-test("has_key_absent_test", () {
+test("contains_key_absent_test", () {
 	assert(
-		core.not([(4, 0), (1, 0)] |> dict.from_list |> dict.has(0)),
+		core.not([(4, 0), (1, 0)] |> dict.from_list |> dict.contains(0)),
 	)
 	()
+})
+
+// Every container's `contains` takes the container first and gives `True`
+// when the second argument is in it: a list element, a set member, a
+// substring, or a dict key.
+test("contains_all_containers_test", () {
+	assert(list.contains([1, 2, 3], 2))
+	assert(
+		core.not(list.contains([1, 2, 3], 4)),
+	)
+	assert(
+		set.contains(set.new() |> set.insert(2), 2),
+	)
+	assert(
+		core.not(
+			set.contains(set.new() |> set.insert(2), 4),
+		),
+	)
+	assert(string.contains("theory", "ory"))
+	assert(
+		core.not(string.contains("theory", "xyz")),
+	)
+	assert(
+		dict.contains(dict.from_list([("a", 1)]), "a"),
+	)
+	assert(
+		core.not(
+			dict.contains(dict.from_list([("a", 1)]), "b"),
+		),
+	)
 })
 
 test("new_size_test", () {
@@ -270,37 +301,37 @@ test("delete_test", () {
 	()
 })
 
-test("upsert_existing_test", () {
+test("update_existing_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
 	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None()) { 0 } }
 
 	assert(
-		dict.upsert(d, "a", inc_or_zero) ==
+		dict.update(d, "a", inc_or_zero) ==
 			dict.from_list([("a", 1), ("b", 1), ("c", 2)]),
 	)
 	()
 })
 
-test("upsert_existing_b_test", () {
+test("update_existing_b_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
 	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None()) { 0 } }
 
 	assert(
-		dict.upsert(d, "b", inc_or_zero) ==
+		dict.update(d, "b", inc_or_zero) ==
 			dict.from_list([("a", 0), ("b", 2), ("c", 2)]),
 	)
 	()
 })
 
-test("upsert_new_test", () {
+test("update_new_test", () {
 	d = dict.from_list([("a", 0), ("b", 1), ("c", 2)])
 
 	inc_or_zero = (x) { x |> (Some(i)) { i + 1 } & (None()) { 0 } }
 
 	assert(
-		dict.upsert(d, "z", inc_or_zero) ==
+		dict.update(d, "z", inc_or_zero) ==
 			dict.from_list([("a", 0), ("b", 1), ("c", 2), ("z", 0)]),
 	)
 	()
@@ -540,10 +571,10 @@ test("zero_must_be_contained_get_test", () {
 	()
 })
 
-test("zero_must_be_contained_has_key_test", () {
+test("zero_must_be_contained_contains_key_test", () {
 	map = dict.new() |> dict.insert(0, ())
 
-	assert(dict.has(map, 0) == True())
+	assert(dict.contains(map, 0) == True())
 	()
 })
 
@@ -1032,9 +1063,9 @@ test("string_keys_test", () {
 	d = dict.from_list(list.map(keys, (k) { (k, string.length(k)) }))
 	assert(dict.size(d) == 5000)
 	assert(dict.get(d, "key4999") == Some(7))
-	assert(dict.has(d, "key1"))
+	assert(dict.contains(d, "key1"))
 	assert(
-		core.not(dict.has(d, "key0")),
+		core.not(dict.contains(d, "key0")),
 	)
 })
 
@@ -1061,17 +1092,34 @@ test("zero_keys_test", () {
 	assert(dict.get(d, 0.0) == Some("b"))
 })
 
-test("upsert_update_test", () {
+test("update_count_test", () {
 	count = (words) {
 		list.fold(words, dict.new(), (d, w) {
-			dict.upsert(d, w, (x) { x |> (Some(n)) { n + 1 } & (None()) { 1 } })
+			dict.update(d, w, (x) { x |> (Some(n)) { n + 1 } & (None()) { 1 } })
 		})
 	}
 	d = count(["a", "b", "a", "c", "a"])
 	assert(dict.get(d, "a") == Some(3))
 	assert(dict.get(d, "c") == Some(1))
-	assert({ dict.update(d, "a", (n) { n * 10 }) |> dict.get("a") } == Some(30))
-	assert(dict.update(d, "z", (n) { n * 10 }) == d)
+	assert(
+		{
+			dict.update(d, "a", (n) {
+				n |> (Some(i)) { i * 10 } & (None()) { 0 }
+			})
+				|> dict.get("a")
+		} ==
+			Some(30),
+	)
+})
+
+test("update_missing_key_test", () {
+	d = dict.from_list([("a", 1)])
+	assert(
+		dict.update(d, "z", (x) {
+			x |> (Some(n)) { n + 1 } & (None()) { 7 }
+		}) ==
+			dict.from_list([("a", 1), ("z", 7)]),
+	)
 })
 
 test("merge_combine_test", () {
@@ -1200,7 +1248,7 @@ test("same_entries_colliding_keys_test", () {
 		assert(dict.size(d) == 2)
 		assert(dict.get(d, "f3zx") == Some(1))
 		assert(dict.get(d, "0pad") == Some(2))
-		assert(dict.has(d, "f3zx"))
+		assert(dict.contains(d, "f3zx"))
 		without_first = dict.delete(d, "f3zx")
 		assert(dict.get(without_first, "f3zx") == None())
 		assert(dict.get(without_first, "0pad") == Some(2))
