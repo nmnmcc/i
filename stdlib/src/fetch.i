@@ -1,12 +1,13 @@
 //// Fetch transport. Response handles belong to the current resource context.
 (
 	i/request
+	i/hostcall
 	i/resource
 	i/fail
 )
 
 (
-	Fetch
+	Fetch(..)
 	Response
 	open
 	status
@@ -17,17 +18,17 @@
 
 Response = (Int)
 
-@host("i:fetch/v1", "request")
+@import("i:fetch/v1")
 Fetch = (
-	start = (String, String, String, BitArray) -> Request(Result(Int, String)),
-	status = (Int) -> Request(Result(Int, String)),
-	headers = (Int) -> Request(Result(String, String)),
-	read = (Int, Int) -> Request(Result(BitArray, String)),
-	close = (Int) -> Request(()),
+	start = (String, String, String, BitArray) -> Result(Int, String),
+	status = (Int) -> Result(Int, String),
+	headers = (Int) -> Result(String, String),
+	read = (Int, Int) -> Result(BitArray, String),
+	close = (Int) -> (),
 )
 
 open = (method, url, headers, body) <- (raw : Fetch) {
-	r = raw.start(method, url, headers, body)
+	r = hostcall.call(() { raw.start(method, url, headers, body) })
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -37,31 +38,31 @@ open = (method, url, headers, body) <- (raw : Fetch) {
 		() {
 			request.state(r) |>
 				(request.Ready(Ok(value))) {
-					request.await_owned(raw.close(value))
+					raw.close(value)
 				}
 				& (_) { () }
-			request.cancel(request.ticket(r))
+			hostcall.cancel(r)
 		},
 	)
 	Response(number)
 }
 
 status = (Response(id)) <- (raw : Fetch) {
-	request.await_owned(raw.status(id)) |>
+	raw.status(id) |>
 		(Ok(value)) { value }
 		& (Error(code)) { fail.raise(code) }
 }
 
 headers = (Response(id)) <- (raw : Fetch) {
-	request.await_owned(raw.headers(id)) |>
+	raw.headers(id) |>
 		(Ok(value)) { value }
 		& (Error(code)) { fail.raise(code) }
 }
 
 read = (Response(id), max) <- (raw : Fetch) {
-	request.await_owned(raw.read(id, max)) |>
+	raw.read(id, max) |>
 		(Ok(value)) { value }
 		& (Error(code)) { fail.raise(code) }
 }
 
-close = (Response(id)) <- (raw : Fetch) { request.await_owned(raw.close(id)) }
+close = (Response(id)) <- (raw : Fetch) { raw.close(id) }

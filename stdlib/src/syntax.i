@@ -175,7 +175,7 @@ definition = (of : Syntax) <- (service : Definitions) -> Syntax {
 
 Diagnostics = (note = (String) -> ())
 
-@external("i:compiler/syntax/v1", "note")
+@runtime("i:compiler/syntax/v1", "note")
 raw_note : (String) -> ()
 
 /// Constructs the compiler's transactional diagnostic service.
@@ -191,25 +191,25 @@ Items = (
 	expose = (Syntax) <- (Fail(SyntaxError)) -> (),
 )
 
-@external("i:compiler/syntax/v1", "metadata_new")
+@runtime("i:compiler/syntax/v1", "metadata_new")
 raw_metadata_new : () -> ItemMetadata
 
-@external("i:compiler/syntax/v1", "metadata_push")
+@runtime("i:compiler/syntax/v1", "metadata_push")
 raw_metadata_push : (ItemMetadata, String, String) -> ItemMetadata
 
-@external("i:compiler/syntax/v1", "items_add")
+@runtime("i:compiler/syntax/v1", "items_add")
 raw_items_add : (Syntax, Syntax, ItemMetadata, Syntax) -> ItemResult
 
-@external("i:compiler/syntax/v1", "items_expose")
+@runtime("i:compiler/syntax/v1", "items_expose")
 raw_items_expose : (Syntax) -> ItemResult
 
-@external("i:compiler/syntax/v1", "items_ok")
+@runtime("i:compiler/syntax/v1", "items_ok")
 raw_items_ok : (ItemResult) -> Bool
 
-@external("i:compiler/syntax/v1", "items_message")
+@runtime("i:compiler/syntax/v1", "items_message")
 raw_items_message : (ItemResult) -> String
 
-@external("i:compiler/syntax/v1", "items_at")
+@runtime("i:compiler/syntax/v1", "items_at")
 raw_items_at : (ItemResult) -> Syntax
 
 build_metadata = (
@@ -253,22 +253,22 @@ _items = () -> Items {
 	)
 }
 
-@external("i:compiler/syntax/v1", "report_error")
+@runtime("i:compiler/syntax/v1", "report_error")
 _report_error : (String, Syntax) -> Syntax
 
-@external("i:compiler/syntax/v1", "definition")
+@runtime("i:compiler/syntax/v1", "definition")
 raw_definition : (Syntax) -> DefinitionResult
 
-@external("i:compiler/syntax/v1", "definition_ok")
+@runtime("i:compiler/syntax/v1", "definition_ok")
 raw_definition_ok : (DefinitionResult) -> Bool
 
-@external("i:compiler/syntax/v1", "definition_value")
+@runtime("i:compiler/syntax/v1", "definition_value")
 raw_definition_value : (DefinitionResult) -> Syntax
 
-@external("i:compiler/syntax/v1", "definition_message")
+@runtime("i:compiler/syntax/v1", "definition_message")
 raw_definition_message : (DefinitionResult) -> String
 
-@external("i:compiler/syntax/v1", "definition_at")
+@runtime("i:compiler/syntax/v1", "definition_at")
 raw_definition_at : (DefinitionResult) -> Syntax
 
 /// Constructs the compiler's definition service for one macro run.
@@ -290,94 +290,94 @@ _definitions = () -> Definitions {
 	)
 }
 
-@external("i:compiler/syntax/v1", "match")
+@runtime("i:compiler/syntax/v1", "match")
 _match : (Syntax, Syntax) -> MatchResult
 
-@external("i:compiler/syntax/v1", "match_ok")
+@runtime("i:compiler/syntax/v1", "match_ok")
 _match_ok : (MatchResult) -> Bool
 
-@external("i:compiler/syntax/v1", "match_one")
+@runtime("i:compiler/syntax/v1", "match_one")
 _match_one : (MatchResult, Int) -> Syntax
 
-@external("i:compiler/syntax/v1", "match_many_len")
+@runtime("i:compiler/syntax/v1", "match_many_len")
 raw_match_many_len : (MatchResult, Int) -> Int
 
-@external("i:compiler/syntax/v1", "match_many_child")
+@runtime("i:compiler/syntax/v1", "match_many_child")
 raw_match_many_child : (MatchResult, Int, Int) -> Syntax
 
-@external("i:compiler/syntax/v1", "template")
+@runtime("i:compiler/syntax/v1", "template")
 _template : (Int) -> Syntax
 
-@external("i:compiler/syntax/v1", "rebuild")
+@runtime("i:compiler/syntax/v1", "rebuild")
 raw_rebuild : (Syntax, SyntaxList) -> Syntax
 
-@external("i:compiler/syntax/v1", "kind")
+@runtime("i:compiler/syntax/v1", "kind")
 raw_kind : (Syntax) -> Int
 
-@external("i:compiler/syntax/v1", "text")
+@runtime("i:compiler/syntax/v1", "text")
 raw_text : (Syntax) -> String
 
-@external("i:compiler/syntax/v1", "int")
+@runtime("i:compiler/syntax/v1", "int")
 raw_int : (Syntax) -> Int
 
-@external("i:compiler/syntax/v1", "float")
+@runtime("i:compiler/syntax/v1", "float")
 raw_float : (Syntax) -> Float
 
-@external("i:compiler/syntax/v1", "length")
+@runtime("i:compiler/syntax/v1", "length")
 raw_length : (Syntax) -> Int
 
-@external("i:compiler/syntax/v1", "child")
+@runtime("i:compiler/syntax/v1", "child")
 raw_child : (Syntax, Int) -> Syntax
 
-@external("i:compiler/syntax/v1", "list_new")
+@runtime("i:compiler/syntax/v1", "list_new")
 raw_list_new : () -> SyntaxList
 
-@external("i:compiler/syntax/v1", "list_push")
+@runtime("i:compiler/syntax/v1", "list_push")
 raw_list_push : (SyntaxList, Syntax) -> SyntaxList
 
-@external("i:compiler/syntax/v1", "make_text")
+@runtime("i:compiler/syntax/v1", "make_text")
 raw_make_text : (Int, String, Syntax) -> SyntaxResult
 
-@external("i:compiler/syntax/v1", "make_int")
+@runtime("i:compiler/syntax/v1", "make_int")
 raw_make_int : (Int, Syntax) -> SyntaxResult
 
-@external("i:compiler/syntax/v1", "make_float")
+@runtime("i:compiler/syntax/v1", "make_float")
 raw_make_float : (Float, Syntax) -> SyntaxResult
 
-@external("i:compiler/syntax/v1", "make_list")
+@runtime("i:compiler/syntax/v1", "make_list")
 raw_make_list : (Int, SyntaxList, Syntax) -> SyntaxResult
 
-@external("i:compiler/syntax/v1", "make_one")
+@runtime("i:compiler/syntax/v1", "make_one")
 raw_make_one : (Int, Syntax, Syntax) -> SyntaxResult
 
-@external("i:compiler/syntax/v1", "syntax_ok")
+@runtime("i:compiler/syntax/v1", "syntax_ok")
 raw_syntax_ok : (SyntaxResult) -> Bool
 
-@external("i:compiler/syntax/v1", "syntax_value")
+@runtime("i:compiler/syntax/v1", "syntax_value")
 raw_syntax_value : (SyntaxResult) -> Syntax
 
-@external("i:compiler/syntax/v1", "syntax_error")
+@runtime("i:compiler/syntax/v1", "syntax_error")
 raw_syntax_error : (SyntaxResult) -> String
 
-@external("i:compiler/syntax/v1", "same_code")
+@runtime("i:compiler/syntax/v1", "same_code")
 raw_same_code : (Syntax, Syntax) -> Bool
 
-@external("i:compiler/syntax/v1", "show")
+@runtime("i:compiler/syntax/v1", "show")
 raw_show : (Syntax) -> String
 
-@external("i:compiler/syntax/v1", "show_as")
+@runtime("i:compiler/syntax/v1", "show_as")
 raw_show_as : (Syntax, Int) -> TextResult
 
-@external("i:compiler/syntax/v1", "text_ok")
+@runtime("i:compiler/syntax/v1", "text_ok")
 raw_text_ok : (TextResult) -> Bool
 
-@external("i:compiler/syntax/v1", "text_value")
+@runtime("i:compiler/syntax/v1", "text_value")
 raw_text_value : (TextResult) -> String
 
-@external("i:compiler/syntax/v1", "text_error")
+@runtime("i:compiler/syntax/v1", "text_error")
 raw_text_error : (TextResult) -> String
 
-@external("i:compiler/syntax/v1", "text_error_at")
+@runtime("i:compiler/syntax/v1", "text_error_at")
 raw_text_error_at : (TextResult) -> Syntax
 
 reverse = (items : List(Syntax), result : List(Syntax)) -> List(Syntax) {
@@ -478,7 +478,7 @@ _rebuild = (template : Syntax, children : List(Syntax)) -> Syntax {
 }
 
 /// Makes syntax at the span and scope of `like`.
-@external("i:compiler/syntax/v1", "type_handle")
+@runtime("i:compiler/syntax/v1", "type_handle")
 raw_type_handle : (Syntax) -> TypeHandle
 
 make = (node : Node, like : Syntax) -> Syntax {
@@ -598,37 +598,37 @@ Types = (
 
 TypeResult = Opaque
 
-@external("i:compiler/syntax/v1", "type_of")
+@runtime("i:compiler/syntax/v1", "type_of")
 raw_type_of : (Syntax) -> TypeResult
 
-@external("i:compiler/syntax/v1", "signature")
+@runtime("i:compiler/syntax/v1", "signature")
 raw_signature : () -> TypeResult
 
-@external("i:compiler/syntax/v1", "subtype")
+@runtime("i:compiler/syntax/v1", "subtype")
 raw_subtype : (Syntax, Syntax) -> TypeResult
 
-@external("i:compiler/syntax/v1", "members")
+@runtime("i:compiler/syntax/v1", "members")
 raw_members : (Syntax) -> TypeResult
 
-@external("i:compiler/syntax/v1", "type_ok")
+@runtime("i:compiler/syntax/v1", "type_ok")
 raw_type_ok : (TypeResult) -> Bool
 
-@external("i:compiler/syntax/v1", "type_value")
+@runtime("i:compiler/syntax/v1", "type_value")
 raw_type_value : (TypeResult) -> Syntax
 
-@external("i:compiler/syntax/v1", "type_truth")
+@runtime("i:compiler/syntax/v1", "type_truth")
 raw_type_truth : (TypeResult) -> Int
 
-@external("i:compiler/syntax/v1", "type_len")
+@runtime("i:compiler/syntax/v1", "type_len")
 raw_type_len : (TypeResult) -> Int
 
-@external("i:compiler/syntax/v1", "type_child")
+@runtime("i:compiler/syntax/v1", "type_child")
 raw_type_child : (TypeResult, Int) -> Syntax
 
-@external("i:compiler/syntax/v1", "type_message")
+@runtime("i:compiler/syntax/v1", "type_message")
 raw_type_message : (TypeResult) -> String
 
-@external("i:compiler/syntax/v1", "type_at")
+@runtime("i:compiler/syntax/v1", "type_at")
 raw_type_at : (TypeResult) -> Syntax
 
 type_result = (r : TypeResult) -> Syntax {

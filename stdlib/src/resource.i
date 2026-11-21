@@ -18,19 +18,19 @@ Scope = (attach = (() -> ()) -> (), gate = Request(()))
 
 /// Runs `with` after `body`, whether `body` ends normally, ends with an
 /// error, or is unwound.
-@external("ilang:resource", "ensure")
+@runtime("ilang:resource", "ensure")
 ensure : <A, N>(() <- N -> A, () <- N -> ()) <- N -> A
 
 // The scope's one-way state cell. These are the ordinary request operations;
 // a completed fake request is a mutable cell that only goes from `Ready` to
 // `Taken` (i/request).
-@external("ilang:request", "ready")
+@runtime("ilang:request", "ready")
 gate_ready : <A>(A) -> Request(A)
 
-@external("ilang:request", "state")
+@runtime("ilang:request", "state")
 gate_state : <A>(Request(A)) -> Result(A, Int)
 
-@external("ilang:request", "take")
+@runtime("ilang:request", "take")
 gate_take : <A>(Request(A)) -> A
 
 /// Makes `release` a function that needs nothing: its services are the row
