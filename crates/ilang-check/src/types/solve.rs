@@ -657,16 +657,19 @@ impl Solver {
     }
 
     /// A need without its implicit services: what a written row must state.
-    pub fn ambient(&mut self, l: &Ty) -> Ty {
+    pub fn ambient(&self, l: &Ty) -> Ty {
         if self.hidden_needs.is_empty() {
             return l.clone();
         }
-        let hidden: Vec<Ty> = self
-            .hidden_needs
-            .iter()
-            .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new()))
-            .collect();
-        self.normalize_mode(Ty::Diff(Box::new(l.clone()), hidden), Mode::Env)
+        let hidden = |t: &Ty| {
+            matches!(t.head(), Some(Head::Named(TypeRef::Custom(id)))
+                if self.hidden_needs.contains(&id))
+        };
+        match l {
+            Ty::Union(ms) => Ty::Union(ms.iter().filter(|m| !hidden(m)).cloned().collect()),
+            Ty::Con(..) if hidden(l) => Ty::Never,
+            _ => l.clone(),
+        }
     }
 
     /// The row parameters of a constructor, determined from its definition.

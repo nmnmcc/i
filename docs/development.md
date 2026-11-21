@@ -114,3 +114,11 @@ output. Its answers come from `ilang_check::query`, and its formatting is
 `ilang_syntax::format`, the formatter of `i fmt`. `editors/vscode` is the
 VS Code extension: its README says how to build it and run its tests
 (`npm test` checks the TextMate grammar against a snapshot of token scopes).
+
+## Heavy test binaries
+
+`ilang-check --test library` and `ilang-cli --test spec` keep the whole
+library graph alive. Always run them with `-- --test-threads=1`, and run only
+one at a time. Measured: `library` peaks at 6.6 GB single-threaded and about
+32 GB with the default parallel test threads. Check `free -g` for at least
+12 GB available before starting one of them.
