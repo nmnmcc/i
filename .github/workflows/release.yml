@@ -110,7 +110,10 @@ jobs:
             echo "i names an ELF interpreter; it will not start without it" >&2
             exit 1
           fi
-          ldd result-i/bin/i | tee ldd-i.txt
+          # `ldd` exits 1 for a file it cannot load as dynamic, which a static
+          # binary is; the text is what matters.
+          ldd result-i/bin/i > ldd-i.txt 2>&1 || true
+          cat ldd-i.txt
           case "$(cat ldd-i.txt)" in
             *"not a dynamic executable"*|*"statically linked"*) ;;
             *) echo "i is a dynamic executable (see ldd-i.txt)" >&2; exit 1 ;;
