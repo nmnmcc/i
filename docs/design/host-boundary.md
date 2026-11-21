@@ -12,7 +12,7 @@ No code is changed by this document. The product choices were decided on
 The boundary has two directions and two products:
 
 - **Import**: i calls the host. Syntax: one attribute, `@import`, on a service
-  type. The toolchain synthesizes a typed `make_<Type>` accessor. The owner or
+  type. The toolchain synthesizes a typed `make_<type>` accessor. The owner or
   a direct dependent constructs the value; a sibling cannot reach the module.
 - **Export**: the host calls i. Syntax: `@export` on a top-level function of a
   **library** package. There is no manifest list.
@@ -211,7 +211,7 @@ service types (the import namespace may repeat with different labels).
 ### 3.2 The generated implementation
 
 An `@import` service type gets a synthesized top-level accessor in its **own
-module**, `make_<Type>`, appended in memory after the source items and added to
+module**, `make_<type>`, appended in memory after the source items and added to
 the module's exports:
 
 ```i
@@ -221,10 +221,10 @@ Logger = (log = (String) <- (Fail(String)) -> Nil)
 f = () { ... }
 
 // synthesized at the end of app/log, not written to disk
-make_Logger : () -> app/log.Logger
+make_logger : () -> app/log.Logger
 ```
 
-`make_Logger()` constructs the service, or returns the one the **call site**
+`make_logger()` constructs the service, or returns the one the **call site**
 already has: it returns `Logger(log = <the import function>)`, and if the
 caller's *service environment* carries a `Logger` (a `<-` binding or inferred
 row in scope, including a fake or a platform value), it returns that instead.
@@ -235,12 +235,12 @@ Each field's import function value is synthesized from the service type's
 The accessor has **no need**, so a host-facing signature stays free of the
 service type and the host supplies only imports. A function that wants an
 injectable service takes it in its own `<- (logger : Logger)` pattern instead;
-callers then pass `make_Logger()` or a fake.
+callers then pass `make_logger()` or a fake.
 
 ```i
 (log = app/log)
 main = () {
-	{ … } <- (log.make_Logger())
+	{ … } <- (log.make_logger())
 }
 ```
 
@@ -263,7 +263,7 @@ main = () {
   service out of its signature; one that takes the service in its pattern
   exposes it, and a dependent calls the accessor to provide it.
 - **Name collisions**: the accessor and its field values are named
-  `make_<Type>` and `<type>_<label>` (first character lowercased); a user
+  `make_<type>` and `<type>_<label>`, both snake_case; a user
   definition with one of those names is E0208, and the user renames.
 - **Fakes**: a test in another module passes `Logger(log = …)` using the
   exported constructor. The fake reaches a function only if that function
@@ -353,11 +353,11 @@ is part of the declared host contract, unlike the old `"async"`/`"request"`
 split which also forced `Request` into every field type. A mode is one word at
 the declaration, never repeated at a call.
 
-**P3 (accepted)**: confirm the same-module accessor `make_<Type>` (no generated
+**P3 (accepted)**: confirm the same-module accessor `make_<type>` (no generated
 files or modules) and that it is an ordinary exported name. Alternative: a
 separate `gen/` module per source module (a visible file for editors, but a
 module cycle when the service's own module calls the accessor; needs a third
-module or a load pass). The name alternative is `impl_<Type>`; `make_<Type>`
+module or a load pass). The name alternative is `impl_<Type>`; `make_<type>`
 wins because it reads as a constructor.
 
 ## 4. Deleting the three attributes
@@ -870,8 +870,8 @@ parallel with the implementation.
    namespace `js` as a service E0328; `ilang:` outside `i` E0306; two
    same-namespace+label services E0311; import in a macro need E0336; missing
    type export E0329; wrong argument count E0326.
-5. **Accessor**: `make_Logger` is synthesized once and exported; a user
-   `make_Logger` is E0208; a fake in another module uses `Logger(..)` and
+5. **Accessor**: `make_logger` is synthesized once and exported; a user
+   `make_logger` is E0208; a fake in another module uses `Logger(..)` and
    works when the function takes the service; a fake field through `call`
    gives a ready Call; `library.out` shows the accessor once; no files appear
    under `src/`.
@@ -902,7 +902,7 @@ parallel with the implementation.
 |---|---|---|---|
 | P1 | optional `product`, default `"program"`; `"library"` explicit | required key (2 209 manifest edits); `[package] kind` (same plus a table) | §1/§7 change |
 | P2 | `@export` on functions only, `"sync"` argument | export whole services too (object protocol; +1 phase) | §2/§7 change |
-| P3 | same-module `make_<Type>` accessor | a separate `src/gen/` module (editors see a file, but its own module calling it makes a cycle); `impl_<Type>` name (shorter) | §3/§7 change |
+| P3 | same-module `make_<type>` accessor | a separate `src/gen/` module (editors see a file, but its own module calling it makes a cycle); `impl_<Type>` name (shorter) | §3/§7 change |
 | P3 name collisions | E0208 (existing duplicate definition) | a new code (one more message) | trivial |
 | P4 | library-only `@runtime` for compiler ops | reuse `@import` with `"runtime"` mode (one name fewer, no registration) | §4.2 changes 150 lines differently |
 | P5 | compile vs panic split of §5.4; `in_group`/`with_wait` names | linear `CallGroup` (new feature) | §5 tests change |
@@ -922,7 +922,7 @@ All seven are accepted as proposed, with the owner's additions:
   `product = "library"` in i.toml"; `E0330` names the same fix. §1.1 and §8 case 1 pin
   the exact text.
 - **P2 accepted.** `@export` is function-only; no whole-service export.
-- **P3 accepted.** The same-module `make_<Type>` accessor, no `src/gen/`
+- **P3 accepted.** The same-module `make_<type>` accessor, no `src/gen/`
   tree and no second module.
 - **P4 accepted.** `@runtime`, library `i` only.
 - **P5 accepted**, with the names re-read against
@@ -1046,7 +1046,7 @@ add : (Int, Int) -> Int = (a, b) { a + b }
 
 @export
 add_logged : (Int, Int) <- (Fail(String)) -> Int = (a, b) {
-	logger = make_Logger()
+	logger = make_logger()
 	logger.log("add")
 	add(a, b)
 }
@@ -1056,7 +1056,7 @@ version : () -> Int = () { 1 }
 ```
 
 The library module export group is `(Logger(..) add add_logged version)`;
-`make_Logger` is added to it synthetically. The root:
+`make_logger` is added to it synthetically. The root:
 
 ```i
 (lib = app/lib)
@@ -1075,7 +1075,7 @@ let exports = Exports::new(&mut instance);
 let answer = exports.add_logged(2, 3)?;
 ```
 
-The synthesized `make_Logger` is an export of `app/lib`; the generated
+The synthesized `make_logger` is an export of `app/lib`; the generated
 `build/app.rs` contains the `Logger` trait, the `add_logged` wrapper and the
 registration helper.
 
