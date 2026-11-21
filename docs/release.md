@@ -72,3 +72,10 @@ builds reproducible.
 The packager fails if the `i` binary or any required package input is missing.
 It does not compile, run tests, or publish. Run the full checking workflow
 before distributing a release.
+
+A release must also have a clean `cargo audit` over `Cargo.lock`: the
+`audit (Cargo.lock)` job of the release workflow fails a tag while a known
+vulnerability is in the lockfile. An advisory we accept needs a written reason
+and an explicit `--ignore`, not a silent pass. The archive does not carry the
+`.dep-v0` section (`auditable = false`, see development.md), so the lockfile is
+the subject of the audit, not the binary.
