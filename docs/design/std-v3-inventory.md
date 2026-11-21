@@ -1163,11 +1163,10 @@ new : <K, V>() -> Dict(K, V)
 size : <K, V>(Dict(K, V)) -> Int
 is_empty : <K, V>(Dict(K, V)) -> Bool
 get : <K, V>(Dict(K, V), K) -> Option(V)
-has : <K, V>(Dict(K, V), K) -> Bool
+contains : <K, V>(Dict(K, V), K) -> Bool
 insert : <K, V>(Dict(K, V), K, V) -> Dict(K, V)
 delete : <K, V>(Dict(K, V), K) -> Dict(K, V)
-upsert : <K, V, N>( Dict(K, V), K, (Option(V)) <- N -> V ) <- N -> Dict(K, V)
-update : <K, V, N>(Dict(K, V), K, (V) <- N -> V) <- N -> Dict(K, V)
+update : <K, V, N>( Dict(K, V), K, (Option(V)) <- N -> V ) <- N -> Dict(K, V)
 from_list : <K, V>(List((K, V))) -> Dict(K, V)
 to_list : <K, V>(Dict(K, V)) -> List((K, V))
 keys : <K, V>(Dict(K, V)) -> List(K)
@@ -1968,7 +1967,7 @@ is_disjoint : <A>(Set(A), Set(A)) -> Bool
 
 **Language use.** Uses a hidden one-constructor Set, immutable Dict, equality/hash and need-polymorphic callbacks. The thin representation layer is useful; it enforces set semantics rather than just renaming a primitive. No service machinery is needed.
 
-**Old style, overlap and thin surface.** Dict collision-order equality can leak through the Set representation. contains uses a different membership verb from dict.has. new/from_list and algebraic operations are appropriate domain functions.
+**Old style, overlap and thin surface.** Dict collision-order equality can leak through the Set representation. `contains` now agrees with `dict.contains`; new/from_list and algebraic operations are appropriate domain functions.
 
 **Tests.** 31 named tests: `stdlib/test/set_test.i` (31). 31 named tests reference every export and cover algebraic cases. Collision-history extensional equality is not guaranteed by the underlying representation. Future equality policy needs explicit tests across independently built sets.
 
@@ -2426,7 +2425,6 @@ or ambiguities, not a claim that the language reserves any name.
 | http.route | Request is third, after method and pattern. | A pipeline of requests cannot feed it directly. |
 | crypto.hmac_sha256/512; hkdf_extract_sha256/512; hkdf_expand_sha256/512 | HMAC puts key first, extract puts salt first, expand puts key first; combined hkdf puts input first. | The meaning of piped bytes changes across the same family. Decide key-as-subject versus input-as-subject once. |
 | bool.xor versus exclusive_nor | Abbreviated and expanded names in one small family. | Users cannot predict the complement name. |
-| dict.has; set.contains; list.contains; regex.is_match | Different membership verbs. | Some reflect domain semantics; dict.has versus contains deserves a deliberate rule. |
 | list/sequence/stream.wrap; option.Some; pair.new | Single-element construction has several vocabularies. | Clarify constructor versus collection singleton naming. |
 | int.to_base2/8/16/36; bit_array.base16_encode/decode | Base formatting and codecs use different naming directions. | Similar tasks are hard to discover by one pattern. |
 | int.bitwise_* versus core.bit_*/shift_* | Prefix and word-order changes for the same primitives. | Public vocabulary is larger than the capability. |
