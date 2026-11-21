@@ -948,17 +948,15 @@ serve_stream = (listener, handler) {
 }
 
 accept_loop = (listener, handler, scope) {
-	stream = net.accept(listener)
-	task.go(scope, () {
-		resource.ensure(
-			() {
-				fail.catch(() { connection_loop(stream, handler, <<>>) })
-				()
-			},
-			() { net.close_stream(stream) },
-		)
+	resource.scoped(() {
+		stream = net.accept(listener)
+		// Keep accepting on the listener in a child of the same task scope,
+		// while this task handles the connection inside this resource scope.
+		// The scope owns `stream`, so it closes when the connection ends.
+		task.go(scope, () { accept_loop(listener, handler, scope) })
+		fail.catch(() { connection_loop(stream, handler, <<>>) })
+		()
 	})
-	accept_loop(listener, handler, scope)
 }
 
 connection_loop = (stream, handler, buffer) {
@@ -1266,6 +1264,7 @@ ClientFunctions = { (
 		Fail(HttpError),
 		requests.Await,
 		requests.Owner,
+		resource.Scope,
 		task.Scheduler,
 		task.Runner,
 	) -> ResponseStream,
@@ -1273,6 +1272,7 @@ ClientFunctions = { (
 		Fail(HttpError),
 		requests.Await,
 		requests.Owner,
+		resource.Scope,
 		task.Scheduler,
 		task.Runner,
 	) -> Response,
@@ -1289,6 +1289,7 @@ Transport = (
 		Fail(HttpError),
 		requests.Await,
 		requests.Owner,
+		resource.Scope,
 		task.Scheduler,
 		task.Runner,
 	) -> ResponseStream,
@@ -1296,6 +1297,7 @@ Transport = (
 		Fail(HttpError),
 		requests.Await,
 		requests.Owner,
+		resource.Scope,
 		task.Scheduler,
 		task.Runner,
 	) -> Response,
@@ -1311,11 +1313,15 @@ Client = (
 	make = () <- (
 		requests.Await,
 		requests.Owner,
+		resource.Scope,
 		task.Scheduler,
 		task.Runner,
 	) -> Transport,
 )
 
+/// Builds the native client from the platform's `net.Net` and `tls.Tls`.
+/// Each connection it opens belongs to the `resource.Scope` current at the
+/// send or stream call, so a caller never has to close it.
 native_client = () <- (n : net.Net, t : tls.Tls) {
 	Client(
 		make = () {
@@ -1373,14 +1379,21 @@ native_client = () <- (n : net.Net, t : tls.Tls) {
 	)
 }
 
+/// Makes a client's three functions. Its transport handles belong to the
+/// `resource.Scope` current at each call, so a caller does not need to call
+/// `close`; `close` remains for releasing a connection pool early.
 client = () <- (c : Client) -> ClientFunctions {
 	t = c.make()
 	(stream = t.stream, send = t.send, close = t.close)
 }
 
 send = (req : Request) -> Response {
-	provider = client()
-	resource.ensure(() { provider.send(req) }, provider.close)
+	// A request is a complete Response, so its transport handles live only
+	// for this send. The scope closes them, also on an error or a cancel.
+	resource.scoped(() {
+		provider = client()
+		provider.send(req)
+	})
 }
 
 fetch_error = (code : String) {
@@ -1449,6 +1462,9 @@ fetch_stream = (req : Request) <- (f : fetch.Fetch) {
 	)
 }
 
+/// Builds a client over the platform's `fetch.Fetch`. Each response it opens
+/// belongs to the `resource.Scope` current at the send or stream call, so a
+/// caller never has to close it.
 fetch_client = () <- (f : fetch.Fetch) {
 	Client(
 		make = () {
@@ -1466,24 +1482,23 @@ fetch_client = () <- (f : fetch.Fetch) {
 				},
 				send = (req) {
 					{
-						reader : (
-							head = Response,
-							read = _,
-							close = _,
-						) = fetch_stream(req)
-						resource.ensure(
-							() {
-								h = reader.head
-								Response(
-									status = h.status,
-									reason = h.reason,
-									headers = h.headers,
-									body = collect_body(reader.read, []),
-									trailers = h.trailers,
-								)
-							},
-							reader.close,
-						)
+						// Buffer the whole body inside a scope that owns the
+						// fetch response, so it closes before this send returns.
+						resource.scoped(() {
+							reader : (
+								head = Response,
+								read = _,
+								close = _,
+							) = fetch_stream(req)
+							h = reader.head
+							Response(
+								status = h.status,
+								reason = h.reason,
+								headers = h.headers,
+								body = collect_body(reader.read, []),
+								trailers = h.trailers,
+							)
+						})
 					} <- (f)
 				},
 				close = () { () },
@@ -1492,10 +1507,10 @@ fetch_client = () <- (f : fetch.Fetch) {
 	)
 }
 
-send_stream = (req : Request) -> ResponseStream {
-	provider = client()
-	resource.ensure(() { provider.stream(req) }, provider.close)
-}
+/// Opens a response stream owned by the current `resource.Scope`: read it
+/// before that scope ends, and the scope closes it. The caller does not
+/// close it. A stream cannot outlive the scope that owns it.
+send_stream = (req : Request) -> ResponseStream { client().stream(req) }
 
 /// A provider is a record containing a send function, so callers can replace it.
 network_client = () {
@@ -1525,6 +1540,8 @@ close_connection = (connection : Connection) {
 		& (Secure(stream)) { tls.close(stream) }
 }
 
+// Releases the idle pooled connections early. The scope that owns them closes
+// them anyway; this only returns capacity sooner.
 close_client = (pool : task.Ref(Pool)) {
 	idle = task.update(pool, (state) {
 		(Pool(idle = [], released = state.released), state.idle)

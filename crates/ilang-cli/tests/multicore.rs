@@ -348,6 +348,7 @@ fn echo_connections_are_served_on_several_workers() {
 	i/stdio
 	i/core
 	i/resource
+	i/request
 )
 
 echo = (stream) {
@@ -360,17 +361,39 @@ echo = (stream) {
 		}
 }
 
+// Take the listener and each accepted stream from the raw Net service: the
+// accept loop must stay outside a resource boundary so workers can pick up
+// the connection tasks, and each connection task opens the scope that owns
+// its stream.
+listen_raw = () <- (raw : net.Net) {
+	request.await(raw.listen(\"127.0.0.1\", 0)) |>
+		(Ok(number)) { net.Listener(number) }
+		& (Error(code)) { panic(\"listen: \" <> code) }
+}
+
+accept_raw = (net.Listener(number)) <- (raw : net.Net) {
+	request.await(raw.accept(number)) |>
+		(Ok(value)) { net.Stream(value) }
+		& (Error(code)) { panic(\"accept: \" <> code) }
+}
+
 serve = (listener, scope) {
-	stream = net.accept(listener)
+	stream = accept_raw(listener)
 	task.go(scope, () {
-		resource.ensure(() { echo(stream) }, () { net.close_stream(stream) })
+		resource.scoped(() {
+			owned = resource.acquire(
+				() { stream },
+				(s) { net.close_stream(s) },
+			)
+			echo(owned)
+		})
 	})
 	serve(listener, scope)
 }
 
 // Program entry.
 main = () {
-	listener = net.listen(\"127.0.0.1\", 0)
+	listener = listen_raw()
 	stdio.print(
 		\"listening \" <> core.inspect(net.local_port(listener)),
 	)

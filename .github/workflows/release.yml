@@ -30,7 +30,11 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  # Every push to a pull request is the same `refs/pull/N/merge`, so a dry run
+  # queued behind an older one would wait for its whole cold build (hours) and
+  # never gate anything. A newer push cancels the dry run; tag and manual runs
+  # must finish, so they keep `false`.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -47,8 +51,14 @@ jobs:
       # repository variable (JSON, same keys); the default is all three
       # supported platforms. An entry needs a runner in this repository's
       # configuration.
+      #
+      # A pull request builds the two Linux archives only: they are the ones
+      # the release ships as a portable binary, and a three-platform cold build
+      # cannot gate a pull request (it is hours). NIX_RELEASE_MATRIX_PR
+      # overrides that set, as NIX_RELEASE_MATRIX overrides the full one. A tag
+      # or a manual run still builds all three.
       matrix:
-        include: ${{ fromJSON(vars.NIX_RELEASE_MATRIX || '[{"platform":"x86_64-linux","system":"x86_64-linux","runner":"ubuntu-24.04"},{"platform":"aarch64-linux","system":"aarch64-linux","runner":"ubuntu-24.04-arm"},{"platform":"aarch64-darwin","system":"aarch64-darwin","runner":"macos-15"}]') }}
+        include: ${{ fromJSON(github.event_name == 'pull_request' && (vars.NIX_RELEASE_MATRIX_PR || '[{"platform":"x86_64-linux","system":"x86_64-linux","runner":"ubuntu-24.04"},{"platform":"aarch64-linux","system":"aarch64-linux","runner":"ubuntu-24.04-arm"}]') || (vars.NIX_RELEASE_MATRIX || '[{"platform":"x86_64-linux","system":"x86_64-linux","runner":"ubuntu-24.04"},{"platform":"aarch64-linux","system":"aarch64-linux","runner":"ubuntu-24.04-arm"},{"platform":"aarch64-darwin","system":"aarch64-darwin","runner":"macos-15"}]')) }}
     steps:
       - name: Free disk space
         if: runner.os == 'Linux'
