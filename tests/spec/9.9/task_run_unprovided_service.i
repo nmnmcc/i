@@ -6,6 +6,4 @@
 )
 
 Dep = (value = Int)
-missing_dep: (() <- (task.Scheduler, Dep) -> ()) <- (task.Runner) -> () = (
-	body
-) <- (runner: task.Runner) { task.run(body) }
+missing_dep: (() <- (Dep) -> ()) -> () = (body) { task.run(body) }

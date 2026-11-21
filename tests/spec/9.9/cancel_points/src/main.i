@@ -36,7 +36,7 @@ sync_forever = () -> () {
 
 probe = (
 	label : String,
-	wait : () <- (Fail(Never), task.Scheduler, request.Root) -> ()
+	wait : () <- (Fail(Never)) -> ()
 ) {
 	result = fail.catch(() {
 		task.scope((s) {

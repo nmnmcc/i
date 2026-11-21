@@ -1,6 +1,6 @@
 {
-  "compiler": "520e72ee075e03a0ab799a4904d3d81671bfeca8",
-  "binary_sha256": "cba52d4e07043ccd175e3af69a5cc0bd0affd62204dfb0028b4fe4162ef2ffff",
+  "compiler": "62a02de1d2595f8288886ae0ecedd21c7bcf75a7",
+  "binary_sha256": "76b4cf09fe4eabdeb39111c1104bd3e5908f28d01185ed349bfdcc8bafcf6b6d",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 60.0,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "app/main.deep : (Int) <- (Fail(Never), task.Scheduler) -> ()\napp/main.main : () <- (Fail(Never), Io, task.Scheduler) -> ()\n",
+      "stdout": "app/main.deep : (Int) <- (Fail(Never)) -> ()\napp/main.main : () <- (Fail(Never), Io) -> ()\n",
       "stderr": ""
     },
     "test0": {
