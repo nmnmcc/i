@@ -52,6 +52,14 @@ REMOVED = {
     'stdlib/test/float_hosts.py',
     'stdlib/test/float_gate.py',
     'stdlib/test/test_test.i',
+    # The 0.2.0 host-boundary design describes its own targets by path: the
+    # resolve modules it splits the checker into, its audit document (on the
+    # audit branch, not main) and the verification script the phases will add.
+    'crates/ilang-check/src/resolve/legacy.rs',
+    'crates/ilang-check/src/resolve/three.rs',
+    'docs/design/consistency-audit.md',
+    'docs/consistency-audit',
+    'scripts/dev-verify',
 }
 
 
