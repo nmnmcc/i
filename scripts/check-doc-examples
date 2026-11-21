@@ -8,6 +8,8 @@ checks fenced examples in the pages (the example runner executes those already).
 A block that is not a complete module is wrapped in `main`. Imports for
 `module.member` uses are added from the standard library. A block that needs
 more context than that is listed in check-doc-examples.json with one reason.
+An entry is keyed by the file and the content of the block, never by its line,
+so moving the text around a page keeps the exemption with the block.
 """
 import argparse
 import hashlib
@@ -82,8 +84,9 @@ def wrap(source, path):
     return group + head
 
 
-def identity(path, line, source):
-    return f'{path}:{line}:{hashlib.sha256(source.encode()).hexdigest()[:12]}'
+def identity(path, source):
+    """`path` and the block's content: two equal blocks share one reason."""
+    return f'{path}:{hashlib.sha256(source.encode()).hexdigest()[:12]}'
 
 
 def run(binary, source, directory, path):
@@ -121,7 +124,7 @@ def main():
             for line, source in blocks(path):
                 if not source.strip():
                     continue
-                key = identity(relative, line, source)
+                key = identity(relative, source)
                 work.append((key, relative, line, source, path))
 
     def check(item):
@@ -151,7 +154,9 @@ def main():
     stale = known.keys() - passed - skipped
     if stale:
         for key in sorted(stale):
-            print(f'{key}: stale reason; the block compiles now or its text changed', file=__import__('sys').stderr)
+            path = key.rsplit(':', 1)[0]
+            print(f'{path}: stale reason {key}: the block compiles now or its text changed',
+                  file=__import__('sys').stderr)
         for key in stale:
             del known[key]
         DATA.write_text(json.dumps(dict(sorted(known.items())), indent=2) + '\n')

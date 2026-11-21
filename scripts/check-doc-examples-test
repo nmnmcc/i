@@ -22,6 +22,10 @@ def write(root, path, body):
     target.write_text(body)
 
 
+def exemptions(root, entries):
+    (root / 'scripts/check-doc-examples.json').write_text(json.dumps(entries) + '\n')
+
+
 def main():
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -29,7 +33,7 @@ def main():
         write(root, 'stdlib/src/foo.i', '(\n\tadd\n)\nadd = (n : Int) -> Int { n + 1 }\n')
         write(root, 'stdlib/src/io.i', '(\n\tIo(..)\n)\nIo = (print = (String) -> ())\n')
         (root / 'scripts').mkdir()
-        (root / 'scripts/check-doc-examples.json').write_text('{}\n')
+        exemptions(root, {})
 
         write(root, 'docs/page.mdx', '```i\nfoo.add(1)\n```\n')
         result = run(root)
@@ -42,18 +46,45 @@ def main():
         assert 'docs/page.mdx:1' in result.stderr, result.stderr
         assert 'missing' in result.stderr, result.stderr
 
-        # A reason suppresses a contextual example; a stale reason fails.
+        # A reason suppresses a contextual example.
         key = [line for line in result.stderr.splitlines() if '[docs/page.mdx' in line][0]
         key = key[key.index('[docs/page.mdx'):].strip('[]')
-        (root / 'scripts/check-doc-examples.json').write_text(
-            json.dumps({key: 'context: test'}) + '\n')
+        exemptions(root, {key: 'context: test'})
         result = run(root)
         assert result.returncode == 0, result.stderr
 
+        # Two identical blocks are one key and one reason: both are exempt.
+        write(root, 'docs/page.mdx',
+              '```i\nfoo.add(missing)\n```\n\n```i\nfoo.add(missing)\n```\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        # Inserting a paragraph moves the block down without changing it: the
+        # key is made from the block's content, so the same exemption still
+        # suppresses it and the check passes.
+        write(root, 'docs/page.mdx',
+              'A paragraph the example does not need.\n\n```i\nfoo.add(missing)\n```\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        # A different broken block at the line the old key named is reported,
+        # not excused: the content differs, so the key does not match and the
+        # old entry is named as stale.
+        write(root, 'docs/page.mdx', '```i\nfoo.add(also_missing)\n```\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+        assert 'docs/page.mdx:1' in result.stderr, result.stderr
+        assert 'also_missing' in result.stderr, result.stderr
+        assert key in result.stderr, result.stderr
+        assert 'stale reason' in result.stderr, result.stderr
+
+        # A reason whose block now compiles is stale and fails.
+        exemptions(root, {key: 'context: test'})
         write(root, 'docs/page.mdx', '```i\nfoo.add(1)\n```\n')
         result = run(root)
         assert result.returncode == 1, result.stdout
         assert 'stale reason' in result.stderr, result.stderr
+        assert key in result.stderr, result.stderr
 
     print('check-doc-examples counterexamples pass.')
     return 0
