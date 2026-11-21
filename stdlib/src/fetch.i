@@ -28,29 +28,30 @@ Fetch = (
 )
 
 open = (method, url, headers, body) <- (raw : Fetch) {
-	r = hostcall.call(() { raw.start(method, url, headers, body) })
-	number = resource.ensure(
+	number = resource.acquire(
 		() {
-			request.await(r) |>
-				(Ok(value)) { value }
-				& (Error(code)) { fail.raise(code) }
+			r = hostcall.call(() { raw.start(method, url, headers, body) })
+			resource.ensure(
+				() {
+					request.await(r) |>
+						(Ok(value)) { value }
+						& (Error(code)) { fail.raise(code) }
+				},
+				() {
+					request.state(r) |>
+						(request.Ready(Ok(value))) { raw.close(value) }
+						& (_) { () }
+					hostcall.cancel(r)
+				},
+			)
 		},
-		() {
-			request.state(r) |>
-				(request.Ready(Ok(value))) {
-					raw.close(value)
-				}
-				& (_) { () }
-			hostcall.cancel(r)
-		},
+		(value) { close(Response(value)) <- (raw) },
 	)
 	Response(number)
 }
 
 status = (Response(id)) <- (raw : Fetch) {
-	raw.status(id) |>
-		(Ok(value)) { value }
-		& (Error(code)) { fail.raise(code) }
+	raw.status(id) |> (Ok(value)) { value } & (Error(code)) { fail.raise(code) }
 }
 
 headers = (Response(id)) <- (raw : Fetch) {

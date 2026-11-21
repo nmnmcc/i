@@ -3947,6 +3947,16 @@ impl<'a> Checker<'a> {
                 Ty::Fn(Box::new(FnTy::new(params, value, env)))
             }
             (Some((value, mut renv)), Some(written)) => {
+                // A function with a written value type carries the implicit
+                // services its body may use.
+                let mut row = vec![renv];
+                row.extend(
+                    self.p
+                        .implicit_services
+                        .iter()
+                        .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new())),
+                );
+                renv = self.env_union(row, f.span);
                 // The written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
                 // `Assert` when a parameter may fail.

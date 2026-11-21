@@ -31,7 +31,10 @@ TlsError = (stage = String, reason = String)
 
 @import("i:tls/v1")
 Tls = (
-	connect = (Int, String, String, BitArray, BitArray, BitArray) -> Result(Int, String),
+	connect = (Int, String, String, BitArray, BitArray, BitArray) -> Result(
+		Int,
+		String,
+	),
 	accept = (Int, BitArray, BitArray, String) -> Result(Int, String),
 	alpn = (Int) -> Result(String, String),
 	read = (Int, Int) -> Result(BitArray, String),
@@ -83,20 +86,23 @@ raise = (message) {
 }
 
 finish = (r : hostcall.Call(Result(Int, String))) <- (raw : Tls) {
-	number = resource.ensure(
+	number = resource.acquire(
 		() {
-			request.await(r) |>
-				(Ok(value)) { value }
-				& (Error(message)) { raise(message) }
+			resource.ensure(
+				() {
+					request.await(r) |>
+						(Ok(value)) { value }
+						& (Error(message)) { raise(message) }
+				},
+				() {
+					request.state(r) |>
+						(request.Ready(Ok(value))) { raw.close(value) }
+						& (_) { () }
+					hostcall.cancel(r)
+				},
+			)
 		},
-		() {
-			request.state(r) |>
-				(request.Ready(Ok(value))) {
-					raw.close(value)
-				}
-				& (_) { () }
-			hostcall.cancel(r)
-		},
+		(value) { close(Stream(value)) <- (raw) },
 	)
 	Stream(number)
 }
@@ -150,9 +156,7 @@ accept = (
 dial = (host, port, opts) { connect(net.connect(host, port), host, opts) }
 
 alpn = (Stream(n)) <- (raw : Tls) {
-	raw.alpn(n) |>
-		(Ok(value)) { value }
-		& (Error(message)) { raise(message) }
+	raw.alpn(n) |> (Ok(value)) { value } & (Error(message)) { raise(message) }
 }
 
 read = (Stream(n), max) <- (raw : Tls) {

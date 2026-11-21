@@ -76,6 +76,15 @@ pub fn standard_with_args(
     process::register(&mut imports, args);
     stdio::register(&mut imports);
     tls::register(&mut imports);
+    // The native runner has no fetch transport; a program that always passes
+    // a fake still links the imports.
+    for field in ["start", "status", "headers", "read", "close"] {
+        imports
+            .async_service("i:fetch/v1", field, |_| async {
+                Ok(Err(Value::String("fetch is not available".into())))
+            })
+            .expect("one fetch field");
+    }
     imports
 }
 

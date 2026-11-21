@@ -61,85 +61,94 @@ Net = (
 )
 
 listen = (address, port) <- (raw : Net) {
-	r = hostcall.call(() { raw.listen(address, port) })
-	number = resource.ensure(
+	number = resource.acquire(
 		() {
-			request.await(r) |>
-				(Ok(value)) { value }
-				& (Error(code)) {
-					fail.raise(
-						NetError(
-							operation = "listen",
-							endpoint = address,
-							code = code,
-						),
-					)
-				}
+			r = hostcall.call(() { raw.listen(address, port) })
+			resource.ensure(
+				() {
+					request.await(r) |>
+						(Ok(value)) { value }
+						& (Error(code)) {
+							fail.raise(
+								NetError(
+									operation = "listen",
+									endpoint = address,
+									code = code,
+								),
+							)
+						}
+				},
+				() {
+					request.state(r) |>
+						(request.Ready(Ok(value))) { raw.close_listener(value) }
+						& (_) { () }
+					hostcall.cancel(r)
+				},
+			)
 		},
-		() {
-			request.state(r) |>
-				(request.Ready(Ok(value))) {
-					raw.close_listener(value)
-				}
-				& (_) { () }
-			hostcall.cancel(r)
-		},
+		(value) { close_listener(Listener(value)) <- (raw) },
 	)
 	Listener(number)
 }
 
 connect = (address, port) <- (raw : Net) {
-	r = hostcall.call(() { raw.connect(address, port) })
-	number = resource.ensure(
+	number = resource.acquire(
 		() {
-			request.await(r) |>
-				(Ok(value)) { value }
-				& (Error(code)) {
-					fail.raise(
-						NetError(
-							operation = "connect",
-							endpoint = address,
-							code = code,
-						),
-					)
-				}
+			r = hostcall.call(() { raw.connect(address, port) })
+			resource.ensure(
+				() {
+					request.await(r) |>
+						(Ok(value)) { value }
+						& (Error(code)) {
+							fail.raise(
+								NetError(
+									operation = "connect",
+									endpoint = address,
+									code = code,
+								),
+							)
+						}
+				},
+				() {
+					request.state(r) |>
+						(request.Ready(Ok(value))) { raw.close_stream(value) }
+						& (_) { () }
+					hostcall.cancel(r)
+				},
+			)
 		},
-		() {
-			request.state(r) |>
-				(request.Ready(Ok(value))) {
-					raw.close_stream(value)
-				}
-				& (_) { () }
-			hostcall.cancel(r)
-		},
+		(value) { close_stream(Stream(value)) <- (raw) },
 	)
 	Stream(number)
 }
 
 accept = (Listener(number)) <- (raw : Net) {
-	r = hostcall.call(() { raw.accept(number) })
-	number = resource.ensure(
+	number = resource.acquire(
 		() {
-			request.await(r) |>
-				(Ok(value)) { value }
-				& (Error(code)) {
-					fail.raise(
-						NetError(
-							operation = "accept",
-							endpoint = "",
-							code = code,
-						),
-					)
-				}
+			r = hostcall.call(() { raw.accept(number) })
+			resource.ensure(
+				() {
+					request.await(r) |>
+						(Ok(value)) { value }
+						& (Error(code)) {
+							fail.raise(
+								NetError(
+									operation = "accept",
+									endpoint = "",
+									code = code,
+								),
+							)
+						}
+				},
+				() {
+					request.state(r) |>
+						(request.Ready(Ok(value))) { raw.close_stream(value) }
+						& (_) { () }
+					hostcall.cancel(r)
+				},
+			)
 		},
-		() {
-			request.state(r) |>
-				(request.Ready(Ok(value))) {
-					raw.close_stream(value)
-				}
-				& (_) { () }
-			hostcall.cancel(r)
-		},
+		(value) { close_stream(Stream(value)) <- (raw) },
 	)
 	Stream(number)
 }
@@ -189,9 +198,7 @@ shutdown_write = (Stream(number)) <- (raw : Net) {
 		}
 }
 
-close_stream = (Stream(number)) <- (raw : Net) {
-	raw.close_stream(number)
-}
+close_stream = (Stream(number)) <- (raw : Net) { raw.close_stream(number) }
 
 close_listener = (Listener(number)) <- (raw : Net) {
 	raw.close_listener(number)
@@ -234,29 +241,32 @@ byte_stream = (stream) {
 
 /// Bind a UDP socket; port zero asks the OS to allocate a port.
 bind = (address, port) <- (raw : Net) {
-	r = hostcall.call(() { raw.bind(address, port) })
-	number = resource.ensure(
+	number = resource.acquire(
 		() {
-			request.await(r) |>
-				(Ok(value)) { value }
-				& (Error(code)) {
-					fail.raise(
-						NetError(
-							operation = "bind",
-							endpoint = address,
-							code = code,
-						),
-					)
-				}
+			r = hostcall.call(() { raw.bind(address, port) })
+			resource.ensure(
+				() {
+					request.await(r) |>
+						(Ok(value)) { value }
+						& (Error(code)) {
+							fail.raise(
+								NetError(
+									operation = "bind",
+									endpoint = address,
+									code = code,
+								),
+							)
+						}
+				},
+				() {
+					request.state(r) |>
+						(request.Ready(Ok(value))) { raw.close_datagram(value) }
+						& (_) { () }
+					hostcall.cancel(r)
+				},
+			)
 		},
-		() {
-			request.state(r) |>
-				(request.Ready(Ok(value))) {
-					raw.close_datagram(value)
-				}
-				& (_) { () }
-			hostcall.cancel(r)
-		},
+		(value) { close_datagram(Datagram(value)) <- (raw) },
 	)
 	Datagram(number)
 }
