@@ -8,7 +8,7 @@
 	main
 )
 
-@import("app:x/v1")
+@import("app:y/v1")
 Svc = (ping = () -> Int)
 
 main = () {

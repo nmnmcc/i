@@ -148,6 +148,14 @@ pub fn testing(log: Log) -> HostImports {
         })
         .expect(ONE);
     imports
+        .async_service("app:y/v1", "ping", |_| async {
+            Ok(Ok(Value::Int(9.into())))
+        })
+        .expect(ONE);
+    imports
+        .service("app:x/v1", "ping", |_| Ok(Ok(Value::Int(9.into()))))
+        .expect(ONE);
+    imports
         .service("test:import/v1", "add", |arguments| {
             let [Value::Int(a), Value::Int(b)] = arguments else {
                 bail!("add takes two Ints");
