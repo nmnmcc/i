@@ -1187,9 +1187,18 @@ fn runtime_config(collector: wasmtime::Collector, heap: u64) -> Config {
 }
 
 impl Program {
-    /// Compile a module in this process, for the CPU it runs on.
+    /// Compile a module in this process, for the CPU it runs on, with the
+    /// workers of an entry run ([`worker_count`]).
     #[cfg(feature = "compiler")]
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_workers(bytes, None)
+    }
+
+    /// Compile a module for at most `workers` workers; `None` is the
+    /// default of [`from_bytes`]. A module with compiler accounting runs on
+    /// one worker, as [`with_workers`](Self::with_workers) does.
+    #[cfg(feature = "compiler")]
+    pub fn from_bytes_with_workers(bytes: &[u8], workers: Option<usize>) -> Result<Self> {
         let metadata = Metadata::read(bytes, bindings::artifact_digest(bytes))?;
         let (collector, heap) = gc_settings()?;
         let mut config = runtime_config(collector, heap);
@@ -1200,7 +1209,7 @@ impl Program {
         let workers = if metadata.macro_static_cost.is_some() {
             1
         } else {
-            worker_count()
+            workers.map_or_else(worker_count, |workers| workers.clamp(1, 255))
         };
         config.epoch_interruption(workers > 1);
         if let Some(store) = compile_store().filter(|_| executable_identity().is_some()) {
@@ -1380,8 +1389,15 @@ impl Program {
                 return Err(anyhow::Error::new(stop).context("the program stopped in ilang_start"));
             }
         }
-        // A module whose `i/task` can publish records gets the other
-        // workers; they start when the first record is published.
+        self.attach_workers(&mut instance, pool_options)?;
+        Ok(instance)
+    }
+
+    /// Gives an instance the other workers of a program, as `run_entry`
+    /// does for an entry: only a module whose `i/task` can publish records
+    /// gets a pool, and the workers start when the first record is
+    /// published.
+    fn attach_workers(&self, instance: &mut Instance, options: HostOptions) -> Result<()> {
         if self.workers > 1
             && options.imports.macro_budget.is_none()
             && let Ok(setup) = instance
@@ -1397,10 +1413,10 @@ impl Program {
                 self.module.clone(),
                 self.workers,
                 self.abi.clone(),
-                pool_options,
+                options,
             ));
         }
-        Ok(instance)
+        Ok(())
     }
 
     /// Runs the program entry in a new instance, on one `ilang` thread

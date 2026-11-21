@@ -151,6 +151,10 @@ enum Command {
         /// the name filter applies within the shard.
         #[arg(long, value_name = "K/N")]
         shard: Option<String>,
+        /// Number of Wasm workers: `1` to `255`, or `auto` for the product
+        /// default (`i run`'s count). Defaults to one.
+        #[arg(long, default_value = "1", value_name = "n|auto", value_parser = parse_workers)]
+        workers: usize,
     },
     #[command(flatten)]
     Package(commands::package::PackageCommand),
@@ -262,15 +266,17 @@ fn main() -> ExitCode {
             time,
             target,
             shard,
-        } => cmd_test(
-            &project,
+            workers,
+        } => cmd_test(TestOptions {
+            project,
             opt,
             offline,
-            filter.as_deref(),
+            filter,
             time,
-            target.into(),
-            shard.as_deref(),
-        ),
+            target: target.into(),
+            shard,
+            workers,
+        }),
         Command::Package(c) => commands::package::run(c),
         Command::Cache(c) => return finish(commands::cache::run(c)),
         Command::Spec(args) => return finish(commands::spec::run(args)),
@@ -553,16 +559,30 @@ fn cmd_run_collection(
     }
 }
 
-fn cmd_test(
-    project: &Path,
+/// The arguments of `i test`.
+struct TestOptions {
+    project: PathBuf,
     opt: u8,
     offline: bool,
-    filter: Option<&str>,
+    filter: Option<String>,
     time: bool,
     target: Target,
-    shard: Option<&str>,
-) -> anyhow::Result<ExitCode> {
-    let shard = match shard.map(parse_shard).transpose() {
+    shard: Option<String>,
+    workers: usize,
+}
+
+fn cmd_test(args: TestOptions) -> anyhow::Result<ExitCode> {
+    let TestOptions {
+        project,
+        opt,
+        offline,
+        filter,
+        time,
+        target,
+        shard,
+        workers,
+    } = args;
+    let shard = match shard.as_deref().map(parse_shard).transpose() {
         Ok(shard) => shard,
         Err(message) => {
             eprintln!("error: {message}");
@@ -585,7 +605,7 @@ fn cmd_test(
         target,
         ..options(opt, true, offline)?
     };
-    let (b, entries) = match ilang_cli::build_tests(project, options, collection.as_deref()) {
+    let (b, entries) = match ilang_cli::build_tests(&project, options, collection.as_deref()) {
         Ok(value) => value,
         Err(error) => {
             eprintln!("{error}");
@@ -613,7 +633,7 @@ fn cmd_test(
         },
     };
     let stage = ilang_syntax::trace::stage("Wasmtime compile");
-    let program = b.host_program()?;
+    let program = b.host_program_with_workers(workers)?;
     drop(stage);
     let mut failed = 0;
     let mut passed = 0;
@@ -630,7 +650,7 @@ fn cmd_test(
             };
             let name = test_name(&entry);
             let mode = get("mode").unwrap_or("test");
-            if filter.is_some_and(|f| !name.contains(f)) {
+            if filter.as_deref().is_some_and(|f| !name.contains(f)) {
                 continue;
             }
             if mode == "skip" || (focused && mode != "only") {
@@ -704,6 +724,20 @@ fn test_name(entry: &ilang_cli::CollectionEntry) -> String {
         .map(|(_, v)| v.as_str())
         .unwrap_or(&entry.target.path);
     format!("{}.{name}", entry.module)
+}
+
+/// `--workers`: a count of 1 to 255, or `auto` for [`ilang_host::worker_count`],
+/// the count that `i run` uses.
+fn parse_workers(text: &str) -> Result<usize, String> {
+    if text.trim() == "auto" {
+        return Ok(ilang_host::worker_count());
+    }
+    match text.trim().parse::<usize>() {
+        Ok(n) if (1..=255).contains(&n) => Ok(n),
+        _ => Err(format!(
+            "--workers expects `auto` or a count from 1 to 255, not {text:?}"
+        )),
+    }
 }
 
 /// `K/N` of `--shard`: N positive and K below it.
