@@ -23,6 +23,7 @@
 //// scope from another task stops.
 (
 	i/request
+	i/hostcall
 	i/resource
 	i/fail
 	i/core
@@ -31,7 +32,7 @@
 )
 
 (
-	Fs
+	Fs(..)
 	File
 	FsError(..)
 	FsProblem(..)
@@ -107,20 +108,20 @@ OpenMode = ReadOnly | WriteTruncate | Append | ReadWrite
 
 Metadata = (size = Int, kind = String)
 
-@host("i:fs/v1", "request")
+@import("i:fs/v1")
 Fs = (
-	open = (String, String) -> Request(Result(Int, String)),
-	read = (Int, Int) -> Request(Result(BitArray, String)),
-	write = (Int, BitArray) -> Request(Result((), String)),
-	flush = (Int) -> Request(Result((), String)),
-	close = (Int) -> Request(()),
-	remove = (String) -> Request(Result((), String)),
-	rename = (String, String) -> Request(Result((), String)),
-	mkdir = (String) -> Request(Result((), String)),
-	list = (String) -> Request(Result(String, String)),
-	size = (String) -> Request(Result(Int, String)),
-	kind = (String) -> Request(Result(String, String)),
-	temp_dir = () -> Request(Result(String, String)),
+	open = (String, String) -> Result(Int, String),
+	read = (Int, Int) -> Result(BitArray, String),
+	write = (Int, BitArray) -> Result((), String),
+	flush = (Int) -> Result((), String),
+	close = (Int) -> (),
+	remove = (String) -> Result((), String),
+	rename = (String, String) -> Result((), String),
+	mkdir = (String) -> Result((), String),
+	list = (String) -> Result(String, String),
+	size = (String) -> Result(Int, String),
+	kind = (String) -> Result(String, String),
+	temp_dir = () -> Result(String, String),
 )
 
 // The one map from the host's error codes to reasons.
@@ -149,7 +150,7 @@ mode_string =
 // Opens the host handle. A cancel while the open is in flight cancels the
 // request and closes a handle that has arrived already.
 open_handle = (path, mode) <- (raw : Fs) {
-	r = raw.open(path, mode_string(mode))
+	r = hostcall.call(() { raw.open(path, mode_string(mode)) })
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -159,10 +160,10 @@ open_handle = (path, mode) <- (raw : Fs) {
 		() {
 			request.state(r) |>
 				(request.Ready(Ok(value))) {
-					request.await_owned(raw.close(value))
+					raw.close(value)
 				}
 				& (_) { () }
-			request.cancel(request.ticket(r))
+			hostcall.cancel(r)
 		},
 	)
 	File(number = number, path = path)
@@ -196,7 +197,7 @@ open = (path : String, mode : OpenMode) {
 /// // <<"hello":utf8>>
 /// ```
 read = (file : File, max_bytes : Int) <- (raw : Fs) {
-	request.await_owned(raw.read(file.number, max_bytes)) |>
+	raw.read(file.number, max_bytes) |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("read", file.path, code) }
 }
@@ -209,7 +210,7 @@ read = (file : File, max_bytes : Int) <- (raw : Fs) {
 /// resource.scoped(() { fs.write(fs.open(path, fs.Append), <<"x":utf8>>) })
 /// ```
 write = (file : File, bytes : BitArray) <- (raw : Fs) {
-	request.await_owned(raw.write(file.number, bytes)) |>
+	raw.write(file.number, bytes) |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("write", file.path, code) }
 }
@@ -226,7 +227,7 @@ write = (file : File, bytes : BitArray) <- (raw : Fs) {
 /// })
 /// ```
 flush = (file : File) <- (raw : Fs) {
-	request.await_owned(raw.flush(file.number)) |>
+	raw.flush(file.number) |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("flush", file.path, code) }
 }
@@ -240,7 +241,7 @@ flush = (file : File) <- (raw : Fs) {
 /// resource.scoped(() { fs.close(fs.open(path, fs.ReadOnly)) })
 /// ```
 close = (file : File) <- (raw : Fs) {
-	request.await_owned(raw.close(file.number))
+	raw.close(file.number)
 }
 
 /// Removes the file or the empty directory at `path`.
@@ -251,7 +252,7 @@ close = (file : File) <- (raw : Fs) {
 /// fs.remove(path)
 /// ```
 remove = (path : String) <- (raw : Fs) {
-	request.await_owned(raw.remove(path)) |>
+	raw.remove(path) |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("remove", path, code) }
 }
@@ -264,7 +265,7 @@ remove = (path : String) <- (raw : Fs) {
 /// fs.rename(old, new)
 /// ```
 rename = (from : String, to : String) <- (raw : Fs) {
-	request.await_owned(raw.rename(from, to)) |>
+	raw.rename(from, to) |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("rename", from, code) }
 }
@@ -278,7 +279,7 @@ rename = (from : String, to : String) <- (raw : Fs) {
 /// fs.mkdir(path)
 /// ```
 mkdir = (path : String) <- (raw : Fs) {
-	request.await_owned(raw.mkdir(path)) |>
+	raw.mkdir(path) |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("mkdir", path, code) }
 }
@@ -305,7 +306,7 @@ list_parts = (text : String, start : Int) -> List(String) {
 /// fs.list(directory)  // ["a.txt", "b"]
 /// ```
 list = (path : String) <- (raw : Fs) {
-	request.await_owned(raw.list(path)) |>
+	raw.list(path) |>
 		(Ok(value)) { list_parts(value, 0) }
 		& (Error(code)) { failure("list", path, code) }
 }
@@ -319,10 +320,10 @@ list = (path : String) <- (raw : Fs) {
 /// fs.metadata(path)  // Metadata(size = 5, kind = "file")
 /// ```
 metadata = (path : String) <- (raw : Fs) {
-	size = request.await_owned(raw.size(path)) |>
+	size = raw.size(path) |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("metadata", path, code) }
-	kind = request.await_owned(raw.kind(path)) |>
+	kind = raw.kind(path) |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("metadata", path, code) }
 	Metadata(size = size, kind = kind)
@@ -336,7 +337,7 @@ metadata = (path : String) <- (raw : Fs) {
 /// fs.temp_dir()  // "/tmp"
 /// ```
 temp_dir = () <- (raw : Fs) {
-	request.await_owned(raw.temp_dir()) |>
+	raw.temp_dir() |>
 		(Ok(value)) { value }
 		& (Error(code)) { failure("temp_dir", "", code) }
 }

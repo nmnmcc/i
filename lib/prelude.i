@@ -30,7 +30,7 @@ Assert = (fail = (AssertionFailure) -> Never)
 Fail(E) = (raise = (E) -> Never)
 
 /// Stops the program with `panic: ` and the message.
-@external("ilang:prelude", "panic")
+@runtime("ilang:prelude", "panic")
 panic : (String) -> Never
 
 /// Reports a failure to `Assert` when `c` is `False`.
