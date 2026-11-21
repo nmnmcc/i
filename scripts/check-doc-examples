@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Compile the examples the documentation shows, without running them.
+"""Compile the examples the library reference shows, without running them.
 
-Two sources are invisible to the example runner: fenced blocks in design notes
-and the `///` comments that the library reference renders. Both can show code
-the compiler rejects. This check builds each block in a scratch package and
-checks it with the compiler.
+The `///` comments become the library pages and are never executed. Each block
+is built in a scratch package and checked with the compiler. `--docs` also
+checks fenced examples in the pages (the example runner executes those already).
 
 A block that is not a complete module is wrapped in `main`. Imports for
 `module.member` uses are added from the standard library. A block that needs
@@ -102,6 +101,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--update', action='store_true', help='rewrite the reasons for current failures')
     parser.add_argument('--jobs', type=int, default=8)
+    parser.add_argument('--docs', action='store_true', help='also check fenced examples in docs (the example runner executes them already)')
     parser.add_argument('--root', type=Path, default=ROOT)
     args = parser.parse_args()
     ROOT = args.root.resolve()
@@ -111,7 +111,7 @@ def main():
     known = json.loads(DATA.read_text()) if DATA.is_file() else {}
     found, failures = 0, []
     work = []
-    for pattern in DOCS + STDLIB:
+    for pattern in ((DOCS if args.docs else ()) + STDLIB):
         for path in sorted(ROOT.glob(pattern)):
             if {'node_modules', 'dist'} & set(path.parts):
                 continue

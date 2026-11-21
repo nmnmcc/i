@@ -12,7 +12,7 @@ BINARY = os.environ.get('I_BIN', str(Path(__file__).resolve().parents[1] / 'targ
 
 
 def run(root):
-    return subprocess.run([sys.executable, '-I', str(CHECK), '--root', str(root)],
+    return subprocess.run([sys.executable, '-I', str(CHECK), '--root', str(root), '--docs'],
                           capture_output=True, text=True, env={**os.environ, 'I_BIN': BINARY})
 
 
