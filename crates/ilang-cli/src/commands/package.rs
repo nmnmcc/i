@@ -886,6 +886,11 @@ fn package_hostcall(p: &ilang_package::Package) -> bool {
     p.hostcall
 }
 
+/// Whether the manifest text has `hostcall = true` at its top level.
+fn text_hostcall(doc: &DocumentMut) -> bool {
+    doc.get("hostcall").and_then(Item::as_bool) == Some(true)
+}
+
 /// The packages of the program in `project` (without its tests) whose
 /// manifest enables hostcall, in the order of the `i deps` report, by key:
 /// `<this package>` for the root, `location@major`, or `path <dir>` (relative
@@ -1534,7 +1539,21 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                     canon.insert(canonical.clone());
                     format!("@external(\"{module}\", \"{function}\") ")
                 }
-                DefKind::Binding { .. } => String::new(),
+                // Only the library `i` declares runtime operations; they are
+                // listed like externals if one is ever in the root.
+                DefKind::Runtime {
+                    module, function, ..
+                } => {
+                    let (shown, canon) = host
+                        .entry(format!("runtime \"{module}\" \"{function}\""))
+                        .or_default();
+                    shown.insert(ty.to_string());
+                    canon.insert(canonical.clone());
+                    format!("@runtime(\"{module}\", \"{function}\") ")
+                }
+                // `make_<type>` is an ordinary exported value (§3.3): its
+                // service's imports are listed with the service type.
+                DefKind::Binding { .. } | DefKind::ServiceAccessor { .. } => String::new(),
             };
             if !d.exported {
                 continue;
