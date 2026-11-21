@@ -6,10 +6,11 @@
 	i/resource
 	i/fail
 	i/task
+	i/hostcall
 )
 
 accept_request = (net.Listener(number)) <- (raw : net.Net) {
-	raw.accept(number)
+	hostcall.call(() { raw.accept(number) })
 }
 
 fake_net = (connect_closed : Request(())) -> net.Net {
@@ -28,18 +29,16 @@ fake_net = (connect_closed : Request(())) -> net.Net {
 		read = (id, max) { Ok(<<>>) },
 		write = (id, bytes) { Ok(()) },
 		shutdown_write = (id) { Ok(()) },
-		close_stream = (id) { connect_closed },
+		close_stream = (id) { request.take(connect_closed) },
 		close_listener = (id) { () },
 	)
 }
 
 test("tls_scope_owns_streams_test", () {
-	connect_closed = ()
-	accept_closed = ()
+	connect_closed = request.ready(())
+	accept_closed = request.ready(())
 	fake = tls.Tls(
-		connect = (stream, name, alpn, roots, cert, key) {
-			Ok(1)
-		},
+		connect = (stream, name, alpn, roots, cert, key) { Ok(1) },
 		accept = (stream, cert, key, alpn) { Ok(2) },
 		alpn = (id) { Ok("") },
 		read = (id, max) { Ok(<<>>) },
@@ -47,8 +46,8 @@ test("tls_scope_owns_streams_test", () {
 		shutdown_write = (id) { Ok(()) },
 		close = (id) {
 			{ id == 1 } |>
-				(True()) { connect_closed }
-				& (False()) { accept_closed }
+				(True()) { request.take(connect_closed) }
+				& (False()) { request.take(accept_closed) }
 		},
 	)
 	resource.scoped(() {
@@ -70,19 +69,17 @@ test("tls_scope_owns_streams_test", () {
 // `dial` composes a TCP stream and a TLS stream. Both must belong to the same
 // scope, and each host close must run exactly once at the scope's end.
 test("tls_dial_owns_both_streams_test", () {
-	raw_closed = ()
-	tls_closed = ()
+	raw_closed = request.ready(())
+	tls_closed = request.ready(())
 	net_fake = fake_net(raw_closed)
 	tls_fake = tls.Tls(
-		connect = (stream, name, alpn, roots, cert, key) {
-			Ok(8)
-		},
+		connect = (stream, name, alpn, roots, cert, key) { Ok(8) },
 		accept = (stream, cert, key, alpn) { Ok(9) },
 		alpn = (id) { Ok("") },
 		read = (id, max) { Ok(<<>>) },
 		write = (id, bytes) { Ok(()) },
 		shutdown_write = (id) { Ok(()) },
-		close = (id) { tls_closed },
+		close = (id) { request.take(tls_closed) },
 	)
 	resource.scoped(() {
 		stream = tls.dial("host", 443, tls.options()) <- (net_fake, tls_fake)
@@ -98,15 +95,17 @@ test("tls_cancel_during_open_test", () {
 	resource.scoped(() {
 		listener = net.listen("127.0.0.1", 0)
 		pending = accept_request(listener)
-		closed = ()
+		closed = request.ready(())
 		fake = tls.Tls(
-			connect = (stream, name, alpn, roots, cert, key) { pending },
-			accept = (stream, cert, key, alpn) { pending },
+			connect = (stream, name, alpn, roots, cert, key) {
+				request.await_owned(pending)
+			},
+			accept = (stream, cert, key, alpn) { request.await_owned(pending) },
 			alpn = (id) { Ok("") },
 			read = (id, max) { Ok(<<>>) },
 			write = (id, bytes) { Ok(()) },
 			shutdown_write = (id) { Ok(()) },
-			close = (id) { closed },
+			close = (id) { request.take(closed) },
 		)
 		r = fail.catch(() {
 			task.scope((group) {

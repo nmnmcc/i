@@ -6,12 +6,13 @@
 	i/resource
 	i/fail
 	i/task
+	i/hostcall
 )
 
 // The raw accept request, without the scope-owning `net.accept`: a fake
 // transport can wait on it, and cancelling the fake's open must cancel it.
 accept_request = (net.Listener(number)) <- (raw : net.Net) {
-	raw.accept(number)
+	hostcall.call(() { raw.accept(number) })
 }
 
 fake_fetch = (start, closed : Request(())) -> fetch.Fetch {
@@ -20,16 +21,13 @@ fake_fetch = (start, closed : Request(())) -> fetch.Fetch {
 		status = (id) { Ok(200) },
 		headers = (id) { Ok("") },
 		read = (id, max) { Ok(<<>>) },
-		close = (id) { closed },
+		close = (id) { request.take(closed) },
 	)
 }
 
 test("fetch_scope_owns_response_test", () {
-	closed = ()
-	fake = fake_fetch(
-		(method, url, headers, body) { Ok(1) },
-		closed,
-	)
+	closed = request.ready(())
+	fake = fake_fetch((method, url, headers, body) { Ok(1) }, closed)
 	resource.scoped(() {
 		res = fetch.open("GET", "http://example.test/", "", <<>>) <- (fake)
 		assert(fetch.status(res) == 200) <- (fake)
@@ -47,8 +45,11 @@ test("fetch_cancel_during_open_test", () {
 	resource.scoped(() {
 		listener = net.listen("127.0.0.1", 0)
 		pending = accept_request(listener)
-		closed = ()
-		fake = fake_fetch((method, url, headers, body) { pending }, closed)
+		closed = request.ready(())
+		fake = fake_fetch(
+			(method, url, headers, body) { request.await_owned(pending) },
+			closed,
+		)
 		r = fail.catch(() {
 			task.scope((group) {
 				task.go(group, () {
