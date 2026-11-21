@@ -1526,9 +1526,7 @@ impl<'a> Resolver<'a> {
                 }
                 // An imported field's implicit services are ambient; they
                 // do not belong in the field type.
-                if valid
-                    && let TypeKind::Fn { env: Some(env), .. } = &mut wire.kind
-                {
+                if valid && let TypeKind::Fn { env: Some(env), .. } = &mut wire.kind {
                     **env = self.without_implicit(env);
                 }
                 let signature = valid.then(|| self.host_fn(&wire, true)).flatten();
@@ -1536,9 +1534,7 @@ impl<'a> Resolver<'a> {
                     hf.request_result = wrapped;
                     self.p.host_fns.insert((TypeId(t as u32), i as u32), hf);
                     let mut field = f.ty.clone();
-                    if imported
-                        && let TypeKind::Fn { env: Some(env), .. } = &mut field.kind
-                    {
+                    if imported && let TypeKind::Fn { env: Some(env), .. } = &mut field.kind {
                         **env = self.without_implicit(env);
                     }
                     if asynchronous {
@@ -1574,9 +1570,7 @@ impl<'a> Resolver<'a> {
 
     /// `t` without the implicit services, as a written `Type`.
     fn without_implicit(&self, t: &Type) -> Type {
-        let implicit = |x: &Type| {
-            matches!(&x.kind, TypeKind::Named { ty: TypeRef::Custom(id), args } if args.is_empty() && self.p.is_implicit_service(*id))
-        };
+        let implicit = |x: &Type| matches!(&x.kind, TypeKind::Named { ty: TypeRef::Custom(id), args } if args.is_empty() && self.p.is_implicit_service(*id));
         let kind = match &t.kind {
             TypeKind::Union(ms) => {
                 let kept: Vec<Type> = ms.iter().filter(|m| !implicit(m)).cloned().collect();

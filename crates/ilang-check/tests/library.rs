@@ -238,7 +238,10 @@ fn library_names() {
                 "map_concurrently",
             ],
         ),
-        ("i/clock", &["make_clock", "monotonic_ns", "unix_ns", "sleep_ns"]),
+        (
+            "i/clock",
+            &["make_clock", "monotonic_ns", "unix_ns", "sleep_ns"],
+        ),
         (
             "i/random",
             &["from_seed", "word", "int", "float", "split", "at_path"],
@@ -330,7 +333,10 @@ fn library_names() {
                 "byte_stream",
             ],
         ),
-        ("i/fetch", &["make_fetch", "open", "status", "headers", "read", "close"]),
+        (
+            "i/fetch",
+            &["make_fetch", "open", "status", "headers", "read", "close"],
+        ),
         (
             "i/stdio",
             &[

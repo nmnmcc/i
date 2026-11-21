@@ -1685,7 +1685,8 @@ impl<'a> Lowerer<'a> {
             );
             let env = fx.env;
             let factory = self.library_callee("i/request", "_provider_root");
-            let value = self.stub_factory(&mut fx, &mut out, factory, vec![Atom::EmptyList, key], env);
+            let value =
+                self.stub_factory(&mut fx, &mut out, factory, vec![Atom::EmptyList, key], env);
             fx.env = self.stub_bind(&mut fx, &mut out, env, root.expect("Root"), value);
             let env = fx.env;
             let factory = self.library_callee("i/request", "_provider_owner");
