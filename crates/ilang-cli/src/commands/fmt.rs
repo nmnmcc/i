@@ -542,15 +542,19 @@ fn rename_noreplace(from: &Path, to: &Path) -> std::io::Result<()> {
     let to = CString::new(to.as_os_str().as_bytes())
         .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
     // SAFETY: both pointers are valid NUL-terminated strings for the call, and
-    // `AT_FDCWD` asks to resolve them relative to the current directory.
+    // `AT_FDCWD` asks to resolve them relative to the current directory. The
+    // syscall is used rather than `libc::renameat2`: that function is a glibc
+    // extension, and the release Linux binary is linked against musl, which
+    // does not export it.
     let result = unsafe {
-        libc::renameat2(
+        libc::syscall(
+            libc::SYS_renameat2,
             libc::AT_FDCWD,
             from.as_ptr(),
             libc::AT_FDCWD,
             to.as_ptr(),
             libc::RENAME_NOREPLACE,
-        )
+        ) as libc::c_int
     };
     if result == 0 {
         Ok(())
