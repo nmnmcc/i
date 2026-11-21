@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Retries a command only when it failed because an external Nix cache was
+# unavailable (an HTTP 418 from the cache proxy, a GitHub cache rate limit, a
+# FlakeHub authentication failure). Any other failure is returned unchanged:
+# this must never retry a real test failure.
+#
+# Every retry prints a warning and the job ends with the number of retries, so
+# a gate that only passes by retrying is visible instead of silently green.
+set -u
+
+if [[ ${1-} == -- ]]; then
+  shift
+fi
+if (( $# == 0 )); then
+  echo 'usage: retry-on [--] <command> [arguments...]' >&2
+  exit 2
+fi
+
+# The signatures, in one place. Each is a fixed string the proxy or its
+# upstream prints; add one here only with the message that shows it.
+SIGNATURES=(
+  'HTTP error 418'          # the Nix cache proxy answering "I'm a teapot"
+  'ResourceExhausted'       # GitHub cache API rate limit (Twirp)
+  'rate limit exceeded'     # the same, spelled by the API
+  'Cannot find netrc'       # FlakeHub authentication
+)
+
+ATTEMPTS=3   # one try and two retries
+DELAY=30     # seconds, doubled after every retry
+
+attempt=1
+retries=0
+log=$(mktemp)
+trap 'rm -f "$log"' EXIT
+
+while :; do
+  "$@" 2>&1 | tee "$log"
+  status=${PIPESTATUS[0]}
+  if (( status == 0 )); then
+    break
+  fi
+  matched=''
+  for signature in "${SIGNATURES[@]}"; do
+    if grep -qF -- "$signature" "$log"; then
+      matched=$signature
+      break
+    fi
+  done
+  if [[ -z $matched ]]; then
+    exit "$status"
+  fi
+  if (( attempt >= ATTEMPTS )); then
+    echo "::error::infrastructure failure after $ATTEMPTS attempts: $matched" >&2
+    exit "$status"
+  fi
+  attempt=$((attempt + 1))
+  retries=$((retries + 1))
+  echo "::warning::retrying after infrastructure failure ($matched), attempt $attempt/$ATTEMPTS"
+  sleep "$DELAY"
+  DELAY=$((DELAY * 2))
+done
+
+if (( retries > 0 )); then
+  echo "::notice::infrastructure retries in this job: $retries"
+  if [[ -n ${GITHUB_STEP_SUMMARY:-} ]]; then
+    echo "Infrastructure retries: $retries" >> "$GITHUB_STEP_SUMMARY"
+  fi
+fi
