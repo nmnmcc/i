@@ -61,7 +61,7 @@ compare = (a : Bool, with : Bool) -> Order {
 }
 
 /// Gives `return` when `when` is `True`, and the value of `otherwise()`
-/// when not. It is used to end early:
+/// when not. It ends early:
 ///
 /// ```i
 /// bool.guard(n < 0, "negative", () { "positive" })

@@ -161,14 +161,17 @@ def generate():
                 output += ['```text', written, '```', '']
         (OUT / (slug + '.mdx')).write_text('\n'.join(output))
     (OUT / 'meta.json').write_text(json.dumps({'title':'Modules','pages':pages}, indent=2) + '\n')
-    if VERSION:
-        links = ' · '.join('[' + slug[2:] + '](/docs/library/generated/' + slug + ')' for slug in pages)
-        text = INDEX.read_text()
-        start, end = '{/* generated:start */}', '{/* generated:end */}'
-        if start in text and end in text:
-            text = re.sub('(?s)' + re.escape(start) + '.*?' + re.escape(end),
-                          start + '\n\nDocuments `' + TAG + '`, the version `i new` writes. The source is [stdlib/src at `' + TAG + '`](https://github.com/nmnmcc/i/tree/' + TAG + '/stdlib/src).\n\n' + links + '\n\n' + end, text)
-            INDEX.write_text(text)
+    links = ' · '.join('[' + slug[2:] + '](/docs/library/generated/' + slug + ')' for slug in pages)
+    source = (f'Documents `{TAG}`, the version `i new` writes. The source is [stdlib/src at `{TAG}`](https://github.com/nmnmcc/i/tree/{TAG}/stdlib/src).'
+              if VERSION else
+              'Documents the working-tree standard library: the unreleased 0.2.0. '
+              'No released compiler builds it yet, so `i new` still writes the released version.')
+    text = INDEX.read_text()
+    start, end = '{/* generated:start */}', '{/* generated:end */}'
+    if start in text and end in text:
+        text = re.sub('(?s)' + re.escape(start) + '.*?' + re.escape(end),
+                      start + '\n\n' + source + '\n\n' + links + '\n\n' + end, text)
+        INDEX.write_text(text)
 
 
 if __name__ == '__main__':

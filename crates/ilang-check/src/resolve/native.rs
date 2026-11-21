@@ -754,13 +754,12 @@ impl<'a, 't> NativeResolver<'a, 't> {
                     Slot::Binding(index)
                 }
                 n::ItemKind::Macro { name, args, .. } => {
-                    let message = if args.is_empty()
-                        && matches!(name.name.as_str(), "import" | "export")
-                    {
-                        "a call at the top level is kept for macros; if this was an old empty header, omit it"
-                    } else {
-                        "a call at the top level is kept for macros"
-                    };
+                    let message =
+                        if args.is_empty() && matches!(name.name.as_str(), "import" | "export") {
+                            "a call at the top level is kept for macros; an empty header is omitted"
+                        } else {
+                            "a call at the top level is kept for macros"
+                        };
                     self.error(code::MACRO_RESERVED, item.span.0, message);
                     Slot::None
                 }

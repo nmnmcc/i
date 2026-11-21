@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Fails when a user-visible output fixture or user documentation says how
+things used to be.
+
+Expected output (tests/**/*.stderr, tests/**/*.out and the same files under
+crates/*/tests/), the expectation lines of spec case headers, and the user
+documentation describe the language as it is. The library sources are included
+because their doc comments become the published reference.
+A phrase such as "no longer" or "deprecated" there is a compatibility note that
+belongs in the history, not in what a user reads. Crate source is not scanned:
+its comments legitimately talk about what changed.
+
+  scripts/check-no-compat [--root PATH]
+"""
+import re
+import sys
+from pathlib import Path
+
+# `deprecated` after `@` or `(` is the attribute (`@deprecated(...)`, or the
+# Lisp form `(@ (deprecated "old") Item)`), and `is deprecated` is the current
+# warning text; neither is a compatibility note.
+PHRASES = re.compile(
+    r'(?:(?<![\w@(])(?<!is )deprecated\b'
+    r'|\b(?:no longer|legacy|previously|used to|removed in|now requires)\b)',
+    re.IGNORECASE,
+)
+SPEC_SUFFIXES = {'.i', '.is', '.toml'}
+SPEC_DIRECTIVES = {'expect', 'stop', 'warning', 'output', 'at'}
+DIRECTIVE = re.compile(r'^\s*(?://|#)\s*([A-Za-z_-]+)\s*:')
+
+
+def files(root):
+    tests_dirs = [root / 'tests', *sorted(root.glob('*/tests')), *sorted(root.glob('*/*/tests'))]
+    for tests in tests_dirs:
+        if not tests.is_dir():
+            continue
+        for path in sorted(tests.rglob('*')):
+            if path.is_file() and path.suffix in ('.stderr', '.out'):
+                yield path, False
+    spec = root / 'tests' / 'spec'
+    if spec.is_dir():
+        for path in sorted(spec.rglob('*')):
+            if path.is_file() and path.suffix in SPEC_SUFFIXES:
+                yield path, True
+    content = root / 'docs' / 'content'
+    if content.is_dir():
+        for path in sorted(content.rglob('*')):
+            if path.is_file() and path.suffix in ('.md', '.mdx') and 'node_modules' not in path.parts:
+                yield path, False
+    for relative in ('docs/spec.md', 'bindings/javascript/README.md', 'editors/tree-sitter-i/README.md'):
+        path = root / relative
+        if path.is_file():
+            yield path, False
+    # The library's doc comments are published as reference pages.
+    library = root / 'stdlib' / 'src'
+    if library.is_dir():
+        for path in sorted(library.rglob('*.i')):
+            yield path, False
+
+
+def scanned_lines(path, header_only):
+    text = path.read_text(encoding='utf-8', errors='replace')
+    for number, line in enumerate(text.splitlines(), 1):
+        if header_only:
+            match = DIRECTIVE.match(line)
+            if not match or match.group(1).lower() not in SPEC_DIRECTIVES:
+                continue
+        yield number, line
+
+
+def main(argv):
+    root = Path(__file__).resolve().parent.parent
+    args = list(argv)
+    if args[:1] == ['--root'] and len(args) == 2:
+        root = Path(args[1]).resolve()
+    elif args:
+        print('usage: check-no-compat [--root PATH]', file=sys.stderr)
+        return 2
+
+    found = 0
+    bad_files = set()
+    count = 0
+    for path, header_only in files(root):
+        count += 1
+        relative = path.relative_to(root).as_posix()
+        for number, line in scanned_lines(path, header_only):
+            for match in PHRASES.finditer(line):
+                found += 1
+                bad_files.add(relative)
+                print(f'{relative}:{number}: {match.group(0)}: {line.strip()}', file=sys.stderr)
+
+    if found:
+        print(f'{found} compatibility phrase(s) in {len(bad_files)} file(s)', file=sys.stderr)
+        return 1
+    print(f'no compatibility phrases in {count} file(s)')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

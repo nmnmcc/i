@@ -45,7 +45,7 @@ Highlight mapping to the VS Code TextMate grammar:
 | strings / escapes | string / string.escape | string.quoted.double.i / constant.character.escape.*.i |
 | comments / documentation | comment / comment.doc | comment.line.*.i |
 | bit formats | type | storage.type.format.i |
-| operators, including ^ and legacy ? | operator | keyword.operator.*.i |
+| operators, including ^ and ? | operator | keyword.operator.*.i |
 | brackets / delimiters | punctuation.bracket / punctuation.delimiter | punctuation.*.i |
 
 The Zed highlight query is an exact copy of `queries/highlights.scm`.

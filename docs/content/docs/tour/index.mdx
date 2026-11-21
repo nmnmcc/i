@@ -25,7 +25,7 @@ tour/main.read_count : (Int) <- (Fail(()), Input) -> Int
 ```
 
 - `(Int)` says the argument is an integer.
-- `Input` after `<-` names the service used to read text.
+- `Input` after `<-` names the service that reads text.
 - `Fail(())` says invalid text raises `()` through a service in that same list.
 - `-> Int` says the result is an integer.
 

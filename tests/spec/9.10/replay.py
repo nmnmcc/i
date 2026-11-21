@@ -6,6 +6,7 @@ artifacts. The spec runner separately checks the same cases at O0 and O2 in
 Rust; this script checks their identical assertions in other targets/engines.
 """
 from pathlib import Path
+import os
 import re
 import json
 import subprocess
@@ -42,8 +43,11 @@ if (process.argv[2] === 'ilang') {{
 ''')
     heavy = ROOT / '.rd/cache/heavy' if (ROOT / '.rd/cache/heavy').is_file() else ROOT.parent / 'cache/heavy'
     shell = ROOT if (ROOT / '.rd/cache/heavy').is_file() else ROOT.parent.parent
-    run(heavy, 'direnv', 'exec', shell, 'cargo', 'build', '-p', 'ilang-syntax', '--example', 'migrate-tests', '--locked')
-    inspector = ROOT / 'target/debug/examples/migrate-tests'
+    inspector_package = ROOT / 'crates/ilang-syntax/examples/legacy'
+    run(heavy, 'direnv', 'exec', shell, 'cargo', 'build', '--manifest-path',
+        inspector_package / 'Cargo.toml', '--bin', 'migrate-tests', '--locked')
+    target = Path(os.environ.get('CARGO_TARGET_DIR') or inspector_package / 'target')
+    inspector = (target if target.is_absolute() else ROOT / target) / 'debug/migrate-tests'
     combinations = 0
     for name in ['laws', 'vectors', 'interface']:
         source = Path(__file__).with_name(name + '.i').read_text()

@@ -48,6 +48,9 @@ REMOVED = {
     'docs/design/std-v3-api.json',
     'docs/design/std-v3-behavior.md',
     'scripts/syn3-delete-*.py',
+    # Removed migration tooling that the design history still cites.
+    'crates/ilang-syntax/examples/legacy/migrate-syntax3.rs',
+    'crates/ilang-syntax/examples/legacy/support/legacy/parser.rs',
     'stdlib/test/float_oracle.py',
     'stdlib/test/float_hosts.py',
     'stdlib/test/float_gate.py',

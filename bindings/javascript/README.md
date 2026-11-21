@@ -186,7 +186,7 @@ They are restricted registrations: without approved declarations, loading fails
 with `ungranted host import <namespace> <name>: a trusted binding plan or explicit
 declaration grant is required`. Refusing a declaration gives
 `ungranted host import <namespace> <name> declared by <module> <declaration>`.
-Legacy `imports` registrations deliberately authorize all declarations of the
+`imports` registrations deliberately authorize all declarations of the
 specified import name, preserving custom embeddings. A resource factory must
 use `contextImports` and explicit declaration approval.
 
@@ -210,14 +210,14 @@ double/echo/nan and bad nan/bits. No IO resource service is implemented here.
 Additional existing fixture grants are `custom.echo_string`, `custom.echo_int`,
 `custom.echo_bits`, `custom.echo_ref`, `custom.echo_bool`, `custom.echo_float`,
 `custom.echo_nil`, `custom:fallible/v1.fallible`, and the compiled fixture's
-`app:clock/v1.tick`. They use the same explicit legacy registration authority.
+`app:clock/v1.tick`. They use the same explicit registration authority.
 
 Approval covers the complete authenticated binding plan: the artifact digest
 and the entire ordered declaration list, including refused and duplicate entries.
 JS authorization tokens retain an immutable snapshot, just as Rust grants do.
 Replacing any part of it, even by deleting a refused alias while keeping identical
 Wasm bytes, requires fresh explicit approval. Wire-import coverage alone cannot
-prove the list complete. Legacy broad registration authority is unchanged.
+prove the list complete. Broad registration authority is unchanged.
 
 Every SDK-managed entry into guest code checks the invocation gate, including
 continuations, result exports, allocation and each free. Ending during a host

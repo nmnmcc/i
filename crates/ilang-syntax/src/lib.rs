@@ -66,7 +66,7 @@ pub fn print_tree(module: &ast::Module, lisp: bool) -> String {
     })
 }
 
-/// Token marks let parse errors in older published packages carry migration guidance.
+/// Token marks let parse errors carry guidance for the current spelling.
 /// This never changes how a name is parsed or resolved.
 pub fn old_syntax_marks(source: &str) -> bool {
     let lexed = lex(source);
@@ -116,7 +116,7 @@ pub fn old_syntax_marks(source: &str) -> bool {
     false
 }
 
-/// A migration hint for an error path, never a grammar restriction.
+/// Guidance for the current spelling on an error path, never a grammar restriction.
 pub fn old_syntax_hint(source: &str) -> Option<&'static str> {
     let lexed = lex(source);
     let has = |name: &str| {
@@ -127,10 +127,10 @@ pub fn old_syntax_hint(source: &str) -> Option<&'static str> {
     };
     if old_syntax_marks(source) || has("import") || has("export") || has("case") {
         Some(
-            "if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`",
+            "headers are written `(…)`, a match is `e |> (pattern) { value } & (_) { other }`, and a guard is `? condition`",
         )
     } else if has("if") {
-        Some("if this is an old clause guard, replace `if condition` with `? condition`")
+        Some("a clause guard is written `? condition`")
     } else {
         None
     }
