@@ -271,7 +271,9 @@ await_spawn = (r : hostcall.Call(Result(Int, String))) <- (raw : Process) -> Chi
 			hostcall.cancel(r)
 		},
 	)
-	raw.own(number)
+	// `own` never answers: its outstanding start is the host's lease on the
+	// child, so it is started and not awaited.
+	_ = hostcall.call(() { raw.own(number) })
 	Child(number)
 }
 

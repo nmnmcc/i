@@ -886,6 +886,11 @@ fn package_hostcall(p: &ilang_package::Package) -> bool {
     p.hostcall
 }
 
+/// Whether the manifest text has `hostcall = true` at its top level.
+fn text_hostcall(doc: &DocumentMut) -> bool {
+    doc.get("hostcall").and_then(Item::as_bool) == Some(true)
+}
+
 /// The packages of the program in `project` (without its tests) whose
 /// manifest enables hostcall, in the order of the `i deps` report, by key:
 /// `<this package>` for the root, `location@major`, or `path <dir>` (relative

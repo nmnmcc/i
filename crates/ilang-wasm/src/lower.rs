@@ -2083,6 +2083,7 @@ impl<'a> Lowerer<'a> {
                 x.request_result =
                     hf.request_result || (later && !request && !hf.errors.is_empty());
                 x.awaited = later;
+                x.answer_result = def.import.is_some() && returns_result(program, &field.ty);
                 let f = self.import_func(import, hf.result);
                 self.constants.insert(f);
                 Some(f)
@@ -2100,9 +2101,11 @@ impl<'a> Lowerer<'a> {
         let field = self.service_field_func(t, index)?;
         let (&(import, result), _) = self.import_funcs.iter().find(|(_, f)| **f == field)?;
         let x = &self.out.imports[import as usize];
-        // A field with errors answers a `Result` that its function unwraps;
-        // a `Call` of it would hold the `Result`, so it is awaited now.
-        if x.kind != ImportKind::AsyncService || x.request || x.request_result {
+        // A field with a `Fail` need answers a `Result` that its function
+        // unwraps; a `Call` of it would hold the `Result`, so it is awaited
+        // now. A field written with its `Result` answer starts.
+        if x.kind != ImportKind::AsyncService || x.request || (x.request_result && !x.answer_result)
+        {
             return None;
         }
         Some((field, self.start_func(import, result)))
@@ -2233,7 +2236,8 @@ impl<'a> Lowerer<'a> {
 
     fn make_external_func(&mut self, d: DefId) -> Option<FuncId> {
         let def = self.program.def(d);
-        let (DefKind::External { .. }, Some((module, function))) = (&def.kind, def.kind.foreign())
+        let (DefKind::External { .. } | DefKind::Runtime { .. }, Some((module, function))) =
+            (&def.kind, def.kind.foreign())
         else {
             return None;
         };
@@ -2424,6 +2428,7 @@ impl<'a> Lowerer<'a> {
             request: false,
             request_result: false,
             awaited: false,
+            answer_result: false,
         });
         self.import_sites.push(site);
         Ok(self.out.imports.len() as ImportId - 1)
@@ -2543,7 +2548,7 @@ impl<'a> Lowerer<'a> {
                 site: None,
             });
             result = answer;
-            if x.request_result {
+            if x.request_result && !x.answer_result {
                 let unwrapped = fresh();
                 let from_result = self.library_callee("i/fail", "from_result");
                 body.push(Stmt::Let {
@@ -2573,9 +2578,14 @@ impl<'a> Lowerer<'a> {
 
     fn def_callee(&mut self, d: DefId) -> Callee {
         match self.program.def(d).kind {
-            DefKind::External { .. } | DefKind::Runtime { .. } if self.is_library(d.module) => {
+            DefKind::External { ref module, .. } | DefKind::Runtime { ref module, .. }
+                if self.is_library(d.module) && module.starts_with("ilang:") =>
+            {
                 let (op, arity) = self.external_op(d).expect("checked library operation");
                 Callee::Direct(self.op_func(op, arity))
+            }
+            DefKind::External { .. } | DefKind::Runtime { .. } if self.is_library(d.module) => {
+                Callee::Direct(self.external_func(d).expect("checked library import"))
             }
             DefKind::Runtime { .. } => unreachable!("`@runtime` is only in the library"),
             DefKind::ServiceAccessor { ty } => Callee::Direct(self.accessor_func(ty)),
@@ -3036,7 +3046,7 @@ impl<'a> Lowerer<'a> {
                 }
             },
             ValueRef::Def(d) => match self.program.def(d).kind {
-                DefKind::External { ref module, .. }
+                DefKind::External { ref module, .. } | DefKind::Runtime { ref module, .. }
                     if !self.is_library(d.module) || !module.starts_with("ilang:") =>
                 {
                     match self.external_func(d) {
@@ -3649,7 +3659,9 @@ impl<'a> Lowerer<'a> {
             {
                 self.external_op(d).ok().map(|(op, _)| op)
             }
-            DefKind::Runtime { .. } => self.external_op(d).ok().map(|(op, _)| op),
+            DefKind::Runtime { ref module, .. } if module.starts_with("ilang:") => {
+                self.external_op(d).ok().map(|(op, _)| op)
+            }
             _ => None,
         }
     }
@@ -3930,7 +3942,7 @@ impl<'a> Lowerer<'a> {
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
                 // A call of an external function is done when it is
                 // reached, like all calls.
-                DefKind::External { ref module, .. }
+                DefKind::External { ref module, .. } | DefKind::Runtime { ref module, .. }
                     if !self.is_library(d.module) || !module.starts_with("ilang:") =>
                 {
                     match self.external_func(*d) {
@@ -5146,6 +5158,33 @@ fn abi_type(t: HostType) -> AbiType {
 fn is_standard_service(program: &hir::Program, t: TypeId) -> bool {
     let def = program.ty(t);
     def.name == "Io" && program.module(def.module).path == "i/io"
+}
+
+/// Whether the function type `t` is written with the result `Result(A, E)`
+/// of the prelude, also through aliases: an imported field's answer.
+fn returns_result(program: &hir::Program, t: &hir::Type) -> bool {
+    let TypeKind::Fn { ret, .. } = &t.kind else {
+        return false;
+    };
+    let mut ret: &hir::Type = ret;
+    for _ in 0..64 {
+        let TypeKind::Named {
+            ty: TypeRef::Custom(id),
+            ..
+        } = &ret.kind
+        else {
+            return false;
+        };
+        let def = program.ty(*id);
+        if def.name == "Result" && Some(def.module) == program.prelude {
+            return true;
+        }
+        match &def.body {
+            TypeBody::Alias(body) => ret = body,
+            TypeBody::Custom(_) => return false,
+        }
+    }
+    false
 }
 
 /// The host signature must preserve wire order and result tags.
