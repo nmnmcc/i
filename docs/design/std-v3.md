@@ -375,7 +375,7 @@ cancel : (Ticket) -> ()
 await : <A>(Request(A)) <- (Await) -> A
 await_owned : <A>(Request(A)) <- (Await) -> A
 wait_any : (List(Ticket)) -> ()
-poll : () -> ()
+poll_requests : () -> ()
 ```
 
 Scope registers releases in reverse acquisition order. Use kept non-Fail
@@ -623,7 +623,7 @@ min : <A, N>(List(A), (A, A) <- N -> Order) <- N -> Option(A)
 
 Persistent hash-trie dictionaries. Reference: E `HashMap.ts`, `Record.ts`; G `dict.gleam`; Go `maps/maps.go`.
 
-Keep all algorithms; has→contains. Add same_entries, using lookup rather than representation equality. group stays here.
+Keep all algorithms; `has` is `contains`. Add same_entries, using lookup rather than representation equality. group stays here.
 
 ```text
 Dict(K,V) = private
@@ -634,8 +634,7 @@ get : <K, V>(Dict(K, V), K) -> Option(V)
 contains : <K, V>(Dict(K, V), K) -> Bool
 insert : <K, V>(Dict(K, V), K, V) -> Dict(K, V)
 delete : <K, V>(Dict(K, V), K) -> Dict(K, V)
-upsert : <K, V, N>( Dict(K, V), K, (Option(V)) <- N -> V ) <- N -> Dict(K, V)
-update : <K, V, N>(Dict(K, V), K, (V) <- N -> V) <- N -> Dict(K, V)
+update : <K, V, N>( Dict(K, V), K, (Option(V)) <- N -> V ) <- N -> Dict(K, V)
 from_list : <K, V>(List((K, V))) -> Dict(K, V)
 to_list : <K, V>(Dict(K, V)) -> List((K, V))
 keys : <K, V>(Dict(K, V)) -> List(K)
@@ -1198,7 +1197,7 @@ Invalid handle use keeps the task stop contract; input capacity errors are Fail.
 |---|---|---|
 | `i/deferred` | One completion, many readers. E `Deferred.ts`. | `Deferred(A,E)` private; `new : () <- C -> Deferred(A,E)`; `complete : (Deferred(A,E),Result(A,E)) <- (Scheduler) -> Bool`; `await : (Deferred(A,E)) <- (Scheduler,Fail(E)) -> A`; `poll : (Deferred(A,E)) <- (Scheduler) -> Option(Result(A,E))`; `is_done : (Deferred(A,E)) <- (Scheduler) -> Bool`. |
 | `i/semaphore` | FIFO admission with safe release. E `Semaphore.ts`; Go `sync/`. | `Semaphore` private; `SemaphoreError = InvalidPermits`, `InvalidPermits = (Int)`; `new : (Int) <- (C,Fail(SemaphoreError)) -> Semaphore`; `with_permits : (Semaphore,Int,() <- N -> A) <- (..N,Scheduler,Fail(SemaphoreError)) -> A`; `with_permit : (Semaphore,() <- N -> A) <- (..N,Scheduler) -> A`; `available : (Semaphore) <- (Scheduler) -> Int`. |
-| `i/queue` | Bounded/unbounded FIFO handoff. E `Queue.ts`. | `Queue(A,E)` private; `QueueError = InvalidCapacity | Closed`, `InvalidCapacity = (Int)`, `Closed = ()`; `bounded, dropping, sliding : (Int) <- (C,Fail(QueueError)) -> Queue(A,E)`; `unbounded : () <- C -> Queue(A,E)`; `offer : (Queue(A,E),A) <- (Scheduler,Fail(QueueError)) -> Bool`; `take : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `poll : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `size : (Queue(A,E)) <- (Scheduler) -> Int`; `end : (Queue(A,E)) <- (Scheduler) -> ()`; `fail : (Queue(A,E),E) <- (Scheduler) -> ()`; `shutdown : (Queue(A,E)) <- (Scheduler) -> ()`. |
+| `i/queue` | Bounded/unbounded FIFO handoff. E `Queue.ts`. | `Queue(A,E)` private; `QueueError = InvalidCapacity | Closed`, `InvalidCapacity = (Int)`, `Closed = ()`; `bounded, dropping, sliding : (Int) <- (C,Fail(QueueError)) -> Queue(A,E)`; `unbounded : () <- C -> Queue(A,E)`; `offer : (Queue(A,E),A) <- (Scheduler,Fail(QueueError)) -> Bool`; `take : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `poll : (Queue(A,E)) <- (Scheduler,Fail(E)) -> Option(A)`; `size : (Queue(A,E)) <- (Scheduler) -> Int`; `end : (Queue(A,E)) <- (Scheduler) -> ()`; `fail_with : (Queue(A,E),E) <- (Scheduler) -> ()`; `shutdown : (Queue(A,E)) <- (Scheduler) -> ()`. |
 | `i/pubsub` | Scoped broadcast to current subscribers. E `PubSub.ts`. | `PubSub(A)`, `Subscription(A)` private; `PubSubError = InvalidCapacity | Closed`, cases as above; `bounded, dropping, sliding : (Int) <- (C,Fail(PubSubError)) -> PubSub(A)`; `subscribe : (PubSub(A)) <- (C,Fail(PubSubError)) -> Subscription(A)`; `publish : (PubSub(A),A) <- (Scheduler,Fail(PubSubError)) -> Bool`; `take : (Subscription(A)) <- (Scheduler) -> Option(A)`; `unsubscribe : (Subscription(A)) <- (Scheduler) -> ()`; `end, shutdown : (PubSub(A)) <- (Scheduler) -> ()`. |
 | `i/latch` | Reusable open/closed gate. E `Latch.ts`. | `Latch` private; `new : (Bool) <- C -> Latch`; `open, close, release, await : (Latch) <- (Scheduler) -> ()`; `is_open : (Latch) <- (Scheduler) -> Bool`. |
 | `i/fiber_set` | Dynamic jobs within one structured group. E `FiberSet.ts`. | `FiberSet(E,N)` private; `scoped : ((FiberSet(E,N)) <- (..N,Fail(E),Scheduler) -> A) <- Tasks[N,E] -> A`; `spawn : (FiberSet(E,N),() <- (..N,Fail(E),Scheduler,Runner,request.Await) -> ()) <- (..N,Scheduler) -> ()`; `size : (FiberSet(E,N)) <- (Scheduler) -> Int`; `await_empty : (FiberSet(E,N)) <- (Scheduler,Fail(E)) -> ()`. |

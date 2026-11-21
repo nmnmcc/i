@@ -197,7 +197,7 @@ test("queue_end_drains_then_none_test", () {
 		queue.end(q)
 		refused = closed(() { queue.offer(q, 3) })
 		// The first terminal transition wins.
-		queue.fail(q, "late")
+		queue.fail_with(q, "late")
 		taken = fail.catch(() {
 			[queue.take(q), queue.poll(q), queue.take(q), queue.take(q)]
 		})
@@ -220,14 +220,14 @@ test("queue_end_wakes_waiting_taker_test", () {
 	()
 })
 
-test("queue_poll_after_fail_keeps_the_waiting_takers_value_test", () {
+test("queue_poll_after_fail_with_keeps_the_waiting_takers_value_test", () {
 	got = in_queue_scope((s) {
 		q : queue.Queue(Int, String) = queue.unbounded()
 		taker = task.go(s, () { fail.catch(() { take_soon(q) }) })
 		task.yield()
 		task.yield()
 		must(() { queue.offer(q, 1) })
-		queue.fail(q, "boom")
+		queue.fail_with(q, "boom")
 		// The taker is still first in line, so the failure is not reported
 		// to the poll before the value is drained.
 		before = fail.catch(() { queue.poll(q) })
@@ -239,15 +239,15 @@ test("queue_poll_after_fail_keeps_the_waiting_takers_value_test", () {
 	()
 })
 
-test("queue_fail_drains_then_raises_test", () {
+test("queue_fail_with_drains_then_raises_test", () {
 	got = in_queue_scope((s) {
 		q : queue.Queue(Int, String) = queue.unbounded()
 		empty : queue.Queue(Int, String) = queue.unbounded()
 		waiting = task.go(s, () { fail.catch(() { queue.take(empty) }) })
 		task.yield()
 		must(() { queue.offer(q, 1) })
-		queue.fail(q, "boom")
-		queue.fail(empty, "empty")
+		queue.fail_with(q, "boom")
+		queue.fail_with(empty, "empty")
 		queue.end(q)
 		refused = closed(() { queue.offer(q, 2) })
 		first = fail.catch(() { queue.take(q) })
