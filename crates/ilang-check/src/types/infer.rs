@@ -1903,9 +1903,21 @@ impl<'a> Checker<'a> {
                     })
                     .collect();
                 let ret = self.conv(ret, local);
-                let env = env
-                    .as_ref()
-                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
+                // A written row carries the implicit services too; a type
+                // with no row stays open.
+                let env = match env {
+                    Some(e) if !matches!(e.kind, TypeKind::Hole) => {
+                        let mut row = vec![self.conv_mode(e, local, Mode::Env)];
+                        row.extend(
+                            self.p
+                                .implicit_services
+                                .iter()
+                                .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new())),
+                        );
+                        self.env_union(row, t.span)
+                    }
+                    _ => Ty::Never,
+                };
                 Ty::Fn(Box::new(FnTy::new(params, ret, env)))
             }
             TypeKind::Union(ts) => {
@@ -3933,17 +3945,6 @@ impl<'a> Checker<'a> {
                 Ty::Fn(Box::new(FnTy::new(params, value, env)))
             }
             (Some((value, mut renv)), Some(written)) => {
-                // A written need row carries the implicit services too.
-                // They are always available, so every written function type
-                // means the same as one that writes them.
-                let mut row = vec![renv];
-                row.extend(
-                    self.p
-                        .implicit_services
-                        .iter()
-                        .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new())),
-                );
-                renv = self.env_union(row, f.span);
                 // The written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
                 // `Assert` when a parameter may fail.
@@ -4168,6 +4169,11 @@ impl<'a> Checker<'a> {
                 display::show(&self.s, &service)));
         }
         for (row, service) in self.s.hidden_shadows(&simple, level) {
+            if let Some(Head::Named(TypeRef::Custom(id))) = service.head()
+                && self.p.implicit_services.contains(&id)
+            {
+                continue;
+            }
             let key = display::show(&self.s, &service);
             let message = match self.s.vars[row.0 as usize].name.clone() {
                 Some(row) => format!(

@@ -766,7 +766,7 @@ pub(crate) fn lower_tests_numeric(
     let mut all_stubs: Vec<_> = platform::stubs(program, typed, options.target.platform())
         .into_iter()
         .collect();
-    mark_later_entries(program, &mut all_stubs);
+    //mark_later_entries(program, &mut all_stubs);
     for (entry, stub) in all_stubs {
         if program.module(entry.module).kind == ModuleKind::Test
             && (!options.tests || options.target == ir::Target::Wasi)

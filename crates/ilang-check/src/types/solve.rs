@@ -653,7 +653,18 @@ impl Solver {
     /// member of `M` with the same type constructor that satisfies it as
     /// a value. Needs compare services in reverse.
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
-        self.constrain_in(l, r, Mode::Env);
+        // Implicit services are ambient: they never have to be stated.
+        if self.hidden_needs.is_empty() {
+            self.constrain_in(l, r, Mode::Env);
+            return;
+        }
+        let hidden: Vec<Ty> = self
+            .hidden_needs
+            .iter()
+            .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new()))
+            .collect();
+        let l = self.normalize_mode(Ty::Diff(Box::new(l.clone()), hidden), Mode::Env);
+        self.constrain_in(&l, r, Mode::Env);
     }
 
     /// The row parameters of a constructor, determined from its definition.
