@@ -114,7 +114,7 @@ the manifest reader and the library-only manifests once.
 add : (Int, Int) -> Int = (a, b) { a + b }
 
 @export("sync")
-print : (String) -> Nil = (text) { … }
+print : (String) -> Nil = (text) { text }
 ```
 
 `@export` is legal on a top-level function item of a library package only. It
@@ -218,10 +218,10 @@ the module's exports:
 // src/log.i as written
 @import("app:log/v1")
 Logger = (log = (String) <- (Fail(String)) -> Nil)
-f = () { ... }
+f = () { Nil }
 
 // synthesized at the end of app/log, not written to disk
-make_logger : () -> app/log.Logger
+make_logger : () -> Logger
 ```
 
 `make_logger()` constructs the service, or returns the one the **call site**
@@ -240,7 +240,7 @@ callers then pass `make_logger()` or a fake.
 ```i
 (log = app/log)
 main = () {
-	{ … } <- (log.make_logger())
+	{ Nil } <- (log.make_logger())
 }
 ```
 
@@ -552,8 +552,8 @@ turns its own key on and imports `i/hostcall`.
 `i/hostcall` exports:
 
 ```i
-Call(A)                   // an unwaited start under one group; not a boundary type
-CallGroup                 // a live group; not a boundary type
+Call(A) = Request(A)              // an unwaited start under one group
+CallGroup = Owner                 // a live group
 Wait = (wait = (Ticket) -> Nil)   // a wait mode
 ```
 
