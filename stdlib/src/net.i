@@ -9,9 +9,9 @@
 
 (
 	Net(..)
-	Listener
-	Stream
-	Datagram
+	Listener(..)
+	Stream(..)
+	Datagram(..)
 	bind
 	send_to
 	receive_from

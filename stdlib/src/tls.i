@@ -10,7 +10,7 @@
 
 (
 	Tls(..)
-	Stream
+	Stream(..)
 	TlsError(..)
 	options
 	identity

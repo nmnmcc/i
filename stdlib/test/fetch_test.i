@@ -17,17 +17,17 @@ accept_request = (net.Listener(number)) <- (raw : net.Net) {
 fake_fetch = (start, closed : Request(())) -> fetch.Fetch {
 	fetch.Fetch(
 		start = start,
-		status = (id) { request.ready(Ok(200)) },
-		headers = (id) { request.ready(Ok("")) },
-		read = (id, max) { request.ready(Ok(<<>>)) },
+		status = (id) { Ok(200) },
+		headers = (id) { Ok("") },
+		read = (id, max) { Ok(<<>>) },
 		close = (id) { closed },
 	)
 }
 
 test("fetch_scope_owns_response_test", () {
-	closed = request.ready(())
+	closed = ()
 	fake = fake_fetch(
-		(method, url, headers, body) { request.ready(Ok(1)) },
+		(method, url, headers, body) { Ok(1) },
 		closed,
 	)
 	resource.scoped(() {
@@ -47,7 +47,7 @@ test("fetch_cancel_during_open_test", () {
 	resource.scoped(() {
 		listener = net.listen("127.0.0.1", 0)
 		pending = accept_request(listener)
-		closed = request.ready(())
+		closed = ()
 		fake = fake_fetch((method, url, headers, body) { pending }, closed)
 		r = fail.catch(() {
 			task.scope((group) {

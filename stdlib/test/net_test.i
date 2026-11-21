@@ -17,20 +17,20 @@ fake_net = (
 	bind_closed : Request(())
 ) -> net.Net {
 	net.Net(
-		bind = (address, port) { request.ready(Ok(1)) },
-		send_to = (id, address, port, bytes) { request.ready(Ok(())) },
-		receive_from = (id, max) { request.ready(Ok(<<>>)) },
-		local_address = (id) { request.ready(Ok("127.0.0.1")) },
-		datagram_port = (id) { request.ready(Ok(1000)) },
+		bind = (address, port) { Ok(1) },
+		send_to = (id, address, port, bytes) { Ok(()) },
+		receive_from = (id, max) { Ok(<<>>) },
+		local_address = (id) { Ok("127.0.0.1") },
+		datagram_port = (id) { Ok(1000) },
 		close_datagram = (id) { bind_closed },
-		listen = (address, port) { request.ready(Ok(2)) },
-		local_port = (id) { request.ready(Ok(1001)) },
-		accept = (id) { request.ready(Ok(3)) },
-		connect = (address, port) { request.ready(Ok(4)) },
-		resolve = (name) { request.ready(Ok("")) },
-		read = (id, max) { request.ready(Ok(<<>>)) },
-		write = (id, bytes) { request.ready(Ok(())) },
-		shutdown_write = (id) { request.ready(Ok(())) },
+		listen = (address, port) { Ok(2) },
+		local_port = (id) { Ok(1001) },
+		accept = (id) { Ok(3) },
+		connect = (address, port) { Ok(4) },
+		resolve = (name) { Ok("") },
+		read = (id, max) { Ok(<<>>) },
+		write = (id, bytes) { Ok(()) },
+		shutdown_write = (id) { Ok(()) },
 		close_stream = (id) {
 			{ id == 3 } |>
 				(True()) { accept_closed }
@@ -41,10 +41,10 @@ fake_net = (
 }
 
 test("net_scope_owns_handles_test", () {
-	listen_closed = request.ready(())
-	connect_closed = request.ready(())
-	accept_closed = request.ready(())
-	bind_closed = request.ready(())
+	listen_closed = ()
+	connect_closed = ()
+	accept_closed = ()
+	bind_closed = ()
 	fake = fake_net(listen_closed, connect_closed, accept_closed, bind_closed)
 	resource.scoped(() {
 		listener = net.listen("127.0.0.1", 0) <- (fake)
