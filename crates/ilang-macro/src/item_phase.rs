@@ -724,7 +724,15 @@ pub fn builtin(attribute: &Attribute) -> bool {
     attribute.module.is_none()
         && matches!(
             attribute.name.name.as_str(),
-            "external" | "js" | "host" | "deprecated" | "macro" | "main" | "wasm"
+            "external"
+                | "js"
+                | "host"
+                | "import"
+                | "runtime"
+                | "deprecated"
+                | "macro"
+                | "main"
+                | "wasm"
         )
 }
 

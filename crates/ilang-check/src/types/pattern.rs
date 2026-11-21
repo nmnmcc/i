@@ -686,7 +686,9 @@ impl Checker<'_> {
             ExprKind::Name(ValueRef::Local(x)) => Some(*x),
             ExprKind::Name(ValueRef::Def(d)) => match self.p.def(*d).kind {
                 DefKind::Binding { var, .. } => Some(var),
-                DefKind::External { .. } => None,
+                DefKind::External { .. }
+                | DefKind::Runtime { .. }
+                | DefKind::ServiceAccessor { .. } => None,
             },
             _ => None,
         };

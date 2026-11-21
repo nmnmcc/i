@@ -15,6 +15,9 @@ pub struct Manifest {
     pub dev_dependencies: Vec<Dependency>,
     pub wasm_exports: Vec<WasmExport>,
     pub entries: Vec<(String, WasmExport)>,
+    /// The root key `hostcall = true`: the package may import
+    /// `i/hostcall` and `i/request`.
+    pub hostcall: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -116,6 +119,7 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
     let mut wasm_exports = Vec::new();
     let mut wasm_synchronous = Vec::new();
     let mut entries = Vec::new();
+    let mut hostcall = false;
     for (key, value) in doc.get_ref().iter() {
         match key.get_ref().as_ref() {
             "name" => match value.get_ref() {
@@ -137,6 +141,14 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
                 }
             }
             "entries" if compiled => entries = entry_table(value, &mut diags),
+            "hostcall" => match value.get_ref() {
+                DeValue::Boolean(b) => hostcall = *b,
+                _ => diags.push(err(
+                    code::HOSTCALL_VALUE,
+                    span(value.span()),
+                    "`hostcall` must be `true` or `false`",
+                )),
+            },
             _ => {}
         }
     }
@@ -207,6 +219,7 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
         dev_dependencies,
         wasm_exports,
         entries,
+        hostcall,
     };
     (Some(manifest), diags)
 }

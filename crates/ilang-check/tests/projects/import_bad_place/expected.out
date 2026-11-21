@@ -1,0 +1,15 @@
+src/main.i:11:1: error[E0327]: `@import` may only be on a service type or a declaration `name: Type`
+src/main.i:14:1: error[E0327]: `@import("namespace", "label", mode)` imports one function and is on a declaration `name: Type`; a service type is written `@import("namespace")` or `@import("namespace", "now")`
+src/main.i:18:1: error[E0329]: an `@import` service type is exported with its constructor and fields: add `Hidden(..)` to the export group of this module
+src/main.i:20:1: error[E0327]: `@import` is on a service type: one constructor whose fields have labels and function types
+src/main.i:23:9: error[E0328]: the namespace `js` is kept for JS values, `@import("js", "expression")` on a declaration of an opaque type
+src/main.i:26:9: error[E0306]: names that start with `ilang:` are kept for the runtime; the library uses `@runtime`
+src/main.i:29:1: error[E0326]: this attribute is written `@import("namespace")` or `@import("namespace", "now")` on a service type, `@import("namespace", "label", "now")` or `@import("namespace", "label", "later")` on a declaration, or `@import("js", "expression")` on a declaration of an opaque type
+src/main.i:32:1: error[E0327]: `@import("namespace")` is on a service type; a declaration imports one function with `@import("namespace", "label", "now")` or `@import("namespace", "label", "later")`
+src/main.i:35:1: error[E0326]: this attribute is written `@import("namespace")` or `@import("namespace", "now")` on a service type, `@import("namespace", "label", "now")` or `@import("namespace", "label", "later")` on a declaration, or `@import("js", "expression")` on a declaration of an opaque type
+src/main.i:38:9: error[E0328]: the namespace `js` is kept for JS values, `@import("js", "expression")`
+src/main.i:42:12: error[E0327]: `@import("js", "expression")` is on a declaration of one opaque type, a type with no constructors
+src/main.i:44:1: error[E0326]: the arguments of `@import` are string literals given by position: `@import("namespace")` or `@import("namespace", "now")` on a service type, `@import("namespace", "label", "now")` or `@import("namespace", "label", "later")` on a declaration, or `@import("js", "expression")` on a declaration of an opaque type
+src/main.i:48:1: error[E0208]: `make_twice` is defined more than once in this module
+src/main.i:53:1: error[E0309]: `@host` and `@import` are both on this item; give one
+src/main.i:56:1: error[E0306]: `@runtime` is kept for the library `i`
