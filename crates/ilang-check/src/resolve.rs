@@ -1529,7 +1529,7 @@ impl<'a> Resolver<'a> {
                 if valid
                     && let TypeKind::Fn { env: Some(env), .. } = &mut wire.kind
                 {
-                    *env = Box::new(self.without_implicit(env));
+                    **env = self.without_implicit(env);
                 }
                 let signature = valid.then(|| self.host_fn(&wire, true)).flatten();
                 if let Some(mut hf) = signature {
@@ -1539,7 +1539,7 @@ impl<'a> Resolver<'a> {
                     if imported
                         && let TypeKind::Fn { env: Some(env), .. } = &mut field.kind
                     {
-                        *env = Box::new(self.without_implicit(env));
+                        **env = self.without_implicit(env);
                     }
                     if asynchronous {
                         field = self.waiting_needs_in(module, field, !raw);
