@@ -16,6 +16,6 @@ main = () {
 	g = hostcall.group()
 	hostcall.in_group(g, () {
 		hostcall.close(g)
-		hostcall.call(() { s.ping() })
+		hostcall.call_in(g, () { s.ping() })
 	})
 }
