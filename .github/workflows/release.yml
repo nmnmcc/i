@@ -16,6 +16,10 @@ on:
   pull_request:
     paths:
       - '.github/workflows/release.yml'
+      - 'flake.nix'
+      - 'flake.lock'
+      - 'nix/i.nix'
+      - 'nix/i-bin.nix'
       - 'nix/package.py'
       - 'nix/release.nix'
   workflow_dispatch:
@@ -26,21 +30,35 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  # Every push to a pull request is the same `refs/pull/N/merge`, so a dry run
+  # queued behind an older one would wait for its whole cold build (hours) and
+  # never gate anything. A newer push cancels the dry run; tag and manual runs
+  # must finish, so they keep `false`.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     name: build (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 180
+    # A cold store builds Python, CMake, LLVM and rustc from source for the
+    # toolchain (a change low in the closure, such as `tzdata` below, reaches
+    # all of them). The store is cached between runs, so only the first run
+    # after such a change pays for it; the ceiling is GitHub's.
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       # Adding a platform is adding an entry to the NIX_RELEASE_MATRIX
       # repository variable (JSON, same keys); the default is all three
       # supported platforms. An entry needs a runner in this repository's
       # configuration.
+      #
+      # A pull request builds the two Linux archives only: they are the ones
+      # the release ships as a portable binary, and a three-platform cold build
+      # cannot gate a pull request (it is hours). NIX_RELEASE_MATRIX_PR
+      # overrides that set, as NIX_RELEASE_MATRIX overrides the full one. A tag
+      # or a manual run still builds all three.
       matrix:
-        include: ${{ fromJSON(vars.NIX_RELEASE_MATRIX || '[{"platform":"x86_64-linux","system":"x86_64-linux","runner":"ubuntu-24.04"},{"platform":"aarch64-linux","system":"aarch64-linux","runner":"ubuntu-24.04-arm"},{"platform":"aarch64-darwin","system":"aarch64-darwin","runner":"macos-15"}]') }}
+        include: ${{ fromJSON(github.event_name == 'pull_request' && (vars.NIX_RELEASE_MATRIX_PR || '[{"platform":"x86_64-linux","system":"x86_64-linux","runner":"ubuntu-24.04"},{"platform":"aarch64-linux","system":"aarch64-linux","runner":"ubuntu-24.04-arm"}]') || (vars.NIX_RELEASE_MATRIX || '[{"platform":"x86_64-linux","system":"x86_64-linux","runner":"ubuntu-24.04"},{"platform":"aarch64-linux","system":"aarch64-linux","runner":"ubuntu-24.04-arm"},{"platform":"aarch64-darwin","system":"aarch64-darwin","runner":"macos-15"}]')) }}
     steps:
       - name: Free disk space
         if: runner.os == 'Linux'
@@ -88,6 +106,49 @@ jobs:
             echo "$bad" >&2
             exit 1
           fi
+      # Independent evidence for Linux: a static musl binary names no
+      # interpreter, no shared library and no RPATH, so nothing in it can
+      # resolve through this machine's store. v0.1.0 passed every other check
+      # here and still could not start without `/nix`.
+      - name: Check the Linux dependencies of i
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          file result-i/bin/i
+          if readelf -l result-i/bin/i | grep 'Requesting program interpreter'; then
+            echo "i names an ELF interpreter; it will not start without it" >&2
+            exit 1
+          fi
+          # `ldd` exits 1 for a file it cannot load as dynamic, which a static
+          # binary is; the text is what matters.
+          ldd result-i/bin/i > ldd-i.txt 2>&1 || true
+          cat ldd-i.txt
+          case "$(cat ldd-i.txt)" in
+            *"not a dynamic executable"*|*"statically linked"*) ;;
+            *) echo "i is a dynamic executable (see ldd-i.txt)" >&2; exit 1 ;;
+          esac
+          if objdump -p result-i/bin/i | grep -E '^[[:space:]]+(NEEDED|RPATH|RUNPATH)'; then
+            echo "i needs shared libraries or carries an RPATH" >&2
+            exit 1
+          fi
+          # Strings are not loads; list them anyway. A store path among them
+          # is what would tie the archive to the machine that built it.
+          strings -a result-i/bin/i | grep -E '^/(nix/store|build)/' | sort -u > build-paths-i.txt || true
+          {
+            echo "### Paths of the build machine in \`i\` (${{ matrix.platform }})"
+            echo '```'
+            cat build-paths-i.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Rust's std panic locations are remapped to `/nix/store/eeee…`,
+          # a prefix that is not a real store path; anything else is.
+          stored=$(grep '^/nix/store/' build-paths-i.txt | grep -v '^/nix/store/eeee' || true)
+          if [ -n "$stored" ]; then
+            echo "i names store paths:" >&2
+            echo "$stored" >&2
+            exit 1
+          fi
       - name: Smoke test
         shell: bash
         run: |
@@ -119,6 +180,57 @@ jobs:
           echo "NAME=$name" >> "$GITHUB_ENV"
           echo "URL=$url" >> "$GITHUB_ENV"
           { echo "### ${{ matrix.platform }}"; echo '```'; cat "dist/i-bin-${{ matrix.platform }}.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      # The archive has to run on a machine that has no Nix at all. This is
+      # the only step that would have caught v0.1.0: `nix build` and the
+      # `i-bin` install pass on a machine with `/nix` whatever the archive
+      # names as its loader. No continue-on-error; a failure fails the run,
+      # and `publish` needs this job.
+      - name: Run the archive in a container without Nix
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          extracted="$RUNNER_TEMP/archive"
+          mkdir -p "$extracted"
+          tar -xzf "dist/$NAME" -C "$extracted"
+          test -x "$extracted/bin/i"
+          # debian:stable-slim has no git, and `i new` resolves the newest
+          # `stdlib-vX.Y.Z` through it. A dry run's tag is not published, so
+          # serve the library from this checkout over a mounted repository.
+          library="$RUNNER_TEMP/library"
+          rm -rf "$library"
+          cp -a stdlib "$library"
+          chmod -R u+w "$library"
+          git -C "$library" init -q
+          git -C "$library" -c user.email=i@example.invalid -c user.name=i add -A
+          git -C "$library" -c user.email=i@example.invalid -c user.name=i commit -qm "library $VERSION"
+          git -C "$library" -c user.email=i@example.invalid -c user.name=i tag "stdlib-v$VERSION"
+          docker run --rm \
+            -v "$extracted:/d:ro" \
+            -v "$library:/library:ro" \
+            -e "ILANG_GIT_URLS=github.com/nmnmcc/i=file:///library" \
+            -e "VERSION=$VERSION" \
+            debian:stable-slim sh -c '
+              set -eu
+              export DEBIAN_FRONTEND=noninteractive
+              export PATH="/d/bin:$PATH"
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends git >/dev/null 2>&1
+              # The mounts belong to the runner user; the container is root.
+              git config --global --add safe.directory "*"
+              test "$(i --version)" = "i $VERSION"
+              cd /tmp
+              i new demo
+              cd demo
+              out=$(i run)
+              test "$out" = "Hello, demo!"
+              # The native executable `i build` writes embeds the runner the
+              # compiler carries, so it has to run here too.
+              i build >/dev/null
+              test "$(./build/demo)" = "Hello, demo!"
+              echo "$out"
+            '
+          echo "The archive ran in a container without Nix." >> "$GITHUB_STEP_SUMMARY"
       - name: Verify the archive as i-bin
         shell: bash
         run: |

@@ -4114,6 +4114,18 @@ impl<'a> Checker<'a> {
                 "the type hides the environment statement's obligation for `{}`: every instance must use the same service form",
                 display::show(&self.s, &service)));
         }
+        for (row, service) in self.s.hidden_shadows(&simple, level) {
+            let key = display::show(&self.s, &service);
+            let message = match self.s.vars[row.0 as usize].name.clone() {
+                Some(row) => format!(
+                    "the need's row `{row}` has no entry for `{key}`, so providing `{key}` here would silently replace a `{key}` that the caller passes in `{row}`: state the entry, as `(..{row}, {key})`"
+                ),
+                None => format!(
+                    "the need's row has no entry for `{key}`, so providing `{key}` here would silently replace a `{key}` that the caller passes in the row: state the entry beside the row"
+                ),
+            };
+            self.error(code::ENV_FORMS, span, message);
+        }
         if has_both(&simple) || self.s.has_obligations(t) {
             // An argument that does not change, with different bounds as
             // an output and as an input: keep the bounds.

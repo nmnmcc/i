@@ -1,9 +1,46 @@
 ---
 title: Install
-description: Build the compiler from source code.
+description: Get a release archive, or build the compiler from source.
 ---
 
-Build i from source code. Get the repository and its binaryen submodule first:
+Get `i` from a release archive, or build the compiler from source.
+
+## Release archive
+
+[Releases](https://github.com/nmnmcc/i/releases) publish `bin/i` in an archive per platform, with a `.sha256` sidecar. Check the sidecar before extracting.
+
+| Platform | Archive | Runs without Nix |
+| --- | --- | --- |
+| macOS, Apple silicon | `i-<version>-aarch64-darwin.tar.gz` | yes |
+| Linux, x86-64 | `i-<version>-x86_64-linux.tar.gz` | no, use `i-bin` below |
+| Linux, ARM64 | `i-<version>-aarch64-linux.tar.gz` | no, use `i-bin` below |
+
+macOS on Apple silicon:
+
+```sh
+version=0.1.0
+archive=i-$version-aarch64-darwin.tar.gz
+curl -LO "https://github.com/nmnmcc/i/releases/download/v$version/$archive"
+curl -LO "https://github.com/nmnmcc/i/releases/download/v$version/$archive.sha256"
+shasum -a 256 -c "$archive.sha256"
+tar -xzf "$archive"
+mkdir -p ~/.local/bin
+install -m 755 bin/i ~/.local/bin/i
+i --version
+```
+
+Put `~/.local/bin` on `PATH` if it is not already. A browser download is quarantined; remove the attribute with `xattr -d com.apple.quarantine bin/i` if macOS refuses to run it.
+
+On Linux the archive's loader path still names the Nix store of the machine that built it, so a raw extract needs Nix and the matching store paths. Install the same prebuilt compiler through Nix, which points it at the local store:
+
+```sh
+nix profile install github:nmnmcc/i#i-bin
+i --version
+```
+
+## Build from source
+
+Building gives you the same compiler for the machine you build on. Get the repository and its binaryen submodule first:
 
 ```sh
 git clone https://github.com/nmnmcc/i
@@ -18,7 +55,7 @@ devenv shell
 cargo build --release
 ```
 
-The development shell supplies the pinned toolchain and Binaryen build tools; the first build compiles Binaryen from source. There is no installer archive in the repository's releases: build here and keep `target/release/i`.
+The development shell supplies the pinned toolchain and Binaryen build tools; the first build compiles Binaryen from source.
 
 ## Compiler path
 
@@ -31,6 +68,6 @@ i --version
 i 0.1.0
 ```
 
-Run this from the i source folder, or invoke `target/release/i` directly. That executable includes library modules, the formatter, and the language server. i is in development with no published release or package; its archive scripts produce local releases only.
+Run this from the i source folder, or invoke `target/release/i` directly. That executable includes library modules, the formatter, and the language server. i is in development; use the newest release for work you want to keep.
 
 [First program](/docs/getting-started/first-program)

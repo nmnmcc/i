@@ -469,7 +469,7 @@ try_fold = <A, Acc, F, N>(
 ///
 /// ```i
 /// list.fold_until([1, 2, 3, 4], 0, (acc, x) {
-///   { x < 3 } |> (True) { list.Continue(acc + x) } & (False) { list.Stop(acc) }
+///   { x < 3 } |> (True()) { list.Continue(acc + x) } & (False()) { list.Stop(acc) }
 /// })  // 3
 /// ```
 fold_until = <A, Acc, N>(
@@ -1226,7 +1226,9 @@ min = <A, N>(over : List(A), with : (A, A) <- N -> Order) -> Option(A) {
 		}
 }
 
-/// Like `zip`, but Raises `()` when the lists have different lengths.
+/// Like `zip`, but raises `()` when the lists have different lengths. The
+/// two lengths are the whole failure, so there is no position in either list
+/// to report.
 ///
 /// Reports failure through `Fail(())`.
 strict_zip = <A, B>(list : List(A), with : List(B)) -> List((A, B)) {

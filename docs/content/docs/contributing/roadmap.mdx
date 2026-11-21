@@ -152,3 +152,15 @@ Other exceptions, including a checked program that traps, are recorded in the [g
 ## Compiler trees
 
 [ast-hir-merge.md](https://github.com/nmnmcc/i/blob/main/docs/design/ast-hir-merge.md) discusses the tree rewrite. Today's [syntax entry point](https://github.com/nmnmcc/i/blob/main/crates/ilang-syntax/src/lib.rs) returns the current `ast::Module` directly, with transition facts; the old syntax-tree conversion described by earlier reports is gone. Notes give no delivery-date promise.
+
+## Wording that waits on a fix
+
+These sentences exist only because a command behaves worse than the words. Remove the sentence when the defect is fixed; the fix and the removal are verified together.
+
+| Sentence | Where | Defect |
+| --- | --- | --- |
+| "`i run` takes a package or a declared entry, not a file…" | [First program](/docs/getting-started/first-program) | `i run src/main.i` reports E0304 at `i.toml:1:1` instead of naming the file argument |
+| "A filter that matches nothing prints `0 passed, 0 failed` and exits 0…" | [Testing](/docs/guides/testing) | `i test` exits 0 when no test runs (empty filter, no collection, no `test/`) |
+| "Install `wasmtime`…" | [Host and WASI interop](/docs/guides/js-and-wasi-interop), home note | `i run --target wasi` without a runtime gives `No such file or directory (os error 2)` |
+| The source-checkout paragraph for the editor clients | [Editor set-up](/docs/getting-started/editor-set-up) | No installable editor client outside a source checkout |
+| The Linux row and `i-bin` paragraph in the archive route | [Install](/docs/getting-started/install) | Linux archives carry the build machine's Nix-store loader and libraries |

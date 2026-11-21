@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 CORPUS = ROOT / 'tests/review'
@@ -23,12 +24,21 @@ def read(name):
 
 
 def write(name, data):
-    (CORPUS / name).write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n')
+    target = CORPUS / name
+    temporary = target.with_name(f'{target.name}.tmp-{os.getpid()}')
+    text = json.dumps(data, indent=2, ensure_ascii=False) + '\n'
+    try:
+        with open(temporary, 'w') as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, target)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
-def main():
-    if os.environ.get('UPDATE') != '1':
-        raise SystemExit('import requires UPDATE=1')
+def preserve():
     manifest = read('manifest.json')
     inventory = read('inventory.json')
     manifest['cases'] = [c for c in manifest['cases'] if not c['id'].startswith('review-r2/')]
@@ -75,6 +85,17 @@ def main():
     write('manifest.json', manifest)
     write('inventory.json', inventory)
     print(f'Preserved {count} complete R2 packages; other tracks unchanged.')
+
+
+def main():
+    if os.environ.get('UPDATE') != '1':
+        raise SystemExit('import requires UPDATE=1')
+    try:
+        preserve()
+    except BaseException:
+        for name in ('manifest.json', 'inventory.json'):
+            print(f'not updated: {CORPUS / name}', file=sys.stderr)
+        raise
 
 
 if __name__ == '__main__':

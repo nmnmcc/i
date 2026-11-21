@@ -39,3 +39,11 @@ fn regeneration_rejects_trimmed_values_and_changed_frame_counts() {
         .is_err()
     );
 }
+
+/// The counterexample for the atomic header write: with `UPDATE=1`, a failed
+/// run leaves the header byte for byte and reports it, and a successful run
+/// replaces it completely.
+#[test]
+fn a_failed_update_leaves_the_golden_unchanged() {
+    spec_header::counterexample("a_failed_update_leaves_the_golden_unchanged");
+}

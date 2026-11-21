@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Make library pages with checked value signatures and complete type definitions."""
 from pathlib import Path
-import io
 import json
 import os
 import re
 import subprocess
-import tarfile
+import library_baseline
 from spec_links import unlink_spec_references
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,35 +16,10 @@ HEAVY = next((path for path in (ROOT.parent / 'cache/heavy', ROOT / '.rd/cache/h
               if path.is_file()), None)
 
 
-def newest_tag():
-    out = subprocess.run(['git', '-C', str(ROOT), 'tag', '--list', 'stdlib-v*', '--sort=-v:refname'],
-                         capture_output=True, text=True, check=True).stdout.split()
-    return out[0] if out else None
-
-
-def library_root():
-    """The library the site documents: the newest tag, the one `i new` writes."""
-    override = os.environ.get('LIBRARY_ROOT')
-    if override:
-        return Path(override).resolve()
-    tag = os.environ.get('LIBRARY_TAG') or newest_tag()
-    if not tag:
-        raise SystemExit('no stdlib-v* tag to document')
-    archive = subprocess.run(['git', '-C', str(ROOT), 'archive', f'{tag}:stdlib'],
-                             capture_output=True, check=True).stdout
-    destination = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag)
-    directory = destination / 'stdlib'
-    if directory.is_dir():
-        return directory
-    directory.mkdir(parents=True)
-    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        tar.extractall(directory, filter='data')
-    return directory
-
-
-TAG = os.environ.get('LIBRARY_TAG') or newest_tag()
-VERSION = TAG.removeprefix('stdlib-v') if TAG else None
-LIBRARY = library_root()
+BASELINE = library_baseline.current(ROOT)
+TAG = BASELINE.tag
+VERSION = BASELINE.version
+LIBRARY = BASELINE.root
 
 
 def checked_types(project):
@@ -163,7 +137,8 @@ def generate():
             else:
                 break
         banner = (f'> Documents `{TAG}`, the version `i new` writes.'
-                  if VERSION else '> Documents the working-tree standard library.')
+                  if VERSION else '> Documents the working-tree standard library: the unreleased 0.2.0. '
+                  'No released compiler builds it yet, so `i new` still writes the released version.')
         output = ['---', 'title: ' + json.dumps(module), '---', '', banner, '', *([safe('\n'.join(opening)), ''] if any(line.strip() for line in opening) else [])]
         exports = next(groups(source), [])
         for name in exports:

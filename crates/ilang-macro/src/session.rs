@@ -5,7 +5,9 @@ use ilang_host::syntax::{
     DefinitionAbort, DefinitionContext, DefinitionReply, ItemContext, ItemRequest,
 };
 use ilang_syntax::lisp::expansion::{MacroArgument, MacroDefinition};
-use ilang_syntax::lisp::syntax::{Syntax, SyntaxError, flip_mark_all, validate_expansion};
+use ilang_syntax::lisp::syntax::{
+    ExpansionError, Syntax, SyntaxError, flip_mark_all, validate_expansion_at,
+};
 
 use crate::prepare::MacroPosition;
 use crate::run::{MacroProgram, RunOutcome};
@@ -38,6 +40,9 @@ pub struct Expanded {
 #[derive(Debug)]
 pub enum Failure {
     Syntax(SyntaxError),
+    /// A returned result breaks a restriction at this node, which may come
+    /// from a template in another module.
+    Expansion(ExpansionError),
     Aborted(DefinitionAbort),
     Stopped(ilang_host::Stop),
     Host(anyhow::Error),
@@ -141,7 +146,7 @@ impl Session {
                 RunOutcome::Stopped(stop) => return Err(Failure::Stopped(stop)),
             };
             ilang_host::syntax::charge_tree(&budget, &syntax, true).map_err(Failure::Host)?;
-            validate_expansion(&syntax, &marked).map_err(Failure::Syntax)?;
+            validate_expansion_at(&syntax, &marked).map_err(Failure::Expansion)?;
             let requests = items
                 .as_ref()
                 .map_or_else(Vec::new, |items| items.take_requests());

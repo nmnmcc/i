@@ -4,7 +4,12 @@
 //// so a Float is never infinite or NaN. `a /. 0.0` is `0.0`;
 //// `divide` raises `()` for a zero divisor instead. Functions here
 //// that could give a result that is not finite, such as `power`, raise
-//// `()` in its place; handle these errors with `fail.catch`.
+//// `()` in its place; handle these errors with `fail.catch`. These
+//// arithmetic failures keep `()`, because the operation itself names the
+//// domain and there is no input position to report.
+////
+//// `parse` reports a failure with `FloatError`, whose `offset` is a UTF-8
+//// byte offset into the text.
 (
 	i/fail
 	i/core
@@ -13,6 +18,7 @@
 
 (
 	parse
+	FloatError(..)
 	to_string
 	compare
 	loosely_compare
@@ -97,14 +103,34 @@ significand_limit = 9007199254740992
 /// ```
 to_string = (x : Float) -> String { core.inspect(x) }
 
-_parse_result = (text : String) -> Result(Float, ()) {
+/// A failure to read a Float. `offset` is a UTF-8 byte offset into the text:
+/// the first byte that cannot be used, or the end of the text when digits
+/// are missing or the number is too big. `reason` is one of:
+///
+/// - `"empty"`: the text is empty.
+/// - `"missing digits"`: a sign, `.`, or exponent marker with no digits.
+/// - `"missing point"`: digits before a `.` that is required and absent.
+/// - `"invalid character"`: a byte that cannot continue the number.
+/// - `"overflow"`: the number is too big for a Float.
+FloatError = (offset = Int, reason = String)
+
+_parse_result = (text : String) -> Result(Float, FloatError) {
 	<<text:utf8>> |>
-		(<<45, rest:bytes>>) { whole(rest, True(), 0, 0, 0) }
-		& (<<43, rest:bytes>>) { whole(rest, False(), 0, 0, 0) }
-		& (bytes) { whole(bytes, False(), 0, 0, 0) }
+		(<<45, rest:bytes>>) { whole(rest, True(), 0, 0, 0, 1) }
+		& (<<43, rest:bytes>>) { whole(rest, False(), 0, 0, 0, 1) }
+		& (bytes) { whole(bytes, False(), 0, 0, 0, 0) }
 }
 
 is_digit = (byte : Int) -> Bool { byte >= 48 && byte <= 57 }
+
+// The reason for text that ends before the number is complete.
+whole_reason = (count : Int, at : Int) -> String {
+	{ count > 0 } |>
+		(True()) { "missing point" }
+		& (False()) {
+			{ at == 0 } |> (True()) { "empty" } & (False()) { "missing digits" }
+		}
+}
 
 // The digits before the point.
 whole = (
@@ -112,8 +138,9 @@ whole = (
 	negative : Bool,
 	coefficient : Int,
 	significant : Int,
-	count : Int
-) -> Result(Float, ()) {
+	count : Int,
+	at : Int
+) -> Result(Float, FloatError) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
 			whole(
@@ -122,12 +149,23 @@ whole = (
 				coefficient * 10 + d - 48,
 				count_significant(significant, d - 48),
 				count + 1,
+				at + 1,
 			)
 		}
 		& (<<46, rest:bytes>> ? count > 0) {
-			fraction(rest, negative, coefficient, significant, 0)
+			fraction(rest, negative, coefficient, significant, 0, at + 1)
 		}
-		& (_) { Error(()) }
+		& (<<46, _:bytes>> ? count == 0) {
+			Error(FloatError(offset = at, reason = "missing digits"))
+		}
+		& (<<>>) {
+			Error(FloatError(offset = at, reason = whole_reason(count, at)))
+		}
+		& (
+			<<marker, _:bytes>>
+			? { marker == 69 || marker == 101 } && count > 0
+		) { Error(FloatError(offset = at, reason = "missing point")) }
+		& (_) { Error(FloatError(offset = at, reason = "invalid character")) }
 }
 
 // The digits after the point.
@@ -136,8 +174,9 @@ fraction = (
 	negative : Bool,
 	coefficient : Int,
 	significant : Int,
-	digits : Int
-) -> Result(Float, ()) {
+	digits : Int,
+	at : Int
+) -> Result(Float, FloatError) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
 			fraction(
@@ -146,30 +185,38 @@ fraction = (
 				coefficient * 10 + d - 48,
 				count_significant(significant, d - 48),
 				digits + 1,
+				at + 1,
 			)
 		}
 		& (<<>> ? digits > 0) {
-			decimal(negative, coefficient, significant, -digits)
+			decimal(negative, coefficient, significant, -digits, at)
 		}
+		& (<<>>) { Error(FloatError(offset = at, reason = "missing digits")) }
 		& (
 			<<marker, rest:bytes>>
 			? digits > 0 && { marker == 69 || marker == 101 }
 		) {
-			(exponent_negative, after) = rest |>
-				(<<45, tail:bytes>>) { (True(), tail) }
-				& (<<43, tail:bytes>>) { (False(), tail) }
-				& (_) { (False(), rest) }
+			(exponent_negative, after, start) = rest |>
+				(<<45, tail:bytes>>) { (True(), tail, at + 2) }
+				& (<<43, tail:bytes>>) { (False(), tail, at + 2) }
+				& (_) { (False(), rest, at + 1) }
 			limit = significant + digits + 400
-			exponent(after, 0, 0, limit) |>
-				(Error(_)) { Error(()) }
-				& (Ok(e)) {
+			exponent(after, 0, 0, limit, start) |>
+				(Error(e)) { Error(e) }
+				& (Ok((e, end))) {
 					signed = exponent_negative |>
 						(True()) { -e }
 						& (False()) { e }
-					decimal(negative, coefficient, significant, signed - digits)
+					decimal(
+						negative,
+						coefficient,
+						significant,
+						signed - digits,
+						end,
+					)
 				}
 		}
-		& (_) { Error(()) }
+		& (_) { Error(FloatError(offset = at, reason = "invalid character")) }
 }
 
 // The number of significant digits, not counting zeros at the start.
@@ -182,19 +229,23 @@ count_significant = (previous : Int, digit : Int) -> Int {
 // When an exponent is greater than any digits could make up for, its exact
 // size has no effect, so it is kept at `limit + 1`. Every byte is still read,
 // so that bad text after it is still found.
-exponent = (bytes : BitArray, value : Int, count : Int, limit : Int) -> Result(
-	Int,
-	(),
-) {
+exponent = (
+	bytes : BitArray,
+	value : Int,
+	count : Int,
+	limit : Int,
+	at : Int
+) -> Result((Int, Int), FloatError) {
 	bytes |>
 		(<<d, rest:bytes>> ? is_digit(d)) {
 			next = { value > limit } |>
 				(True()) { limit + 1 }
 				& (False()) { value * 10 + d - 48 }
-			exponent(rest, next, count + 1, limit)
+			exponent(rest, next, count + 1, limit, at + 1)
 		}
-		& (<<>> ? count > 0) { Ok(value) }
-		& (_) { Error(()) }
+		& (<<>> ? count > 0) { Ok((value, at)) }
+		& (<<>>) { Error(FloatError(offset = at, reason = "missing digits")) }
+		& (_) { Error(FloatError(offset = at, reason = "invalid character")) }
 }
 
 // The Float nearest to `coefficient` × 10^`exponent`.
@@ -202,15 +253,16 @@ decimal = (
 	negative : Bool,
 	coefficient : Int,
 	digits : Int,
-	exponent : Int
-) -> Result(Float, ()) {
+	exponent : Int,
+	at : Int
+) -> Result(Float, FloatError) {
 	sign = negative |> (True()) { sign_mask } & (False()) { 0 }
 	magnitude = digits + exponent - 1
 	{ coefficient == 0 } |>
 		(True()) { Ok(core.float_from_bits(sign)) }
 		& (False()) {
 			{ magnitude > 308 } |>
-				(True()) { Error(()) }
+				(True()) { Error(FloatError(offset = at, reason = "overflow")) }
 				& (False()) {
 					{ magnitude < -324 } |>
 						(True()) { Ok(core.float_from_bits(sign)) }
@@ -226,7 +278,14 @@ decimal = (
 								(Ok(bits)) {
 									Ok(core.float_from_bits(sign + bits))
 								}
-								& (Error(_)) { Error(()) }
+								& (Error(_)) {
+									Error(
+										FloatError(
+											offset = at,
+											reason = "overflow",
+										),
+									)
+								}
 						}
 				}
 		}
@@ -412,8 +471,8 @@ floor = (x : Float) -> Float { core.floor(x) }
 /// The nearest whole number, as an Int. A half goes away from zero.
 ///
 /// ```i
-/// float.round(2.5)    // 3
-/// float.round(-2.5)   // -3
+/// float.round(2.5)     // 3
+/// float.round(-.2.5)   // -3
 /// ```
 round = (x : Float) -> Int {
 	{ x <. 0.0 } |>
@@ -1514,23 +1573,25 @@ _tan_result = (x : Float) -> Result(Float, ()) {
 /// more digits, and then an optional exponent: `e` or `E`, an optional `-`
 /// or `+`, and one or more digits. The result is the nearest Float, with
 /// ties to even, worked out with exact integers. Text that is not in this
-/// form, or a number too big for a Float, raises `()`. A number too
-/// small for a Float gives `0.0` with its sign.
+/// form, or a number too big for a Float, raises `FloatError`, which gives
+/// the offset and the reason. A number too small for a Float gives `0.0`
+/// with its sign.
 ///
 /// ```i
 /// fail.catch(() { float.parse("1.5") })      // Ok(1.5)
 /// fail.catch(() { float.parse("-2.0e-3") })  // Ok(-0.002)
-/// fail.catch(() { float.parse("1") })        // Error(())
+/// fail.catch(() { float.parse("1") })        // Error(FloatError(offset = 1, reason = "missing point"))
 /// ```
 ///
-/// Reports failure through `Fail(())`.
+/// Reports failure through `Fail(FloatError)`.
 parse = (text : String) -> Float { fail.from_result(_parse_result(text)) }
 
 /// `base` to the power of a whole number. A negative exponent gives the
 /// inverse: `power(2.0, -1)` is `0.5`. `0.0` with a negative exponent, and a
-/// result too big for a Float, raise `()`. The result is within one
-/// unit in the last place of the exact power, and exact when the exact power
-/// is a Float.
+/// result too big for a Float, raise `()`, because the operation itself
+/// names the domain and there is no input position to report. The result is
+/// within one unit in the last place of the exact power, and exact when the
+/// exact power is a Float.
 ///
 /// ```i
 /// fail.catch(() { float.power(2.0, 10) })  // Ok(1024.0)
@@ -1542,17 +1603,19 @@ power = (base : Float, of : Int) -> Float {
 	fail.from_result(_power_result(base, of))
 }
 
-/// The square root. A negative number raises `()`.
+/// The square root. A negative number raises `()`, because the operation
+/// itself names the domain and there is no input position to report.
 ///
 /// ```i
 /// fail.catch(() { float.square_root(4.0) })   // Ok(2.0)
-/// fail.catch(() { float.square_root(-1.0) })  // Error(())
+/// fail.catch(() { float.square_root(-.1.0) })  // Error(())
 /// ```
 ///
 /// Reports failure through `Fail(())`.
 square_root = (x : Float) -> Float { fail.from_result(_square_root_result(x)) }
 
-/// `a /. by`, raising `()` when `by` is `0.0`.
+/// `a /. by`, raising `()` when `by` is `0.0`, because the operation itself
+/// names the domain and there is no input position to report.
 ///
 /// Reports failure through `Fail(())`.
 divide = (a : Float, by : Float) -> Float {
@@ -1560,7 +1623,8 @@ divide = (a : Float, by : Float) -> Float {
 }
 
 /// The remainder of `a` divided by `by`, rounded down, with the sign of
-/// `by`, raising `()` when `by` is `0.0`.
+/// `by`, raising `()` when `by` is `0.0`, because the operation itself names
+/// the domain and there is no input position to report.
 ///
 /// ```i
 /// fail.catch(() { float.modulo(13.3, 3.3) })  // Ok(0.10000000000000053)
@@ -1571,8 +1635,9 @@ modulo = (a : Float, by : Float) -> Float {
 	fail.from_result(_modulo_result(a, by))
 }
 
-/// `e` to the power `x`. A result too big for a Float raises `()`;
-/// that is for `x` greater than about 709.78.
+/// `e` to the power `x`. A result too big for a Float raises `()`; that is
+/// for `x` greater than about 709.78. The operation itself names the domain
+/// and there is no input position to report.
 ///
 /// ```i
 /// fail.catch(() { float.exponential(1.0) })  // Ok(2.718281828459045)
@@ -1581,8 +1646,9 @@ modulo = (a : Float, by : Float) -> Float {
 /// Reports failure through `Fail(())`.
 exponential = (x : Float) -> Float { fail.from_result(_exponential_result(x)) }
 
-/// The natural logarithm (base `e`). `0.0` and negative numbers raise
-/// `()`.
+/// The natural logarithm (base `e`). `0.0` and negative numbers raise `()`,
+/// because the operation itself names the domain and there is no input
+/// position to report.
 ///
 /// ```i
 /// fail.catch(() { float.logarithm(1.0) })  // Ok(0.0)
@@ -1594,8 +1660,9 @@ logarithm = (x : Float) -> Float { fail.from_result(_logarithm_result(x)) }
 
 /// `base` to the power `of`, for any Float exponent. A negative base with
 /// an exponent that is not a whole number, `0.0` with a negative exponent,
-/// and a result too big for a Float raise `()`. The result is within
-/// one unit in the last place of the exact power.
+/// and a result too big for a Float raise `()`, because the operation itself
+/// names the domain and there is no input position to report. The result is
+/// within one unit in the last place of the exact power.
 ///
 /// ```i
 /// fail.catch(() { float.real_power(16.0, 0.5) })  // Ok(4.0)
@@ -1607,31 +1674,40 @@ real_power = (base : Float, of : Float) -> Float {
 	fail.from_result(_real_power_result(base, of))
 }
 
-/// The arcsine in radians; inputs outside [-1, 1] raise ().
+/// The arcsine in radians; inputs outside [-1, 1] raise `()`, because the
+/// operation itself names the domain and there is no input position to
+/// report.
 ///
 /// Reports failure through `Fail(())`.
 asin = (x : Float) -> Float { fail.from_result(_asin_result(x)) }
 
-/// The arccosine in radians; inputs outside [-1, 1] raise ().
+/// The arccosine in radians; inputs outside [-1, 1] raise `()`, because the
+/// operation itself names the domain and there is no input position to
+/// report.
 ///
 /// Reports failure through `Fail(())`.
 acos = (x : Float) -> Float { fail.from_result(_acos_result(x)) }
 
 /// Convert radians to degrees, returning an error if the result overflows.
+/// The operation itself names the domain and there is no input position to
+/// report, so the error is `()`.
 ///
 /// Reports failure through `Fail(())`.
 degrees = (radians : Float) -> Float {
 	fail.from_result(_degrees_result(radians))
 }
 
-/// The Euclidean length of (x, y), returning an error on overflow.
+/// The Euclidean length of (x, y), returning an error on overflow. The
+/// operation itself names the domain and there is no input position to
+/// report, so the error is `()`.
 ///
 /// Reports failure through `Fail(())`.
 hypot = (x : Float, y : Float) -> Float {
 	fail.from_result(_hypot_result(x, y))
 }
 
-/// Tangent of an angle in radians.
+/// Tangent of an angle in radians. A pole raises `()`, because the operation
+/// itself names the domain and there is no input position to report.
 ///
 /// Reports failure through `Fail(())`.
 tan = (x : Float) -> Float { fail.from_result(_tan_result(x)) }

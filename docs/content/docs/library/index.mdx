@@ -98,10 +98,10 @@ main = () <- (io : Io) {
 
 ```text
 42
-Error(())
+Error(IntError(offset = 0, reason = "invalid digit"))
 ```
 
-[int](/docs/library/generated/i-int) documents accepted input and the `Fail(())` service required for parsing.
+[int](/docs/library/generated/i-int) documents accepted input and the `Fail(int.IntError)` service required for parsing.
 
 ## Dependencies
 
