@@ -2,3 +2,5 @@ name = "cli_log"
 
 [dependencies]
 i = { path = "../../stdlib" }
+
+hostcall = true

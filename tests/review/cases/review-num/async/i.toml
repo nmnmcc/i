@@ -4,3 +4,5 @@ exports = ["asyncprobe/main.work"]
 
 [dependencies]
 i = { path = "../../../../../stdlib" }
+
+hostcall = true

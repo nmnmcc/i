@@ -2,3 +2,5 @@ name = "app"
 
 [dependencies]
 i = { path = "../../../../../../../stdlib" }
+
+hostcall = true
