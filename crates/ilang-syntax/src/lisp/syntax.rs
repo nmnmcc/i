@@ -879,10 +879,27 @@ fn same_origin_tree(a: &Syntax, b: &Syntax) -> bool {
     true
 }
 
+/// A macro result that breaks a restriction, with the offending node. The
+/// node keeps its scope, so a caller can tell a template from written syntax;
+/// a bare span cannot say which file it belongs to.
+#[derive(Clone, Debug)]
+pub struct ExpansionError {
+    pub message: String,
+    pub at: Syntax,
+}
+
 /// Validate the authority and datum restrictions on one macro result.
 /// The inputs must be the syntax arguments of that run. Mark changes preserve
 /// node origins; rebuilding even an identical attribute does not.
 pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), SyntaxError> {
+    validate_expansion_at(result, arguments).map_err(|error| SyntaxError {
+        message: error.message,
+        span: error.at.span(),
+    })
+}
+
+/// [`validate_expansion`], reporting the offending node itself.
+pub fn validate_expansion_at(result: &Syntax, arguments: &[Syntax]) -> Result<(), ExpansionError> {
     use std::collections::{HashMap, HashSet};
     fn restricted(s: &Syntax) -> Option<&str> {
         let Node::Round(xs) = s.node() else {
@@ -904,10 +921,10 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
         };
         matches!(name, "external" | "host" | "js" | "macro").then_some(name)
     }
-    fn descend<'a>(
+    fn descend<'a, E>(
         root: &'a Syntax,
-        f: &mut impl FnMut(&'a Syntax) -> Result<(), SyntaxError>,
-    ) -> Result<(), SyntaxError> {
+        f: &mut impl FnMut(&'a Syntax) -> Result<(), E>,
+    ) -> Result<(), E> {
         let mut pending = vec![root];
         while let Some(current) = pending.pop() {
             f(current)?;
@@ -921,29 +938,39 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
         }
         Ok(())
     }
+    let error = |at: &Syntax, message: &str| ExpansionError {
+        message: message.into(),
+        at: at.clone(),
+    };
     let mut allowed = HashMap::new();
     for arg in arguments {
         descend(arg, &mut |s| {
             if restricted(s).is_some_and(|name| name != "macro") {
                 allowed.insert(Arc::as_ptr(&s.0.origin) as usize, s);
             }
-            Ok(())
+            Ok::<_, ExpansionError>(())
         })?;
     }
     let mut used = HashSet::new();
     descend(result, &mut |s| {
         if !s.valid_scope_identity() {
-            return Err(s.error("a made name cannot change a compiler-provided name identity"));
+            return Err(error(
+                s,
+                "a made name cannot change a compiler-provided name identity",
+            ));
         }
         if matches!(
             s.node(),
             Node::Quote(_) | Node::Unquote(_) | Node::Splice(_)
         ) {
-            return Err(s.error("a macro result cannot contain a quote, unquote, or splice"));
+            return Err(error(
+                s,
+                "a macro result cannot contain a quote, unquote, or splice",
+            ));
         }
         if let Some(name) = restricted(s) {
             if name == "macro" {
-                return Err(s.error("a macro result cannot define a macro"));
+                return Err(error(s, "a macro result cannot define a macro"));
             }
             let origin = Arc::as_ptr(&s.0.origin) as usize;
             if !allowed
@@ -951,7 +978,10 @@ pub fn validate_expansion(result: &Syntax, arguments: &[Syntax]) -> Result<(), S
                 .is_some_and(|original| same_origin_tree(original, s))
                 || !used.insert(origin)
             {
-                return Err(s.error("a foreign attribute must come unchanged from an argument and occur at most once"));
+                return Err(error(
+                    s,
+                    "a foreign attribute must come unchanged from an argument and occur at most once",
+                ));
             }
         }
         Ok(())

@@ -2463,6 +2463,50 @@ fn a_macro_cannot_be_used_in_its_defining_module() {
     );
 }
 
+/// An item macro whose output defines a macro is a form error. The
+/// generated `@macro` lies in the virtual suffix of the caller file; the error
+/// must be reported at the call, with the template as a note, and the compiler
+/// must not panic.
+#[test]
+fn macro_defined_by_an_expansion_is_reported_at_the_call_site() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("i.toml"),
+        format!("name = \"app\"\n{}", library_dependencies()),
+    )
+    .unwrap();
+    std::fs::create_dir(dir.path().join("src")).unwrap();
+    let template_text = "(, gen)\n(@ macro (= gen (-> (,) _ `(@ macro (= inner (-> (,) _ 1))))))\n";
+    std::fs::write(dir.path().join("src/macros.is"), template_text).unwrap();
+    let source_text = "((gen) = app/macros)\ngen()\n";
+    std::fs::write(dir.path().join("src/main.i"), source_text).unwrap();
+    let (mut graph, diagnostics) = ilang_cli::load(dir.path(), false, true);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let (parsed, _) = ilang_check::parse(&graph);
+    let source_of = |path: &str| parsed.iter().find(|p| p.path == path).unwrap().source;
+    let (main, macros) = (source_of("app/main"), source_of("app/macros"));
+    let checked = ilang_macro::project::check(&mut graph);
+    let error = checked
+        .diags
+        .iter()
+        .find(|d| d.is_error() && d.message.contains("cannot define a macro"))
+        .unwrap_or_else(|| panic!("{:?}", checked.diags));
+    assert_eq!(error.source, Some(main));
+    // The primary span is the call `gen()` in the written caller text, not
+    // the template's position reinterpreted in the caller file.
+    let call = source_text.find("gen()").unwrap();
+    assert_eq!(error.span.start as usize, call, "{error:?}");
+    assert!((error.span.end as usize) <= source_text.len(), "{error:?}");
+    let note = error
+        .related
+        .iter()
+        .find(|n| n.message.contains("template"))
+        .unwrap_or_else(|| panic!("{error:?}"));
+    assert_eq!(note.source, macros);
+    let template = template_text.find("(@ macro (= inner").unwrap();
+    assert_eq!(note.span.start as usize, template, "{note:?}");
+}
+
 #[test]
 fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
     std::thread::Builder::new()
