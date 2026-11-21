@@ -178,15 +178,20 @@ def toml_value(value):
 
 
 def library_root():
-    """Examples run against the library `i new` writes, not the working tree."""
+    """Examples run against the library the site documents: this checkout.
+
+    A tag names a released library, and the released compiler is the one that
+    builds it. This tree carries the constructor change, which no released
+    compiler builds yet, so the examples run against the checkout, the same
+    baseline as the generated pages (`generate-library.py`). `LIBRARY_TAG`
+    moves both back to a tag when 0.2.0 and its compiler ship together.
+    """
     override = os.environ.get('LIBRARY_ROOT')
     if override:
         return Path(override)
-    tag = os.environ.get('LIBRARY_TAG') or (subprocess.run(
-        ['git', '-C', str(ROOT), 'tag', '--list', 'stdlib-v*', '--sort=-v:refname'],
-        capture_output=True, text=True, check=True).stdout.split() or [None])[0]
+    tag = os.environ.get('LIBRARY_TAG')
     if not tag:
-        raise SystemExit('no stdlib-v* tag; fetch tags or set LIBRARY_TAG')
+        return ROOT / 'stdlib'
     directory = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag) / 'stdlib'
     if directory.is_dir():
         return directory
