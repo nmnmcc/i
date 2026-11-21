@@ -1,0 +1,9 @@
+# spec: 10.4
+# expect: pass
+# host-boundary §5.3, §8 case 5: `call` on a fake field calls it now and
+# gives a ready Call.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

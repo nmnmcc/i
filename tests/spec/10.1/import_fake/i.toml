@@ -1,0 +1,9 @@
+# spec: 10.1
+# expect: pass
+# host-boundary §3.2, §8 case 5: a fake made with the exported constructor
+# reaches a function that takes the service in its own pattern; no host
+# function is called.
+name = "app"
+
+[dependencies]
+i = { path = "../../../../stdlib" }

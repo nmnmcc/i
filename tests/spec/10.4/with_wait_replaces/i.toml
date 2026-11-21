@@ -1,0 +1,9 @@
+# spec: 10.4
+# expect: pass
+# host-boundary §5.3: `with_wait(w)` makes `w` the wait of every await in
+# the body and restores the ambient wait after it.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

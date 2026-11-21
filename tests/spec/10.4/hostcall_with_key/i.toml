@@ -1,0 +1,8 @@
+# spec: 10.4
+# expect: pass
+# host-boundary §5.1: with the key, both dispatcher modules compile.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

@@ -1,0 +1,10 @@
+# spec: 10.4
+# expect: pass
+# host-boundary §5.3: `in_group(g)` makes `g` the group of a start in the
+# body, including one in a wrapper; closing `g` cancels it, and a start
+# outside the body is in the ambient group and is not cancelled.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

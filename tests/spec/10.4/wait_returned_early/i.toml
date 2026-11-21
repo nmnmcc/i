@@ -1,0 +1,8 @@
+# spec: 10.4
+# expect: stop "panic: hostcall: wait returned early"
+# host-boundary §5.4 row 10: a custom wait that returns while the Call waits.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }
