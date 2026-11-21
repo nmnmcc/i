@@ -6,6 +6,7 @@
 	i/fail
 	i/clock
 	i/http
+	i/resource
 )
 
 handle = (req : http.Request) {
@@ -44,23 +45,28 @@ handle = (req : http.Request) {
 }
 
 test("network_client", () {
-	listener = net.listen("127.0.0.1", 0)
-	url = "http://127.0.0.1:" <> core.inspect(net.local_port(listener))
-	task.run(() {
-		task.race(
-			() { http.serve(listener, handle) },
-			() {
-				assert(http.get(url <> "/chunked").body == <<"chunked":utf8>>)
-				assert(http.get(url <> "/redirect").body == <<"chunked":utf8>>)
-				assert(
-					http.post(url <> "/post", <<"hello":utf8>>).body ==
-						<<"hello":utf8>>,
-				)
-				()
-			},
-		)
-	}) <- (http.native_client())
-	net.close_listener(listener)
+	resource.scoped(() {
+		listener = net.listen("127.0.0.1", 0)
+		url = "http://127.0.0.1:" <> core.inspect(net.local_port(listener))
+		task.run(() {
+			task.race(
+				() { http.serve(listener, handle) },
+				() {
+					assert(
+						http.get(url <> "/chunked").body == <<"chunked":utf8>>,
+					)
+					assert(
+						http.get(url <> "/redirect").body == <<"chunked":utf8>>,
+					)
+					assert(
+						http.post(url <> "/post", <<"hello":utf8>>).body ==
+							<<"hello":utf8>>,
+					)
+					()
+				},
+			)
+		}) <- (http.native_client())
+	})
 })
 
 test("client_timeout", () {

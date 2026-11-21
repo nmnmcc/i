@@ -31,10 +31,12 @@ else
       inherit (artifact) url hash;
     };
 
-    # The archive is built by Nix on the release machine, so its ELF
-    # interpreter and RPATH (or its Mach-O install names) name that
-    # machine's store. Rewriting them against this machine's libraries is
-    # what makes the archive installable from another store.
+    # Archives from the next release on are static on Linux: no interpreter,
+    # no RPATH, nothing to rewrite. The `v0.1.0` archives that `nix/release.nix`
+    # still pins are glibc binaries whose ELF interpreter and RPATH name the
+    # release machine's store, and rewriting them against this machine's
+    # libraries (or the Mach-O install names) is what makes those installable
+    # from another store.
     nativeBuildInputs =
       lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.autoPatchelfHook ]
       ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [ pkgs.fixDarwinDylibNames ];

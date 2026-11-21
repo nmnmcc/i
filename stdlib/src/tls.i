@@ -8,8 +8,8 @@
 )
 
 (
-	Tls
-	Stream
+	Tls(..)
+	Stream(..)
 	TlsError(..)
 	options
 	identity
@@ -83,7 +83,9 @@ raise = (message) {
 		& (Error(_)) { panic("tls: invalid error") }
 }
 
-finish = (r : Request(Result(Int, String))) <- (raw : Tls) {
+// Opens the TLS handle. A cancel while the open is in flight cancels the
+// request and closes a handle that has arrived already.
+finish_handle = (r : Request(Result(Int, String))) <- (raw : Tls) {
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -102,6 +104,15 @@ finish = (r : Request(Result(Int, String))) <- (raw : Tls) {
 	Stream(number)
 }
 
+finish = (r : Request(Result(Int, String))) {
+	resource.acquire(() { finish_handle(r) }, (stream) { close(stream) })
+}
+
+/// Establishes client TLS on `stream` and gives a `Stream` owned by the
+/// current `resource.Scope`: its close is attached to the scope before
+/// `connect` gives the stream, and runs when the scope ends.
+///
+/// Needs `resource.Scope`, `Tls`, `Await` and `Fail(TlsError)`.
 connect = (
 	stream,
 	name,
@@ -124,6 +135,11 @@ connect = (
 	)
 }
 
+/// Establishes server TLS on `stream` and gives a `Stream` owned by the
+/// current `resource.Scope`: its close is attached to the scope before
+/// `accept` gives the stream, and runs when the scope ends.
+///
+/// Needs `resource.Scope`, `Tls`, `Await` and `Fail(TlsError)`.
 accept = (
 	stream,
 	ident : (cert = BitArray, key = BitArray),
@@ -144,6 +160,13 @@ accept = (
 	)
 }
 
+/// Connects to `host` and `port` and establishes client TLS, giving a
+/// `Stream` owned by the current `resource.Scope`. The TCP stream and the
+/// TLS stream are attached to the same scope; its close closes both, and a
+/// double close does nothing.
+///
+/// Needs `resource.Scope`, `Tls`, `Net`, `Await`, `Fail(TlsError)` and
+/// `Fail(NetError)`.
 dial = (host, port, opts) { connect(net.connect(host, port), host, opts) }
 
 alpn = (Stream(n)) <- (raw : Tls) {
@@ -170,6 +193,12 @@ shutdown_write = (Stream(n)) <- (raw : Tls) {
 		& (Error(message)) { raise(message) }
 }
 
+/// Closes a TLS stream. Closing a TLS stream that is closed already does
+/// nothing. The scope that owns the stream calls this; a program does not
+/// need to. Closing the TLS stream does not close the underlying TCP stream;
+/// `tls.dial` attaches that stream to the same scope, so both close together.
+///
+/// Needs `Tls` and `Await`.
 close = (Stream(n)) <- (raw : Tls) { request.await_owned(raw.close(n)) }
 
 byte_stream = (stream) {

@@ -5,8 +5,9 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 
-from corpus import ROOT, CORPUS, dump, sha
+from corpus import ROOT, CORPUS, atomic_write, dump, sha
 
 BASELINE = 'd655684bdb809c5a38bf86b61fc5ef26f5bc5392'
 STD2 = {
@@ -24,9 +25,7 @@ def codes(outcome):
     return sorted(set(re.findall(r'error\[([^]]+)\]', outcome['check']['stderr'])))
 
 
-def audit():
-    if os.environ.get('UPDATE') != '1':
-        raise SystemExit('audit-k4 requires UPDATE=1')
+def _audit():
     before_cases = saved('tests/review/manifest.json')['cases']
     before_rules = saved('tests/review/requirements.json')['requirements']
     rules = json.loads((CORPUS / 'requirements.json').read_text())['requirements']
@@ -144,7 +143,18 @@ def audit():
     lines += ['', 'Benchmark output hashes differ for: ' + ', '.join(r['workload'] for r in output_changes) + '.',
               'Exact hashes and all timing/counter differences are in k4-integration.json.', '',
               'Long-generation result differences from the stored long run: ' + json.dumps(generation_changes, ensure_ascii=False) + '.', '']
-    (CORPUS / 'k4-integration.md').write_text('\n'.join(lines).rstrip() + '\n')
+    atomic_write(CORPUS / 'k4-integration.md', '\n'.join(lines).rstrip() + '\n')
     print(json.dumps({'promotions': len(promotions), 'remaining_k4': remaining,
                       'accepted_then_rejected': len(rejected), 'outside_changes': len(outside),
                       'all_changed_observations': len(changes), 'benchmark_workloads': len(benches)}))
+
+
+def audit():
+    if os.environ.get('UPDATE') != '1':
+        raise SystemExit('audit-k4 requires UPDATE=1')
+    try:
+        _audit()
+    except BaseException:
+        print(f'not updated: {CORPUS / "k4-integration.json"}', file=sys.stderr)
+        print(f'not updated: {CORPUS / "k4-integration.md"}', file=sys.stderr)
+        raise

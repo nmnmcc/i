@@ -335,7 +335,8 @@ i/fail.raise : (A) <- (Fail(A)) -> Never
 i/fail.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
 i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
 i/fail.map_error : (() <- (Fail(B), ..N) -> A, (B) <- N -> C) <- (Fail(C), ..N) -> A
-i/fetch.open : (String, String, String, BitArray) <- (Fail(String), Fetch, request.Await, request.Owner) -> Response
+i/fetch.open_handle : (String, String, String, BitArray) <- (Fail(String), Fetch, request.Await, request.Owner) -> Response
+i/fetch.open : (String, String, String, BitArray) <- (Fail(String), Fetch, request.Await, request.Owner, resource.Scope) -> Response
 i/fetch.status : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> Int
 i/fetch.headers : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> String
 i/fetch.read : (Response, Int) <- (Fail(String), Fetch, request.Await, request.Owner) -> BitArray
@@ -552,9 +553,9 @@ i/http.header_lines : (List((String, BitArray))) -> BitArray
 i/http.reason : (Int) -> String
 i/http.hex_string : (Int) -> String
 i/http.lowercase : (String) -> String
-i/http.serve : (net.Listener, (Request) <- (Fail(A), ..N) -> Response) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
-i/http.serve_stream : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(A), ..N) -> Response) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
-i/http.accept_loop : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(B), N & { Fail(A) | task.Scheduler | task.Runner | requests.Await | { Fail(Never) | requests.Await | task.Runner | task.Scheduler | N } & { task.Scheduler | N } }) -> Response, task.Group(A)) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
+i/http.serve : (net.Listener, (Request) <- (Fail(A), resource.Scope, ..N) -> Response) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> ()
+i/http.serve_stream : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(A), resource.Scope, ..N) -> Response) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> ()
+i/http.accept_loop : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(A), resource.Scope, ..N) -> Response, task.Group(B)) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> ()
 i/http.connection_loop : (net.Stream, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(A), ..N) -> Response, BitArray) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> ()
 i/http.write_server_reply : (net.Stream, Response, Bool) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner) -> ()
 i/http.request_framing : (AnyHeaders) <- (Fail(BadMessage)) -> BodyFraming
@@ -565,26 +566,26 @@ i/http.split_bytes : (BitArray, Int) -> (BitArray, BitArray)
 i/http.collect_body : ((65536) <- N -> BitArray, List(BitArray)) <- N -> BitArray
 i/http.drain_body : ((65536) <- N -> BitArray) <- N -> ()
 i/http.native_client : () <- (net.Net, tls.Tls) -> Client
-i/http.client : () <- (Client, requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), send = (Request) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response, stream = (Request) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> BitArray))
+i/http.client : () <- (Client, requests.Await, requests.Owner, resource.Scope, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), send = (Request) <- (Fail(HttpError), requests.Await, requests.Owner, resource.Scope, task.Runner, task.Scheduler) -> Response, stream = (Request) <- (Fail(HttpError), requests.Await, requests.Owner, resource.Scope, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> BitArray))
 i/http.send : (Request) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
 i/http.fetch_error : (String) <- (Fail(Dns | Protocol | Connect)) -> Never
 i/http.fetch_reply : (() <- (Fail(String), ..N) -> A) <- (Fail(HttpError), ..N) -> A
 i/http.fetch_headers : (List(String)) -> List((String, String))
-i/http.fetch_open : (Request) <- (Fail(HttpError), fetch.Fetch, requests.Await, requests.Owner) -> fetch.Response
-i/http.fetch_stream : (Request) <- (Fail(HttpError), fetch.Fetch, requests.Await, requests.Owner) -> (close = () <- (requests.Await, requests.Owner) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner) -> BitArray)
+i/http.fetch_open : (Request) <- (Fail(HttpError), fetch.Fetch, requests.Await, requests.Owner, resource.Scope) -> fetch.Response
+i/http.fetch_stream : (Request) <- (Fail(HttpError), fetch.Fetch, requests.Await, requests.Owner, resource.Scope) -> (close = () <- (requests.Await, requests.Owner) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner) -> BitArray)
 i/http.fetch_client : () <- (fetch.Fetch) -> Client
-i/http.send_stream : (Request) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> BitArray)
-i/http.network_client : () <- (task.Scheduler) -> (close = () <- (net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> (), send = (Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response)
+i/http.send_stream : (Request) <- (Client, Fail(HttpError), requests.Await, requests.Owner, resource.Scope, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> BitArray)
+i/http.network_client : () <- (task.Scheduler) -> (close = () <- (net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> (), send = (Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, resource.Scope, task.Scheduler, tls.Tls) -> Response)
 i/http.close_connection : (Connection) <- (net.Net, requests.Await, requests.Owner, tls.Tls) -> ()
 i/http.close_client : (task.Ref(Pool)) <- (net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> ()
 i/http.pool_take : (List(Idle), Bool, String, Int) -> (List(Idle), Option(Idle))
 i/http.get : (String) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
 i/http.post : (String, BitArray) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
 i/http._body_text_result : (Response) -> Result(String, ())
-i/http.follow : (task.Ref(Pool), Request, Int) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
+i/http.follow : (task.Ref(Pool), Request, Int) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, resource.Scope, task.Scheduler, tls.Tls) -> Response
 i/http.redirect_headers : (AnyHeaders, uri.Uri, uri.Uri, Bool) -> AnyHeaders
-i/http.send_once : (task.Ref(Pool), Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
-i/http.dial : (Bool, String, Int) <- (Fail(Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, tls.Tls) -> Connection
+i/http.send_once : (task.Ref(Pool), Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, resource.Scope, task.Scheduler, tls.Tls) -> Response
+i/http.dial : (Bool, String, Int) <- (Fail(Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, resource.Scope, tls.Tls) -> Connection
 i/http.exchange : (task.Ref(Pool), Idle, Request, BitArray) <- (Fail(Connect | Tls | Protocol | PeerClosed), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
 i/http.read_reply : ((read = (65536) <- N -> BitArray, write = A), Method, BitArray) <- (Fail(Protocol | PeerClosed), ..N) -> (Response, BitArray, Bool)
 i/http.read_progress : ((read = (65536) <- N -> BitArray, write = A), Method, BitArray, B & Bool) <- (Fail(Protocol | PeerClosed), ..N) -> (Response, BitArray, B | Bool)
@@ -786,9 +787,12 @@ i/log.stderr : () -> Sink(stdio.StdioError, request.Await | request.Owner | stdi
 i/log.stdout : () -> Sink(stdio.StdioError, request.Await | request.Owner | stdio.Stdio)
 i/log.file : (String) -> Sink(fs.FsError, A)
 i/log.timestamped : (Entry) <- (Fail(i/clock.ClockError), i/clock.Clock, request.Await, request.Owner) -> Entry
-i/net.listen : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Listener
-i/net.connect : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
-i/net.accept : (Listener) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
+i/net.listen_handle : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Listener
+i/net.listen : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner, resource.Scope) -> Listener
+i/net.connect_handle : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
+i/net.connect : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner, resource.Scope) -> Stream
+i/net.accept_handle : (Listener) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
+i/net.accept : (Listener) <- (Fail(NetError), Net, request.Await, request.Owner, resource.Scope) -> Stream
 i/net.local_port : (Listener | Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> Int
 i/net.read : (Stream, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray
 i/net.write : (Stream, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
@@ -800,7 +804,8 @@ i/net.parts : (String, Int) -> List(String)
 i/net.resolve : (String) <- (Fail(NetError), Net, request.Await, request.Owner) -> List(String)
 i/net.stream_number : (Stream) -> Int
 i/net.byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> (), read = (Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(NetError), Net, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ())
-i/net.bind : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Datagram
+i/net.bind_handle : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Datagram
+i/net.bind : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner, resource.Scope) -> Datagram
 i/net.send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
 i/net.receive_from : (Datagram, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> (address = String, data = BitArray, port = Int)
 i/net.decode_datagram : (A) -> (address = String, data = BitArray, port = Int)
@@ -1692,10 +1697,11 @@ i/tls.identity : (BitArray, BitArray) -> (cert = BitArray, key = BitArray)
 i/tls.join : (List(String)) -> String
 i/tls.slice : (String, Int, Int) -> String
 i/tls.raise : (String) <- (Fail(TlsError)) -> Never
-i/tls.finish : (Request(Result(Int, String))) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
-i/tls.connect : (net.Stream, String, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
-i/tls.accept : (net.Stream, (cert = BitArray, key = BitArray), (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
-i/tls.dial : (String, Int, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(net.NetError | TlsError), Tls, net.Net, request.Await, request.Owner) -> Stream
+i/tls.finish_handle : (Request(Result(Int, String))) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
+i/tls.finish : (Request(Result(Int, String))) <- (Fail(TlsError), Tls, request.Await, request.Owner, resource.Scope) -> Stream
+i/tls.connect : (net.Stream, String, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, request.Await, request.Owner, resource.Scope) -> Stream
+i/tls.accept : (net.Stream, (cert = BitArray, key = BitArray), (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, request.Await, request.Owner, resource.Scope) -> Stream
+i/tls.dial : (String, Int, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(net.NetError | TlsError), Tls, net.Net, request.Await, request.Owner, resource.Scope) -> Stream
 i/tls.alpn : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> String
 i/tls.read : (Stream, Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray
 i/tls.write : (Stream, BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ()

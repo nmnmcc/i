@@ -12,6 +12,7 @@ import shutil
 import signal
 import math
 import subprocess
+import sys
 import tempfile
 import time
 import tomllib
@@ -29,9 +30,43 @@ SOURCES = {
 }
 
 
-def dump(path, value):
+def atomic_write(path, text):
+    """Replace `path` through a temporary file in the same directory.
+
+    A killed run leaves either the old bytes or all of the new ones, never a
+    part. The temporary name does not end in a golden suffix, so test
+    discovery cannot pick up a file left behind by a crash.
+    """
+    path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + '\n')
+    temporary = path.with_name(f'{path.name}.tmp-{os.getpid()}')
+    try:
+        with open(temporary, 'w') as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def commit_goldens(updates, ok):
+    """Write staged golden files only when the run that made them succeeded.
+
+    With `ok` false nothing is written, so every golden keeps its bytes, and
+    each path is named on standard error as not updated.
+    """
+    if not ok:
+        for path, _ in updates:
+            print(f'not updated: {path}', file=sys.stderr)
+        return
+    for path, text in updates:
+        atomic_write(path, text)
+
+
+def dump(path, value):
+    atomic_write(path, json.dumps(value, indent=2, ensure_ascii=False) + '\n')
 
 
 def sha(data):
@@ -171,7 +206,7 @@ def import_reviews(args):
             target.parent.mkdir(parents=True, exist_ok=True)
             if not target.exists() or target.read_bytes() != data.encode():
                 (path / 'expected.json').unlink(missing_ok=True)
-            target.write_text(data)
+            atomic_write(target, data)
         case_id = str(path.relative_to(CORPUS / 'cases'))
         cases.append({'id': case_id, 'project': str(path.relative_to(ROOT)), 'origin': origin, 'context': project.get('context'), 'source': project['source'], 'finding': Path(origin).stem, 'files': [x for x in project['files'] if x.endswith('.i')]})
         for entry in project['origins']:
@@ -392,13 +427,14 @@ def run_corpus(args):
         return case, outcome, bound, time.monotonic() - started
     pool = ThreadPoolExecutor(max_workers=args.jobs)
     timings = []
+    updates = []
     for n, (case, result, bound, seconds) in enumerate(pool.map(observe_case, cases)):
         timings.append((case['id'], seconds))
         applicable = [r for r in requirements['requirements'] if re.search(r['pattern'], case['id'])]
         expected_cycle = any('E0505' in r.get('diagnostic_codes', []) and r.get('phase') != 'entry' for r in applicable)
         expected_path = ROOT / case['project'] / 'expected.json'
         if update:
-            dump(expected_path, {'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': bound, 'outcome': result})
+            updates.append((expected_path, json.dumps({'compiler': revision, 'binary_sha256': binary_digest, 'kind': 'observation; semantic requirements are separate', 'bound_seconds': bound, 'outcome': result}, indent=2, ensure_ascii=False) + '\n'))
         elif not expected_path.exists():
             failures.append(case['id'] + ': missing expected.json')
         else:
@@ -464,6 +500,9 @@ def run_corpus(args):
                 stream.write(json.dumps({'set': 'corpus-cases', 'key': key, 'seconds': round(seconds, 3)}) + '\n')
     print(json.dumps({**({'shard': '%d/%d' % args.shard} if args.shard else {}), 'selected': len(cases), 'checks': dict(summary), 'failures': failures}, indent=2))
     pool.shutdown()
+    if update:
+        # Publish nothing until every selected case has a complete outcome.
+        commit_goldens(updates, not failures)
     if failures:
         raise SystemExit(1)
 
@@ -503,16 +542,16 @@ def register_parses(args):
             config[key]['track'] = 'T3'
         else:
             marker = '// old-syntax-check: ' + ','.join(d.split(':', 1)[0] for d in diagnostics) + '\n'
-            target.write_text(marker + source)
+            atomic_write(target, marker + source)
         if config[key].get('track'):
-            target.write_text(source)
+            atomic_write(target, source)
         if path != target:
             path.unlink()
         case.setdefault('stored', {})[name] = str(stored)
         invalid += 1
         # Prefix markers change diagnostic positions; recapture through the real CLI.
         (project / 'expected.json').unlink(missing_ok=True)
-    config_path.write_text(json.dumps(config, indent=2) + '\n')
+    atomic_write(config_path, json.dumps(config, indent=2) + '\n')
     dump(manifest_path, manifest)
     retained = {ROOT / c['project'] / c.get('stored', {}).get(name, name)
                 for c in manifest['cases'] for name in c['files']}
@@ -572,7 +611,7 @@ def report(args):
         if not requirement.get('known_failure'):
             continue
         lines += ['- ' + requirement['finding'], '  Required: ' + requirement['outcome'] + '.', '  Source: ' + requirement['source'], '  Cases: ' + ', '.join(c['id'] for c in manifest['cases'] if re.search(requirement['pattern'], c['id'])), '']
-    (CORPUS / 'known-failures.md').write_text('\n'.join(lines) + '\n')
+    atomic_write(CORPUS / 'known-failures.md', '\n'.join(lines) + '\n')
     if args.checks_log:
         log = args.checks_log.read_text()
         decoder = json.JSONDecoder()

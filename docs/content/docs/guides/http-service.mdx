@@ -76,13 +76,16 @@ handle = (req : http.Request) {
 	i/task
 	i/stdio
 	i/http
+	i/resource
 	guide_http/handler
 )
 
 main = () {
-	listener = net.listen("127.0.0.1", 18080)
-	stdio.print("listening on 127.0.0.1:18080")
-	task.run(() { http.serve(listener, handler.handle) })
+	resource.scoped(() {
+		listener = net.listen("127.0.0.1", 18080)
+		stdio.print("listening on 127.0.0.1:18080")
+		task.run(() { http.serve(listener, handler.handle) })
+	})
 }
 ```
 
@@ -156,7 +159,7 @@ i run --opt 2
 listening on 127.0.0.1:18080
 ```
 
-The server buffers request bodies and handles connections within a structured task scope; `task.run` supplies its task runner. The command stays running; use another terminal for requests and Ctrl-C to stop it.
+The server owns the listener in a `resource.scoped` body, buffers request bodies and handles connections within a structured task scope; `task.run` supplies its task runner. The command stays running; use another terminal for requests and Ctrl-C to stop it.
 
 ## Requests
 
