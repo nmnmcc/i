@@ -28,18 +28,14 @@ test("fake_capabilities", () {
 					()
 				} <- (
 					process.WorkingDirectory(
-						cwd = () { request.ready(Ok("/fake")) },
+						cwd = () { Ok("/fake") },
 					),
 				)
-			} <- (process.Entropy(entropy = (n) { request.ready(Ok(<<n>>)) }))
-		} <- (process.Environment(env = (name) { request.ready(Error(name)) }))
+			} <- (process.Entropy(entropy = (n) { Ok(<<n>>) }))
+		} <- (process.Environment(env = (name) { Error(name) }))
 	} <- (
 		process.Arguments(
-			args = () {
-				request.ready(
-					Ok(<<2, 0, 0, 0, 1, 0, 0, 0, 97, 2, 0, 0, 0, 98, 99>>),
-				)
-			},
+			args = () { Ok(<<2, 0, 0, 0, 1, 0, 0, 0, 97, 2, 0, 0, 0, 98, 99>>) },
 		),
 	)
 })

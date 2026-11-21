@@ -16,7 +16,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "hostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -180,7 +180,7 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
     fs::write(
         directory.path().join("i.toml"),
         format!(
-            "name = \"app\"\n[wasm]\nexports = [{exports}]\n{}",
+            "name = \"app\"\nhostcall = true\n[wasm]\nexports = [{exports}]\n{}",
             library_dependencies()
         ),
     )

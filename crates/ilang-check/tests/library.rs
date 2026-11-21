@@ -143,6 +143,7 @@ fn library_names() {
                 "take",
                 "settled",
                 "cancel",
+                "wait",
                 "await",
                 "await_owned",
                 "wait_any",

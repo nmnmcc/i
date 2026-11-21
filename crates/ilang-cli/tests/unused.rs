@@ -8,7 +8,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "hostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -18,7 +18,7 @@ fn unused_binding_warning_keeps_check_successful() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!("name = \"app\"\nhostcall = true\n{}", library_dependencies()),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("test")).unwrap();

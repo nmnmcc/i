@@ -22,7 +22,7 @@ fn built_program(source: &str, opt: Level) -> Program {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(
         directory.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!("name = \"app\"\nhostcall = true\n{}", library_dependencies()),
     )
     .unwrap();
     std::fs::create_dir(directory.path().join("src")).unwrap();
@@ -638,7 +638,7 @@ fn task_run_discharges_scheduler_in_the_printed_entry_need() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(
         directory.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!("name = \"app\"\nhostcall = true\n{}", library_dependencies()),
     )
     .unwrap();
     std::fs::create_dir(directory.path().join("src")).unwrap();

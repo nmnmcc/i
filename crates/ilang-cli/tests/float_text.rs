@@ -16,7 +16,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "hostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -195,7 +195,7 @@ fn programs() -> Vec<(u8, Program)> {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"text\"\n[wasm]\nexports = [\"text/main.show\", \"text/main.nested\"]\n{}",
+            "name = \"text\"\nhostcall = true\n[wasm]\nexports = [\"text/main.show\", \"text/main.nested\"]\n{}",
             library_dependencies()
         ),
     )

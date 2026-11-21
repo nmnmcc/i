@@ -14,7 +14,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "hostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -609,7 +609,7 @@ fn numeric_corpus_agrees_at_o0_o2_o3() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"numeric\"\n[wasm]\nexports = {exports:?}\n{}",
+            "name = \"numeric\"\nhostcall = true\n[wasm]\nexports = {exports:?}\n{}",
             library_dependencies()
         ),
     )
@@ -925,7 +925,7 @@ fn nonnumeric_functions_are_emitted_byte_equal() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"plain\"\n[wasm]\nexports = [\"plain/pass.pass\"]\n{}",
+            "name = \"plain\"\nhostcall = true\n[wasm]\nexports = [\"plain/pass.pass\"]\n{}",
             library_dependencies()
         ),
     )
@@ -977,7 +977,7 @@ fn nonnumeric_functions_are_emitted_byte_equal() {
 fn representation_facts_follow_code_identity_not_debug_names() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
-    std::fs::write(dir.path().join("i.toml"), format!("name = \"identity\"\n[wasm]\nexports = [\"identity/functions.floating\", \"identity/functions.integer\"]\n{}", library_dependencies())).unwrap();
+    std::fs::write(dir.path().join("i.toml"), format!("name = \"identity\"\nhostcall = true\n[wasm]\nexports = [\"identity/functions.floating\", \"identity/functions.integer\"]\n{}", library_dependencies())).unwrap();
     std::fs::write(dir.path().join("src/functions.i"), "(floating, integer)\nfloating = (x : Float) -> Float { x +. 1.0 }\ninteger = (x : Int) -> Int { x + 1 }\n").unwrap();
     let (graph, diagnostics) = ilang_package::load(dir.path());
     assert!(diagnostics.is_empty());
@@ -1023,7 +1023,7 @@ fn transitive_suspend_preserves_pending_logical_frames() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"trace\"\n{}", library_dependencies()),
+        format!("name = \"trace\"\nhostcall = true\n{}", library_dependencies()),
     )
     .unwrap();
     std::fs::write(dir.path().join("src/main.i"), "(i/control)\ng = (b, x : Float) -> Float {\n y = control.suspend(b, (k) { control.resume(k, 1.0) })\n x *. x +. y\n}\nf = (b, x : Float) -> Float {\n y = g(b, x)\n y +. 0.25\n}\nh = (b, x : Float) -> Float {\n y = f(b, x)\n y +. 0.5\n}\n\nmain = () {\n control.boundary((b) { h(b, 1.0e308) })\n ()\n}\n").unwrap();

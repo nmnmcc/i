@@ -11,7 +11,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "hostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -62,7 +62,7 @@ fn a_round_tripped_program_keeps_scope_and_order() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"block_nesting_roundtrip\"\n{}",
+            "name = \"block_nesting_roundtrip\"\nhostcall = true\n{}",
             library_dependencies()
         ),
     )

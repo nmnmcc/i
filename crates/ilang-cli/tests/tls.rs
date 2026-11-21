@@ -9,7 +9,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "hostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -34,7 +34,7 @@ fn tls_round_trip_and_certificate_validation() {
     fs::create_dir(project.path().join("src")).unwrap();
     fs::write(
         project.path().join("i.toml"),
-        format!("name = \"tls_test\"\n{}", library_dependencies()),
+        format!("name = \"tls_test\"\nhostcall = true\n{}", library_dependencies()),
     )
     .unwrap();
     let source = format!(

@@ -11,7 +11,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "hostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -27,7 +27,7 @@ fn options(level: Level) -> BuildOptions {
 fn project(path: &Path) {
     std::fs::write(
         path.join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!("name = \"app\"\nhostcall = true\n{}", library_dependencies()),
     )
     .unwrap();
     std::fs::create_dir(path.join("src")).unwrap();
@@ -351,7 +351,7 @@ fn collections_call_aliases_and_computed_function_values() {
         std::fs::create_dir(dir.path().join("src")).unwrap();
         std::fs::write(
             dir.path().join("i.toml"),
-            format!("name = \"probe\"\n{}", library_dependencies()),
+            format!("name = \"probe\"\nhostcall = true\n{}", library_dependencies()),
         )
         .unwrap();
         std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();
