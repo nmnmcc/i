@@ -72,7 +72,10 @@ fn package(dir: &Path, main: &str) -> PathBuf {
     std::fs::create_dir_all(project.join("src")).unwrap();
     std::fs::write(
         project.join("i.toml"),
-        format!("name = \"app\"\nhostcall = true\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::write(project.join("src/main.i"), main).unwrap();

@@ -18,7 +18,10 @@ fn lisp_modules_are_checked_with_source_locations() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\nhostcall = true\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -204,7 +207,10 @@ fn interpolation_keeps_its_result_through_both_surface_conversions() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\nhostcall = true\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();

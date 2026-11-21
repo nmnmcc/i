@@ -1023,7 +1023,10 @@ fn transitive_suspend_preserves_pending_logical_frames() {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"trace\"\nhostcall = true\n{}", library_dependencies()),
+        format!(
+            "name = \"trace\"\nhostcall = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::write(dir.path().join("src/main.i"), "(i/control)\ng = (b, x : Float) -> Float {\n y = control.suspend(b, (k) { control.resume(k, 1.0) })\n x *. x +. y\n}\nf = (b, x : Float) -> Float {\n y = g(b, x)\n y +. 0.25\n}\nh = (b, x : Float) -> Float {\n y = f(b, x)\n y +. 0.5\n}\n\nmain = () {\n control.boundary((b) { h(b, 1.0e308) })\n ()\n}\n").unwrap();
