@@ -5,4 +5,4 @@
 	i/request
 )
 
-main = () { request.poll() }
+main = () { request.poll_requests() }

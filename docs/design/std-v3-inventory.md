@@ -654,7 +654,7 @@ cancel : (Ticket) -> ()
 await : (Request(A)) <- (Await) -> A
 await_owned : (Request(A)) <- (Await) -> A
 wait_any : (List(Ticket)) -> ()
-poll : () -> ()
+poll_requests : () -> ()
 ```
 
 **Missing attached type/constructor docs.** `Await`, `Cancelled`, `Owner`, `Ready`, `RequestState`, `Root`, `Taken`, `Waiting`. Module prose may still describe them.
@@ -804,7 +804,7 @@ Export visibility: `Scheduler`, `DetachedScheduler`, `Runner`, `DetachedRunner`,
 Scheduler = ( run = Key(()), root = request.Root, path = Keyed, seed = () -> rng.Generator, witness = Witness, step = (Command) -> StepAnswer, runner = Runner, waiter = request.Await, )
 Scheduler = DetachedScheduler | Scheduler
 DetachedScheduler = ()
-Runner = ( seed = rng.Generator, context = request.Root, policy = Policy, allocate = () -> List(Int), active = (Key(()), Active) -> RunControl, wait = (Key(()), request.Root, List(Ticket)) -> RunControl, poll = (Key(()), List(Ticket), Bool) -> RunControl, forget = (Key(())) -> (), )
+Runner = ( seed = rng.Generator, context = request.Root, policy = Policy, allocate = () -> List(Int), active = (Key(()), Active) -> RunControl, wait = (Key(()), request.Root, List(Ticket)) -> RunControl, poll_work = (Key(()), List(Ticket), Bool) -> RunControl, forget = (Key(())) -> (), )
 Runner = DetachedRunner | Runner
 DetachedRunner = ()
 Scope(E) = (info = ScopeInfo, errors = Key(E))
