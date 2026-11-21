@@ -322,7 +322,7 @@ test("timeout_clock_failure_test", () {
 		assert(
 			r == Error(clock.ClockError(operation = "sleep_ns", code = "boom")),
 		)
-		// R5: the body's final ran before `timeout` returned.
+		// The body's final ran before `timeout` returned (R5).
 		assert(task.get(ran))
 		// The clock's error is not this call's Timeout.
 		assert(r != Error(time.Timeout(after = time.hours(1))))
