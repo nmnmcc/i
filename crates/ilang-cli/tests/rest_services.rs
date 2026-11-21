@@ -10,7 +10,7 @@ fn manifest(name: &str) -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "name = {name:?}\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "name = {name:?}\nhostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }

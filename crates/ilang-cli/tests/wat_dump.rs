@@ -84,7 +84,7 @@ fn wat_dump() {
                 std::fs::write(
                     dir.path().join("i.toml"),
                     format!(
-                        "name = \"spec\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+                        "name = \"spec\"\nhostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
                         root.join("stdlib").to_str().unwrap()
                     ),
                 )

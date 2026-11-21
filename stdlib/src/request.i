@@ -27,6 +27,7 @@
 	take
 	settled
 	cancel
+	wait
 	await
 	await_owned
 	wait_any
@@ -135,6 +136,9 @@ state = <A>(r : Request(A)) -> RequestState(A) {
 		& (Error(2)) { Taken() }
 		& (Error(_)) { panic("request: invalid state") }
 }
+
+/// Waits for the answer and leaves its state alone; `await` also takes it.
+wait = (r) <- (waiter : Await) { waiter.wait(ticket(r)) }
 
 /// Borrows the producer; cancelling this waiter does not cancel its work.
 await = (r) <- (waiter : Await) {

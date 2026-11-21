@@ -8,7 +8,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "[dependencies]\ni = {{ path = {:?} }}\n",
+        "hostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }

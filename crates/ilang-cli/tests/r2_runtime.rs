@@ -13,7 +13,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "[dependencies]\ni = {{ path = {:?} }}\n",
+        "hostcall = true\nlibrary-rows = true\n[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -473,21 +473,21 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
     // a source copy; the IO and continuation queries are unused by this pure unit probe.
     let source = include_str!("../../../stdlib/src/task.i");
     let source = source.replace(
-        "@external(\"ilang:request\", \"observe_change\")\nobserve_change : (Key(())) -> Request(())",
+        "@runtime(\"ilang:request\", \"observe_change\")\nobserve_change : (Key(())) -> Request(())",
         "observe_change = (_root : Key(())) -> Request(()) { request.ready(()) }",
     ).replace(
-        "@external(\"ilang:request\", \"has_work\")\nhas_work : (Ticket) -> Bool",
+        "@runtime(\"ilang:request\", \"has_work\")\nhas_work : (Ticket) -> Bool",
         "has_work = (_ticket : Ticket) -> Bool { False() }",
     );
     let begin = source
-        .find("@external(\"ilang:control\", \"finalizing\")")
+        .find("@runtime(\"ilang:control\", \"finalizing\")")
         .unwrap();
     let end = source[begin..].find("\nFrame = (").unwrap() + begin;
     let source = source[..begin].to_string()
         + "finalizing = <A, R, N, B, M>(\n\t_k: Continuation(A, R, N),\n\t_b: Boundary(B, M)\n) -> Bool { False() }\n"
         + &source[end..];
     let begin = source
-        .find("@external(\"ilang:worker\", \"enabled\")")
+        .find("@runtime(\"ilang:worker\", \"enabled\")")
         .unwrap();
     let end = source[begin..].find("\ndrop_shares = ").unwrap() + begin;
     let source = source[..begin].to_string()
@@ -506,8 +506,8 @@ fn recorded_failures_use_lexicographic_paths_with_prefixes_first() {
            worker_share_get = (_run: Key(()), _address: Address) -> List(Keyed) { [] }\n\
            worker_share_drop = (_run: Key(()), _address: Address) -> () { () }\n"
         + &source[end..];
-    assert!(!source.contains("@external(\"ilang:request\""));
-    assert!(!source.contains("@external(\"ilang:worker\""));
+    assert!(!source.contains("@runtime(\"ilang:request\""));
+    assert!(!source.contains("@runtime(\"ilang:worker\""));
     let source = source
         + r#"
 
@@ -657,7 +657,7 @@ fn task_run_discharges_scheduler_in_the_printed_entry_need() {
     assert!(
         shown
             .lines()
-            .any(|line| line == "app/main.main : () <- (Assert, Fail(Never), task.Runner) -> ()"),
+            .any(|line| line == "app/main.main : () <- (Assert, Fail(Never)) -> ()"),
         "{shown}"
     );
 }

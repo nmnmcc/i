@@ -18,7 +18,7 @@ fn check_status(files: &[(&str, &str)], status: i32) -> String {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            "name = \"app\"\nhostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
             library.to_str().unwrap()
         ),
     )

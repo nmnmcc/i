@@ -1658,7 +1658,10 @@ impl<'a> Resolver<'a> {
     /// A need written in program source may not name an implicit service:
     /// inference carries them. The library `i` binds and forwards them.
     fn implicit_written(&mut self, t: &Type) {
-        if self.in_library() || self.p.implicit_services.is_empty() {
+        if self.in_library()
+            || self.graph.packages[self.p.module(self.cur).package].library_rows
+            || self.p.implicit_services.is_empty()
+        {
             return;
         }
         match &t.kind {

@@ -1116,6 +1116,7 @@ i/request.take : (Request(A)) -> A
 i/request.settled : (Ticket) -> Bool
 i/request.cancel : (Ticket) -> ()
 i/request.state : (Request(A)) -> RequestState(A)
+i/request.wait : (Request(A)) -> ()
 i/request.await : (Request(A)) -> A
 i/request.await_owned : (Request(A)) -> A
 i/request.wait_any : (List(Ticket)) -> ()

@@ -94,7 +94,7 @@ fn run_http_program(source: &str) {
     std::fs::write(
         project.path().join("i.toml"),
         format!(
-            "name = \"http_test\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            "name = \"http_test\"\nhostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
             library.to_str().unwrap()
         ),
     )
@@ -452,7 +452,7 @@ fn http_stream_request_body() {
     std::fs::write(
         project.path().join("i.toml"),
         format!(
-            "name = \"http_stream_test\"\n[dependencies]\ni = {{ path = {:?} }}\n",
+            "name = \"http_stream_test\"\nhostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
             library.to_str().unwrap()
         ),
     )

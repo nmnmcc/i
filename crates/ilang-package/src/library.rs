@@ -45,5 +45,6 @@ pub(crate) fn add(graph: &mut PackageGraph) {
         entries: Vec::new(),
         location: None,
         hostcall: true,
+        library_rows: true,
     });
 }

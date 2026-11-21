@@ -262,6 +262,8 @@ pub struct Package {
     pub location: Option<PackageLocation>,
     /// `hostcall = true` in its manifest; always on for the library `i`.
     pub hostcall: bool,
+    /// Written implicit services are accepted in this package's need rows.
+    pub library_rows: bool,
 }
 
 impl Package {
@@ -671,6 +673,7 @@ impl Loader {
                 .collect(),
             location: None,
             hostcall: manifest.hostcall || manifest.name == LIBRARY_NAME,
+            library_rows: manifest.library_rows || manifest.name == LIBRARY_NAME,
         });
         self.by_dir.insert(dir.clone(), id);
         self.stack.push(Node::Dir(dir.clone()));
@@ -757,6 +760,7 @@ impl Loader {
             entries: Vec::new(),
             location: Some(loc.clone()),
             hostcall: manifest.hostcall || manifest.name == LIBRARY_NAME,
+            library_rows: manifest.library_rows || manifest.name == LIBRARY_NAME,
         });
         self.by_key.insert(key.clone(), id);
         // A package got by location may not have path dependencies.

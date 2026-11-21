@@ -124,8 +124,8 @@ cancel_owned = () { cancel_probe(True()) }
 
 cancel_borrowed = () { cancel_probe(False()) }
 
-ready_wait = <A>(r : Request(A)) <- (await : request.Await) {
-	await.wait(request.ticket(r))
+ready_wait = <A>(r : Request(A)) {
+	request.wait(r)
 }
 
 // §5.4 race-then-read: the losing waiter never owns the producer.
