@@ -29,6 +29,35 @@ fn scalar_requirement(ty: &Ty) -> bool {
 
 /// The names of the custom types as the module `m` writes them: the types
 /// of other modules with the name of their module.
+/// The type of `make_<T>`, `() -> T(A…)`, and its type variables: those
+/// of the type definition.
+pub(crate) fn service_accessor_type(p: &Program, t: TypeId, span: Span) -> (Type, Vec<TyVarId>) {
+    let params = p.ty(t).params.iter().map(|(_, v)| *v).collect::<Vec<_>>();
+    let result = Type {
+        kind: TypeKind::Named {
+            ty: TypeRef::Custom(t),
+            args: params
+                .iter()
+                .map(|v| Type {
+                    kind: TypeKind::Var(*v),
+                    span,
+                })
+                .collect(),
+        },
+        span,
+    };
+    let ty = Type {
+        kind: TypeKind::Fn {
+            params: Vec::new(),
+            ret: Box::new(result),
+            err: None,
+            env: None,
+        },
+        span,
+    };
+    (ty, params)
+}
+
 pub(super) fn type_names(p: &Program, m: ModuleId) -> Vec<String> {
     let here = p.module(m);
     p.types
@@ -204,6 +233,7 @@ impl<'a> Checker<'a> {
             fail: find("Fail"),
         };
         solver.row_params = row_parameters(p);
+        solver.hidden_needs = std::sync::Arc::new(p.implicit_services.clone());
         Checker {
             p,
             sources,
@@ -283,7 +313,15 @@ impl<'a> Checker<'a> {
                 }
             }
             for (di, d) in m.defs.iter().enumerate() {
-                if let DefKind::External { ty, ty_vars, .. } = &d.kind {
+                let accessor;
+                let declared = match &d.kind {
+                    DefKind::ServiceAccessor { ty } => {
+                        accessor = service_accessor_type(p, *ty, d.span);
+                        Some((&accessor.0, accessor.1.as_slice()))
+                    }
+                    kind => kind.declared(),
+                };
+                if let Some((ty, ty_vars)) = declared {
                     self.check_places(ty, Pol::Pos, 0);
                     self.s.level = 1;
                     self.new_tyvars(ty_vars);
@@ -351,12 +389,10 @@ impl<'a> Checker<'a> {
             .enumerate()
             .flat_map(|(mi, module)| {
                 module.defs.iter().enumerate().filter_map(move |(di, def)| {
-                    (def.exported || matches!(def.kind, DefKind::External { .. })).then_some(
-                        DefId {
-                            module: ModuleId(mi as u32),
-                            index: di as u32,
-                        },
-                    )
+                    (def.exported || def.kind.declared().is_some()).then_some(DefId {
+                        module: ModuleId(mi as u32),
+                        index: di as u32,
+                    })
                 })
             })
             .filter_map(|id| self.defs.get(&id).cloned())
@@ -389,7 +425,7 @@ impl<'a> Checker<'a> {
                 };
                 let opts = display::Opts {
                     mono: true,
-                    written: matches!(d.kind, DefKind::External { .. }),
+                    written: d.kind.declared().is_some(),
                 };
                 // A partial result may omit a recursive scheme only after
                 // the failure has been diagnosed.
@@ -2121,11 +2157,15 @@ impl<'a> Checker<'a> {
                             .cloned()
                             .unwrap_or_else(Knowledge::unknown)
                     }
-                    DefKind::External { .. } => Knowledge::certain(scheme.map_or(Ty::Top, |s| {
-                        let k = display::known(&self.s, &s.ty, s.level);
-                        self.note_general(&k);
-                        k
-                    })),
+                    DefKind::External { .. }
+                    | DefKind::Runtime { .. }
+                    | DefKind::ServiceAccessor { .. } => {
+                        Knowledge::certain(scheme.map_or(Ty::Top, |s| {
+                            let k = display::known(&self.s, &s.ty, s.level);
+                            self.note_general(&k);
+                            k
+                        }))
+                    }
                 };
                 let t = match self.defs.get(d).cloned() {
                     Some(s) => self.instantiate(&s),
@@ -2965,7 +3005,9 @@ impl<'a> Checker<'a> {
             ExprKind::Name(ValueRef::Local(v)) => Some(*v),
             ExprKind::Name(ValueRef::Def(d)) => match self.p.def(*d).kind {
                 DefKind::Binding { var, .. } => Some(var),
-                DefKind::External { .. } => None,
+                DefKind::External { .. }
+                | DefKind::Runtime { .. }
+                | DefKind::ServiceAccessor { .. } => None,
             },
             _ => None,
         }

@@ -38,7 +38,7 @@ pub(crate) fn visit_module<'h>(p: &'h Program, m: ModuleId, f: &mut dyn FnMut(No
         visit_binding(&b.binding, f);
     }
     for d in &module.defs {
-        if let DefKind::External { ty, .. } = &d.kind {
+        if let Some((ty, _)) = d.kind.declared() {
             visit_type(ty, f);
         }
     }
@@ -256,7 +256,10 @@ impl Query<'_> {
             Target::Local(v) => types = self.var_types(*v),
             Target::Def(d) => match &self.program.def(*d).kind {
                 DefKind::Binding { var, .. } => types = self.var_types(*var),
-                DefKind::External { ty, .. } => named_types_deep(ty, &mut types),
+                DefKind::External { ty, .. } | DefKind::Runtime { ty, .. } => {
+                    named_types_deep(ty, &mut types)
+                }
+                DefKind::ServiceAccessor { ty } => types.push(TypeRef::Custom(*ty)),
             },
             Target::Ctor(c) => types.push(TypeRef::Custom(c.ty)),
             Target::Field(fields) => {

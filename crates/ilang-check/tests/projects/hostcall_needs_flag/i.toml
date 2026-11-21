@@ -1,0 +1,6 @@
+name = "app"
+hostcall = "yes"
+
+[dependencies]
+i = { path = "../../../../../stdlib" }
+dep = { path = "dep" }

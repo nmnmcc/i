@@ -88,6 +88,12 @@ pub mod code {
     pub const COMPILER_CAPABILITY: &str = "E0322";
     pub const HOST_TYPE: &str = "E0320";
     pub const EXPORT_NAME_TWICE: &str = "E0321";
+    pub const HOSTCALL_NEEDS_FLAG: &str = "E0323";
+    pub const IMPLICIT_SERVICE_WRITTEN: &str = "E0325";
+    pub const IMPORT_ARGS: &str = "E0326";
+    pub const IMPORT_PLACE: &str = "E0327";
+    pub const IMPORT_NAMESPACE: &str = "E0328";
+    pub const IMPORT_TYPE_EXPORT: &str = "E0329";
     pub const DEPRECATED: &str = "W0301";
     // Order.
     pub const NEEDS_ITSELF: &str = "E0401";
