@@ -235,7 +235,7 @@ jobs:
     name: lint and test (rust, other crates)
     needs: changes
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       CHECKS_TEST_GROUP: rest
     steps:
@@ -290,7 +290,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -337,7 +337,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -396,7 +396,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -441,7 +441,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
