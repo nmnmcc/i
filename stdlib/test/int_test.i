@@ -75,17 +75,26 @@ test("parse_leading_zero_test", () {
 })
 
 test("parse_empty_test", () {
-	assert(fail.catch(() { int.parse("") }) == Error(()))
+	assert(
+		fail.catch(() { int.parse("") }) ==
+			Error(int.IntError(offset = 0, reason = "empty")),
+	)
 	()
 })
 
 test("parse_invalid_test", () {
-	assert(fail.catch(() { int.parse("what") }) == Error(()))
+	assert(
+		fail.catch(() { int.parse("what") }) ==
+			Error(int.IntError(offset = 0, reason = "invalid digit")),
+	)
 	()
 })
 
 test("parse_float_test", () {
-	assert(fail.catch(() { int.parse("1.23") }) == Error(()))
+	assert(
+		fail.catch(() { int.parse("1.23") }) ==
+			Error(int.IntError(offset = 1, reason = "invalid digit")),
+	)
 	()
 })
 
@@ -100,17 +109,31 @@ test("base_parse_hex_negative_test", () {
 })
 
 test("base_parse_base_1_test", () {
-	assert(fail.catch(() { int.parse_base("100", 1) }) == Error(()))
+	assert(
+		fail.catch(() { int.parse_base("100", 1) }) ==
+			Error(int.IntError(offset = 0, reason = "base out of range")),
+	)
 	()
 })
 
 test("base_parse_base_37_test", () {
-	assert(fail.catch(() { int.parse_base("100", 37) }) == Error(()))
+	assert(
+		fail.catch(() { int.parse_base("100", 37) }) ==
+			Error(int.IntError(offset = 0, reason = "base out of range")),
+	)
 	()
 })
 
 test("base_parse_invalid_hex_test", () {
-	assert(fail.catch(() { int.parse_base("AG", 16) }) == Error(()))
+	assert(
+		fail.catch(() { int.parse_base("AG", 16) }) ==
+			Error(
+				int.IntError(
+					offset = 1,
+					reason = "digit out of range for base",
+				),
+			),
+	)
 	()
 })
 
@@ -910,12 +933,42 @@ test("parse_more_test", () {
 		fail.catch(() { int.parse("123456789012345678901234567890") }) ==
 			Ok(123456789012345678901234567890),
 	)
-	assert(fail.catch(() { int.parse("") }) == Error(()))
-	assert(fail.catch(() { int.parse("-") }) == Error(()))
-	assert(fail.catch(() { int.parse("1_000") }) == Error(()))
-	assert(fail.catch(() { int.parse(" 1") }) == Error(()))
-	assert(fail.catch(() { int.parse("1e3") }) == Error(()))
-	assert(fail.catch(() { int.parse("٣") }) == Error(()))
+	assert(
+		fail.catch(() { int.parse("") }) ==
+			Error(int.IntError(offset = 0, reason = "empty")),
+	)
+	assert(
+		fail.catch(() { int.parse("-") }) ==
+			Error(int.IntError(offset = 1, reason = "missing digits")),
+	)
+	assert(
+		fail.catch(() { int.parse("1_000") }) ==
+			Error(int.IntError(offset = 1, reason = "invalid digit")),
+	)
+	assert(
+		fail.catch(() { int.parse(" 1") }) ==
+			Error(int.IntError(offset = 0, reason = "invalid digit")),
+	)
+	assert(
+		fail.catch(() { int.parse("1e3") }) ==
+			Error(int.IntError(offset = 1, reason = "invalid digit")),
+	)
+	assert(
+		fail.catch(() { int.parse("٣") }) ==
+			Error(int.IntError(offset = 0, reason = "invalid digit")),
+	)
+})
+
+test("parse_error_reasons_test", () {
+	assert(
+		fail.catch(() { int.parse("nope") }) ==
+			Error(int.IntError(offset = 0, reason = "invalid digit")),
+	)
+	assert(fail.catch(() { int.parse("-42") }) == Ok(-42))
+	assert(
+		core.inspect(fail.catch(() { int.parse("12x") })) ==
+			"Error(IntError(offset = 2, reason = \"invalid digit\"))",
+	)
 })
 
 test("parse_base_more_test", () {
@@ -923,9 +976,23 @@ test("parse_base_more_test", () {
 	assert(fail.catch(() { int.parse_base("FF", 16) }) == Ok(255))
 	assert(fail.catch(() { int.parse_base("-101", 2) }) == Ok(-5))
 	assert(fail.catch(() { int.parse_base("z", 36) }) == Ok(35))
-	assert(fail.catch(() { int.parse_base("2", 2) }) == Error(()))
-	assert(fail.catch(() { int.parse_base("1", 1) }) == Error(()))
-	assert(fail.catch(() { int.parse_base("1", 37) }) == Error(()))
+	assert(
+		fail.catch(() { int.parse_base("2", 2) }) ==
+			Error(
+				int.IntError(
+					offset = 0,
+					reason = "digit out of range for base",
+				),
+			),
+	)
+	assert(
+		fail.catch(() { int.parse_base("1", 1) }) ==
+			Error(int.IntError(offset = 0, reason = "base out of range")),
+	)
+	assert(
+		fail.catch(() { int.parse_base("1", 37) }) ==
+			Error(int.IntError(offset = 0, reason = "base out of range")),
+	)
 })
 
 test("to_base_more_test", () {
