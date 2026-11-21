@@ -954,6 +954,63 @@ fn deps_lists_the_packages_and_their_permissions() {
     );
 }
 
+/// A package and its dependency both set `hostcall = true`: `i add` shows it
+/// as new, `i deps` shows it under both, and `i build` names both once, in
+/// the same order, before it writes the artifact.
+#[test]
+fn deps_and_build_show_the_hostcall_switch() {
+    let w = World::new();
+    let dir = w.project(
+        "app",
+        &[
+            ("i.toml", &format!("hostcall = true\n{}", app_toml())),
+            ("src/main.i", " (x)\n\nx = 1\n"),
+        ],
+    );
+    let project = dir.display().to_string();
+    w.project(
+        "util",
+        &[
+            ("i.toml", "name = \"util\"\nhostcall = true\n"),
+            ("src/math.i", " (one)\n\none = 1\n"),
+        ],
+    );
+    let util = w.path().join("util").display().to_string();
+    let out = w.ok(&["add", "util", "--path", &util, "--project", &project]);
+    assert!(
+        out.contains("new permission: util (path ../util) can use hostcall\n"),
+        "{out}"
+    );
+    let out = w.ok(&["deps", "--project", &project]);
+    assert_eq!(
+        out,
+        "app (this package)\n  hostcall\n  no host services and no external functions\n\
+         util (path ../util)\n  hostcall\n  no host services and no external functions\n"
+    );
+    let out = w.ok(&["build", "--target", "host", "--project", &project]);
+    assert_eq!(
+        out.lines()
+            .filter(|l| l.starts_with("hostcall: "))
+            .collect::<Vec<_>>(),
+        ["hostcall: <this package>", "hostcall: path ../util"],
+        "{out}"
+    );
+    // `i check` prints nothing about it; with the switch off nothing is shown.
+    assert_eq!(w.ok(&["check", "--project", &project]), "");
+    write(
+        &dir,
+        &[(
+            "i.toml",
+            &read(&dir.join("i.toml")).replace("hostcall = true\n", ""),
+        )],
+    );
+    write(&w.path().join("util"), &[("i.toml", "name = \"util\"\n")]);
+    let out = w.ok(&["build", "--target", "host", "--project", &project]);
+    assert!(!out.contains("hostcall"), "{out}");
+    let out = w.ok(&["deps", "--project", &project]);
+    assert!(!out.contains("hostcall"), "{out}");
+}
+
 // ---- i publish ----
 
 /// A package in its own git repository, with one commit.
@@ -1010,6 +1067,27 @@ fn publish_tags_a_first_version() {
     assert!(err.contains("must be newer than every tag"), "{err}");
     let err = w.fails(&["publish", "0.9.0", "--project", &project]);
     assert!(err.contains("must be newer than every tag"), "{err}");
+}
+
+/// `i publish` shows a package that turns `hostcall` on since its newest tag
+/// as a new permission; keeping it on shows nothing.
+#[test]
+fn publish_shows_hostcall_as_a_new_permission() {
+    let w = World::new();
+    let dir = published(&w, API_1);
+    let project = dir.display().to_string();
+    let out = w.ok(&["publish", "1.0.0", "--project", &project]);
+    assert!(!out.contains("hostcall"), "{out}");
+    let toml = read(&dir.join("i.toml"));
+    write(&dir, &[("i.toml", &format!("hostcall = true\n{toml}"))]);
+    commit(&dir, "hostcall");
+    let out = w.ok(&["publish", "1.0.1", "--project", &project]);
+    assert!(
+        out.contains("new permission: pub can use hostcall\n"),
+        "{out}"
+    );
+    let out = w.ok(&["publish", "1.0.2", "--dry-run", "--project", &project]);
+    assert!(!out.contains("hostcall"), "{out}");
 }
 
 /// A `BrokenPipe` from writing to a child process is a failure, not a
