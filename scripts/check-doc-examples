@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,7 +26,7 @@ DATA = ROOT / 'scripts/check-doc-examples.json'
 DOCS = ('docs/**/*.md', 'docs/**/*.mdx')
 STDLIB = ('stdlib/src/**/*.i', 'stdlib/test/**/*.i')
 MODULE = re.compile(r'(?<![\w/.-])([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)')
-MODULES = {p.stem for p in (ROOT / 'stdlib/src').glob('*.i')}
+MODULES = set()
 SKIP = {'i', 'self', 'main', 'testlib'}
 
 
@@ -60,21 +61,25 @@ def blocks(path):
         yield text[:match.start()].count('\n') + 1, match.group(1)
 
 
-def wrap(source):
-    """A module for the block, plus whether it was wrapped."""
+def wrap(source, path):
+    """A module for the block; blocks without declarations go in `main`."""
+    module_like = (source.lstrip().startswith('(') or
+                   re.search(r'(?m)^[A-Za-z_][\w]*\s*[:(=]', source))
     imports = []
-    for module in sorted(set(MODULE.findall(source))):
-        name = module[0]
-        if name in MODULES and name not in SKIP and not re.search(
-                r'(?m)^\s*\(?%s\b' % re.escape(name), source):
-            imports.append(f'\t{name} = i/{name}')
-    if re.search(r'(?m)^main\s*=', source):
-        head = source
-    elif source.lstrip().startswith('(') and '=' not in source.splitlines()[0]:
+    if not source.lstrip().startswith('('):
+        for module in sorted(set(MODULE.findall(source))):
+            name = module[0]
+            if name in MODULES and name not in SKIP:
+                line = f'\t{name} = i/{name}'
+                if line not in imports:
+                    imports.append(line)
+        group = '(\n\t(Io) = i/io\n' + '\n'.join(imports) + '\n)\n'
+    else:
+        group = ''
+    if module_like:
         head = source
     else:
         head = 'main = () <- (a : Assert, f : Fail(Never), io : Io) {\n' + source + '\n}'
-    group = '(\n\t(Io) = i/io\n' + '\n'.join(imports) + '\n)\n' if imports or True else ''
     return group + head
 
 
@@ -82,49 +87,95 @@ def identity(path, line, source):
     return f'{path}:{line}:{hashlib.sha256(source.encode()).hexdigest()[:12]}'
 
 
-def run(binary, source, directory):
+def run(binary, source, directory, path):
     (directory / 'i.toml').write_text(
         f'name = "example"\n[dependencies]\ni = {{ path = {json.dumps(str(ROOT / "stdlib"))} }}\n')
     (directory / 'src').mkdir()
-    (directory / 'src/main.i').write_text(wrap(source))
+    (directory / 'src/main.i').write_text(wrap(source, path))
     result = subprocess.run([str(binary), 'check', '--offline', '--project', str(directory)],
                             capture_output=True, text=True)
     return result.returncode, result.stderr
 
 
 def main():
+    global ROOT, DATA, MODULES
     parser = argparse.ArgumentParser()
     parser.add_argument('--update', action='store_true', help='rewrite the reasons for current failures')
+    parser.add_argument('--jobs', type=int, default=8)
+    parser.add_argument('--root', type=Path, default=ROOT)
     args = parser.parse_args()
+    ROOT = args.root.resolve()
+    DATA = ROOT / 'scripts/check-doc-examples.json'
+    MODULES = {p.stem for p in (ROOT / 'stdlib/src').glob('*.i')}
     binary = compiler()
     known = json.loads(DATA.read_text()) if DATA.is_file() else {}
     found, failures = 0, []
-    with tempfile.TemporaryDirectory(prefix='doc-examples-') as scratch:
-        directory = Path(scratch)
-        for pattern in DOCS + STDLIB:
-            for path in sorted(ROOT.glob(pattern)):
-                if 'node_modules' in path.parts:
+    work = []
+    for pattern in DOCS + STDLIB:
+        for path in sorted(ROOT.glob(pattern)):
+            if {'node_modules', 'dist'} & set(path.parts):
+                continue
+            relative = str(path.relative_to(ROOT))
+            if relative.startswith(('docs/content/docs/library/generated', 'docs/content/docs/standard/generated')):
+                continue
+            for line, source in blocks(path):
+                if not source.strip():
                     continue
-                relative = str(path.relative_to(ROOT))
-                for line, source in blocks(path):
-                    if not source.strip():
-                        continue
-                    key = identity(relative, line, source)
-                    if key in known:
-                        continue
-                    found += 1
-                    shutil.rmtree(directory, ignore_errors=True)
-                    directory.mkdir()
-                    code, stderr = run(binary, source, directory)
-                    if code:
-                        first = next((x for x in stderr.splitlines() if 'error' in x), stderr.strip().splitlines()[0] if stderr.strip() else 'no output')
-                        failures.append((key, relative, line, first))
+                key = identity(relative, line, source)
+                work.append((key, relative, line, source, path))
+
+    def check(item):
+        key, relative, line, source, path = item
+        directory = Path(tempfile.mkdtemp(prefix='doc-example-'))
+        try:
+            code, stderr = run(binary, source, directory, path)
+            if not code:
+                return None
+            first = next((x for x in stderr.splitlines() if 'error' in x),
+                          stderr.strip().splitlines()[0] if stderr.strip() else 'no output')
+            return (key, relative, line, first)
+        finally:
+            shutil.rmtree(directory, ignore_errors=True)
+
+    passed, skipped = set(), set()
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        for item, result in zip(work, pool.map(check, work)):
+            key = item[0]
+            if result is None:
+                passed.add(key)
+                continue
+            if key in known:
+                skipped.add(key)
+                continue
+            failures.append(result)
+    stale = known.keys() - passed - skipped
+    if stale:
+        for key in sorted(stale):
+            print(f'{key}: stale reason; the block compiles now or its text changed', file=__import__('sys').stderr)
+        for key in stale:
+            del known[key]
+        DATA.write_text(json.dumps(dict(sorted(known.items())), indent=2) + '\n')
+    if failures and args.update:
+        for key, _, _, message in failures:
+            codes = set(re.findall(r'E\d+', message))
+            if codes & {'E0101', 'E0105', 'E0115'}:
+                known[key] = 'fragment: the block is not a complete module'
+            elif codes & {'E0201', 'E0202', 'E0209', 'E0210', 'E0212', 'E0234', 'E0221'}:
+                known[key] = 'context: the block uses names or types declared in the surrounding text'
+            else:
+                known[key] = 'context: the block depends on surrounding declarations'
+        DATA.write_text(json.dumps(dict(sorted(known.items())), indent=2) + '\n')
+        print(f'wrote {len(known)} reasons')
+        return 0
     if failures:
         for key, path, line, message in failures:
             print(f'{path}:{line}: {message}   [{key}]', file=__import__('sys').stderr)
-        print(f'{len(failures)} of {found} checked examples do not compile. Add a reason to {DATA.name}.', file=__import__('sys').stderr)
+        print(f'{len(failures)} of {len(work)} checked examples do not compile. Add a reason to {DATA.name}.', file=__import__('sys').stderr)
         return 1
-    print(f'Document examples checked: {found}.')
+    if stale:
+        print(f'{len(stale)} reasons are stale.', file=__import__('sys').stderr)
+        return 1
+    print(f'Document examples checked: {len(work)}.')
     return 0
 
 

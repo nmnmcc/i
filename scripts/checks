@@ -9,8 +9,9 @@
 #   scripts/checks snippets   every i snippet in the repository parses, or gives its registered
 #                             diagnostics (scripts/check-snippets and its own tests)
 #   scripts/checks doc-paths  every source path and library module the documentation
-#                             names exists (scripts/check-doc-paths and
-#                             scripts/check-doc-modules, with their counterexamples)
+#                             names exists, and every documented example
+#                             compiles (scripts/check-doc-paths, -modules and
+#                             -examples, with their counterexamples)
 #   scripts/checks i          the release `i`, and with it the i sources;
 #                             `scripts/dev-new-machine` proves that a copy of
 #                             that `i` still makes, checks, runs and tests a
@@ -82,6 +83,8 @@ doc-paths() {
   python3 -I scripts/check-doc-paths-test
   python3 -I scripts/check-doc-modules
   python3 -I scripts/check-doc-modules-test
+  python3 -I scripts/check-doc-examples
+  python3 -I scripts/check-doc-examples-test
 }
 
 # The slowest test targets of ilang-cli, which CI runs in a job of their own (cli-heavy);
