@@ -83,8 +83,11 @@ doc-paths() {
   python3 -I scripts/check-doc-paths-test
   python3 -I scripts/check-doc-modules
   python3 -I scripts/check-doc-modules-test
-  python3 -I scripts/check-doc-examples
-  python3 -I scripts/check-doc-examples-test
+  # These need a compiler; the docs job sets I_BIN, a developer may have one built.
+  if [[ -n "${I_BIN:-}" || -x target/release/i ]]; then
+    python3 -I scripts/check-doc-examples
+    python3 -I scripts/check-doc-examples-test
+  fi
 }
 
 # The slowest test targets of ilang-cli, which CI runs in a job of their own (cli-heavy);
