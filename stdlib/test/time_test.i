@@ -281,16 +281,53 @@ test("timeout_expired_test", () {
 })
 
 test("timeout_body_error_test", () {
+	// The deadline is only an upper bound: the body returns in two scheduler
+	// turns (one yield, then the raise), while the timer is an hour away and
+	// is cancelled when the body returns. The body error is the only possible
+	// outcome, so this does not depend on which child wins a race.
+	r = fail.catch(() {
+		time.timeout(time.hours(1), () {
+			task.yield()
+			fail.raise("boom")
+		})
+	})
+	// A body error comes back as-is, never as this call's Timeout.
+	assert(r == Error("boom"))
+	assert(r != Error(time.Timeout(after = time.hours(1))))
+	()
+})
+
+// A clock that cannot install the timer: `sleep_ns` is already failed when it
+// is handed back, so the timer loses no matter how the scheduler orders it.
+failing_clock : clock.Clock = clock.Clock(
+	monotonic_ns = () { request.ready(Ok(0)) },
+	unix_ns = () { request.ready(Ok(0)) },
+	sleep_ns = (n) { request.ready(Error("boom")) },
+)
+
+// The clock-failure path: the body is blocked forever, so the only way
+// `timeout` can return is the failed timer. It must cancel the body, run the
+// body's final, and then return the clock's error, not a Timeout.
+test("timeout_clock_failure_test", () {
+	ran = task.ref(False())
 	{
 		r = fail.catch(() {
-			time.timeout(time.seconds(1), () {
-				task.yield()
-				fail.raise("boom")
+			time.timeout(time.hours(1), () {
+				resource.ensure(
+					() { task.sync(task.never()) },
+					() { task.set(ran, True()) },
+				)
 			})
 		})
-		assert(r == Error("boom"))
+		assert(
+			r == Error(clock.ClockError(operation = "sleep_ns", code = "boom")),
+		)
+		// R5: the body's final ran before `timeout` returned.
+		assert(task.get(ran))
+		// The clock's error is not this call's Timeout.
+		assert(r != Error(time.Timeout(after = time.hours(1))))
 		()
-	} <- (unused_clock)
+	} <- (failing_clock)
 })
 
 test("timeout_bad_deadline_test", () {
