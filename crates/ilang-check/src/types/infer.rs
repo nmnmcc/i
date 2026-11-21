@@ -1905,7 +1905,9 @@ impl<'a> Checker<'a> {
                     .collect();
                 let ret = self.conv(ret, local);
                 let env = match env {
-                    Some(e) if !matches!(e.kind, TypeKind::Hole) => self.conv_mode(e, local, Mode::Env),
+                    Some(e) if !matches!(e.kind, TypeKind::Hole) => {
+                        self.conv_mode(e, local, Mode::Env)
+                    }
                     _ => Ty::Never,
                 };
                 Ty::Fn(Box::new(FnTy::new(params, ret, env)))
