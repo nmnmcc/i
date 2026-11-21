@@ -3,8 +3,12 @@
 # to end through the `i-bin` package.
 #
 # Pushing a `v*` tag is the only way to publish: only then does the `publish`
-# job run and create (or update) the GitHub release. Pull-request runs are dry
-# runs; they build, package, verify and upload Actions artifacts, nothing more.
+# job run and create (or update) the GitHub release.
+#
+# A pull-request run is a gate, so it must be minutes: it restores the archive
+# built by the nightly run on main (same Nix inputs) and smokes it in a
+# container without Nix. Only a cache miss builds. A cold build is the Nix
+# store closure, not `i`; see docs/development.md.
 #
 # After a successful tag run, copy the entries of the `i-bin-fragment`
 # artifact (also shown in the run summary) into `nix/release.nix`.
@@ -18,10 +22,16 @@ on:
       - '.github/workflows/release.yml'
       - 'flake.nix'
       - 'flake.lock'
-      - 'nix/i.nix'
-      - 'nix/i-bin.nix'
-      - 'nix/package.py'
-      - 'nix/release.nix'
+      - 'nix/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'crates/**/Cargo.toml'
+      - 'crates/**/build.rs'
+      - 'rust-toolchain.toml'
+  # Fills the archive cache that pull-request gates restore, so a gate is a
+  # smoke test rather than a cold build.
+  schedule:
+    - cron: '0 3 * * *'
   workflow_dispatch:
 
 # Read only for the build jobs; `publish` raises it for the tag run.
@@ -72,29 +82,51 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: false
+      # The gate is the smoke test below, not a rebuild: the archive is keyed
+      # by every input that changes the build (the flake pins, the packaging
+      # script, the manifests) and by the platform. A tag never restores: a
+      # release builds the tree it names.
+      - name: Restore the archive
+        id: archive
+        if: github.event_name == 'pull_request' || github.event_name == 'schedule'
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: dist
+          key: i-archive-${{ matrix.system }}-${{ hashFiles('nix/**', 'flake.lock', 'Cargo.lock', 'Cargo.toml', 'crates/**/Cargo.toml', 'crates/**/build.rs', 'rust-toolchain.toml') }}
+      - name: Read the cached version
+        if: steps.archive.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          echo "VERSION=$(sed -n 's/^version=//p' dist/i-bin-${{ matrix.platform }}.txt)" >> "$GITHUB_ENV"
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+        if: steps.archive.outputs.cache-hit != 'true'
         with:
           extra-conf: |
             always-allow-substitutes = true
       - uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
+        if: steps.archive.outputs.cache-hit != 'true'
         with:
           use-flakehub: disabled
           use-gha-cache: enabled
           source-revision: cd88146e8de45fc50afaee98634fea04249c3c13
       - name: Read the version
+        if: steps.archive.outputs.cache-hit != 'true'
         run: echo "VERSION=$(nix eval --raw .#packages.${{ matrix.system }}.i.version)" >> "$GITHUB_ENV"
       - name: Build i
+        if: steps.archive.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
           start=$(date +%s)
           out=$(nix build --print-out-paths .#packages.${{ matrix.system }}.i -L)
           ln -sfn "$out" result-i
-          echo "Built \`i\` $VERSION for ${{ matrix.platform }} in $(( $(date +%s) - start )) s." >> "$GITHUB_STEP_SUMMARY"
+          seconds=$(( $(date +%s) - start ))
+          echo "Built \`i\` $VERSION for ${{ matrix.platform }} in $seconds s."
+          echo "cold build: $(( (seconds + 59) / 60 )) min for ${{ matrix.platform }}" | tee -a "$GITHUB_STEP_SUMMARY"
       # Independent evidence for Darwin: only system libraries, no store
       # paths. This is what decides whether i-bin can be installed elsewhere.
       - name: Check the Darwin dependencies of i
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.archive.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -111,7 +143,7 @@ jobs:
       # resolve through this machine's store. v0.1.0 passed every other check
       # here and still could not start without `/nix`.
       - name: Check the Linux dependencies of i
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && steps.archive.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -149,7 +181,30 @@ jobs:
             echo "$stored" >&2
             exit 1
           fi
+      # `i new` resolves the newest `stdlib-vX.Y.Z` through git, and the
+      # published tag is the *released* library, which an unreleased compiler
+      # may not build. Serve this checkout's library under the tag `i new`
+      # will ask for; the container smoke mounts the same directory.
+      - name: Prepare the library for the smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          library="$RUNNER_TEMP/library"
+          # A version no published tag can have. If the `file://` mapping
+          # ever stops working, `i new` asks for this version and fails
+          # loudly instead of resolving the real, older library and passing
+          # (or failing with errors that look like a compiler bug).
+          smoke_version="$VERSION-dev.$(git rev-parse --short=12 HEAD)"
+          echo "SMOKE_VERSION=$smoke_version" >> "$GITHUB_ENV"
+          rm -rf "$library"
+          cp -a stdlib "$library"
+          chmod -R u+w "$library"
+          git -C "$library" init -q
+          git -C "$library" -c user.email=i@example.invalid -c user.name=i add -A
+          git -C "$library" -c user.email=i@example.invalid -c user.name=i commit -qm "library $smoke_version"
+          git -C "$library" -c user.email=i@example.invalid -c user.name=i tag "stdlib-v$smoke_version"
       - name: Smoke test
+        if: steps.archive.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -159,11 +214,28 @@ jobs:
           mkdir -p "$work/home"
           cd "$work"
           export HOME="$work/home"
-          "$i" new demo
-          out=$("$i" run --project demo)
+          export ILANG_GIT_URLS="github.com/nmnmcc/i=file://$RUNNER_TEMP/library"
+          # The smoke must not reach the network: with one, it can resolve a
+          # library that has nothing to do with this checkout and still pass.
+          # `file://` above is the only source, and Linux runs it in an empty
+          # network namespace to prove that. macOS has no `unshare -n`, so it
+          # relies on the single source plus the version assertion below: one
+          # step weaker. The container step is `--network none` on Linux.
+          if [ "$(uname -s)" = Linux ]; then
+            run=(sudo env "HOME=$HOME" "PATH=$PATH" "ILANG_GIT_URLS=$ILANG_GIT_URLS" unshare -n --)
+          else
+            run=(env)
+          fi
+          "${run[@]}" "$i" new demo
+          grep -qF "github.com/nmnmcc/i//stdlib@$SMOKE_VERSION" demo/i.toml
+          echo "library: $(grep -F 'github.com/nmnmcc/i//stdlib@' demo/i.toml)"
+          out=$("${run[@]}" "$i" run --project demo)
           echo "$out"
           test "$out" = "Hello, demo!"
+          "${run[@]}" "$i" build >/dev/null
+          test "$(./build/demo)" = "Hello, demo!"
       - name: Package
+        if: steps.archive.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -180,11 +252,31 @@ jobs:
           echo "NAME=$name" >> "$GITHUB_ENV"
           echo "URL=$url" >> "$GITHUB_ENV"
           { echo "### ${{ matrix.platform }}"; echo '```'; cat "dist/i-bin-${{ matrix.platform }}.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Read the cached archive
+        if: steps.archive.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=$(ls dist/i-*-${{ matrix.platform }}.tar.gz)
+          echo "NAME=$(basename "$file")" >> "$GITHUB_ENV"
+          echo "The archive is from the cache; the container smoke below is the gate." >> "$GITHUB_STEP_SUMMARY"
       # The archive has to run on a machine that has no Nix at all. This is
       # the only step that would have caught v0.1.0: `nix build` and the
       # `i-bin` install pass on a machine with `/nix` whatever the archive
       # names as its loader. No continue-on-error; a failure fails the run,
       # and `publish` needs this job.
+      - name: Prepare the smoke image
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # git for `i new`, binutils and file for the static assertions. The
+          # image is built here; the smoke itself then runs without network.
+          docker build -q -t i-smoke - <<'DOCKER'
+          FROM debian:stable-slim
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+                git binutils file >/dev/null && rm -rf /var/lib/apt/lists/*
+          DOCKER
       - name: Run the archive in a container without Nix
         if: runner.os == 'Linux'
         shell: bash
@@ -196,32 +288,39 @@ jobs:
           test -x "$extracted/bin/i"
           # debian:stable-slim has no git, and `i new` resolves the newest
           # `stdlib-vX.Y.Z` through it. A dry run's tag is not published, so
-          # serve the library from this checkout over a mounted repository.
+          # the prepared library is mounted instead.
           library="$RUNNER_TEMP/library"
-          rm -rf "$library"
-          cp -a stdlib "$library"
-          chmod -R u+w "$library"
-          git -C "$library" init -q
-          git -C "$library" -c user.email=i@example.invalid -c user.name=i add -A
-          git -C "$library" -c user.email=i@example.invalid -c user.name=i commit -qm "library $VERSION"
-          git -C "$library" -c user.email=i@example.invalid -c user.name=i tag "stdlib-v$VERSION"
-          docker run --rm \
+          test -d "$library/.git"
+          docker run --rm --network none \
             -v "$extracted:/d:ro" \
             -v "$library:/library:ro" \
             -e "ILANG_GIT_URLS=github.com/nmnmcc/i=file:///library" \
             -e "VERSION=$VERSION" \
-            debian:stable-slim sh -c '
+            -e "SMOKE_VERSION=$SMOKE_VERSION" \
+            i-smoke sh -c '
               set -eu
-              export DEBIAN_FRONTEND=noninteractive
               export PATH="/d/bin:$PATH"
-              apt-get update -qq
-              apt-get install -y -qq --no-install-recommends git >/dev/null 2>&1
+              # The archive must be static in itself, not merely start because
+              # this container happens to carry a library. Same evidence as the
+              # build job, taken inside the container.
+              binary=$(command -v i)
+              file "$binary"
+              if readelf -l "$binary" | grep -q "Requesting program interpreter"; then
+                echo "i names an ELF interpreter; it will not start without it" >&2
+                exit 1
+              fi
+              if objdump -p "$binary" | grep -qE "^[[:space:]]+(NEEDED|RPATH|RUNPATH)"; then
+                echo "i needs shared libraries or carries an RPATH" >&2
+                exit 1
+              fi
               # The mounts belong to the runner user; the container is root.
               git config --global --add safe.directory "*"
               test "$(i --version)" = "i $VERSION"
               cd /tmp
               i new demo
               cd demo
+              grep -qF "github.com/nmnmcc/i//stdlib@$SMOKE_VERSION" i.toml
+              echo "library: $(grep -F 'github.com/nmnmcc/i//stdlib@' i.toml)"
               out=$(i run)
               test "$out" = "Hello, demo!"
               # The native executable `i build` writes embeds the runner the
@@ -232,6 +331,7 @@ jobs:
             '
           echo "The archive ran in a container without Nix." >> "$GITHUB_STEP_SUMMARY"
       - name: Verify the archive as i-bin
+        if: steps.archive.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -249,7 +349,7 @@ jobs:
           test "$(./result-i-bin/bin/i --version)" = "i $VERSION"
           test "$(./result-i-bin/bin/i --version)" = "$(./result-i/bin/i --version)"
       - name: Check the Darwin dependencies of i-bin
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.archive.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
