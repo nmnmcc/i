@@ -1779,7 +1779,7 @@ fn build_and_check_explain_an_old_syntax_dependency_tag() {
             "{err}"
         );
         assert!(
-            err.contains("use a newer version of the package, or an older version of `i`"),
+            err.contains("use a version of the package that is written in this syntax"),
             "{err}"
         );
     }
@@ -1804,7 +1804,7 @@ fn publish_skips_an_old_syntax_interface_and_allows_a_patch() {
     commit(&dir, "new syntax");
     let out = w.ok(&["publish", "1.0.1", "--project", dir.to_str().unwrap()]);
     assert!(
-        out.contains("the interface of `v1.0.0` is in the syntax from before"),
+        out.contains("the interface of `v1.0.0` is not in the syntax that `i`"),
         "{out}"
     );
     assert!(out.contains("check the interface by hand"), "{out}");

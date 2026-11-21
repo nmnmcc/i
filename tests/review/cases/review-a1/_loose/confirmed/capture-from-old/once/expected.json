@@ -11,7 +11,7 @@
       ],
       "exit": 1,
       "stdout": "",
-      "stderr": "src/types.i:2:15: error[E0101]: expected an expression, found `)`\nsrc/types.i:3:5: error[E0101]: a type definition is `Name = right side`; the constructor list `Name { … }` is removed: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`\nnote: src/types.i: if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`\n2 errors\n"
+      "stderr": "src/types.i:2:15: error[E0101]: expected an expression, found `)`\nsrc/types.i:3:5: error[E0101]: a type definition is `Name = right side`: write each constructor as its own labelled type, `C = (…)`, and the sum as `Name = C1 | C2`\nnote: src/types.i: a header is a group `(…)`, without `import` or `export`; a match is written `e |> (pattern) { value } & (_) { other }`, not `case e { … }`; a guard is written `? condition`, not `if condition`\n2 errors\n"
     }
   }
 }

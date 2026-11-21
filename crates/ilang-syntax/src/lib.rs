@@ -127,10 +127,10 @@ pub fn old_syntax_hint(source: &str) -> Option<&'static str> {
     };
     if old_syntax_marks(source) || has("import") || has("export") || has("case") {
         Some(
-            "if this is old syntax: replace `import (…)` and `export (…)` with header groups `(…)`, and `case e { … }` with `e |> (pattern) { value } & (_) { other }`; write guards with `?` instead of `if`",
+            "a header is a group `(…)`, without `import` or `export`; a match is written `e |> (pattern) { value } & (_) { other }`, not `case e { … }`; a guard is written `? condition`, not `if condition`",
         )
     } else if has("if") {
-        Some("if this is an old clause guard, replace `if condition` with `? condition`")
+        Some("a clause guard is written `? condition`, not `if condition`")
     } else {
         None
     }
