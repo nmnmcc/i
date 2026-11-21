@@ -21,12 +21,12 @@ read_count = (extra) <- (input : Input) { int.parse(input.read()) + extra }
 ```
 
 ```text
-tour/main.read_count : (Int) <- (Fail(()), Input) -> Int
+tour/main.read_count : (Int) <- (Fail(int.IntError), Input) -> Int
 ```
 
 - `(Int)` says the argument is an integer.
 - `Input` after `<-` names the service used to read text.
-- `Fail(())` says invalid text raises `()` through a service in that same list.
+- `Fail(int.IntError)` says invalid text raises `int.IntError`, an offset and a reason, through a service in that same list.
 - `-> Int` says the result is an integer.
 
 ## Tour pages
@@ -116,7 +116,7 @@ main = () <- (io : Io) {
 
 ```text
 Ok(42)
-Error(())
+Error(IntError(offset = 0, reason = "invalid digit"))
 ```
 
 `fail.catch` supplies `Fail` while the callback runs.
@@ -141,8 +141,8 @@ read_text = (extra) { int.to_string(read_count(extra)) }
 ```
 
 ```text
-tour/main.read_count : (Int) <- (Fail(()), Input) -> Int
-tour/main.read_text : (Int) <- (Fail(()), Input) -> String
+tour/main.read_count : (Int) <- (Fail(int.IntError), Input) -> Int
+tour/main.read_text : (Int) <- (Fail(int.IntError), Input) -> String
 ```
 
 Text conversion changes the result type and keeps the service needs.
@@ -167,11 +167,11 @@ fixed_count = (extra) { read_count(extra) <- (Input(read = () { "40" })) }
 ```
 
 ```text
-tour/main.read_count : (Int) <- (Fail(()), Input) -> Int
-tour/main.fixed_count : (Int) <- (Fail(())) -> Int
+tour/main.read_count : (Int) <- (Fail(int.IntError), Input) -> Int
+tour/main.fixed_count : (Int) <- (Fail(int.IntError)) -> Int
 ```
 
-The function provides `Input`, so its callers still need `Fail(())`.
+The function provides `Input`, so its callers still need `Fail(int.IntError)`.
 
 ## Scratch project
 
