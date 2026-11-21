@@ -1,0 +1,8 @@
+# spec: 10.4
+# expect: compile-error E0325
+# host-boundary §5.5 rule 1: `Root` is not written in a need row, also on main.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

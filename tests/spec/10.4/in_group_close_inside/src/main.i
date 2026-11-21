@@ -1,0 +1,21 @@
+(
+	i/hostcall
+)
+
+(
+	Svc(..)
+	main
+)
+
+// A "now" field: `call` needs no wait for it.
+@import("app:x/v1", "now")
+Svc = (ping = () -> Int)
+
+main = () {
+	s = Svc(ping = () { 1 })
+	g = hostcall.group()
+	hostcall.in_group(g, () {
+		hostcall.close(g)
+		hostcall.call(() { s.ping() })
+	})
+}

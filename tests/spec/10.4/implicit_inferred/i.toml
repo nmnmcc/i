@@ -1,0 +1,9 @@
+# spec: 10.4
+# expect: pass
+# host-boundary §5.5 rule 1: with the needs left out, inference carries
+# `Await`, `Owner` and `Root`, and a value parameter `root : Root` stays.
+name = "app"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }
