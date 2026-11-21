@@ -142,6 +142,15 @@ pub fn stub(p: &Program, t: &Typed, entry: DefId, target: Target) -> Result<Stub
         }
     }
     stub.is_async = target != Wasi && (stub.is_async || stub.tasks);
+    // Every start of a host service that answers later is made under the
+    // ambient `Owner`. The implicit services are ambient, so a need does not
+    // show them (a closure passed through a library function drops them):
+    // an entry that waits for the host always opens the request root.
+    if stub.is_async {
+        stub.root = true;
+        stub.owner = true;
+        stub.await_ = true;
+    }
     if errors.is_empty() {
         Ok(stub)
     } else {

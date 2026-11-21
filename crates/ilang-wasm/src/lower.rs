@@ -766,7 +766,7 @@ pub(crate) fn lower_tests_numeric(
     let mut all_stubs: Vec<_> = platform::stubs(program, typed, options.target.platform())
         .into_iter()
         .collect();
-    mark_later_entries(program, &mut all_stubs);
+    mark_later_entries(program, typed, &mut all_stubs);
     for (entry, stub) in all_stubs {
         if program.module(entry.module).kind == ModuleKind::Test
             && (!options.tests || options.target == ir::Target::Wasi)
@@ -823,9 +823,13 @@ pub(crate) fn lower_tests_numeric(
 }
 
 /// Whether `later` is reachable from the entry through HIR references,
-/// including function bodies made in an activated body.
+/// including function bodies made in an activated body. The implicit
+/// services are ambient, so an entry's need does not show them: an entry
+/// that reaches a function needing `Runner` or `Scheduler` runs in
+/// `task.run`, as an entry that names them does.
 fn mark_later_entries(
     program: &hir::Program,
+    typed: &Typed,
     stubs: &mut [(DefId, Result<platform::Stub, Vec<Diagnostic>>)],
 ) {
     let mut later = BTreeSet::new();
@@ -857,17 +861,34 @@ fn mark_later_entries(
             }
         }
     }
-    if later.is_empty() {
+    let [_, _, _, runner, scheduler] = platform::request_types(program);
+    let tasks_types: Vec<TypeRef> = [runner, scheduler]
+        .into_iter()
+        .flatten()
+        .map(TypeRef::Custom)
+        .collect();
+    if later.is_empty() && tasks_types.is_empty() {
         return;
     }
     let mut edges: std::collections::HashMap<DefId, BTreeSet<DefId>> =
         std::collections::HashMap::new();
-    for m in &program.modules {
+    let mut tasks = BTreeSet::new();
+    for (mi, m) in program.modules.iter().enumerate() {
+        let module = ModuleId(mi as u32);
         for b in &m.bindings {
-            let mut set = BTreeSet::new();
+            let mut set = Refs::default();
             refs(&b.binding.value, &mut set);
+            let needs_tasks = set.envs.iter().any(|span| {
+                typed
+                    .services
+                    .get(&(module, *span))
+                    .is_some_and(|t| tasks_types.contains(t))
+            });
             for d in b.defs.iter().copied() {
-                edges.entry(d).or_default().extend(set.iter().copied());
+                edges.entry(d).or_default().extend(set.defs.iter().copied());
+                if needs_tasks {
+                    tasks.insert(d);
+                }
             }
         }
     }
@@ -876,9 +897,11 @@ fn mark_later_entries(
         let mut seen = BTreeSet::from([*entry]);
         let mut queue = vec![*entry];
         let mut found = false;
+        let mut found_tasks = false;
         while let Some(d) = queue.pop() {
-            if later.contains(&d) {
-                found = true;
+            found |= later.contains(&d);
+            found_tasks |= tasks.contains(&d);
+            if found && found_tasks {
                 break;
             }
             if let Some(next) = edges.get(&d) {
@@ -889,7 +912,12 @@ fn mark_later_entries(
                 }
             }
         }
-        if found {
+        if found_tasks && !stub.tasks {
+            stub.tasks = true;
+            stub.is_async |= stub.target != platform::Target::Wasi;
+        }
+        if found || stub.is_async {
+            // An async entry opens the request root (`platform::stub`).
             stub.is_async = true;
             stub.root = true;
             stub.owner = true;
@@ -898,7 +926,15 @@ fn mark_later_entries(
     }
 }
 
-fn refs_block(b: &hir::Block, out: &mut BTreeSet<DefId>) {
+/// What a top-level value refers to: the definitions it names, and the
+/// spans of the names of the environment parameters of its functions.
+#[derive(Default)]
+struct Refs {
+    defs: BTreeSet<DefId>,
+    envs: Vec<Span>,
+}
+
+fn refs_block(b: &hir::Block, out: &mut Refs) {
     for s in &b.stmts {
         match s {
             hir::Stmt::Bind(b) => refs(&b.value, out),
@@ -907,10 +943,10 @@ fn refs_block(b: &hir::Block, out: &mut BTreeSet<DefId>) {
     }
 }
 
-fn refs(e: &hir::Expr, out: &mut BTreeSet<DefId>) {
+fn refs(e: &hir::Expr, out: &mut Refs) {
     match &e.kind {
         hir::ExprKind::Name(hir::ValueRef::Def(d)) => {
-            out.insert(*d);
+            out.defs.insert(*d);
         }
         hir::ExprKind::Tuple(ts) | hir::ExprKind::List { items: ts, .. } => {
             ts.iter().for_each(|t| refs(t, out))
@@ -921,7 +957,14 @@ fn refs(e: &hir::Expr, out: &mut BTreeSet<DefId>) {
         }
         hir::ExprKind::BitArray(segs) => segs.iter().for_each(|s| refs(&s.value, out)),
         hir::ExprKind::Block(b) => refs_block(b, out),
-        hir::ExprKind::Fn(f) => refs_block(&f.body, out),
+        hir::ExprKind::Fn(f) => {
+            for p in &f.params {
+                if let hir::Param::Env { name, .. } = p {
+                    out.envs.push(name.span);
+                }
+            }
+            refs_block(&f.body, out)
+        }
         hir::ExprKind::Multi(gs) => gs.iter().for_each(|g| refs(&g.value, out)),
         hir::ExprKind::Case { subject, clauses } => {
             refs(subject, out);
@@ -994,7 +1037,7 @@ pub(crate) fn lower_selected_numeric(
     );
     let stub = platform::stub(program, typed, target, options.target.platform())?;
     let mut pair = vec![(target, Ok(stub))];
-    mark_later_entries(program, &mut pair);
+    mark_later_entries(program, typed, &mut pair);
     let (_, stub) = pair.pop().expect("one stub");
     let stub = stub.expect("the stub was Ok");
     l.specialize_equality = numeric == crate::Numeric::Scalars;
