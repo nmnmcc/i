@@ -23,6 +23,9 @@
   "crates/ilang-binaryen/build.rs:2032fbb8c77ca19f": {
     "not_source": "Cargo build instruction"
   },
+  "crates/ilang-binaryen/build.rs:6524d878578afb5f": {
+    "not_source": "Cargo build instruction"
+  },
   "crates/ilang-check/src/types/display.rs:e790f23ba7dd9bcd": {
     "not_source": "Rendered type variable name"
   },
