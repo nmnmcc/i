@@ -13,7 +13,7 @@
     "generate": "python3 scripts/generate-standard.py && python3 scripts/generate-library-test && python3 scripts/generate-library.py && python3 scripts/generate-design-index.py",
     "prebuild": "npm run generate && python3 ../scripts/check-doc-modules",
     "predev": "npm run generate && python3 ../scripts/check-doc-modules",
-    "check:links": "npm run check:spec-links && npm run check:fonts && npm run check:selector && python3 scripts/check-links.py && python3 ../scripts/check-doc-modules-test",
+    "check:links": "npm run check:spec-links && npm run check:fonts && npm run check:selector && python3 scripts/check-links.py && python3 ../scripts/check-doc-modules-test && python3 scripts/library-baseline-test",
     "check:spec-links": "python3 scripts/check-spec-links-test && python3 scripts/check-spec-links.py",
     "check:placeholders": "python3 scripts/check-placeholders-test && python3 scripts/check-placeholders.py",
     "check:rendering": "python3 scripts/check-example-rendering.py",

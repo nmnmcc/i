@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Make library pages with checked value signatures and complete type definitions."""
 from pathlib import Path
-import io
 import json
 import os
 import re
 import subprocess
-import tarfile
+import library_baseline
 from spec_links import unlink_spec_references
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,35 +16,10 @@ HEAVY = next((path for path in (ROOT.parent / 'cache/heavy', ROOT / '.rd/cache/h
               if path.is_file()), None)
 
 
-def library_root():
-    """The library the site documents: the tree being built.
-
-    A tag names a released library, and the released compiler is the one that
-    builds it. This tree carries the constructor change, which no released
-    compiler builds yet, so the site documents the checkout and marks it
-    unpublished; return to a tag when 0.2.0 and its compiler ship together.
-    """
-    override = os.environ.get('LIBRARY_ROOT')
-    if override:
-        return Path(override).resolve()
-    if not os.environ.get('LIBRARY_TAG'):
-        return ROOT / 'stdlib'
-    tag = os.environ.get('LIBRARY_TAG')
-    archive = subprocess.run(['git', '-C', str(ROOT), 'archive', f'{tag}:stdlib'],
-                             capture_output=True, check=True).stdout
-    destination = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag)
-    directory = destination / 'stdlib'
-    if directory.is_dir():
-        return directory
-    directory.mkdir(parents=True)
-    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        tar.extractall(directory, filter='data')
-    return directory
-
-
-TAG = os.environ.get('LIBRARY_TAG')
-VERSION = TAG.removeprefix('stdlib-v') if TAG else None
-LIBRARY = library_root()
+BASELINE = library_baseline.current(ROOT)
+TAG = BASELINE.tag
+VERSION = BASELINE.version
+LIBRARY = BASELINE.root
 
 
 def checked_types(project):
