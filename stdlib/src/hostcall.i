@@ -140,11 +140,11 @@ with_wait = (w : Wait, body) {
 /// ambient group, without awaiting it. A fake (a closure that is not an
 /// import field) is called now and its result is a ready Call.
 @runtime("ilang:hostcall", "call")
-call : <A, N>(() <- (..N, req.Await, req.Owner) -> A) <- (..N, req.Await) -> Call(A)
+call : <A, N>(() <- (..N, req.Await, req.Owner) -> A) <- (..N, req.Await, req.Owner) -> Call(A)
 
 /// `call` in the group `g`.
 @runtime("ilang:hostcall", "call_in")
-call_in : <A, N>(CallGroup, () <- (..N, req.Await, req.Owner) -> A) <- (..N, req.Await) -> Call(A)
+call_in : <A, N>(CallGroup, () <- (..N, req.Await, req.Owner) -> A) <- (..N, req.Await, req.Owner) -> Call(A)
 
 terminal = (state) {
 	state |>
