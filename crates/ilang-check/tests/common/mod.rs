@@ -2,6 +2,7 @@
 
 #![allow(dead_code)]
 
+pub mod golden;
 pub mod tree;
 
 use ilang_check::hir::{Def, ModuleId, Program};
