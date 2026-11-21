@@ -8,6 +8,7 @@
 	i/json
 	i/schema
 	i/bit_array
+	i/resource
 )
 
 User = (name = String, age = Int)
@@ -87,9 +88,11 @@ handle = (req : http.Request) {
 }
 
 main = () {
-	listener = net.listen("127.0.0.1", 0)
-	stdio.print(
-		"listening " <> core.inspect(net.local_port(listener)),
-	)
-	task.run(() { http.serve(listener, handle) })
+	resource.scoped(() {
+		listener = net.listen("127.0.0.1", 0)
+		stdio.print(
+			"listening " <> core.inspect(net.local_port(listener)),
+		)
+		task.run(() { http.serve(listener, handle) })
+	})
 }

@@ -44,50 +44,66 @@ fn tls_round_trip_and_certificate_validation() {
  i/tls
  i/task
  i/fail
+ i/resource
 )
 
 main = () {{
- listener = net.listen("127.0.0.1", 0)
- port = net.local_port(listener)
- ident = tls.identity(<<{server:?}:utf8>>, <<{key:?}:utf8>>)
- opts = (..tls.options(), alpn = ["test"], roots = <<{ca:?}:utf8>>)
- task.run(() {{
-  task.scope((scope) {{
-   task.go(scope, () {{
-    stream = tls.accept(net.accept(listener), ident, opts)
-    assert(tls.alpn(stream) == "test")
-    assert(tls.read(stream, 4) == <<"ping":utf8>>)
-    tls.write(stream, <<"pong":utf8>>)
-    tls.close(stream)
+ resource.scoped(() {{
+  listener = net.listen("127.0.0.1", 0)
+  port = net.local_port(listener)
+  ident = tls.identity(<<{server:?}:utf8>>, <<{key:?}:utf8>>)
+  opts = (..tls.options(), alpn = ["test"], roots = <<{ca:?}:utf8>>)
+  task.run(() {{
+   task.scope((scope) {{
+    task.go(scope, () {{
+     resource.scoped(() {{
+      stream = tls.accept(net.accept(listener), ident, opts)
+      assert(tls.alpn(stream) == "test")
+      assert(tls.read(stream, 4) == <<"ping":utf8>>)
+      tls.write(stream, <<"pong":utf8>>)
+     }})
+    }})
+    resource.scoped(() {{
+     stream = tls.dial("localhost", port, opts)
+     assert(tls.alpn(stream) == "test")
+     flow = tls.byte_stream(stream)
+     flow.write(<<"ping":utf8>>)
+     assert(flow.read(4) == <<"pong":utf8>>)
+     ()
+    }})
    }})
-   stream = tls.dial("localhost", port, opts)
-   assert(tls.alpn(stream) == "test")
-   flow = tls.byte_stream(stream)
-   flow.write(<<"ping":utf8>>)
-   assert(flow.read(4) == <<"pong":utf8>>)
-   tls.close(stream)
-   ()
+  }})
+  task.run(() {{
+   task.scope((scope) {{
+    server = task.go(scope, () {{
+     resource.scoped(() {{
+      fail.catch(() {{ tls.accept(net.accept(listener), ident, opts) }})
+     }})
+    }})
+    resource.scoped(() {{
+     result = fail.catch(() {{ tls.dial("localhost", port, tls.options()) }})
+     result |> (Error(tls.TlsError(stage = stage, reason = _))) {{ assert(stage == "certificate") }} & (_) {{ panic("expected certificate error") }}
+    }})
+    task.join(server)
+    ()
+   }})
+  }})
+  task.run(() {{
+   task.scope((scope) {{
+    server = task.go(scope, () {{
+     resource.scoped(() {{
+      fail.catch(() {{ tls.accept(net.accept(listener), ident, opts) }})
+     }})
+    }})
+    resource.scoped(() {{
+     result = fail.catch(() {{ tls.connect(net.connect("localhost", port), "wrong.example", opts) }})
+     result |> (Error(tls.TlsError(stage = stage, reason = _))) {{ assert(stage == "certificate") }} & (_) {{ panic("expected name error") }}
+    }})
+    task.join(server)
+    ()
+   }})
   }})
  }})
- task.run(() {{
-  task.scope((scope) {{
-   server = task.go(scope, () {{ fail.catch(() {{ tls.accept(net.accept(listener), ident, opts) }}) }})
-   result = fail.catch(() {{ tls.dial("localhost", port, tls.options()) }})
-   result |> (Error(tls.TlsError(stage = stage, reason = _))) {{ assert(stage == "certificate") }} & (_) {{ panic("expected certificate error") }}
-   task.join(server)
-   ()
-  }})
- }})
- task.run(() {{
-  task.scope((scope) {{
-   server = task.go(scope, () {{ fail.catch(() {{ tls.accept(net.accept(listener), ident, opts) }}) }})
-   result = fail.catch(() {{ tls.connect(net.connect("localhost", port), "wrong.example", opts) }})
-   result |> (Error(tls.TlsError(stage = stage, reason = _))) {{ assert(stage == "certificate") }} & (_) {{ panic("expected name error") }}
-   task.join(server)
-   ()
-  }})
- }})
- net.close_listener(listener)
 }}
 "#,
         server = server.pem(),
