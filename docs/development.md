@@ -107,6 +107,23 @@ with `--sync-keys` after adding or removing units.
 Release archives are built with `./scripts/dev-release`; see
 [release packaging](release.md).
 
+The release workflow's cold path is the **Nix store closure, not `i`**. A pin
+change (`flake.lock`, or a package low in the closure such as `tzdata`) makes
+the runner rebuild `rust-minimal`, `curl` and the Python packages from source,
+which can take hours; the compiler itself is minutes. That cost is why a
+pull-request run restores the archive built by the nightly run on `main` (same
+Nix inputs, keyed per platform) and only smokes it in a container without
+`/nix`; a tag still builds the tree it names and publishes it. Do not optimise
+the compiler for the cold path.
+
+The smoke is offline. Linux runs it in an empty network namespace and the
+container with `--network none`; macOS has no `unshare -n` and relies on the
+single `ILANG_GIT_URLS` source plus an assertion on the version in `i.toml`,
+which is one step weaker. The library the smoke serves is tagged with
+`<flake version>-dev.<commit>`, a version no published tag can have, so a
+broken redirect asks for a tag that does not exist and fails loudly instead of
+resolving the released, older library.
+
 ## Editor support
 
 `i lsp` runs the language server (`crates/ilang-lsp`) on standard input and
