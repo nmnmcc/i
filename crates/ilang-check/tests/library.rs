@@ -201,7 +201,7 @@ fn library_names() {
                 "to_text",
             ],
         ),
-        ("i/io", &[]),
+        ("i/io", &["make_io"]),
         (
             "i/task",
             &[
@@ -238,7 +238,7 @@ fn library_names() {
                 "map_concurrently",
             ],
         ),
-        ("i/clock", &["monotonic_ns", "unix_ns", "sleep_ns"]),
+        ("i/clock", &["make_clock", "monotonic_ns", "unix_ns", "sleep_ns"]),
         (
             "i/random",
             &["from_seed", "word", "int", "float", "split", "at_path"],
@@ -246,6 +246,7 @@ fn library_names() {
         (
             "i/fs",
             &[
+                "make_fs",
                 "open",
                 "read",
                 "write",
@@ -267,6 +268,11 @@ fn library_names() {
         (
             "i/process",
             &[
+                "make_arguments",
+                "make_entropy",
+                "make_environment",
+                "make_process",
+                "make_working_directory",
                 "args",
                 "env",
                 "cwd",
@@ -287,6 +293,7 @@ fn library_names() {
         (
             "i/net",
             &[
+                "make_net",
                 "bind",
                 "send_to",
                 "receive_from",
@@ -309,6 +316,7 @@ fn library_names() {
         (
             "i/tls",
             &[
+                "make_tls",
                 "options",
                 "identity",
                 "connect",
@@ -322,10 +330,11 @@ fn library_names() {
                 "byte_stream",
             ],
         ),
-        ("i/fetch", &["open", "status", "headers", "read", "close"]),
+        ("i/fetch", &["make_fetch", "open", "status", "headers", "read", "close"]),
         (
             "i/stdio",
             &[
+                "make_stdio",
                 "read",
                 "write",
                 "write_error",
@@ -352,11 +361,14 @@ fn library_names() {
     // Every primitive of `i/core` is an external of `ilang:core` with its
     // own name.
     for d in &program.module(common::module(&program, "i/core")).defs {
-        let DefKind::External {
-            module, function, ..
-        } = &d.kind
-        else {
-            panic!("{} is not external", d.name)
+        let (module, function) = match &d.kind {
+            DefKind::External {
+                module, function, ..
+            }
+            | DefKind::Runtime {
+                module, function, ..
+            } => (module, function),
+            _ => panic!("{} is not external", d.name),
         };
         assert_eq!(
             (module.as_str(), function.as_str()),

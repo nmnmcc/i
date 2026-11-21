@@ -19,11 +19,11 @@
 )
 
 /// The `width` bits at `start`, big endian, as a number from 0.
-@external("ilang:bits", "read_unsigned")
+@runtime("ilang:bits", "read_unsigned")
 read_unsigned : (BitArray, Int, Int) -> Int
 
 /// `value`, from 0 to 2^width - 1, as `width` bits, big endian.
-@external("ilang:bits", "from_unsigned")
+@runtime("ilang:bits", "from_unsigned")
 from_unsigned : (Int, Int) -> BitArray
 
 /// The Int in the `width` bits of `bits` at `start`.

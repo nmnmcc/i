@@ -1,4 +1,5 @@
 name = "i"
+hostcall = true
 
 [test]
 collection = "i/test.tests"

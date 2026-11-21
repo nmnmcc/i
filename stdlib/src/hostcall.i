@@ -81,16 +81,16 @@ RequestState(A) = req.RequestState(A)
 
 /// Whether the group with this key is still open (not closed, and its Root
 /// not closed).
-@external("ilang:hostcall", "group_live")
+@runtime("ilang:hostcall", "group_live")
 group_live : (Key(())) -> Bool
 
 /// Whether the Root with this key is still open.
-@external("ilang:hostcall", "root_live")
+@runtime("ilang:hostcall", "root_live")
 root_live : (Key(())) -> Bool
 
 /// Moves a request into the group with this key; a settled request only
 /// changes its provenance.
-@external("ilang:hostcall", "adopt")
+@runtime("ilang:hostcall", "adopt")
 move_to : <A>(Request(A), Key(())) -> Request(A)
 
 // ---- Groups ----
@@ -139,12 +139,12 @@ with_wait = (w : Wait, body) {
 /// Starts `op`, one direct field call of an `@import` service, in the
 /// ambient group, without awaiting it. A fake (a closure that is not an
 /// import field) is called now and its result is a ready Call.
-@external("ilang:hostcall", "call")
-call : <A>(() -> A) -> Call(A)
+@runtime("ilang:hostcall", "call")
+call : <A, N>(() <- (..N, req.Await, req.Owner) -> A) <- (..N, req.Await) -> Call(A)
 
 /// `call` in the group `g`.
-@external("ilang:hostcall", "call_in")
-call_in : <A>(CallGroup, () -> A) -> Call(A)
+@runtime("ilang:hostcall", "call_in")
+call_in : <A, N>(CallGroup, () <- (..N, req.Await, req.Owner) -> A) <- (..N, req.Await) -> Call(A)
 
 terminal = (state) {
 	state |>
