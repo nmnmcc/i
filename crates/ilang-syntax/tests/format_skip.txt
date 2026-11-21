@@ -1,41 +1,41 @@
-parse crates/ilang-check/tests/projects/package_deps/lib/test/broken.i
-parse crates/ilang-check/tests/projects/syntax_error/src/main.i
-parse editors/vscode/test/sample.i
-parse tests/review/cases/review-rec/_loose/probes/src/main.i
-parse tests/review/cases/review-runtime/echo-types/src/task.i
-parse tests/review/cases/review-s6/probe/src/main.i
-parse tests/review/cases/review-std1/factory/src/main.i
-parse tests/review/cases/review-std1/tree/src/main.i
-parse tests/review/cases/review-std1/variance/src/main.i
-parse tests/spec/1.7/a1_same_line_negative.i
-parse tests/spec/1.7/a1_same_line_tuple.i
-parse tests/spec/1.7/annotation_pipe_declaration_error.i
-parse tests/spec/1.7/one_binding_function_error.i
-parse tests/spec/2.2/a1_empty_header.i
-parse tests/spec/2.2/a1_header_order.i
-parse tests/spec/2.2/a1_macro_attribute_same_line.i
-parse tests/spec/3/syn2_old_empty_record_type.i
-parse tests/spec/3/syn2_old_error_marker.i
-parse tests/spec/3/syn2_old_record_type.i
-parse tests/spec/4.6/written_poly_union.i
-parse tests/spec/4.6/written_poly_union_arity.i
-parse tests/spec/6/a1_wrong_pattern.i
-parse tests/spec/6/interpolation_import.i
-parse tests/spec/6/interpolation_literal_type.i
-parse tests/spec/6/interpolation_pattern.i
-parse tests/spec/6/interpolation_record_label.i
-parse tests/spec/6/interpolation_type_label.i
-parse tests/spec/6/multiline_close.i
-parse tests/spec/6/multiline_open.i
-parse tests/spec/6/multiline_underindent.i
-parse tests/spec/6/raw_string_bad_escape.i
-parse tests/spec/6/raw_string_unterminated.i
-parse tests/spec/6/syn2_mixed_tuple.i
-parse tests/spec/6/syn2_old_brace_record.i
-parse tests/spec/6/syn2_old_mixed_tuple.i
-parse tests/spec/7/annotation_pipe_binding_error.i
-parse tests/spec/7/annotation_pipe_data_error.i
-parse tests/spec/7/annotation_pipe_result_error.i
-parse tests/spec/7/keyed_data_order.i
-parse tests/spec/7/suffix_nonliteral.i
-parse tests/spec/7/suffix_two_binders.i
+parse crates/ilang-check/tests/projects/package_deps/lib/test/broken.i 047e24477825
+parse crates/ilang-check/tests/projects/syntax_error/src/main.i 4e8d73dce44c
+parse editors/vscode/test/sample.i d42e50dc40f6
+parse tests/review/cases/review-rec/_loose/probes/src/main.i 2a7f4d241afb
+parse tests/review/cases/review-runtime/echo-types/src/task.i fe8ea750b99a
+parse tests/review/cases/review-s6/probe/src/main.i 85a35332c772
+parse tests/review/cases/review-std1/factory/src/main.i 4dedc4d85675
+parse tests/review/cases/review-std1/tree/src/main.i 142b5def7034
+parse tests/review/cases/review-std1/variance/src/main.i c6d5ff42726b
+parse tests/spec/1.7/a1_same_line_negative.i f8d9f6bc7e3c
+parse tests/spec/1.7/a1_same_line_tuple.i f4e20738a142
+parse tests/spec/1.7/annotation_pipe_declaration_error.i 4b5fb314e8a5
+parse tests/spec/1.7/one_binding_function_error.i 5d21e0454eed
+parse tests/spec/2.2/a1_empty_header.i 2c925e0810c7
+parse tests/spec/2.2/a1_header_order.i 52945d872b33
+parse tests/spec/2.2/a1_macro_attribute_same_line.i 55f0d1248542
+parse tests/spec/3/syn2_old_empty_record_type.i a26d7c6408ce
+parse tests/spec/3/syn2_old_error_marker.i a6dbc45b51be
+parse tests/spec/3/syn2_old_record_type.i b738ff1c09a6
+parse tests/spec/4.6/written_poly_union.i ffec57640d8b
+parse tests/spec/4.6/written_poly_union_arity.i 003471a33db2
+parse tests/spec/6/a1_wrong_pattern.i 9ac1376f35bf
+parse tests/spec/6/interpolation_import.i a964c4fc0b44
+parse tests/spec/6/interpolation_literal_type.i 164194205e3a
+parse tests/spec/6/interpolation_pattern.i b0365b01c4e4
+parse tests/spec/6/interpolation_record_label.i 31829ad11685
+parse tests/spec/6/interpolation_type_label.i 7dd804107558
+parse tests/spec/6/multiline_close.i 0b813138b881
+parse tests/spec/6/multiline_open.i ce1867af458d
+parse tests/spec/6/multiline_underindent.i 806db0224689
+parse tests/spec/6/raw_string_bad_escape.i f3602ab7c4f0
+parse tests/spec/6/raw_string_unterminated.i 4def175b684f
+parse tests/spec/6/syn2_mixed_tuple.i 6f901451a389
+parse tests/spec/6/syn2_old_brace_record.i 58a358bab4da
+parse tests/spec/6/syn2_old_mixed_tuple.i 3cf036a839ea
+parse tests/spec/7/annotation_pipe_binding_error.i bb986879dfdf
+parse tests/spec/7/annotation_pipe_data_error.i 135273214530
+parse tests/spec/7/annotation_pipe_result_error.i c4adeb2e5def
+parse tests/spec/7/keyed_data_order.i fe6edcbccc45
+parse tests/spec/7/suffix_nonliteral.i 5c1462754f1e
+parse tests/spec/7/suffix_two_binders.i c45cc2e8c208
