@@ -44,6 +44,7 @@ test(`fetch provider at O${opt}: GET POST headers status timeout cancel refused 
 	i/task
 	i/http
 	i/bit_array
+	i/resource
 	(Some, None) = i/option
 )
 
@@ -95,13 +96,15 @@ status = (url: String) {
 }
 timeout = (url: String) {
 	checked(() {
-		text(
-			http.send_timeout(
-				http.client().send,
-				http.request(http.Method("GET"), url),
-				20000000,
-			),
-		)
+		resource.scoped(() {
+			text(
+				http.send_timeout(
+					http.client().send,
+					http.request(http.Method("GET"), url),
+					20000000,
+				),
+			)
+		})
 	})
 }
 cancel = (url: String) {
@@ -117,17 +120,19 @@ cancel = (url: String) {
 }
 stream = (url: String) {
 	checked(() {
-		reader = http.send_stream(http.request(http.Method("GET"), url))
-		first = reader.read(5)
-		assert(first == <<"first":utf8>>)
-		assert(
-			text(http.get(url <> "/advance")) == "advanced",
-		)
-		second = reader.read(6)
-		assert(second == <<"second":utf8>>)
-		assert(reader.read(1) == <<>>)
-		reader.close()
-		"stream ok"
+		resource.scoped(() {
+			reader = http.send_stream(http.request(http.Method("GET"), url))
+			first = reader.read(5)
+			assert(first == <<"first":utf8>>)
+			assert(
+				text(http.get(url <> "/advance")) == "advanced",
+			)
+			second = reader.read(6)
+			assert(second == <<"second":utf8>>)
+			assert(reader.read(1) == <<>>)
+			reader.close()
+			"stream ok"
+		})
 	})
 }
 `);

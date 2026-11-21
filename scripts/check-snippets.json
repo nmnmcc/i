@@ -2215,7 +2215,7 @@
     ],
     "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
   },
-  "crates/ilang-cli/tests/tls.rs:4c73e28c2d6baaa7": {
+  "crates/ilang-cli/tests/tls.rs:21114513b8e1a882": {
     "substitutions": [
       [
         "{server:?}",
