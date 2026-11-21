@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""Counterexamples for the plan/summary gate.
+
+Two shapes must hold, at the level of the plan artifact and the required
+summary check rather than a live run:
+
+  docs-only   a change to `docs/` plans every Rust job as skipped; the summary
+              passes with markers for the jobs that do run, and fails if one
+              of the skipped jobs reports as run;
+  rust        a change that sets `rust` plans the Rust jobs, including the std
+              workers shards, and the summary fails when one of their markers
+              is missing or a dependency was cancelled.
+
+The job list of the plan and the `needs` of the summary are one table
+(`JOBS` in scripts/ci/plan); this test pins the two ends: what the filters say
+about a job, and what the summary accepts as a complete run.
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+PLAN = ROOT / 'scripts/ci/plan'
+SUMMARY = ROOT / 'scripts/ci/summary'
+WORKERS_JOB = 'std_workers'
+WORKERS_NAMES = ['run (i, std, workers, 1/2)', 'run (i, std, workers, 2/2)']
+
+
+def plan(changed, out):
+    result = subprocess.run(
+        [sys.executable, '-I', str(PLAN), '--changed', json.dumps(changed), '--out', str(out)],
+        cwd=ROOT, text=True, capture_output=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    expected = json.loads((out / 'expected.json').read_text())
+    print(f'  plan({changed}): ' + ', '.join(
+        f'{e["job"]}={"runs" if e["runs"] else "skipped"}' for e in expected))
+    return expected
+
+
+def summary(expected, results, markers):
+    with tempfile.TemporaryDirectory() as directory:
+        directory = Path(directory)
+        (directory / 'expected.json').write_text(json.dumps(expected))
+        (directory / 'markers').mkdir()
+        for index, name in enumerate(markers):
+            (directory / 'markers' / str(index)).write_text(name)
+        env = dict(os.environ, NEEDS=json.dumps(
+            {e['job']: {'result': results[e['job']]} for e in expected}))
+        return subprocess.run(
+            [sys.executable, '-I', str(SUMMARY), '--expected', str(directory / 'expected.json'),
+             '--markers', str(directory / 'markers')],
+            cwd=ROOT, text=True, capture_output=True, env=env,
+        )
+
+
+def markers_for(expected):
+    return [name for e in expected if e['runs'] for name in e['names']]
+
+
+def results_for(expected, cancelled=()):
+    return {e['job']: 'cancelled' if e['job'] in cancelled else
+            ('success' if e['runs'] else 'skipped') for e in expected}
+
+
+def by_job(expected, job):
+    return next(e for e in expected if e['job'] == job)
+
+
+def main():
+    with tempfile.TemporaryDirectory() as directory:
+        directory = Path(directory)
+
+        print('docs-only')
+        docs = plan({'rust': False, 'docs': True, 'editors': False}, directory / 'docs')
+        for job in ('check_tests', 'value_types', 'cli_tests', 'spec', 'corpus', 'std', WORKERS_JOB):
+            assert not by_job(docs, job)['runs'], f'{job} must be skipped by a docs-only change'
+        workers = by_job(docs, WORKERS_JOB)
+        assert workers['names'] == WORKERS_NAMES, workers['names']
+        assert summary(docs, results_for(docs), markers_for(docs)).returncode == 0, \
+            summary(docs, results_for(docs), markers_for(docs)).stdout
+        # A job the plan calls skipped cannot report as run.
+        bad = results_for(docs)
+        bad['check_tests'] = 'success'
+        failed = summary(docs, bad, markers_for(docs))
+        assert failed.returncode == 1, 'a skipped job that ran must fail the summary'
+        assert 'but the path filters skip it' in failed.stdout, failed.stdout
+
+        print('rust')
+        rust = plan({'rust': True, 'docs': False, 'editors': False}, directory / 'rust')
+        assert by_job(rust, WORKERS_JOB)['runs'], 'a rust change must run the std workers shards'
+        assert by_job(rust, WORKERS_JOB)['names'] == WORKERS_NAMES
+        passed = summary(rust, results_for(rust), markers_for(rust))
+        assert passed.returncode == 0, passed.stdout + passed.stderr
+
+        # The required check must name the missing new shard.
+        without = [name for name in markers_for(rust) if name not in WORKERS_NAMES]
+        missing = summary(rust, results_for(rust), without)
+        assert missing.returncode == 1, 'a rust change without the workers shards must fail'
+        for name in WORKERS_NAMES:
+            assert f'missing: {name}' in missing.stdout, missing.stdout
+
+        # A run cancelled by a newer push is not a pass.
+        cancelled = summary(rust, results_for(rust, cancelled={'check_tests'}), markers_for(rust))
+        assert cancelled.returncode == 1, 'a cancelled dependency must fail the summary'
+        assert 'job check_tests: result cancelled' in cancelled.stdout, cancelled.stdout
+
+    print('plan and summary counterexamples pass.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
