@@ -3950,12 +3950,14 @@ impl<'a> Checker<'a> {
                 // A function with a written value type carries the implicit
                 // services its body may use.
                 let mut row = vec![renv];
-                row.extend(
-                    self.p
-                        .implicit_services
-                        .iter()
-                        .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new())),
-                );
+                if let Ty::Union(ms) = &env {
+                    for id in &self.p.implicit_services {
+                        let t = Ty::named(TypeRef::Custom(*id), Vec::new());
+                        if ms.contains(&t) {
+                            row.push(t);
+                        }
+                    }
+                }
                 renv = self.env_union(row, f.span);
                 // The written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and

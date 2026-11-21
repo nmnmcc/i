@@ -1524,16 +1524,28 @@ impl<'a> Resolver<'a> {
                         valid = false;
                     }
                 }
+                // An imported field's implicit services are ambient; they
+                // do not belong in the field type.
+                if valid
+                    && let TypeKind::Fn { env: Some(env), .. } = &mut wire.kind
+                {
+                    *env = Box::new(self.without_implicit(env));
+                }
                 let signature = valid.then(|| self.host_fn(&wire, true)).flatten();
                 if let Some(mut hf) = signature {
                     hf.request_result = wrapped;
                     self.p.host_fns.insert((TypeId(t as u32), i as u32), hf);
+                    let mut field = f.ty.clone();
+                    if imported
+                        && let TypeKind::Fn { env: Some(env), .. } = &mut field.kind
+                    {
+                        *env = Box::new(self.without_implicit(env));
+                    }
                     if asynchronous {
-                        let field = f.ty.clone();
-                        let field = self.waiting_needs_in(module, field, !raw);
-                        if let TypeBody::Custom(cs) = &mut self.p.types[t].body {
-                            cs[0].fields[i].ty = field;
-                        }
+                        field = self.waiting_needs_in(module, field, !raw);
+                    }
+                    if let TypeBody::Custom(cs) = &mut self.p.types[t].body {
+                        cs[0].fields[i].ty = field;
                     }
                 } else {
                     self.cur = module;
@@ -1558,6 +1570,32 @@ impl<'a> Resolver<'a> {
                 }
             }
         }
+    }
+
+    /// `t` without the implicit services, as a written `Type`.
+    fn without_implicit(&self, t: &Type) -> Type {
+        let implicit = |x: &Type| {
+            matches!(&x.kind, TypeKind::Named { ty: TypeRef::Custom(id), args } if args.is_empty() && self.p.is_implicit_service(*id))
+        };
+        let kind = match &t.kind {
+            TypeKind::Union(ms) => {
+                let kept: Vec<Type> = ms.iter().filter(|m| !implicit(m)).cloned().collect();
+                match kept.as_slice() {
+                    [] => TypeKind::Named {
+                        ty: TypeRef::Builtin(BuiltinType::Never),
+                        args: Vec::new(),
+                    },
+                    [one] => one.kind.clone(),
+                    _ => TypeKind::Union(kept),
+                }
+            }
+            _ if implicit(t) => TypeKind::Named {
+                ty: TypeRef::Builtin(BuiltinType::Never),
+                args: Vec::new(),
+            },
+            _ => t.kind.clone(),
+        };
+        Type { kind, span: t.span }
     }
 
     /// A type of `i/request` by name, when the library has it.
