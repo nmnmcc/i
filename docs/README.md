@@ -9,7 +9,9 @@ npm run dev
 ```
 
 The development server prints its local URL. `npm run build` generates the
-standard and library reference before building the static site in `dist/`. The library reference is generated from the newest `stdlib-v*` tag, the version `i new` writes, not from the working tree; `../scripts/check-doc-modules` fails the build if a page names an `i/<module>` that tag does not have. A page about the next release starts with a visible `> **Unpublished.**` line and is left out.
+standard and library reference before building the static site in `dist/`.
+
+The pages, `../scripts/check-doc-modules` and `scripts/run-examples.py` all read one baseline: `scripts/library_baseline.py`. By default it is the working tree; `LIBRARY_TAG=stdlib-vX.Y.Z` moves all three to that tag at once. **The version a page describes, the version the module check compares against and the version the examples run against must be the same**, or the documentation contradicts itself. `docs/scripts/library-baseline-test` proves the three move together. A page about a later release starts with a visible `> **Unpublished.**` line and is left out. The library reference is marked as the development tree until a release pairs with the language; `library_baseline.py` still has the tag path for that switch.
 `npm run check:links` checks the built local links; `npm run check:examples`
 checks module-header blank lines, then fenced i examples with the repository's
 parser and snippet registry, then executes complete examples against the tree's compiler.

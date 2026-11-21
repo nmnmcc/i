@@ -380,9 +380,9 @@ stdio_mode =
 /// 		child = process.spawn_piped(
 /// 			"sh",
 /// 			["-c", "printf hi"],
-/// 			process.Null,
-/// 			process.Piped,
-/// 			process.Inherit,
+/// 			process.Null(),
+/// 			process.Piped(),
+/// 			process.Inherit(),
 /// 		)
 /// 		assert(process.read_stdout(child, 100) == <<"hi":utf8>>)
 /// 		assert(process.wait(child) == 0)
@@ -423,9 +423,9 @@ spawn_piped = (program, values, input, output, errors) <- (
 /// 		child = process.spawn_config(
 /// 			"sh",
 /// 			["-c", "test \"$X\" = y && test \"$PWD\" = /"],
-/// 			process.Null,
-/// 			process.Null,
-/// 			process.Inherit,
+/// 			process.Null(),
+/// 			process.Null(),
+/// 			process.Inherit(),
 /// 			process.ReplaceEnvironment(["X=y"]),
 /// 			process.AtDirectory("/"),
 /// 		)
@@ -480,9 +480,9 @@ spawn_config = (
 /// 		child = process.spawn_piped(
 /// 			"sh",
 /// 			["-c", "printf hi"],
-/// 			process.Null,
-/// 			process.Piped,
-/// 			process.Inherit,
+/// 			process.Null(),
+/// 			process.Piped(),
+/// 			process.Inherit(),
 /// 		)
 /// 		assert(process.read_stdout(child, 100) == <<"hi":utf8>>)
 /// 		assert(process.read_stdout(child, 100) == <<>>)
@@ -506,9 +506,9 @@ read_stdout = (Child(number), max) <- (raw : Process) {
 /// 		child = process.spawn_piped(
 /// 			"sh",
 /// 			["-c", "printf oops >&2"],
-/// 			process.Null,
-/// 			process.Null,
-/// 			process.Piped,
+/// 			process.Null(),
+/// 			process.Null(),
+/// 			process.Piped(),
 /// 		)
 /// 		assert(process.read_stderr(child, 100) == <<"oops":utf8>>)
 /// 	})
@@ -532,9 +532,9 @@ read_stderr = (Child(number), max) <- (raw : Process) {
 /// 		child = process.spawn_piped(
 /// 			"cat",
 /// 			[],
-/// 			process.Piped,
-/// 			process.Piped,
-/// 			process.Inherit,
+/// 			process.Piped(),
+/// 			process.Piped(),
+/// 			process.Inherit(),
 /// 		)
 /// 		process.write_stdin(child, <<"hi":utf8>>)
 /// 		process.close_stdin(child)
@@ -560,9 +560,9 @@ write_stdin = (Child(number), bytes) <- (raw : Process) {
 /// 		child = process.spawn_piped(
 /// 			"cat",
 /// 			[],
-/// 			process.Piped,
-/// 			process.Null,
-/// 			process.Inherit,
+/// 			process.Piped(),
+/// 			process.Null(),
+/// 			process.Inherit(),
 /// 		)
 /// 		process.close_stdin(child)
 /// 		assert(process.wait(child) == 0)
@@ -629,9 +629,9 @@ read_all_stderr = (child : Child) <- (raw : Process) -> BitArray {
 /// 			child = process.spawn_piped(
 /// 				"sh",
 /// 				["-c", "printf out; printf err >&2"],
-/// 				process.Null,
-/// 				process.Piped,
-/// 				process.Piped,
+/// 				process.Null(),
+/// 				process.Piped(),
+/// 				process.Piped(),
 /// 			)
 /// 			output = process.collect(child)
 /// 			assert(output.stdout == <<"out":utf8>>)
