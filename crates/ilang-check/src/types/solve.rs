@@ -672,6 +672,42 @@ impl Solver {
         }
     }
 
+    /// Implicit services are ambient: a need for one fits a closed row,
+    /// which has no variable to carry it on. An open row takes it as an
+    /// ordinary member, so that inference carries it to whoever gives the
+    /// row, and in the end to the entry, which binds it.
+    fn ambient_member(&self, l: &Ty, r: &Ty) -> bool {
+        !self.hidden_needs.is_empty()
+            && matches!(l, Ty::Con(Head::Named(TypeRef::Custom(id)), _, args)
+                if args.is_empty() && self.hidden_needs.contains(id))
+            && !Self::open_row(r)
+    }
+
+    /// The implicit services that [`ambient`](Self::ambient) takes out of
+    /// `l`.
+    pub fn implicit_part(&self, l: &Ty) -> Vec<Ty> {
+        let hidden = |t: &Ty| {
+            matches!(t.head(), Some(Head::Named(TypeRef::Custom(id)))
+                if self.hidden_needs.contains(&id))
+        };
+        match l {
+            Ty::Union(ms) => ms.iter().filter(|m| hidden(m)).cloned().collect(),
+            Ty::Con(..) if hidden(l) => vec![l.clone()],
+            _ => Vec::new(),
+        }
+    }
+
+    /// Whether a row has a variable that can still take more members.
+    pub fn open_row(t: &Ty) -> bool {
+        match t {
+            Ty::Var(_) => true,
+            Ty::Union(ms) | Ty::Inter(ms) => ms.iter().any(Self::open_row),
+            Ty::Diff(a, _) => Self::open_row(a),
+            Ty::Both(a, b) => Self::open_row(a) || Self::open_row(b),
+            _ => false,
+        }
+    }
+
     /// The row parameters of a constructor, determined from its definition.
     pub fn rows(&self, h: Head, n: usize) -> ParamModes<Mode> {
         if n == 0 {
@@ -1174,6 +1210,9 @@ impl Solver {
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
             return;
         }
+        if env == Mode::Env && self.ambient_member(l, r) {
+            return;
+        }
         if matches!(l, Ty::Inter(ms) if ms.contains(r))
             || matches!(r, Ty::Union(ms) if ms.contains(l))
         {
@@ -1466,8 +1505,9 @@ impl Solver {
                 // shape is a mismatch of the parameter data.
                 self.constrain(&g.param, &f.param);
                 self.constrain(&f.ret, &g.ret);
-                let env = self.ambient(&f.env);
-                self.constrain_env(&env, &g.env);
+                // Implicit services go on into an open row; a closed one
+                // takes them as ambient (`ambient_member`).
+                self.constrain_env(&f.env, &g.env);
             }
             _ => self.fail(FailKind::Mismatch, l, r),
         }

@@ -3921,6 +3921,16 @@ impl<'a> Checker<'a> {
         self.function_depth -= 1;
         let known = self.fn_known(f, &expected, body_known);
         let mut env = self.pop_effects(f.span);
+        // A written need takes the implicit services of the body as
+        // ambient (`sub_env`). When that need is open (it forwards a row
+        // of the caller), the function still needs them, so that its
+        // callers, and in the end the entry, give them. A closed written
+        // need keeps them ambient, as a closed function type does.
+        let mut implicit = self.s.implicit_part(&env);
+        for t in &env_tys {
+            implicit.extend(self.s.implicit_part(t));
+        }
+        let forwards = Solver::open_row;
         let assert = Ty::named(self.b.assert, Vec::new());
         if rest_env {
             let declared = self.env_union(env_tys.clone(), f.span);
@@ -3928,7 +3938,11 @@ impl<'a> Checker<'a> {
                 env = self.env_union(vec![env, assert.clone()], f.span);
             }
             self.sub_env(&env, &declared, f.body.span, Some(f.span));
-            env = Ty::Never;
+            env = if forwards(&declared) {
+                self.env_union(implicit.clone(), f.span)
+            } else {
+                Ty::Never
+            };
             fails = false;
         }
         let t = match (ret, &f.ret) {
@@ -3975,6 +3989,11 @@ impl<'a> Checker<'a> {
                 }
                 if fails {
                     self.sub_env(&assert, &renv, nspan, None);
+                }
+                if !implicit.is_empty() && forwards(&renv) {
+                    let mut row = vec![renv];
+                    row.extend(implicit);
+                    renv = self.env_union(row, f.span);
                 }
                 Ty::Fn(Box::new(FnTy::new(params, value, renv)))
             }
