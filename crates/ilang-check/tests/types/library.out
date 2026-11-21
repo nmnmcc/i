@@ -69,21 +69,22 @@ i/bit_array.hex_digits : "0123456789ABCDEF"
 i/bit_array.char_at : (String, Int) -> String
 i/bit_array.base16_encode : (BitArray) -> String
 i/bit_array.hex_value : (Int) -> Int
-i/bit_array._base16_decode_result : (String) -> Result(BitArray, ())
+i/bit_array._base16_decode_result : (String) -> Result(BitArray, BitArrayError)
 i/bit_array.standard : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 i/bit_array.url_safe : "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 i/bit_array.encode64 : (BitArray, String, Bool) -> String
 i/bit_array.base64_encode : (BitArray, Bool) -> String
 i/bit_array.base64_url_encode : (BitArray, Bool) -> String
 i/bit_array.value64 : (Int, Int, Int) -> Int
-i/bit_array.decode64 : (String, Int, Int) -> Result(BitArray, ())
-i/bit_array._base64_decode_result : (String) -> Result(BitArray, ())
-i/bit_array._base64_url_decode_result : (String) -> Result(BitArray, ())
+i/bit_array.first_invalid : (Int, Int, Int, Int, Int) -> Int
+i/bit_array.decode64 : (String, Int, Int) -> Result(BitArray, BitArrayError)
+i/bit_array._base64_decode_result : (String) -> Result(BitArray, BitArrayError)
+i/bit_array._base64_url_decode_result : (String) -> Result(BitArray, BitArrayError)
 i/bit_array.to_string : (BitArray) <- (Fail(())) -> String
 i/bit_array.slice : (BitArray, Int, Int) <- (Fail(())) -> BitArray
-i/bit_array.base16_decode : (String) <- (Fail(())) -> BitArray
-i/bit_array.base64_decode : (String) <- (Fail(())) -> BitArray
-i/bit_array.base64_url_decode : (String) <- (Fail(())) -> BitArray
+i/bit_array.base16_decode : (String) <- (Fail(BitArrayError)) -> BitArray
+i/bit_array.base64_decode : (String) <- (Fail(BitArrayError)) -> BitArray
+i/bit_array.base64_url_decode : (String) <- (Fail(BitArrayError)) -> BitArray
 i/bits.read_unsigned : (BitArray, Int, Int) -> Int
 i/bits.from_unsigned : (Int, Int) -> BitArray
 i/bits.read_int : (BitArray, Int, Int, Bool, Bool) -> Int
@@ -349,13 +350,14 @@ i/float.copy_sign : (Float, Float) -> Float
 i/float.fraction_unit : 4503599627370496
 i/float.significand_limit : 9007199254740992
 i/float.to_string : (Float) -> String
-i/float._parse_result : (String) -> Result(Float, ())
+i/float._parse_result : (String) -> Result(Float, FloatError)
 i/float.is_digit : (Int) -> Bool
-i/float.whole : (BitArray, Bool, Int, Int, Int) -> Result(Float, ())
-i/float.fraction : (BitArray, Bool, Int, Int, Int) -> Result(Float, ())
+i/float.whole_reason : (Int, Int) -> String
+i/float.whole : (BitArray, Bool, Int, Int, Int, Int) -> Result(Float, FloatError)
+i/float.fraction : (BitArray, Bool, Int, Int, Int, Int) -> Result(Float, FloatError)
 i/float.count_significant : (Int, Int) -> Int
-i/float.exponent : (BitArray, Int, Int, Int) -> Result(Int, ())
-i/float.decimal : (Bool, Int, Int, Int) -> Result(Float, ())
+i/float.exponent : (BitArray, Int, Int, Int, Int) -> Result((Int, Int), FloatError)
+i/float.decimal : (Bool, Int, Int, Int, Int) -> Result(Float, FloatError)
 i/float.ratio_bits : (Int, Int) -> Result(Int, ())
 i/float.radix_order : (Int, Int, Int) -> Int
 i/float.order_factors : (Int, Int, Int, Int, List((Int, Int))) -> (Int, Int)
@@ -429,7 +431,7 @@ i/float.sin : (Float) -> Float
 i/float.cos : (Float) -> Float
 i/float.trig_tan : (Float, Float, Bool) -> Float
 i/float._tan_result : (Float) -> Result(Float, ())
-i/float.parse : (String) <- (Fail(())) -> Float
+i/float.parse : (String) <- (Fail(FloatError)) -> Float
 i/float.power : (Float, Int) <- (Fail(())) -> Float
 i/float.square_root : (Float) <- (Fail(())) -> Float
 i/float.divide : (Float, Float) <- (Fail(())) -> Float
@@ -600,9 +602,9 @@ i/http.body_text : (Response) <- (Fail(())) -> String
 i/http.body_json : (Response) <- (Fail(BodyError)) -> json.Json
 i/http.body_decode : (Response, schema.Schema(A, schema.SchemaError)) <- (Fail(BodyError)) -> A
 i/int.to_string : (Int) -> String
-i/int._parse_result : (String) -> Result(Int, ())
-i/int._parse_base_result : (String, Int) -> Result(Int, ())
-i/int.parse_digits : (BitArray, Int, Int, Bool) -> Result(Int, ())
+i/int._parse_result : (String) -> Result(Int, IntError)
+i/int._parse_base_result : (String, Int) -> Result(Int, IntError)
+i/int.parse_digits : (BitArray, Int, Int, Bool, Int) -> Result(Int, IntError)
 i/int.digit_value : (Int) -> Int
 i/int._to_base_result : (Int, Int) -> Result(String, ())
 i/int.base_string : (Int, Int) -> String
@@ -641,8 +643,8 @@ i/int.bitwise_not : (Int) -> Int
 i/int.bitwise_shift_left : (Int, Int) -> Int
 i/int.bitwise_shift_right : (Int, Int) -> Int
 i/int.range : (Int, Int, A, (A, Int) <- N -> A) <- N -> A
-i/int.parse : (String) <- (Fail(())) -> Int
-i/int.parse_base : (String, Int) <- (Fail(())) -> Int
+i/int.parse : (String) <- (Fail(IntError)) -> Int
+i/int.parse_base : (String, Int) <- (Fail(IntError)) -> Int
 i/int.to_base : (Int, Int) <- (Fail(())) -> String
 i/int.power : (Int, Int) <- (Fail(())) -> Int
 i/int.square_root : (Int) <- (Fail(())) -> Float

@@ -471,8 +471,8 @@ floor = (x : Float) -> Float { core.floor(x) }
 /// The nearest whole number, as an Int. A half goes away from zero.
 ///
 /// ```i
-/// float.round(2.5)    // 3
-/// float.round(-2.5)   // -3
+/// float.round(2.5)     // 3
+/// float.round(-.2.5)   // -3
 /// ```
 round = (x : Float) -> Int {
 	{ x <. 0.0 } |>
@@ -1608,7 +1608,7 @@ power = (base : Float, of : Int) -> Float {
 ///
 /// ```i
 /// fail.catch(() { float.square_root(4.0) })   // Ok(2.0)
-/// fail.catch(() { float.square_root(-1.0) })  // Error(())
+/// fail.catch(() { float.square_root(-.1.0) })  // Error(())
 /// ```
 ///
 /// Reports failure through `Fail(())`.

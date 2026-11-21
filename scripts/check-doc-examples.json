@@ -1,8 +1,6 @@
 {
   "stdlib/src/bool.i:66:d3160dc09ffc": "context: the block uses names or types declared in the surrounding text",
   "stdlib/src/dict.i:331:c9291fcf8236": "context: the block uses names or types declared in the surrounding text",
-  "stdlib/src/float.i:1547:c16d3677c840": "context: the block depends on surrounding declarations",
-  "stdlib/src/float.i:414:7f8b8323af5c": "context: the block depends on surrounding declarations",
   "stdlib/src/float_text.i:21:23aeb6eb8f7a": "context: the block depends on surrounding declarations",
   "stdlib/src/fs.i:178:600ffb45352f": "context: the block uses names or types declared in the surrounding text",
   "stdlib/src/fs.i:194:2efedbfaee7b": "context: the block uses names or types declared in the surrounding text",
