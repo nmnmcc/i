@@ -7,3 +7,5 @@ i = { path = "../../stdlib" }
 collection = "i/test.tests"
 
 [dev-dependencies]
+
+hostcall = true

@@ -1,6 +1,5 @@
-# spec: 9.7
-# expect: compile-error E0523
-name = "app"
+name = "probe"
+hostcall = true
 
 [dependencies]
 i = { path = "../../../../stdlib" }

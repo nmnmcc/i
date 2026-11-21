@@ -5,3 +5,5 @@ exports = ["app/r2.go_progress", "app/r2.unlisted_answer", "app/r2.overlap", "ap
 
 [dependencies]
 i = { path = "../../../../stdlib" }
+
+hostcall = true
