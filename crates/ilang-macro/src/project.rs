@@ -478,9 +478,20 @@ fn map_failure(
         if diagnostic.source != Some(source) || !scoped.is_generated(diagnostic.span) {
             continue;
         }
-        let origin = scoped
-            .origin(diagnostic.span)
-            .expect("expanded diagnostic has an origin");
+        let Some(origin) = scoped.origin(diagnostic.span) else {
+            // No expansion recorded this span, so it names no text of this
+            // file. Keep the error, at the end of the written text, rather
+            // than abort or point at text the user never wrote.
+            let end = scoped.original_len();
+            diagnostic.span = ilang_syntax::span::Span::new(end, end);
+            diagnostic.related.push(ilang_package::DiagnosticNote {
+                source,
+                span: diagnostic.span,
+                message: "the error lies in macro-generated code whose location was not recorded"
+                    .into(),
+            });
+            continue;
+        };
         let syntax = &origin.syntax;
         let template = syntax.scope().module != source.0 || !syntax.scope().marks.is_empty();
         if template {

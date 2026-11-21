@@ -4063,6 +4063,7 @@
     "test:syn3_roundtrip_run": 4.13,
     "test:syntax_runtime": 40.34,
     "test:test_selection": 26.81,
+    "test:test_workers": 4.22,
     "test:tls": 2.54,
     "test:typed_macros": 41.25,
     "test:udp": 14.7,
@@ -4117,6 +4118,7 @@
     "test:syn3_roundtrip_run",
     "test:syntax_runtime",
     "test:test_selection",
+    "test:test_workers",
     "test:tls",
     "test:typed_macros",
     "test:udp",
@@ -5313,6 +5315,16 @@
     "bench@2",
     "examples/hello@0",
     "examples/hello@2",
+    "stdlib@0",
+    "stdlib@2"
+   ]
+  },
+  "std-worker-tests": {
+   "costs": {
+    "stdlib@0": 258.146,
+    "stdlib@2": 212.264
+   },
+   "keys": [
     "stdlib@0",
     "stdlib@2"
    ]

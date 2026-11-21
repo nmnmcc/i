@@ -31,6 +31,7 @@
 # For CI, which builds once and splits the slow sets into shards:
 #   CHECKS_I_BINARY=path      the i part uses this `i` instead of building it
 #   CHECKS_SKIP_CORPUS=1      the i part leaves out the review corpus
+#   CHECKS_I_WORKERS=n|auto   passed to `i test --workers` (unset: the CLI default)
 #   CHECKS_SHARD=k/n          the i part runs only shard k of n of the review corpus
 #                             (scripts/review-corpus run --shard k/n); unset, the whole corpus
 #   CHECKS_TEST_GROUP=...     rust-test runs one group of the tests (see rust-test below);
@@ -88,6 +89,10 @@ doc-paths() {
   python3 -I scripts/check-doc-paths-test
   python3 -I scripts/check-doc-modules
   python3 -I scripts/check-doc-modules-test
+  if [[ -n "${I_BIN:-}" || -x target/release/i ]]; then
+    python3 -I scripts/check-doc-examples
+    python3 -I scripts/check-doc-examples-test
+  fi
 }
 
 no-compat() {
@@ -238,7 +243,11 @@ i() {
   fi
   if [[ -n "${CHECKS_I_PROJECTS:-}" ]]; then
     for project_opt in $CHECKS_I_PROJECTS; do
-      "$i" test --project "${project_opt%@*}" --opt "${project_opt##*@}"
+      if [[ -n "${CHECKS_I_WORKERS:-}" ]]; then
+        "$i" test --project "${project_opt%@*}" --opt "${project_opt##*@}" --workers "$CHECKS_I_WORKERS"
+      else
+        "$i" test --project "${project_opt%@*}" --opt "${project_opt##*@}"
+      fi
     done
   else
     for level in 0 2; do

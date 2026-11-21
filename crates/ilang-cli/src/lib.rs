@@ -61,6 +61,13 @@ impl Built {
     pub fn host_program(&self) -> anyhow::Result<ilang_host::Program> {
         ilang_host::Program::from_bytes(&self.wasm)?.with_binding_plan(self.binding_plan.clone())
     }
+
+    /// The program for at most `workers` workers, as `i test --workers`
+    /// asks. One worker keeps the single-worker scheduling of `i run`.
+    pub fn host_program_with_workers(&self, workers: usize) -> anyhow::Result<ilang_host::Program> {
+        ilang_host::Program::from_bytes_with_workers(&self.wasm, Some(workers))?
+            .with_binding_plan(self.binding_plan.clone())
+    }
     pub fn host_options(&self) -> ilang_host::HostOptions {
         let mut options = if self.tests {
             test_options_with_templates(self.templates.clone().into())

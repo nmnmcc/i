@@ -18,7 +18,7 @@ fn library_dependencies() -> String {
     )
 }
 
-fn program(source: &str, opt: Level) -> Program {
+fn built_program(source: &str, opt: Level) -> Program {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(
         directory.path().join("i.toml"),
@@ -37,8 +37,12 @@ fn program(source: &str, opt: Level) -> Program {
         },
     )
     .unwrap();
+    Program::from_bytes(&built.wasm).unwrap()
+}
+
+fn program(source: &str, opt: Level) -> Program {
     // R2 pins the one-worker FIFO order.
-    Program::from_bytes(&built.wasm).unwrap().with_workers(1)
+    built_program(source, opt).with_workers(1)
 }
 
 #[test]
@@ -62,6 +66,121 @@ use std::{
     sync::{Arc, Mutex},
     task::{Context, Poll, Waker},
 };
+
+/// A settled ticket must answer the wait of a task that runs on another
+/// worker. The scheduler only ever saw `Wait([])` (the ticket stays with the
+/// worker that owns it), so neither the settled answer nor a later `Woken`
+/// message could reach the waiter: with the default worker count the entry
+/// run waited on itself forever.
+#[test]
+fn a_settled_request_answers_a_child_task_under_the_default_worker_count() {
+    let source = r#"
+(
+    (Io) = i/io
+    i/task
+    i/request
+    i/core
+)
+
+print = (t : String) <- (io : Io) { io.print(t) }
+
+main = () {
+    task.run(() {
+        out = task.ref(Ok(0))
+        task.scope((g) {
+            t = task.go(g, () {
+                task.set(out, request.await(request.ready(Error("boom"))))
+            })
+            task.join(t)
+            ()
+        })
+        print(core.inspect(task.get(out)))
+        ()
+    })
+}
+"#;
+    for opt in [Level::O0, Level::O2] {
+        let program = built_program(source, opt);
+        let log = services::Log::default();
+        let printed = log.clone();
+        let imports = services::standard(move |text| printed.lock().unwrap().push(text.into()));
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let runner = std::thread::spawn(move || {
+            let outcome = program.run_entry(HostOptions::new(imports));
+            sender.send(outcome.is_ok()).ok();
+        });
+        let ok = receiver
+            .recv_timeout(std::time::Duration::from_secs(30))
+            .expect("a settled request did not answer its waiter");
+        runner.join().ok();
+        assert!(ok);
+        assert_eq!(*log.lock().unwrap(), ["Error(\"boom\")"]);
+    }
+}
+
+/// A task that parks forever in a final must stop the entry run with the
+/// deadlock panic at every worker count. Its record stays adopted by worker 0
+/// until the task ends, but an adopted record is not progress by itself: with
+/// the default worker count the entry run waited for its own parked task
+/// forever instead of reporting the deadlock.
+#[test]
+fn a_task_parked_in_a_final_stops_the_entry_run_under_the_default_worker_count() {
+    let source = r#"
+(
+    (Io) = i/io
+    i/task
+    i/resource
+    i/fail
+    i/random
+)
+
+print = (t : String) <- (io : Io) { io.print(t) }
+
+main = () {
+    r = fail.catch(() {
+        task.scope((s) {
+            gate : task.Channel(Int) = task.channel()
+            task.go(s, () {
+                resource.ensure(() {
+                    task.send(gate, 1)
+                    task.sync(task.never())
+                }, () {
+                    print("K final waits forever")
+                    task.sync(task.never())
+                })
+            })
+            task.receive(gate)
+            fail.raise("boom")
+        })
+    })
+    print("K end (should not reach)")
+}
+"#;
+    for opt in [Level::O0, Level::O2] {
+        let program = built_program(source, opt);
+        let log = services::Log::default();
+        let printed = log.clone();
+        let imports = services::standard(move |text| printed.lock().unwrap().push(text.into()));
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let runner = std::thread::spawn(move || {
+            let outcome = program.run_entry(HostOptions::new(imports));
+            sender.send(outcome).ok();
+        });
+        let outcome = receiver
+            .recv_timeout(std::time::Duration::from_secs(30))
+            .expect("a parked task did not stop the run");
+        runner.join().ok();
+        let outcome = outcome.unwrap();
+        let Outcome::Stop(stop) = outcome else {
+            panic!("{outcome:?}")
+        };
+        assert_eq!(
+            stop.message.as_ref().unwrap().lines().next(),
+            Some("panic: task: deadlock")
+        );
+        assert_eq!(*log.lock().unwrap(), ["K final waits forever"]);
+    }
+}
 
 #[derive(Default)]
 struct GateState {
