@@ -2453,6 +2453,28 @@ An entry that needs a service its target does not give is the compile error
 | `close` | Close a TLS stream. Closing a closed stream does nothing; the owning scope calls this. |
 | `byte_stream` | Make a byte stream interface for a TLS stream. |
 
+#### Parsing and conversion errors
+
+`i/int`, `i/float` and `i/bit_array` are ordinary libraries, not host
+service libraries. Their text parsing and byte decoding report a failure
+with a record that names the position. Offsets are UTF-8 byte offsets into
+the input text; `reason` is one of the strings listed.
+
+| Function | Type | Reasons |
+|---|---|---|
+| `int.parse` | `(text: String) <- (Fail(int.IntError)) -> Int` | `"empty"`, `"missing digits"`, `"invalid digit"`, `"digit out of range for base"` |
+| `int.parse_base` | `(text: String, base: Int) <- (Fail(int.IntError)) -> Int` | the `int.parse` reasons and `"base out of range"` |
+| `float.parse` | `(text: String) <- (Fail(float.FloatError)) -> Float` | `"empty"`, `"missing digits"`, `"missing point"`, `"invalid character"`, `"overflow"` |
+| `bit_array.base16_decode` | `(input: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid digit"`, `"missing digit"` |
+| `bit_array.base64_decode` | `(encoded: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid character"`, `"incomplete group"`, `"bad padding"` |
+| `bit_array.base64_url_decode` | `(encoded: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid character"`, `"incomplete group"`, `"bad padding"` |
+
+`int.IntError`, `float.FloatError` and `bit_array.BitArrayError` all have the
+data `(offset = Int, reason = String)`. Arithmetic domain failures in `int` and
+`float`, and `bit_array.to_string`, `bit_array.slice` and `list.strict_zip`,
+keep `()`: the operation itself names the domain and there is no input
+position to report.
+
 ## 10. The host boundary
 
 ### 10.1 External functions
