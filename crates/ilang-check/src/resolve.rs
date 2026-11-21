@@ -1452,7 +1452,35 @@ impl<'a> Resolver<'a> {
                 let mut wire = f.ty.clone();
                 let mut wrapped = false;
                 let mut valid = true;
-                if raw {
+                if imported {
+                    // An imported field is written with its answer:
+                    // `Result(A, E)` is the error channel, not a request cell.
+                    let mut ret = ret.as_ref().clone();
+                    let result_args = loop {
+                        if let TypeKind::Named {
+                            ty: TypeRef::Custom(id),
+                            args,
+                        } = &ret.kind
+                            && self.p.ty(*id).name == "Result"
+                            && Some(self.p.ty(*id).module) == self.p.prelude
+                            && args.len() == 2
+                        {
+                            break Some(args.clone());
+                        }
+                        match self.expand_alias(&ret) {
+                            Some(next) => ret = next,
+                            None => break None,
+                        }
+                    };
+                    if let Some(args) = result_args {
+                        wire.kind = TypeKind::Fn {
+                            params: params.clone(),
+                            ret: Box::new(args[0].clone()),
+                            err: Some(Box::new(args[1].clone())),
+                            env: env.clone(),
+                        };
+                    }
+                } else if raw {
                     valid = err.is_none() && env.is_none();
                     let expanded = self.expand(ret);
                     if let TypeKind::Named {
