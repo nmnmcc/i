@@ -3932,7 +3932,18 @@ impl<'a> Checker<'a> {
                 let env = self.env_union(envs, f.span);
                 Ty::Fn(Box::new(FnTy::new(params, value, env)))
             }
-            (Some((value, renv)), Some(written)) => {
+            (Some((value, mut renv)), Some(written)) => {
+                // A written need row carries the implicit services too.
+                // They are always available, so every written function type
+                // means the same as one that writes them.
+                let mut row = vec![renv];
+                row.extend(
+                    self.p
+                        .implicit_services
+                        .iter()
+                        .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new())),
+                );
+                renv = self.env_union(row, f.span);
                 // The written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
                 // `Assert` when a parameter may fail.
