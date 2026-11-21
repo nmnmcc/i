@@ -477,6 +477,36 @@ fn a_rigid_row_with_a_stated_entry_takes_a_one_form_provide() {
 }
 
 #[test]
+fn an_inferred_need_takes_a_one_form_provide() {
+    // §9.2: only a rigid row variable rejects a provide of a key it does not
+    // state. A function with no written need has an inferred row, which
+    // simply gains the entry from the provide. The second program reaches
+    // the row through a continuation's row argument, as in
+    // tests/spec/9/control_lazy_env_unwind.i.
+    for source in [
+        "Name = (text = String)\nread = () { 1 }\naround = (b) { { b() } <- (Name(text = \"around\")) }\nmain = () { around(read) }\n",
+        "(i/control)\nName = (text = String)\nf = (b) { control.suspend(b, (k) { { control.cancel(k)\n\"c\" } <- (Name(text = \"out\")) }) }\nmain = () { control.boundary((b) { f(b) }) }\n",
+    ] {
+        let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+        let checked = ilang_check::check(&graph);
+        let ours: Vec<_> = checked
+            .diags
+            .iter()
+            .filter(|d| {
+                d.source
+                    .is_some_and(|id| graph.sources.get(id).text == source)
+            })
+            .cloned()
+            .collect();
+        assert!(
+            ours.is_empty(),
+            "{source}: {:?}",
+            graph.sources.render_all(&ours)
+        );
+    }
+}
+
+#[test]
 fn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {
     // An unused Fail entry still requires its provider; choosing E = Never
     // must not erase the service key. Check both unused and raised entries.

@@ -1033,6 +1033,12 @@ impl Solver {
             if self.var(v).level <= level || self.var(v).row == Mode::Value {
                 continue;
             }
+            // A written row variable is a promise about the caller's row,
+            // which the provide would silently overwrite. An inferred row
+            // simply gains the entry from the provide, as it always could.
+            if shadows && self.var(v).name.is_none() {
+                continue;
+            }
             let above = self.reach(vec![v], false).0;
             let below = self.reach(vec![v], true).0;
             let aliases: Vec<_> = above
