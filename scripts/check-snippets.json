@@ -1544,10 +1544,6 @@
   "crates/ilang-check/tests/diagnostic_traps.rs:24dcfaf171c4adcd": {
     "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
   },
-  "bindings/javascript/test/providers.test.mjs:b89cd1ef46e15e08": {
-    "not_source": true,
-    "reason": "TOML host-export manifest data; services are provided in the i entry."
-  },
   "crates/ilang-wasm/tests/codegen.rs:6694c492172dacaf": {
     "suffix": "\n  a0\n}\n",
     "reason": "Render the existing source template or complete its assembly fragment; runtime tests still exercise the full generator"
@@ -2834,9 +2830,6 @@
   "bindings/javascript/test/fetch.test.mjs:cede5b76faccf642": {
     "not_source": "test source fragment or template"
   },
-  "bindings/javascript/test/providers.test.mjs:4f37ad713716b72e": {
-    "not_source": "test source fragment or template"
-  },
   "bindings/javascript/test/wasi.test.mjs:4f37ad713716b72e": {
     "not_source": "test source fragment or template"
   },
@@ -3226,6 +3219,12 @@
     "not_source": true
   },
   "crates/ilang-cli/tests/expansion_sites.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "bindings/javascript/test/providers.test.mjs:06fa66930fc0137d": {
+    "not_source": true
+  },
+  "bindings/javascript/test/providers.test.mjs:956bb7b8401afdbf": {
     "not_source": true
   }
 }
