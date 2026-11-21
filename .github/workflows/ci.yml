@@ -73,6 +73,11 @@ env:
 # Binaryen, by job and Cargo.lock. Pushes to main, redesign and ci/** write it;
 # a run reads the caches of its own branch, of main and, for a pull request, of
 # its base branch (GitHub's cache scoping).
+#
+# The action hashes the lockfiles itself and appends that hash after its restore
+# prefix, so a Cargo.lock change restores the previous artifacts and rebuilds
+# only what changed. Do not put hashFiles('Cargo.lock') in `key:`: that moves
+# the hash into the prefix and turns every lock change into a cold build.
 
 jobs:
   changes:
@@ -130,7 +135,7 @@ jobs:
           cargo --version
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: plan-${{ hashFiles('Cargo.lock') }}
+          key: plan
           save-if: true
       # A failing ilang-shard command fails this job, and with it the run:
       # no matrix is ever empty.
@@ -188,7 +193,7 @@ jobs:
         run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: release-${{ hashFiles('Cargo.lock') }}
+          key: release
           # Run rustc and cargo of the Devenv shell, not those of the runner.
           cmd-format: devenv shell -- {0}
           # The objects of Binaryen's C++ (see CMAKE_CXX_COMPILER_LAUNCHER in
@@ -235,7 +240,7 @@ jobs:
     name: lint and test (rust, other crates)
     needs: changes
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       CHECKS_TEST_GROUP: rest
     steps:
@@ -255,7 +260,7 @@ jobs:
         run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: test-rest-${{ hashFiles('Cargo.lock') }}
+          key: test-rest
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: true
@@ -290,7 +295,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -320,7 +325,7 @@ jobs:
         with:
           # The shards build the same crate, so they share one cache; the
           # first shard writes it.
-          key: test-check-${{ hashFiles('Cargo.lock') }}
+          key: test-check
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: true
@@ -337,7 +342,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -367,7 +372,7 @@ jobs:
         run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: test-value-types-${{ hashFiles('Cargo.lock') }}
+          key: test-value-types
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: true
@@ -396,7 +401,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -423,7 +428,7 @@ jobs:
         run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: test-cli-${{ hashFiles('Cargo.lock') }}
+          key: test-cli
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: true
@@ -441,7 +446,7 @@ jobs:
     needs: plan
     if: fromJSON(needs.plan.outputs.changed).rust
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.plan.outputs.max_parallel) }}
@@ -469,7 +474,7 @@ jobs:
         run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: test-spec-${{ hashFiles('Cargo.lock') }}
+          key: test-spec
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: true
@@ -520,7 +525,7 @@ jobs:
         run: ./scripts/ci/retry nix profile install github:NixOS/nixpkgs/e513db7b0a65def6f6e17bb55195dfe510871944#devenv
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: web-${{ hashFiles('Cargo.lock') }}
+          key: web
           cmd-format: devenv shell -- {0}
           cache-directories: ~/.cache/ccache
           save-if: true
