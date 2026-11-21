@@ -3,11 +3,13 @@
 (
 	i/task
 	i/request
+	i/hostcall
 )
 @host("review:gate/v1", "request")
 Gate = (wait = () -> Request(()))
 
-main = () <- (gate : Gate, root : request.Root) {
+main = () <- (gate : Gate) {
+	root = hostcall.root()
 	pending = gate.wait()
 	task.scope((s) {
 		child = task.go(s, () {

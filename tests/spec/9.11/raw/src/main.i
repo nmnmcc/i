@@ -11,20 +11,24 @@ Later = (
 	echo = (String) -> Request(String),
 )
 
-main = () <- (later : Later, root : request.Root, owner : request.Owner) {
-	a = later.double(21)
-	b = later.echo("answer")
-	assert(request.count(owner) == 2)
-	assert(request.count_root(root) == 2)
-	assert(request.state(a) == request.Waiting())
-	assert(request.await_owned(b) == "answer")
-	assert(request.await_owned(a) == Ok(42))
-	assert(request.count_root(root) == 0)
-	r = request.within(() {
-		value = later.double(-1)
-		request.wait_any([request.ticket(value)])
-		value
-	})
-	assert(request.state(r) == request.Ready(Error("negative")))
-	assert(request.take(r) == Error("negative"))
+main = () <- (later : Later) {
+	root = request.open_root()
+	owner = request.open_owner() <- (root)
+	{
+		a = later.double(21)
+		b = later.echo("answer")
+		assert(request.count(owner) == 2)
+		assert(request.count_root(root) == 2)
+		assert(request.state(a) == request.Waiting())
+		assert(request.await_owned(b) == "answer")
+		assert(request.await_owned(a) == Ok(42))
+		assert(request.count_root(root) == 0)
+		r = request.within(() {
+			value = later.double(-1)
+			request.wait_any([request.ticket(value)])
+			value
+		})
+		assert(request.state(r) == request.Ready(Error("negative")))
+		assert(request.take(r) == Error("negative"))
+	} <- (root, owner)
 }
