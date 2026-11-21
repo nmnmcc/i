@@ -3129,25 +3129,10 @@
   "crates/ilang-cli/tests/big_int.rs:ecb5a03d85fb0c88": {
     "not_source": true
   },
-  "crates/ilang-cli/tests/typed_macros.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/macro_run.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/lisp.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
   "crates/ilang-cli/tests/r2_performance.rs:1dfbdf3cbf57ea96": {
     "not_source": true
   },
   "crates/ilang-cli/tests/numeric_lowering.rs:0bc2aa94d1bf8986": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/r2_runtime.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/macro_run.rs:8ce7aab7b2517857": {
     "not_source": true
   },
   "crates/ilang-cli/tests/value_type_performance.rs:0ffebdd0c084a84a": {
@@ -3159,16 +3144,10 @@
   "crates/ilang-cli/tests/http.rs:f4cb490d78aa96e5": {
     "not_source": true
   },
-  "crates/ilang-cli/tests/macro_run.rs:fd97733bca407fc7": {
-    "not_source": true
-  },
   "crates/ilang-cli/tests/collections.rs:d7c39d21bdcec997": {
     "not_source": true
   },
   "crates/ilang-cli/tests/many_tests.rs:b8c0d48a71dafff1": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/r2_runtime.rs:0889189731cd96fd": {
     "not_source": true
   },
   "crates/ilang-cli/tests/macro_run.rs:d7c39d21bdcec997": {
@@ -3177,34 +3156,10 @@
   "crates/ilang-cli/tests/r2_runtime.rs:9a245db7004a13ae": {
     "not_source": true
   },
-  "crates/ilang-cli/tests/diagnostic_repairs.rs:892bad5222a89cff": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/macro_run.rs:7d44f0c4bb6ec107": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/unused.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/native.rs:6bf88dc22754f45f": {
-    "not_source": true
-  },
   "crates/ilang-cli/tests/rest_services.rs:3562ca42e227191e": {
     "not_source": true
   },
-  "crates/ilang-cli/tests/wasi.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/native.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
   "crates/ilang-cli/tests/numeric_lowering.rs:6596c13d0b171400": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/native.rs:11cae0c2b56ba038": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/r2_fixtures.rs:1b2f489ad86c69ef": {
     "not_source": true
   },
   "crates/ilang-cli/tests/float_text.rs:7ac93126f04543ea": {
@@ -3216,16 +3171,61 @@
   "crates/ilang-cli/tests/syn3_roundtrip_run.rs:918ee59a8a7bccc6": {
     "not_source": true
   },
-  "crates/ilang-cli/tests/expansion_sites.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
-  "crates/ilang-cli/tests/value_types.rs:2ca9fbb2a1e0216e": {
-    "not_source": true
-  },
   "crates/ilang-cli/tests/r2_runtime.rs:e7a0a87095d6cb79": {
     "not_source": true
   },
-  "crates/ilang-cli/tests/collections.rs:2ca9fbb2a1e0216e": {
+  "crates/ilang-cli/tests/macro_run.rs:94d7a5a7f650aaf7": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/wasi.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/lisp.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/macro_run.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/diagnostic_repairs.rs:fbcdee08ccf39c40": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/typed_macros.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:633a329ba7614ad9": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/value_types.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/collections.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/native.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/unused.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_fixtures.rs:41f690846897b3dc": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/native.rs:01714d3b3411ab49": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/native.rs:fdac003e61cdf8d9": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/macro_run.rs:3286fd37acb5fe77": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/macro_run.rs:aff43d4ee754b145": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/expansion_sites.rs:951a8036fbb8b928": {
     "not_source": true
   }
 }
