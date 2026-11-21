@@ -26,6 +26,7 @@
 //// from another task stops.
 (
 	i/request
+	i/hostcall
 	i/resource
 	i/fail
 	i/core
@@ -37,7 +38,7 @@
 	Environment(..)
 	WorkingDirectory(..)
 	Entropy(..)
-	Process
+	Process(..)
 	Child
 	Stdio(..)
 	spawn_piped
@@ -107,23 +108,21 @@ DirectoryMode = InheritDirectory | AtDirectory
 
 Child = (Int)
 
-@host("i:arguments/v1", "request")
-Arguments = (args = () -> Request(Result(BitArray, String)))
+@import("i:arguments/v1")
+Arguments = (args = () -> Result(BitArray, String))
 
-@host("i:environment/v1", "request")
-Environment = (env = (String) -> Request(Result(String, String)))
+@import("i:environment/v1")
+Environment = (env = (String) -> Result(String, String))
 
-@host("i:working-directory/v1", "request")
-WorkingDirectory = (cwd = () -> Request(Result(String, String)))
+@import("i:working-directory/v1")
+WorkingDirectory = (cwd = () -> Result(String, String))
 
-@host("i:entropy/v1", "request")
-Entropy = (entropy = (Int) -> Request(Result(BitArray, String)))
+@import("i:entropy/v1")
+Entropy = (entropy = (Int) -> Result(BitArray, String))
 
-@host("i:process/v1", "request")
+@import("i:process/v1")
 Process = (
-	spawn_piped = (String, BitArray, String, String, String) -> Request(
-		Result(Int, String),
-	),
+	spawn_piped = (String, BitArray, String, String, String) -> Result(Int, String),
 	spawn_config = (
 		String,
 		BitArray,
@@ -134,16 +133,16 @@ Process = (
 		BitArray,
 		String,
 		String,
-	) -> Request(Result(Int, String)),
-	own = (Int) -> Request(()),
-	read_stdout = (Int, Int) -> Request(Result(BitArray, String)),
-	read_stderr = (Int, Int) -> Request(Result(BitArray, String)),
-	write_stdin = (Int, BitArray) -> Request(Result((), String)),
-	close_stdin = (Int) -> Request(Result((), String)),
-	spawn = (String, BitArray) -> Request(Result(Int, String)),
-	wait = (Int) -> Request(Result(Int, String)),
-	terminate = (Int) -> Request(Result((), String)),
-	close = (Int) -> Request(()),
+	) -> Result(Int, String),
+	own = (Int) -> (),
+	read_stdout = (Int, Int) -> Result(BitArray, String),
+	read_stderr = (Int, Int) -> Result(BitArray, String),
+	write_stdin = (Int, BitArray) -> Result((), String),
+	close_stdin = (Int) -> Result((), String),
+	spawn = (String, BitArray) -> Result(Int, String),
+	wait = (Int) -> Result(Int, String),
+	terminate = (Int) -> Result((), String),
+	close = (Int) -> (),
 )
 
 // The one place that reads host error codes.
@@ -219,7 +218,7 @@ decode_args =
 /// Needs: `Arguments`.
 /// Errors: `ProcessError(operation = "args", ...)` when the host cannot give them.
 args = () <- (raw : Arguments) {
-	request.await_owned(raw.args()) |>
+	raw.args() |>
 		(Ok(value)) { decode_args(value) }
 		& (Error(code)) { raise_error("args", code) }
 }
@@ -230,7 +229,7 @@ args = () <- (raw : Arguments) {
 /// is not set; `Invalid` for an empty name or one with `=` or NUL; `Other`
 /// (code `"not_utf8"`) when the value is not UTF-8.
 env = (name) <- (raw : Environment) {
-	request.await_owned(raw.env(name)) |>
+	raw.env(name) |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("env", code) }
 }
@@ -239,7 +238,7 @@ env = (name) <- (raw : Environment) {
 /// Needs: `WorkingDirectory`.
 /// Errors: `ProcessError(operation = "cwd", ...)`.
 cwd = () <- (raw : WorkingDirectory) {
-	request.await_owned(raw.cwd()) |>
+	raw.cwd() |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("cwd", code) }
 }
@@ -249,14 +248,14 @@ cwd = () <- (raw : WorkingDirectory) {
 /// Errors: `ProcessError(operation = "entropy", reason = Invalid, ...)` for a
 /// negative or too large count.
 entropy = (bytes) <- (raw : Entropy) {
-	request.await_owned(raw.entropy(bytes)) |>
+	raw.entropy(bytes) |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("entropy", code) }
 }
 
 // Waits for a spawn request. A spawn that is cancelled after the host made
 // the child still closes it.
-await_spawn = (r : Request(Result(Int, String))) <- (raw : Process) -> Child {
+await_spawn = (r : hostcall.Call(Result(Int, String))) <- (raw : Process) -> Child {
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -266,10 +265,10 @@ await_spawn = (r : Request(Result(Int, String))) <- (raw : Process) -> Child {
 		() {
 			request.state(r) |>
 				(request.Ready(Ok(value))) {
-					request.await_owned(raw.close(value))
+					raw.close(value)
 				}
 				& (_) { () }
-			request.cancel(request.ticket(r))
+			hostcall.cancel(r)
 		},
 	)
 	raw.own(number)
@@ -306,7 +305,7 @@ spawn = (program, values) <- (_scope : resource.Scope, raw : Process) {
 	resource.acquire(
 		() {
 			await_spawn(
-				raw.spawn(program, encode_args(values)),
+				hostcall.call(() { raw.spawn(program, encode_args(values)) }),
 			)
 		},
 		release,
@@ -328,7 +327,7 @@ spawn = (program, values) <- (_scope : resource.Scope, raw : Process) {
 /// }
 /// ```
 wait = (Child(number)) <- (raw : Process) {
-	request.await_owned(raw.wait(number)) |>
+	raw.wait(number) |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("wait", code) }
 }
@@ -349,7 +348,7 @@ wait = (Child(number)) <- (raw : Process) {
 /// }
 /// ```
 terminate = (Child(number)) <- (raw : Process) {
-	request.await_owned(raw.terminate(number)) |>
+	raw.terminate(number) |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("terminate", code) }
 }
@@ -359,7 +358,7 @@ terminate = (Child(number)) <- (raw : Process) {
 /// child as well.
 /// Needs: `Process`. Raises nothing.
 close = (Child(number)) <- (raw : Process) {
-	request.await_owned(raw.close(number))
+	raw.close(number)
 }
 
 stdio_mode =
@@ -396,13 +395,15 @@ spawn_piped = (program, values, input, output, errors) <- (
 	resource.acquire(
 		() {
 			await_spawn(
-				raw.spawn_piped(
-					program,
-					encode_args(values),
-					stdio_mode(input),
-					stdio_mode(output),
-					stdio_mode(errors),
-				),
+				hostcall.call(() {
+					raw.spawn_piped(
+						program,
+						encode_args(values),
+						stdio_mode(input),
+						stdio_mode(output),
+						stdio_mode(errors),
+					)
+				}),
 			)
 		},
 		release,
@@ -451,17 +452,19 @@ spawn_config = (
 	resource.acquire(
 		() {
 			await_spawn(
-				raw.spawn_config(
-					program,
-					encode_args(values),
-					stdio_mode(input),
-					stdio_mode(output),
-					stdio_mode(errors),
-					env_mode,
-					encode_args(entries),
-					path,
-					cwd_mode,
-				),
+				hostcall.call(() {
+					raw.spawn_config(
+						program,
+						encode_args(values),
+						stdio_mode(input),
+						stdio_mode(output),
+						stdio_mode(errors),
+						env_mode,
+						encode_args(entries),
+						path,
+						cwd_mode,
+					)
+				}),
 			)
 		},
 		release,
@@ -490,7 +493,7 @@ spawn_config = (
 /// }
 /// ```
 read_stdout = (Child(number), max) <- (raw : Process) {
-	request.await_owned(raw.read_stdout(number, max)) |>
+	raw.read_stdout(number, max) |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("read_stdout", code) }
 }
@@ -515,7 +518,7 @@ read_stdout = (Child(number), max) <- (raw : Process) {
 /// }
 /// ```
 read_stderr = (Child(number), max) <- (raw : Process) {
-	request.await_owned(raw.read_stderr(number, max)) |>
+	raw.read_stderr(number, max) |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("read_stderr", code) }
 }
@@ -543,7 +546,7 @@ read_stderr = (Child(number), max) <- (raw : Process) {
 /// }
 /// ```
 write_stdin = (Child(number), bytes) <- (raw : Process) {
-	request.await_owned(raw.write_stdin(number, bytes)) |>
+	raw.write_stdin(number, bytes) |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("write_stdin", code) }
 }
@@ -570,7 +573,7 @@ write_stdin = (Child(number), bytes) <- (raw : Process) {
 /// }
 /// ```
 close_stdin = (Child(number)) <- (raw : Process) {
-	request.await_owned(raw.close_stdin(number)) |>
+	raw.close_stdin(number) |>
 		(Ok(value)) { value }
 		& (Error(code)) { raise_error("close_stdin", code) }
 }

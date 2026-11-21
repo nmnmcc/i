@@ -202,16 +202,16 @@ Outcome(A) = Ran(A) | Expired | ClockFailed
 ///
 /// That path has no deterministic test yet. The only way to make a clock
 /// fail on demand is a fake service whose `sleep_ns` gives
-/// `request.ready(Error(...))`, and awaiting such an already-failed fake
+/// `Error(...)`, and awaiting such an already-failed fake
 /// request inside a child task hangs the runtime (a real host request error
 /// in a child task returns normally). The hang, without this module:
 ///
 /// ```i
 /// test = () {
 ///   broken = clock.Clock(
-///     monotonic_ns = () { request.ready(Ok(0)) },
-///     unix_ns = () { request.ready(Ok(0)) },
-///     sleep_ns = (n) { request.ready(Error("boom")) },
+///     monotonic_ns = () { Ok(0) },
+///     unix_ns = () { Ok(0) },
+///     sleep_ns = (n) { Error("boom") },
 ///   )
 ///   { task.scope((g) {
 ///     t = task.go(g, () {

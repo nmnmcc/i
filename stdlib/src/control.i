@@ -9,27 +9,27 @@
 )
 
 /// Makes a boundary `b` and does `body(b)`.
-@external("ilang:control", "boundary")
+@runtime("ilang:control", "boundary")
 boundary : <R, N>((Boundary(R, N)) <- N -> R) <- N -> R
 
 /// Pauses the computation back to the boundary `b`, and does `f(k)` in the
 /// place of the boundary.
-@external("ilang:control", "suspend")
+@runtime("ilang:control", "suspend")
 suspend : <R, N, A>(Boundary(R, N), (Continuation(A, R, N)) <- N -> R) -> A
 
 /// Ends the boundary `b` at once with `value`, as `suspend(b, (k) { cancel(k)
 /// value })` does, but without keeping the paused computation: no frame
 /// records are made, and `resource.ensure` functions inside `b` run as for an
 /// error.
-@external("ilang:control", "escape")
+@runtime("ilang:control", "escape")
 escape : <R, N>(Boundary(R, N), R) -> Never
 
 /// Goes on with the paused computation, with `value` as the value of `suspend`.
-@external("ilang:control", "resume")
+@runtime("ilang:control", "resume")
 resume : <A, R, N>(Continuation(A, R, N), A) <- N -> R
 
 /// Unwinds the paused computation.
-@external("ilang:control", "cancel")
+@runtime("ilang:control", "cancel")
 cancel : <A, R, N>(Continuation(A, R, N)) <- N -> ()
 
 /// Keeps the rest of the current environment; Fail comes from the later caller.
