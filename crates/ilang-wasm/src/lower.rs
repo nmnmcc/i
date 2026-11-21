@@ -4294,6 +4294,31 @@ impl<'a> Lowerer<'a> {
             });
             env = Env::Local(dst);
         }
+        if group.is_none() {
+            // `call` uses the ambient group; refuse a closed one with the
+            // same text as `call_in`.
+            let Some(owner) = self.out.request_owner else {
+                self.error(fx.module, span, "`hostcall.call` needs the request Owner");
+                return Some(finish(out, tail, Atom::Unit));
+            };
+            let value = fx.local(LocalType::Value);
+            out.push(Stmt::Let {
+                dst: value,
+                value: Value::Service(fx.env, owner),
+                site,
+            });
+            let open = self.library_callee("i/hostcall", "open_group");
+            let_value(
+                fx,
+                out,
+                Value::Call {
+                    callee: open,
+                    args: vec![Atom::Local(value)],
+                    env: fx.env,
+                },
+                site,
+            );
+        }
         let result = fx.local(LocalType::Value);
         let ready = |value: Atom| Stmt::Let {
             dst: result,

@@ -20,5 +20,5 @@ main = () {
 	outside = start("out")
 	hostcall.close(g)
 	assert(request.state(inside) == request.Cancelled())
-	assert(request.take(outside) == "out")
+	assert(request.await(outside) == "out")
 }
