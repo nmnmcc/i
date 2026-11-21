@@ -22,7 +22,7 @@ fake_net = (
 		receive_from = (id, max) { Ok(<<>>) },
 		local_address = (id) { Ok("127.0.0.1") },
 		datagram_port = (id) { Ok(1000) },
-		close_datagram = (id) { bind_closed },
+		close_datagram = (id) { request.take(bind_closed) },
 		listen = (address, port) { Ok(2) },
 		local_port = (id) { Ok(1001) },
 		accept = (id) { Ok(3) },
@@ -33,18 +33,18 @@ fake_net = (
 		shutdown_write = (id) { Ok(()) },
 		close_stream = (id) {
 			{ id == 3 } |>
-				(True()) { accept_closed }
-				& (False()) { connect_closed }
+				(True()) { request.take(accept_closed) }
+				& (False()) { request.take(connect_closed) }
 		},
-		close_listener = (id) { listen_closed },
+		close_listener = (id) { request.take(listen_closed) },
 	)
 }
 
 test("net_scope_owns_handles_test", () {
-	listen_closed = ()
-	connect_closed = ()
-	accept_closed = ()
-	bind_closed = ()
+	listen_closed = request.ready(())
+	connect_closed = request.ready(())
+	accept_closed = request.ready(())
+	bind_closed = request.ready(())
 	fake = fake_net(listen_closed, connect_closed, accept_closed, bind_closed)
 	resource.scoped(() {
 		listener = net.listen("127.0.0.1", 0) <- (fake)
