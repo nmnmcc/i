@@ -6,7 +6,6 @@
 (
 	i/control
 	i/fail
-	i/request
 )
 
 @host("test:async/v1", "async")
@@ -16,7 +15,7 @@ Paused = (
 	Continuation(
 		(),
 		Step,
-		Fail(String) | Later | request.Await | request.Owner,
+		Fail(String) | Later,
 	),
 )
 Done = (Int)

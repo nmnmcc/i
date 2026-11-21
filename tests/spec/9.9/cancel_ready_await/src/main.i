@@ -9,7 +9,7 @@
 	i/fail
 )
 
-probe = (wait : () <- (request.Await) -> ()) {
+probe = (wait : () -> ()) {
 	result = fail.catch(() {
 		task.scope((s) {
 			armed : task.Channel(()) = task.channel()

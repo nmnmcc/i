@@ -1,6 +1,6 @@
 {
-  "compiler": "8633c6bc2cf1321ddafa65bfc64278519e3c6a57",
-  "binary_sha256": "06c337b2d3a126d2a38655ebaf9a9ac4f061cbfba747e20affb0b1da839617af",
+  "compiler": "62a02de1d2595f8288886ae0ecedd21c7bcf75a7",
+  "binary_sha256": "76b4cf09fe4eabdeb39111c1104bd3e5908f28d01185ed349bfdcc8bafcf6b6d",
   "kind": "observation; semantic requirements are separate",
   "bound_seconds": 10,
   "outcome": {
@@ -10,7 +10,7 @@
         "--types"
       ],
       "exit": 0,
-      "stdout": "asyncprobe/main.work : (Float) <- (Pause, request.Await, request.Owner) -> Float\n",
+      "stdout": "asyncprobe/main.work : (Float) <- (Pause) -> Float\n",
       "stderr": ""
     },
     "test0": {

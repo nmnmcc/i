@@ -7,8 +7,8 @@
 	i/request
 )
 
-ready_wait = <A>(r : Request(A)) <- (await : request.Await) {
-	await.wait(request.ticket(r))
+ready_wait = <A>(r : Request(A)) {
+	request.wait_any([request.ticket(r)])
 }
 
 main = () {
