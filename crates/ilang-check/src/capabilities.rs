@@ -13,7 +13,11 @@ fn reaches_compiler(program: &Program, initial: impl IntoIterator<Item = DefId>)
             continue;
         }
         match &program.def(id).kind {
-            DefKind::External { module, .. } if module.starts_with("i:compiler/") => return true,
+            DefKind::External { module, .. } | DefKind::Runtime { module, .. }
+                if module.starts_with("i:compiler/") =>
+            {
+                return true;
+            }
             DefKind::Binding { .. } if program.module(id.module).path == "i/syntax" => return true,
             DefKind::Binding { binding, .. } => {
                 let b = &program.module(id.module).bindings[*binding as usize].binding;

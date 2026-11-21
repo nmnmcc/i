@@ -1,0 +1,3 @@
+src/main.i:11:24: error[E0325]: `i/request.Await` is an implicit service: it is not written in a need, and inference carries it
+src/main.i:13:19: error[E0325]: `i/request.Owner` is an implicit service: it is not written in a need, and inference carries it
+src/main.i:13:34: error[E0325]: `i/task.Scheduler` is an implicit service: it is not written in a need, and inference carries it

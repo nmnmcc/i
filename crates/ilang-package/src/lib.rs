@@ -34,6 +34,7 @@ pub mod code {
     pub const BAD_VERSION: &str = "E0608";
     pub const PATH_DEPENDENCY: &str = "E0609";
     pub const WASM_EXPORT: &str = "E0610";
+    pub const HOSTCALL_VALUE: &str = "E0616";
     // The code "E0620" is not assigned.
     pub const NO_PACKAGE: &str = "E0621";
     pub const PACKAGE_CIRCLE: &str = "E0622";
@@ -259,6 +260,8 @@ pub struct Package {
     pub entries: Vec<(String, WasmExport)>,
     /// For a package got by location: its location and version.
     pub location: Option<PackageLocation>,
+    /// `hostcall = true` in its manifest; always on for the library `i`.
+    pub hostcall: bool,
 }
 
 impl Package {
@@ -667,6 +670,7 @@ impl Loader {
                 })
                 .collect(),
             location: None,
+            hostcall: manifest.hostcall || manifest.name == LIBRARY_NAME,
         });
         self.by_dir.insert(dir.clone(), id);
         self.stack.push(Node::Dir(dir.clone()));
@@ -752,6 +756,7 @@ impl Loader {
             wasm_synchronous: Vec::new(),
             entries: Vec::new(),
             location: Some(loc.clone()),
+            hostcall: manifest.hostcall || manifest.name == LIBRARY_NAME,
         });
         self.by_key.insert(key.clone(), id);
         // A package got by location may not have path dependencies.

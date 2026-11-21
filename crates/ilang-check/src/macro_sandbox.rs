@@ -32,11 +32,12 @@ pub fn foreign_externals(
             continue;
         }
         match &program.def(id).kind {
-            DefKind::External { .. } => {
+            DefKind::External { .. } | DefKind::Runtime { .. } => {
                 if !graph.is_language(program.module(id.module).package) {
                     foreign.insert(id);
                 }
             }
+            DefKind::ServiceAccessor { .. } => {}
             DefKind::Binding { binding, .. } => {
                 let binding = &program.module(id.module).bindings[*binding as usize].binding;
                 queue.extend(

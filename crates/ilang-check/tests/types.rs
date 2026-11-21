@@ -105,7 +105,7 @@ fn same_as_text(program: &Program, types: &Typed) {
                 module,
                 index: index as u32,
             };
-            let wanted = d.exported || matches!(d.kind, DefKind::External { .. });
+            let wanted = d.exported || d.kind.declared().is_some();
             match (types.schemes.get(&id), types.scheme_types.get(&id)) {
                 (Some(text), Some(tree)) => {
                     assert!(

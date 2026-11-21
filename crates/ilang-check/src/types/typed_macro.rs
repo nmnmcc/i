@@ -1139,6 +1139,7 @@ mod tests {
             exported: true,
             constructors_exported: true,
             host: None,
+            import: None,
             deprecated: None,
         });
         TypedMacroQuery {

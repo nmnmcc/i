@@ -200,7 +200,9 @@ impl Query<'_> {
                 let v = match self.canonical(m, Target::Local(*v)) {
                     Target::Def(d) => match self.program.def(d).kind {
                         DefKind::Binding { var, .. } => var,
-                        DefKind::External { .. } => *v,
+                        DefKind::External { .. }
+                        | DefKind::Runtime { .. }
+                        | DefKind::ServiceAccessor { .. } => *v,
                     },
                     _ => *v,
                 };
@@ -208,7 +210,9 @@ impl Query<'_> {
             }
             ExprKind::Name(ValueRef::Def(d)) => match self.program.def(*d).kind {
                 DefKind::Binding { var, .. } => self.var_types(var),
-                DefKind::External { .. } => Vec::new(),
+                DefKind::External { .. }
+                | DefKind::Runtime { .. }
+                | DefKind::ServiceAccessor { .. } => Vec::new(),
             },
             _ => Vec::new(),
         };
@@ -697,13 +701,16 @@ impl Query<'_> {
                             _ => Vec::new(),
                         }
                     }
-                    Some(DefKind::External { ty, .. }) => match &ty.kind {
-                        TypeKind::Fn { params, .. } => params
-                            .iter()
-                            .map(|x| x.label.as_ref().map(|l| l.name.clone()))
-                            .collect(),
-                        _ => Vec::new(),
-                    },
+                    Some(DefKind::ServiceAccessor { .. }) => Vec::new(),
+                    Some(DefKind::External { ty, .. } | DefKind::Runtime { ty, .. }) => {
+                        match &ty.kind {
+                            TypeKind::Fn { params, .. } => params
+                                .iter()
+                                .map(|x| x.label.as_ref().map(|l| l.name.clone()))
+                                .collect(),
+                            _ => Vec::new(),
+                        }
+                    }
                     None => Vec::new(),
                 };
                 match shown {
