@@ -623,7 +623,7 @@ min : <A, N>(List(A), (A, A) <- N -> Order) <- N -> Option(A)
 
 Persistent hash-trie dictionaries. Reference: E `HashMap.ts`, `Record.ts`; G `dict.gleam`; Go `maps/maps.go`.
 
-Keep all algorithms; has→contains. Add same_entries, using lookup rather than representation equality. group stays here.
+Keep all algorithms; `has` is `contains`. Add same_entries, using lookup rather than representation equality. group stays here.
 
 ```text
 Dict(K,V) = private
@@ -634,8 +634,7 @@ get : <K, V>(Dict(K, V), K) -> Option(V)
 contains : <K, V>(Dict(K, V), K) -> Bool
 insert : <K, V>(Dict(K, V), K, V) -> Dict(K, V)
 delete : <K, V>(Dict(K, V), K) -> Dict(K, V)
-upsert : <K, V, N>( Dict(K, V), K, (Option(V)) <- N -> V ) <- N -> Dict(K, V)
-update : <K, V, N>(Dict(K, V), K, (V) <- N -> V) <- N -> Dict(K, V)
+update : <K, V, N>( Dict(K, V), K, (Option(V)) <- N -> V ) <- N -> Dict(K, V)
 from_list : <K, V>(List((K, V))) -> Dict(K, V)
 to_list : <K, V>(Dict(K, V)) -> List((K, V))
 keys : <K, V>(Dict(K, V)) -> List(K)
