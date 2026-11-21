@@ -25,7 +25,7 @@ fn project(name: &str, source: &str) -> PathBuf {
     std::fs::write(
         dir.join("i.toml"),
         format!(
-            "name = {name:?}\n[dependencies]\ni = {{ path = {:?} }}\n",
+            "name = {name:?}\nhostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
             library.to_str().unwrap()
         ),
     )
@@ -295,7 +295,15 @@ fn serve_clients(project: &Path, workers: Option<usize>, clients: usize) -> Stri
         .unwrap();
     let port: u16 = line
         .strip_prefix("listening ")
-        .unwrap()
+        .unwrap_or_else(|| {
+            let _ = server.0.kill();
+            let mut err = String::new();
+            if let Some(mut e) = server.0.stderr.take() {
+                use std::io::Read;
+                let _ = e.read_to_string(&mut err);
+            }
+            panic!("server did not listen: {line:?} {err}")
+        })
         .trim()
         .parse()
         .unwrap();
@@ -366,13 +374,13 @@ echo = (stream) {
 // the connection tasks, and each connection task opens the scope that owns
 // its stream.
 listen_raw = () <- (raw : net.Net) {
-	request.await(raw.listen(\"127.0.0.1\", 0)) |>
+	raw.listen(\"127.0.0.1\", 0) |>
 		(Ok(number)) { net.Listener(number) }
 		& (Error(code)) { panic(\"listen: \" <> code) }
 }
 
 accept_raw = (net.Listener(number)) <- (raw : net.Net) {
-	request.await(raw.accept(number)) |>
+	raw.accept(number) |>
 		(Ok(value)) { net.Stream(value) }
 		& (Error(code)) { panic(\"accept: \" <> code) }
 }

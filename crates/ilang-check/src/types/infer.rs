@@ -1791,9 +1791,8 @@ impl<'a> Checker<'a> {
     /// `N` in `M` for two environments, with problems reported
     /// at `span`, and `other` the place of the written type.
     fn sub_env(&mut self, l: &Ty, r: &Ty, span: Span, other: Option<Span>) {
-        let l = self.s.ambient(l);
-        self.fix_notes = self.fixed_reached(&l, r);
-        self.s.constrain_env(&l, r);
+        self.fix_notes = self.fixed_reached(l, r);
+        self.s.constrain_env(l, r);
         self.flush(span, other);
     }
 
@@ -1905,19 +1904,8 @@ impl<'a> Checker<'a> {
                     })
                     .collect();
                 let ret = self.conv(ret, local);
-                // A written row carries the implicit services too; a type
-                // with no row stays open.
                 let env = match env {
-                    Some(e) if !matches!(e.kind, TypeKind::Hole) => {
-                        let mut row = vec![self.conv_mode(e, local, Mode::Env)];
-                        row.extend(
-                            self.p
-                                .implicit_services
-                                .iter()
-                                .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new())),
-                        );
-                        self.env_union(row, t.span)
-                    }
+                    Some(e) if !matches!(e.kind, TypeKind::Hole) => self.conv_mode(e, local, Mode::Env),
                     _ => Ty::Never,
                 };
                 Ty::Fn(Box::new(FnTy::new(params, ret, env)))
