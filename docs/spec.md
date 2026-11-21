@@ -2419,21 +2419,21 @@ An entry that needs a service its target does not give is the compile error
 
 | Function | What it does |
 |---|---|
-| `bind` | Bind a UDP datagram socket to an address and port (0 selects a port). |
+| `bind` | Bind a UDP datagram socket to an address and port (0 selects a port). The socket belongs to the current resource scope. |
 | `send_to` | Send one datagram to an address and port. |
 | `receive_from` | Receive one datagram and its sender address and port. |
 | `local_address` | Read a datagram socket's numeric local address. |
-| `close_datagram` | Close a datagram socket. |
-| `listen` | Listen for TCP connections. |
+| `close_datagram` | Close a datagram socket. Closing a closed socket does nothing; the owning scope calls this. |
+| `listen` | Listen for TCP connections. The listener belongs to the current resource scope. |
 | `local_port` | Read a listener or datagram socket’s local port. |
-| `accept` | Accept a TCP connection. |
-| `connect` | Connect to a host and port. |
+| `accept` | Accept a TCP connection. The stream belongs to the current resource scope. |
+| `connect` | Connect to a host and port. The stream belongs to the current resource scope. |
 | `resolve` | Resolve a host name to addresses. |
 | `read` | Read bytes from a stream. |
 | `write` | Write bytes to a stream. |
 | `shutdown_write` | Shut down the stream’s write side. |
-| `close_stream` | Close a stream. |
-| `close_listener` | Close a listener. |
+| `close_stream` | Close a stream. Closing a closed stream does nothing; the owning scope calls this. |
+| `close_listener` | Close a listener. Closing a closed listener does nothing; the owning scope calls this. |
 | `stream_number` | Return the underlying stream number. |
 | `byte_stream` | Make a byte stream interface for a connection. |
 
@@ -2443,14 +2443,14 @@ An entry that needs a service its target does not give is the compile error
 |---|---|
 | `options` | Make default TLS options. |
 | `identity` | Make a certificate and key identity. |
-| `connect` | Establish client TLS on a connected stream. |
-| `accept` | Establish server TLS on a connected stream. |
-| `dial` | Connect to a host and establish client TLS. |
+| `connect` | Establish client TLS on a connected stream. The TLS stream belongs to the current resource scope. |
+| `accept` | Establish server TLS on a connected stream. The TLS stream belongs to the current resource scope. |
+| `dial` | Connect to a host and establish client TLS. The TCP and TLS streams both belong to the current resource scope. |
 | `alpn` | Read the negotiated ALPN protocol. |
 | `read` | Read bytes from a TLS stream. |
 | `write` | Write bytes to a TLS stream. |
 | `shutdown_write` | Shut down the TLS stream’s write side. |
-| `close` | Close a TLS stream. |
+| `close` | Close a TLS stream. Closing a closed stream does nothing; the owning scope calls this. |
 | `byte_stream` | Make a byte stream interface for a TLS stream. |
 
 ## 10. The host boundary
