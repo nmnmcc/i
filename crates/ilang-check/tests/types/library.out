@@ -1,6 +1,6 @@
 $prelude.panic : (String) -> Never
 $prelude.assert : (Bool) <- (Assert) -> ()
-i/assertion.catch : (() <- (Assert, ..N) -> A) <- N -> Result(A, AssertionFailure)
+i/assertion.catch : (() <- N -> A) <- (N - Assert) -> Result(A, AssertionFailure)
 i/big.sign : (Int) -> Int
 i/big.digits : (Int) -> List(Int)
 i/big.from_digits : (Int, List(Int)) -> Int
@@ -314,21 +314,21 @@ i/dict.remove_entry : (List((A, B)), A, List((A, B))) -> Option(List((A, B)))
 i/dict.upsert : (Dict(A, B), A, (Option(B)) <- N -> B) <- N -> Dict(A, B)
 i/dict.update : (Dict(A, B), A, (B) <- N -> B) <- N -> Dict(A, B)
 i/dict.from_list : (List((A, B))) -> Dict(A, B)
-i/dict.fold : (Dict(A, B), C, (C, A, B) <- (N & N2) -> C) <- (..N, ..N2) -> C
-i/dict.fold_node : (Node(A, B), C, (C, A, B) <- (N & N2) -> C) <- (..N, ..N2) -> C
+i/dict.fold : (Dict(A, B), C, (C, A, B) <- N -> C) <- N -> C
+i/dict.fold_node : (Node(A, B), C, (C, A, B) <- N -> C) <- N -> C
 i/dict.fold_entries : (List((A, B)), C, (C, A, B) <- N -> C) <- N -> C
 i/dict.to_list : (Dict(A, B)) -> List((A, B))
 i/dict.keys : (Dict(A, B)) -> List(A)
 i/dict.values : (Dict(A, B)) -> List(B)
-i/dict.each : (Dict(A, B), (A, B) <- (N & N2) -> C) <- (..N, ..N2) -> ()
-i/dict.map_values : (Dict(A, B), (A, B) <- (N & N2) -> C) <- (..N, ..N2) -> Dict(A, C)
-i/dict.map_node : (Node(A, B), (A, B) <- (N & N2) -> C) <- (..N, ..N2) -> Node(A, C)
+i/dict.each : (Dict(A, B), (A, B) <- N -> C) <- N -> ()
+i/dict.map_values : (Dict(A, B), (A, B) <- N -> C) <- N -> Dict(A, C)
+i/dict.map_node : (Node(A, B), (A, B) <- N -> C) <- N -> Node(A, C)
 i/dict.map_entries : (List((A, B)), (A, B) <- N -> C, List((A, C))) <- N -> List((A, C))
-i/dict.filter : (Dict(A, B), (A, B) <- (N & N2) -> Bool) <- (..N, ..N2) -> Dict(A, B)
+i/dict.filter : (Dict(A, B), (A, B) <- N -> Bool) <- N -> Dict(A, B)
 i/dict.take : (Dict(A, B), List(A)) -> Dict(A, B)
 i/dict.drop : (Dict(A, B), List(A)) -> Dict(A, B)
 i/dict.merge : (Dict(A, B), Dict(A, B)) -> Dict(A, B)
-i/dict.combine : (Dict(A, B), Dict(A, B), (B, B) <- (N & N2) -> B) <- (..N, ..N2) -> Dict(A, B)
+i/dict.combine : (Dict(A, B), Dict(A, B), (B, B) <- N -> B) <- N -> Dict(A, B)
 i/dict.group : (List(A), (A) <- N -> B) <- N -> Dict(B, List(A))
 i/dict.same_entries : (Dict(A, B), Dict(C, D)) -> Bool
 i/dict.reverse_onto : (List(A), List(A)) -> List(A)
@@ -582,9 +582,9 @@ i/http.header_lines : (List((String, BitArray))) -> BitArray
 i/http.reason : (Int) -> String
 i/http.hex_string : (Int) -> String
 i/http.lowercase : (String) -> String
-i/http.serve : (net.Listener, (Request) <- (Fail(B), resource.Scope, { Fail(A) | resource.Scope | N } & { Fail(A) | N } & { resource.Scope | { Fail(A) | N | resource.Scope } & { Fail(A) | N } }) -> Response) <- (Fail(A | net.NetError), net.Net, ..N) -> ()
-i/http.serve_stream : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray, trailers = () -> AnyHeaders)) <- (Fail(B), resource.Scope, { Fail(A) | resource.Scope | N } & { Fail(A) | N } & { resource.Scope | { Fail(A) | N | resource.Scope } & { Fail(A) | N } }) -> Response) <- (Fail(A | net.NetError), net.Net, ..N) -> ()
-i/http.accept_loop : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray, trailers = () -> AnyHeaders)) <- (Fail(B), N & { Fail(A) | N & { resource.Scope | N2 } | resource.Scope } & { resource.Scope | N2 & { Fail(A) | N & { resource.Scope | N2 } | resource.Scope } }, resource.Scope) -> Response, task.Group(A)) <- (Fail(net.NetError), net.Net, ..N, ..N2) -> ()
+i/http.serve : (net.Listener, (Request) <- (Fail(A), resource.Scope, ..N) -> Response) <- (Fail(net.NetError), net.Net, ..N) -> ()
+i/http.serve_stream : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray, trailers = () -> AnyHeaders)) <- (Fail(A), resource.Scope, ..N) -> Response) <- (Fail(net.NetError), net.Net, ..N) -> ()
+i/http.accept_loop : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray, trailers = () -> AnyHeaders)) <- (Fail(A), resource.Scope, ..N) -> Response, task.Group(B)) <- (Fail(net.NetError), net.Net, ..N) -> ()
 i/http.connection_loop : (net.Stream, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray, trailers = () -> AnyHeaders)) <- (Fail(A), ..N) -> Response, BitArray) <- (Fail(net.NetError), net.Net, ..N) -> ()
 i/http.write_server_reply : (net.Stream, Response, Bool) <- (Fail(net.NetError), net.Net) -> ()
 i/http.request_framing : (AnyHeaders) <- (Fail(BadMessage)) -> BodyFraming
@@ -621,7 +621,7 @@ i/http.read_progress : ((read = (65536) <- N -> BitArray, write = A), Method, Bi
 i/http._body_json_result : (Response) -> Result(json.Json, BodyError)
 i/http._body_decode_result : (Response, schema.Schema(A, schema.SchemaError)) -> Result(A, BodyError)
 i/http.send_with : ((Request) <- N -> Response, Request) <- N -> Response
-i/http.send_timeout : ((Request) <- (Fail(A | HttpError), ..N) -> Response, Request, Int) <- (Fail(A | HttpError | clock.ClockError), clock.Clock, ..N) -> Response
+i/http.send_timeout : ((Request) <- (Fail(A | HttpError), { Fail(Never) | N } & { Fail(A) | N }) -> Response, Request, Int) <- (Fail(A | HttpError | clock.ClockError), clock.Clock, ..N) -> Response
 i/http.route : (Method, String, Request) -> Option(List((String, String)))
 i/http.match_segments : (List(String), List(String)) -> Option(List((String, String)))
 i/http.net_transport : (net.Stream) -> (read = (Int) <- (Fail(Connect), net.Net) -> BitArray, write = (BitArray) <- (Fail(Connect), net.Net) -> ())
@@ -762,16 +762,16 @@ i/list._strict_zip_result : (List(A), List(B)) -> Result(List((A, B)), ())
 i/list.unzip : (List((A, B))) -> (List(A), List(B))
 i/list.intersperse : (List(A), A) -> List(A)
 i/list.unique : (List(A)) -> List(A)
-i/list.sort : (List(A), (A, A) <- ({ N & { N2 & N } & { N3 & N } } & { N4 & N5 }) -> Order) <- (..N, ..N2, ..N3, ..N4, ..N5) -> List(A)
-i/list.runs : (List(A), (A, A) <- (N & { N2 & N } & { N3 & N }) -> Order, List(List(A))) <- (..N, ..N2, ..N3) -> List(List(A))
-i/list.ascending : (List(A), A, List(A), (A, A) <- (N & { N2 & N & { N3 & N2 } }) -> Order, List(List(A))) <- (..N, ..N2, ..N3) -> List(List(A))
-i/list.descending : (List(A), A, List(A), (A, A) <- (N & { N2 & { N3 & N2 } & N }) -> Order, List(List(A))) <- (..N, ..N2, ..N3) -> List(List(A))
+i/list.sort : (List(A), (A, A) <- N -> Order) <- N -> List(A)
+i/list.runs : (List(A), (A, A) <- N -> Order, List(List(A))) <- N -> List(List(A))
+i/list.ascending : (List(A), A, List(A), (A, A) <- N -> Order, List(List(A))) <- N -> List(List(A))
+i/list.descending : (List(A), A, List(A), (A, A) <- N -> Order, List(List(A))) <- N -> List(List(A))
 i/list.flip : (Direction) -> Direction
-i/list.merge_all : (List(List(A)), (A, A) <- (N & N2) -> Order) <- (..N, ..N2) -> List(A)
-i/list.rounds : (List(List(A)), Direction, (A, A) <- (N & N2) -> Order) <- (..N, ..N2) -> List(A)
-i/list.next_round : (List(List(A)), Direction, (A, A) <- (N & N2) -> Order, List(List(A))) <- (..N, ..N2) -> List(List(A))
+i/list.merge_all : (List(List(A)), (A, A) <- N -> Order) <- N -> List(A)
+i/list.rounds : (List(List(A)), Direction, (A, A) <- N -> Order) <- N -> List(A)
+i/list.next_round : (List(List(A)), Direction, (A, A) <- N -> Order, List(List(A))) <- N -> List(List(A))
 i/list.flip_run : (List(A)) -> List(A)
-i/list.merge_pair : (List(A), List(A), Direction, (A, A) <- (N & N2) -> Order) <- (..N, ..N2) -> List(A)
+i/list.merge_pair : (List(A), List(A), Direction, (A, A) <- N -> Order) <- N -> List(A)
 i/list.merge_down : (List(A), List(A), (A, A) <- N -> Order, List(A)) <- N -> List(A)
 i/list.merge_up : (List(A), List(A), (A, A) <- N -> Order, List(A)) <- N -> List(A)
 i/list.range : (Int, Int) -> List(Int)
@@ -1132,7 +1132,7 @@ i/resource.gate_state : (Request(A)) -> Result(A, Int)
 i/resource.gate_take : (Request(A)) -> A
 i/resource.pure_release : ((A) <- N -> ()) <- N -> (A) -> ()
 i/resource.acquire : (() <- (Fail(B), ..N) -> A, (A) <- N -> ()) <- (Fail(B), Scope, ..N) -> A
-i/resource.scoped : (() <- (N & { Scope | N2 }, Scope) -> A) <- (..N, ..N2) -> A
+i/resource.scoped : (() <- (Scope, ..N) -> A) <- N -> A
 i/result.is_ok : (Result(A, B)) -> Bool
 i/result.is_error : (Result(A, B)) -> Bool
 i/result.map : (Result(A, B), (A) <- N -> C) <- N -> Result(C, B)
@@ -1196,7 +1196,7 @@ i/schema.tagged_union : (String, List((String, Schema(A, SchemaError))), (A) -> 
 i/schema.decode : (Schema(A, B), json.Json) <- (Fail(B)) -> A
 i/schema.parse : (Schema(A, SchemaError), String) <- (Fail(ParseError)) -> A
 i/semaphore.new : (Int) <- (Fail(InvalidPermits), resource.Scope) -> Semaphore
-i/semaphore.with_permits : (Semaphore, Int, () <- (N & N2) -> A) <- (Fail(InvalidPermits), ..N, ..N2) -> A
+i/semaphore.with_permits : (Semaphore, Int, () <- N -> A) <- (Fail(InvalidPermits), ..N) -> A
 i/semaphore.with_permit : (Semaphore, () <- N -> A) <- N -> A
 i/semaphore.available : (Semaphore) -> Int
 i/semaphore.hold : (Semaphore, Int, () <- N -> A) <- N -> A
@@ -1221,9 +1221,9 @@ i/sequence.split : (Sequence(A), Int) -> (Sequence(A), Sequence(A))
 i/sequence.take : (Sequence(A), Int) -> Sequence(A)
 i/sequence.drop : (Sequence(A), Int) -> Sequence(A)
 i/sequence.reverse : (Sequence(A)) -> Sequence(A)
-i/sequence.map : (Sequence(A), (A) <- (N & N2 & N3) -> B) <- (..N, ..N2, ..N3) -> Sequence(B)
-i/sequence.fold : (Sequence(A), B, (B, A) <- (N & N2 & N3) -> B) <- (..N, ..N2, ..N3) -> B
-i/sequence.each : (Sequence(A), (A) <- (N & N2 & N3) -> B) <- (..N, ..N2, ..N3) -> ()
+i/sequence.map : (Sequence(A), (A) <- N -> B) <- N -> Sequence(B)
+i/sequence.fold : (Sequence(A), B, (B, A) <- N -> B) <- N -> B
+i/sequence.each : (Sequence(A), (A) <- N -> B) <- N -> ()
 i/sequence.to_list : (Sequence(A)) -> List(A)
 i/sequence.same_elements : (Sequence(A), Sequence(B)) -> Bool
 i/sequence.node_size : (Leaf(A) | Branch2(B) | Branch3(C)) -> Int
@@ -1255,9 +1255,9 @@ i/sequence.set_tree : (Tree(A), Int, A) -> Tree(A)
 i/sequence.reverse_node : (Node(A)) -> Node(A)
 i/sequence.reverse_tree : (Tree(A)) -> Tree(A)
 i/sequence.map_node : (Node(A), (A) <- N -> B) <- N -> Node(B)
-i/sequence.map_tree : (Tree(A), (A) <- (N & N2 & N3) -> B) <- (..N, ..N2, ..N3) -> Tree(B)
+i/sequence.map_tree : (Tree(A), (A) <- N -> B) <- N -> Tree(B)
 i/sequence.fold_node : (Node(A), B, (B, A) <- N -> B) <- N -> B
-i/sequence.fold_tree : (Tree(A), B, (B, A) <- (N & N2 & N3) -> B) <- (..N, ..N2, ..N3) -> B
+i/sequence.fold_tree : (Tree(A), B, (B, A) <- N -> B) <- N -> B
 i/set.new : () -> Set(Never)
 i/set.size : (Set(A)) -> Int
 i/set.is_empty : (Set(A)) -> Bool
@@ -1266,10 +1266,10 @@ i/set.delete : (Set(A), A) -> Set(A)
 i/set.contains : (Set(A), B) -> Bool
 i/set.to_list : (Set(A)) -> List(A)
 i/set.from_list : (List(A)) -> Set(A)
-i/set.fold : (Set(A), B, (B, A) <- (N & N2) -> B) <- (..N, ..N2) -> B
-i/set.each : (Set(A), (A) <- (N & N2) -> B) <- (..N, ..N2) -> ()
-i/set.map : (Set(A), (A) <- (N & N2) -> B) <- (..N, ..N2) -> Set(B)
-i/set.filter : (Set(A), (A) <- (N & N2) -> Bool) <- (..N, ..N2) -> Set(A)
+i/set.fold : (Set(A), B, (B, A) <- N -> B) <- N -> B
+i/set.each : (Set(A), (A) <- N -> B) <- N -> ()
+i/set.map : (Set(A), (A) <- N -> B) <- N -> Set(B)
+i/set.filter : (Set(A), (A) <- N -> Bool) <- N -> Set(A)
 i/set.take : (Set(A), List(A)) -> Set(A)
 i/set.drop : (Set(A), List(A)) -> Set(A)
 i/set.union : (Set(A), Set(A)) -> Set(A)
@@ -1512,7 +1512,7 @@ i/task.add_task : (State, TaskState) -> State
 i/task.set_scope : (State, ScopeState) -> State
 i/task.guarded : (Scheduler, Maybe(Address), () -> Completion) -> Completion
 i/task.complete : (() <- (Fail(B), ..N) -> A, Key(Result(A, B)), Key(B), Bool) <- N -> Completion
-i/task.make_start : (() <- (Fail(B), ..N) -> A, Key(Result(A, B)), Key(B), Bool) <- N -> Start
+i/task.make_start : (() <- (Fail(B), N & { Fail(Never) | N2 }) -> A, Key(Result(A, B)), Key(B), Bool) <- (..N, ..N2) -> Start
 i/task.worker_enabled : () -> Bool
 i/task.worker_publish : (Job) -> Int
 i/task.worker_claim : (Int) -> Bool
@@ -1629,8 +1629,8 @@ i/task.loop : (State) -> RunReply
 i/task.scope_call_body : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
 i/task.scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), ..N) -> B
 i/task.local_scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), ..N) -> B
-i/task.go_key : (Group(A), () <- (Fail(A), ..N) -> B, Key(Result(B, A))) <- N -> Task(B, A)
-i/task.go : (Group(A), () <- (Fail(A), ..N) -> B) <- N -> Task(B, A)
+i/task.go_key : (Group(A), () <- (Fail(A), N & { Fail(Never) | N2 }) -> B, Key(Result(B, A))) <- (..N, ..N2) -> Task(B, A)
+i/task.go : (Group(A), () <- (Fail(A), N & { Fail(A) | { Fail(Never) | N } & N }) -> B) <- N -> Task(B, A)
 i/task.branch_at : (List(Branch(A, B, C)), Int) -> Branch(A, B, C)
 i/task.sync_body : (Event(A, B, C), Scheduler) <- (Fail(B), ..C) -> A
 i/task.always : (A) -> Event(A, Never, Never)
@@ -1653,17 +1653,17 @@ i/task.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B
 i/task.ref : (A) -> Ref(A)
 i/task.update : (Ref(A), (A) -> (A, B)) -> B
 i/task.both : (() <- (Fail(B), ..N) -> A, () <- (Fail(B), ..N) -> C) <- (Fail(B), ..N) -> (A, C)
-i/task.race : (() <- (Fail(B), ..N) -> A, () <- (Fail(B), ..N) -> A) <- (Fail(B), ..N) -> A
+i/task.race : (() <- (Fail(B), { Fail(Never) | N } & { Fail(B) | N }) -> A, () <- (Fail(B), { Fail(Never) | N } & { Fail(B) | N }) -> A) <- (Fail(B), ..N) -> A
 i/task.spawn_values : (Group(A), List(B), (B) <- (Fail(A), ..N) -> C) <- N -> List(Task(C, A))
 i/task.join_values : (List(Task(A, B & C))) <- (Fail(C)) -> List(A)
 i/task.map_concurrently : (List(A), (A) <- (Fail(C), ..N) -> B) <- (Fail(C), ..N) -> List(B)
-i/task.execute_body : (() <- (Fail(B), ..N) -> A, Runner, rng.Generator, Policy) <- N -> Result(Result(A, B), NotRunnable)
+i/task.execute_body : (() <- (Fail(B), N & { Fail(B) | N2 & { Fail(Never) | N3 } }) -> A, Runner, rng.Generator, Policy) <- (..N, ..N2, ..N3) -> Result(Result(A, B), NotRunnable)
 i/task.run : (() <- N -> A) <- N -> A
-i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(B), ..N) -> A) <- (Fail(B | NotRunnable), ..N) -> A
+i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | N2 } & { N2 | Fail(Never) } } & { N2 | Fail(Never) } }) -> A) <- (Fail(B | NotRunnable), ..N, ..N2) -> A
 i/task._entry : (() <- N -> A) <- N -> A
 i/task.scope_call : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
-i/task.execute : (() <- (Fail(B), ..N) -> A, Runner, rng.Generator, Policy) <- N -> Result(Result(A, B), NotRunnable)
-i/task.sync : (Event(A, B, C | Fail(B) | Runner | Scheduler | request.Await | request.Owner | request.Root)) <- (Fail(B), ..C) -> A
+i/task.execute : (() <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | N2 } & { N2 | Fail(Never) } } & { N2 | Fail(Never) } }) -> A, Runner, rng.Generator, Policy) <- (..N, ..N2) -> Result(Result(A, B), NotRunnable)
+i/task.sync : (Event(A, B, C | Fail(B))) <- (Fail(B), ..C) -> A
 i/task.root_active : (Key(()), Active) -> ContinueRun
 i/task.cause_allowed : (State, TaskState, Cause) -> Bool
 i/task.frame_abort : (List(Frame)) -> Maybe(() -> Never)
@@ -1724,7 +1724,7 @@ i/time.sleep : (Duration) <- (Fail(clock.ClockError), clock.Clock) -> ()
 i/time.measure : (() <- N -> A) <- (Fail(clock.ClockError), clock.Clock, ..N) -> (A, Duration)
 i/time.divide : (Duration, Int) <- (Fail(DivisionByZero)) -> Duration
 i/time.max_timeout : 9223372036854775807
-i/time.timeout : (Duration, () <- (Fail(B), ..N) -> A) <- (Fail(BadDeadline | Timeout | B | clock.ClockError), clock.Clock, ..N) -> A
+i/time.timeout : (Duration, () <- (Fail(B), { Fail(Never) | N } & { Fail(B) | N }) -> A) <- (Fail(BadDeadline | Timeout | B | clock.ClockError), clock.Clock, ..N) -> A
 i/tls.options : () -> (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)
 i/tls.identity : (BitArray, BitArray) -> (cert = BitArray, key = BitArray)
 i/tls.join : (List(String)) -> String

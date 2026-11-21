@@ -6,7 +6,7 @@ fixed : () -> Int
 collect : (() <- (Yield(A), ..N) -> ()) <- N -> List(A)
 numbers : () -> List(Int)
 my_assert : (Bool) <- (Assert) -> ()
-catch : (() <- (Assert, ..N) -> A) <- N -> Result(A, AssertionFailure)
+catch : (() <- N -> A) <- (N - Assert) -> Result(A, AssertionFailure)
 checked : () -> Result(1, AssertionFailure)
 checked_library : () -> Result("x", AssertionFailure)
 inc : (A & Int) -> A
