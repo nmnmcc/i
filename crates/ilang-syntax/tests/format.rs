@@ -16,7 +16,74 @@ mod native_shape;
 use ilang_syntax::format::format;
 use ilang_syntax::lex;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+
+fn write_then_rename(temporary: &Path, path: &Path, content: &str) -> std::io::Result<()> {
+    let mut file = fs::File::create(temporary)?;
+    file.write_all(content.as_bytes())?;
+    file.flush()?;
+    file.sync_all()?;
+    drop(file);
+    fs::rename(temporary, path)
+}
+
+/// Replace `path` with `content` through a temporary file in the same
+/// directory, then rename it over the golden. A crash or kill leaves either
+/// the old bytes or all of the new ones, never a part of them.
+fn write_atomically(path: &Path, content: &str) -> std::io::Result<()> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SERIAL: AtomicU64 = AtomicU64::new(0);
+    let dir = path.parent().unwrap_or(Path::new("."));
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
+    let temporary = dir.join(format!("{name}.tmp-{}-{serial}", std::process::id()));
+    let result = write_then_rename(&temporary, path, content);
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
+}
+
+/// Publish every staged golden after the run succeeded. When it did not,
+/// leave each golden untouched and name it on standard error.
+fn commit_goldens(updates: &[(PathBuf, String)], ok: bool) -> std::io::Result<()> {
+    if !ok {
+        for (path, _) in updates {
+            eprintln!("not updated: {}", path.display());
+        }
+        return Ok(());
+    }
+    for (path, content) in updates {
+        write_atomically(path, content)?;
+    }
+    Ok(())
+}
+
+/// Golden updates collected while the test runs. Dropping it without calling
+/// [`Staged::commit`] (a panic, for example) leaves the files alone and names
+/// each one on standard error.
+#[derive(Default)]
+struct Staged(Vec<(PathBuf, String)>);
+
+impl Staged {
+    fn push(&mut self, path: PathBuf, content: String) {
+        self.0.push((path, content));
+    }
+
+    fn commit(mut self, ok: bool) -> std::io::Result<()> {
+        let updates = std::mem::take(&mut self.0);
+        commit_goldens(&updates, ok)
+    }
+}
+
+impl Drop for Staged {
+    fn drop(&mut self) {
+        for (path, _) in &self.0 {
+            eprintln!("not updated: {}", path.display());
+        }
+    }
+}
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -183,7 +250,12 @@ fn format_properties() {
     // before resolution, so it belongs in the recorded invalid-source list.
     let skip_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/format_skip.txt");
     if std::env::var_os("UPDATE").is_some() {
-        fs::write(&skip_path, &skipped).unwrap();
+        // A recorded failure must leave the previous list in place.
+        if failed.is_empty() && checked > 250 {
+            write_atomically(&skip_path, &skipped).unwrap();
+        } else {
+            eprintln!("not updated: {}", skip_path.display());
+        }
     } else {
         assert_eq!(
             fs::read_to_string(skip_path).unwrap_or_default(),
@@ -210,6 +282,7 @@ fn format_golden() {
     paths.sort();
     assert!(paths.len() >= 10);
     let mut failed = Vec::new();
+    let mut updates = Staged::default();
     for path in &paths {
         let src = fs::read_to_string(path).unwrap();
         assert!(parse_module(&src).1.is_empty(), "{}", path.display());
@@ -219,7 +292,8 @@ fn format_golden() {
         let actual = format(&src).unwrap();
         let out = path.with_extension("out");
         if update {
-            fs::write(&out, &actual).unwrap();
+            // Keep every new file in memory; a panic below publishes none.
+            updates.push(out, actual);
             continue;
         }
         let expected = fs::read_to_string(&out).unwrap_or_default();
@@ -228,10 +302,54 @@ fn format_golden() {
             failed.push(path.file_name().unwrap().to_string_lossy().into_owned());
         }
     }
+    if update {
+        updates.commit(failed.is_empty()).unwrap();
+    }
     assert!(
         failed.is_empty(),
         "formatted files differ: {failed:?} (run with UPDATE=1 to bless)"
     );
+}
+
+/// The counterexample for the atomic write: with `UPDATE=1`, a run that
+/// reports a failure leaves the golden byte for byte and says it did.
+/// The child process runs this test alone, so `UPDATE` cannot reach another
+/// test that writes goldens.
+#[test]
+fn a_failed_update_leaves_the_golden_unchanged() {
+    const TEST: &str = "a_failed_update_leaves_the_golden_unchanged";
+    if let Some(path) = std::env::var_os("ILANG_GOLDEN_CHILD") {
+        // SAFETY: this test is the only one the child runs (`--exact`).
+        unsafe { std::env::set_var("UPDATE", "1") };
+        commit_goldens(&[(PathBuf::from(path), "new\n".to_string())], false).unwrap();
+        return;
+    }
+    let dir = std::env::temp_dir().join(format!("ilang-format-golden-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("case.out");
+    fs::write(&path, b"old\n").unwrap();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", TEST, "--nocapture"])
+        .env("ILANG_GOLDEN_CHILD", &path)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "counterexample child failed: {output:?}"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains(&format!("not updated: {}", path.display())),
+        "stderr was {stderr:?}"
+    );
+    assert_eq!(
+        fs::read(&path).unwrap(),
+        b"old\n",
+        "a failed run changed {path:?}"
+    );
+    commit_goldens(&[(path.clone(), "new\n".to_string())], true).unwrap();
+    assert_eq!(fs::read(&path).unwrap(), b"new\n");
+    fs::remove_dir_all(&dir).unwrap();
 }
 
 #[test]
