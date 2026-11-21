@@ -418,7 +418,9 @@ impl<'a> Query<'a> {
                     let b = &p.module(d.module).bindings[*binding as usize].binding;
                     (binder_pattern(&b.pattern, *var), Some(&b.value), d.module)
                 }
-                DefKind::External { .. } => (None, None, d.module),
+                DefKind::External { .. }
+                | DefKind::Runtime { .. }
+                | DefKind::ServiceAccessor { .. } => (None, None, d.module),
             },
             Target::Local(v) => {
                 let mut found = (None, None);
@@ -563,8 +565,8 @@ impl<'a> Query<'a> {
             return Some(s.clone());
         }
         match &self.program.def(d).kind {
-            DefKind::External { ty, .. } => Some(self.show_type(ty)),
-            DefKind::Binding { .. } => None,
+            DefKind::External { ty, .. } | DefKind::Runtime { ty, .. } => Some(self.show_type(ty)),
+            DefKind::Binding { .. } | DefKind::ServiceAccessor { .. } => None,
         }
     }
 
@@ -1070,7 +1072,7 @@ impl<'a> Query<'a> {
                 index: i as u32,
             };
             w.occ.push((d.span, Target::Def(id)));
-            if let DefKind::External { ty, .. } = &d.kind {
+            if let Some((ty, _)) = d.kind.declared() {
                 w.ty(ty);
             }
         }
@@ -1329,7 +1331,9 @@ impl<'a> Query<'a> {
                     .def_of_var(m, v)
                     .and_then(|d| match self.program.def(d).kind {
                         DefKind::Binding { var, .. } => Some(var),
-                        DefKind::External { .. } => None,
+                        DefKind::External { .. }
+                        | DefKind::Runtime { .. }
+                        | DefKind::ServiceAccessor { .. } => None,
                     })
                     .unwrap_or(v);
                 types = self.var_types(var);
@@ -1452,7 +1456,9 @@ impl<'a> Query<'a> {
         let def = self.program.def(d);
         let detail = self.def_type(d);
         let is_fn = match &def.kind {
-            DefKind::External { .. } => true,
+            DefKind::External { .. }
+            | DefKind::Runtime { .. }
+            | DefKind::ServiceAccessor { .. } => true,
             DefKind::Binding { binding, .. } => matches!(
                 self.program.module(d.module).bindings[*binding as usize]
                     .binding

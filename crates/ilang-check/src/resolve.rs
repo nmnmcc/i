@@ -154,11 +154,32 @@ enum Found {
 /// The attributes of one item, after they are checked.
 #[derive(Default)]
 struct Attrs {
+    /// The module and function of a declaration: `@external`, `@runtime`,
+    /// or `@import` on a declaration (namespace and label, or `js` and the
+    /// expression).
     external: Option<(String, String)>,
+    /// Which attribute gave `external`.
+    declaration: DeclForm,
     host: Option<Host>,
+    import: Option<Import>,
     main: bool,
     deprecated: Option<String>,
 }
+
+/// The attribute of a declaration `name: Type`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum DeclForm {
+    #[default]
+    External,
+    Runtime,
+    /// `@import("namespace", "label", mode)`.
+    Import(ImportMode),
+    /// `@import("js", "expression")`.
+    JsValue,
+}
+
+/// The forms of `@import`, for messages.
+const IMPORT_FORMS: &str = r#"`@import("namespace")` or `@import("namespace", "now")` on a service type, `@import("namespace", "label", "now")` or `@import("namespace", "label", "later")` on a declaration, or `@import("js", "expression")` on a declaration of an opaque type"#;
 
 struct Resolver<'a> {
     graph: &'a PackageGraph,
@@ -654,6 +675,24 @@ impl<'a> Resolver<'a> {
                 format!("`{written}` is a module under `test/`, which a module under `src/` may not import"),
             );
             return None;
+        }
+        // The dispatcher modules need the package's `hostcall` switch.
+        let me = self.p.module(self.cur);
+        let pkg = &self.graph.packages[me.package];
+        if self.graph.is_standard_library(package)
+            && matches!(written.as_str(), "i/hostcall" | "i/request")
+            && !pkg.hostcall
+            && !self.graph.is_language(me.package)
+        {
+            let manifest = pkg
+                .manifest_source
+                .map(|s| self.graph.sources.get(s).display.clone())
+                .unwrap_or_else(|| "i.toml".to_string());
+            self.error(
+                code::HOSTCALL_NEEDS_FLAG,
+                item.span,
+                format!("`{written}` needs the hostcall switch; set `hostcall = true` at the top level of {manifest}"),
+            );
         }
         Some(target)
     }
@@ -1388,28 +1427,14 @@ impl<'a> Resolver<'a> {
     /// service are types that the host can take, and they have no
     /// environment. Each such function is put in `host_fns`.
     fn host_fns(&mut self) {
-        let request_module = self
-            .p
-            .modules
-            .iter()
-            .position(|m| m.path == "i/request")
-            .map(|i| ModuleId(i as u32));
-        let service = |name: &str| {
-            self.p
-                .types
-                .iter()
-                .position(|t| Some(t.module) == request_module && t.name == name)
-                .map(|i| TypeId(i as u32))
-        };
-        let await_type = service("Await");
-        let owner_type = service("Owner");
         for t in 0..self.p.types.len() {
             let def = &self.p.types[t];
             let (Some(host), TypeBody::Custom(ctors)) = (&def.host, &def.body) else {
                 continue;
             };
             let [ctor] = ctors.as_slice() else { continue };
-            let (module, asynchronous, raw) = (def.module, host.is_async, host.is_request);
+            let (module, asynchronous, raw) = (def.module, host.asynchronous(), host.request());
+            let imported = def.import.is_some();
             let fields = ctor.fields.clone();
             for (i, f) in fields.iter().enumerate() {
                 if value_dependent(&self.p, &f.ty) {
@@ -1476,41 +1501,10 @@ impl<'a> Resolver<'a> {
                     hf.request_result = wrapped;
                     self.p.host_fns.insert((TypeId(t as u32), i as u32), hf);
                     if asynchronous {
-                        let mut needs = Vec::new();
-                        if !raw && let Some(id) = await_type {
-                            needs.push(Type {
-                                kind: TypeKind::Named {
-                                    ty: TypeRef::Custom(id),
-                                    args: vec![],
-                                },
-                                span: f.ty.span,
-                            });
-                        }
-                        if let Some(id) = owner_type {
-                            needs.push(Type {
-                                kind: TypeKind::Named {
-                                    ty: TypeRef::Custom(id),
-                                    args: vec![],
-                                },
-                                span: f.ty.span,
-                            });
-                        }
-                        if let TypeBody::Custom(cs) = &mut self.p.types[t].body
-                            && let TypeKind::Fn { env, .. } = &mut cs[0].fields[i].ty.kind
-                        {
-                            needs.extend(env.take().map(|e| *e));
-                            *env = Some(Box::new(Type {
-                                kind: TypeKind::Union(needs),
-                                span: f.ty.span,
-                            }));
-                        }
-                        if let Some(dependency) = request_module
-                            && dependency != module
-                            && !self.p.modules[module.0 as usize]
-                                .imports
-                                .contains(&dependency)
-                        {
-                            self.p.modules[module.0 as usize].imports.push(dependency);
+                        let field = f.ty.clone();
+                        let field = self.waiting_needs_in(module, field, !raw);
+                        if let TypeBody::Custom(cs) = &mut self.p.types[t].body {
+                            cs[0].fields[i].ty = field;
                         }
                     }
                 } else {
@@ -1526,11 +1520,124 @@ impl<'a> Resolver<'a> {
                             .unwrap_or_default(),
                         _ => String::new(),
                     };
+                    let shape = if imported {
+                        "An imported field is written with its answer, not `Request`"
+                    } else {
+                        "Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors"
+                    };
                     self.error(code::HOST_TYPE, f.ty.span,
-                        format!("a host field's parameters and result must use `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. Request fields return `Request(A)` or `Request(Result(A, E))`, with no written need or errors{input_note}"));
+                        format!("a host field's parameters and result must use `()`, `Bool`, `Int`, `Float`, `String`, `BitArray`, or opaque types with no constructors. A field may have no need or exactly `Fail(E)`, where `E` contains only the six built-in types. {shape}{input_note}"));
                 }
             }
         }
+    }
+
+    /// A type of `i/request` by name, when the library has it.
+    fn request_type(&self, name: &str) -> Option<TypeId> {
+        self.p
+            .types
+            .iter()
+            .position(|t| {
+                t.name == name
+                    && self.p.module(t.module).path == "i/request"
+                    && self
+                        .graph
+                        .is_standard_library(self.p.module(t.module).package)
+            })
+            .map(|i| TypeId(i as u32))
+    }
+
+    /// The function type `t` of a declaration in the current module, with
+    /// the needs of a call that waits for the host.
+    fn waiting_needs(&mut self, t: Type) -> Type {
+        self.waiting_needs_in(self.cur, t, true)
+    }
+
+    /// `t` with `Await` (when `wait`) and `Owner` added to its need, and
+    /// `module` made to depend on `i/request`.
+    fn waiting_needs_in(&mut self, module: ModuleId, mut t: Type, wait: bool) -> Type {
+        let span = t.span;
+        let named = |id: TypeId| Type {
+            kind: TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                args: vec![],
+            },
+            span,
+        };
+        let mut needs = Vec::new();
+        if wait && let Some(id) = self.request_type("Await") {
+            needs.push(named(id));
+        }
+        if let Some(id) = self.request_type("Owner") {
+            needs.push(named(id));
+        }
+        if let TypeKind::Fn { env, .. } = &mut t.kind {
+            needs.extend(env.take().map(|e| *e));
+            *env = Some(Box::new(Type {
+                kind: TypeKind::Union(needs),
+                span,
+            }));
+        }
+        let request_module = self
+            .p
+            .modules
+            .iter()
+            .position(|m| m.path == "i/request" && self.graph.is_standard_library(m.package))
+            .map(|i| ModuleId(i as u32));
+        if let Some(dependency) = request_module
+            && dependency != module
+            && !self.p.modules[module.0 as usize]
+                .imports
+                .contains(&dependency)
+        {
+            self.p.modules[module.0 as usize].imports.push(dependency);
+        }
+        t
+    }
+
+    /// A need written in program source may not name an implicit service:
+    /// inference carries them. The library `i` binds and forwards them.
+    fn implicit_written(&mut self, t: &Type) {
+        if self.in_library() || self.p.implicit_services.is_empty() {
+            return;
+        }
+        match &t.kind {
+            TypeKind::Named {
+                ty: TypeRef::Custom(id),
+                ..
+            } if self.p.is_implicit_service(*id) => {
+                let def = self.p.ty(*id);
+                let name = format!("{}.{}", self.p.module(def.module).path, def.name);
+                self.error(
+                    code::IMPLICIT_SERVICE_WRITTEN,
+                    t.span,
+                    format!("`{name}` is an implicit service: it is not written in a need, and inference carries it"),
+                );
+            }
+            TypeKind::Union(ms) | TypeKind::Diff(ms) => {
+                for m in ms {
+                    self.implicit_written(m);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// The implicit services of the library ([`IMPLICIT_SERVICES`]), by
+    /// type identity.
+    fn implicit_services(&mut self) {
+        let mut found = Vec::new();
+        for (i, t) in self.p.types.iter().enumerate() {
+            let module = self.p.module(t.module);
+            if self.graph.is_standard_library(module.package)
+                && IMPLICIT_SERVICES
+                    .iter()
+                    .any(|(m, n)| *m == module.path && *n == t.name)
+            {
+                found.push(TypeId(i as u32));
+            }
+        }
+        self.p.implicit_services = found;
     }
 
     /// The parts of B.2 of a written function type at the host boundary,
@@ -2364,7 +2471,10 @@ impl<'a> Resolver<'a> {
                 continue;
             }
             match &d.kind {
-                DefKind::External { ty, .. } => checks.push((format!("`{}`", d.name), ty.clone())),
+                DefKind::External { ty, .. } | DefKind::Runtime { ty, .. } => {
+                    checks.push((format!("`{}`", d.name), ty.clone()))
+                }
+                DefKind::ServiceAccessor { .. } => {}
                 DefKind::Binding { var, .. } => {
                     exported_vars.insert(*var, d.name.clone());
                 }

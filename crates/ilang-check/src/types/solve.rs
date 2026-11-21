@@ -201,6 +201,9 @@ pub(crate) struct Solver {
     /// The declared aliases whose expansion is a union, to show such a
     /// union by its name.
     pub alias_folds: std::sync::Arc<Vec<super::display::AliasFold>>,
+    /// The implicit services (`Program::implicit_services`): a shown need
+    /// row leaves them out.
+    pub hidden_needs: std::sync::Arc<Vec<TypeId>>,
     /// A failed coalescence is diagnostic recovery, never an unknown type
     /// that may silently make a program pass. The checker drains this at
     /// binding and artifact boundaries, including known-type conversions.
@@ -306,6 +309,7 @@ impl Solver {
         snapshot.has_need_meets = self.has_need_meets;
         snapshot.comparison_wrappers = self.comparison_wrappers.clone();
         snapshot.alias_folds = self.alias_folds.clone();
+        snapshot.hidden_needs = self.hidden_needs.clone();
         snapshot
     }
     /// Discard inference caches: a cached solved goal is not a rigid proof.
@@ -448,6 +452,7 @@ impl Solver {
             failures: Vec::new(),
             type_names,
             alias_folds: Default::default(),
+            hidden_needs: Default::default(),
             reach_marks: ReachMarks::default(),
         }
     }
@@ -457,6 +462,7 @@ impl Solver {
         let mut solver = Solver::new(self.variance.clone(), self.type_names.clone());
         solver.row_params = self.row_params.clone();
         solver.alias_folds = self.alias_folds.clone();
+        solver.hidden_needs = self.hidden_needs.clone();
         solver
     }
 
@@ -2982,6 +2988,7 @@ impl Solver {
         view.vars = self.vars.clone();
         view.has_need_meets = self.has_need_meets;
         view.row_params = self.row_params.clone();
+        view.hidden_needs = self.hidden_needs.clone();
         view.normalize_type(t).then_some(view)
     }
 

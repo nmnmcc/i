@@ -10,7 +10,9 @@ use std::collections::HashSet;
 fn is_package_entry(p: &Program, d: DefId) -> bool {
     match p.def(d).kind {
         DefKind::Binding { binding, .. } => p.module(d.module).bindings[binding as usize].main,
-        DefKind::External { .. } => false,
+        DefKind::External { .. } | DefKind::Runtime { .. } | DefKind::ServiceAccessor { .. } => {
+            false
+        }
     }
 }
 
@@ -29,7 +31,8 @@ pub(crate) fn check(p: &Program, test_shaped: &HashSet<DefId>) -> Vec<Diagnostic
                         references.pending.push(id);
                     }
                 }
-                DefKind::External { ty, .. } => references.ty(ty),
+                DefKind::External { ty, .. } | DefKind::Runtime { ty, .. } => references.ty(ty),
+                DefKind::ServiceAccessor { .. } => {}
             }
         }
         for b in &m.bindings {

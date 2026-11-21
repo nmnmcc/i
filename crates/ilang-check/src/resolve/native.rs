@@ -130,6 +130,7 @@ fn resolve_here(
     for m in 0..count {
         r.collect(ModuleId(m));
     }
+    r.implicit_services();
     r.builtins();
     for m in 0..count {
         r.imports(ModuleId(m));
@@ -766,18 +767,41 @@ impl<'a, 't> NativeResolver<'a, 't> {
                 }
                 n::ItemKind::Decl { name, ty } => {
                     let (module, function) = attrs.external.clone().unwrap_or_default();
-                    let kind = DefKind::External {
-                        module,
-                        function,
-                        ty: Type {
-                            kind: TypeKind::Error,
-                            span: ty.span.0,
-                        },
-                        ty_vars: Vec::new(),
+                    let ty = Type {
+                        kind: TypeKind::Error,
+                        span: ty.span.0,
+                    };
+                    let kind = if attrs.declaration == DeclForm::Runtime {
+                        DefKind::Runtime {
+                            module,
+                            function,
+                            ty,
+                            ty_vars: Vec::new(),
+                        }
+                    } else {
+                        DefKind::External {
+                            module,
+                            function,
+                            ty,
+                            ty_vars: Vec::new(),
+                        }
                     };
                     let before = self.p.module(m).defs.len();
                     self.add_def(m, &name.name, name.span.0, kind, &attrs);
                     if self.p.module(m).defs.len() > before {
+                        let id = DefId {
+                            module: m,
+                            index: before as u32,
+                        };
+                        match attrs.declaration {
+                            DeclForm::Import(mode) => {
+                                self.p.import_modes.insert(id, mode);
+                            }
+                            DeclForm::JsValue => {
+                                self.p.js_values.insert(id);
+                            }
+                            DeclForm::External | DeclForm::Runtime => {}
+                        }
                         if typed_declaration {
                             let id = DefId {
                                 module: m,
@@ -828,6 +852,40 @@ impl<'a, 't> NativeResolver<'a, 't> {
             })
             .collect();
         self.exports(m, &exports, &ast.items);
+        self.service_accessors(m);
+    }
+
+    /// `make_<type>` for each `@import` service type of `m` (the type name
+    /// in snake case, [`accessor_name`]): exported, with no source. The type
+    /// itself must be exported with `(..)`.
+    fn service_accessors(&mut self, m: ModuleId) {
+        let types = self.p.module(m).types.clone();
+        for t in types {
+            let def = self.p.ty(t);
+            if def.import.is_none() {
+                continue;
+            }
+            let (name, span, exported) = (def.name.clone(), def.span, def.constructors_exported);
+            if !exported {
+                self.error(
+                    code::IMPORT_TYPE_EXPORT,
+                    span,
+                    format!("an `@import` service type is exported with its constructor and fields: add `{name}(..)` to the export group of this module"),
+                );
+            }
+            let accessor = accessor_name(&name);
+            let before = self.p.module(m).defs.len();
+            self.add_def(
+                m,
+                &accessor,
+                span,
+                DefKind::ServiceAccessor { ty: t },
+                &Attrs::default(),
+            );
+            if self.p.module(m).defs.len() > before {
+                self.p.modules[m.0 as usize].defs[before].exported = true;
+            }
+        }
     }
 
     fn collect_pattern_binders(
@@ -953,6 +1011,7 @@ impl<'a, 't> NativeResolver<'a, 't> {
             exported: false,
             constructors_exported: false,
             host: attrs.host.clone(),
+            import: attrs.import.clone(),
             deprecated: attrs.deprecated.clone(),
         });
         self.p.modules[mi].types.push(id);
@@ -963,13 +1022,20 @@ impl<'a, 't> NativeResolver<'a, 't> {
     fn attributes(&mut self, item: &n::Item, list: &[&n::Attribute]) -> Attrs {
         let mut out = Attrs::default();
         let mut seen = HashSet::new();
+        // The attribute that says what a declaration or a service is.
+        let mut foreign: Option<&str> = None;
         for a in list {
             let name = a.name.name.as_str();
             let written = a
                 .module
                 .as_ref()
                 .map_or_else(|| format!("@{name}"), |m| format!("@{}.{name}", m.name));
-            if a.module.is_some() || !matches!(name, "external" | "host" | "deprecated") {
+            if a.module.is_some()
+                || !matches!(
+                    name,
+                    "external" | "host" | "import" | "runtime" | "deprecated"
+                )
+            {
                 self.error(code::UNKNOWN_ATTRIBUTE, a.span.0, format!("the attribute `{written}` is kept for macros; the built-in attributes are `@external`, `@host`, and `@deprecated`"));
                 continue;
             }
@@ -983,8 +1049,24 @@ impl<'a, 't> NativeResolver<'a, 't> {
             }
             let strings = attribute_strings(a).unwrap_or_default();
             let args: Vec<&str> = strings.iter().map(|(s, _)| s.as_str()).collect();
+            if name == "import" {
+                if attribute_call(a) {
+                    self.error(code::IMPORT_ARGS, a.span.0, format!("the arguments of `@import` are string literals given by position: {IMPORT_FORMS}"));
+                    continue;
+                }
+                if let Some(previous) = foreign.replace(name) {
+                    self.error(
+                        code::ATTRIBUTE_TWICE,
+                        a.span.0,
+                        format!("`@import` and `@{previous}` are both on this item; give one"),
+                    );
+                    continue;
+                }
+                self.import_attribute(item, a, &strings, &mut out);
+                continue;
+            }
             let (counts, place_ok, place): (&[usize], bool, &str) = match name {
-                "external" => (
+                "external" | "runtime" => (
                     &[2],
                     matches!(item.kind, n::ItemKind::Decl { .. }),
                     "a declaration `name: Type`",
@@ -999,6 +1081,7 @@ impl<'a, 't> NativeResolver<'a, 't> {
             };
             let form = match name {
                 "external" => r#"`@external("module", "function")`"#,
+                "runtime" => r#"`@runtime("module", "function")`"#,
                 "host" => r#"`@host("namespace")` or `@host("namespace", "async")`"#,
                 _ => r#"`@deprecated("note")`"#,
             };
@@ -1027,7 +1110,28 @@ impl<'a, 't> NativeResolver<'a, 't> {
                 );
                 continue;
             }
+            if name != "deprecated"
+                && let Some(previous) = foreign.replace(name)
+            {
+                self.error(
+                    code::ATTRIBUTE_TWICE,
+                    a.span.0,
+                    format!("`@{name}` and `@{previous}` are both on this item; give one"),
+                );
+                continue;
+            }
             match name {
+                "runtime" => {
+                    if !self.in_library() {
+                        self.error(
+                            code::RESERVED_ILANG,
+                            a.span.0,
+                            "`@runtime` is kept for the library `i`",
+                        );
+                    }
+                    out.external = Some((args[0].to_string(), args[1].to_string()));
+                    out.declaration = DeclForm::Runtime;
+                }
                 "external" | "host" => {
                     if (args[0].starts_with("ilang:") || args[0].starts_with("i:compiler/"))
                         && !self.in_library()
@@ -1045,11 +1149,12 @@ impl<'a, 't> NativeResolver<'a, 't> {
                     if name == "external" {
                         out.external = Some((args[0].to_string(), args[1].to_string()));
                     } else {
-                        out.host = Some(Host {
-                            namespace: args[0].to_string(),
-                            is_async: args.len() == 2,
-                            is_request: args.get(1).is_some_and(|m| *m == "request"),
-                        });
+                        let mode = match args.get(1) {
+                            None => HostMode::Now,
+                            Some(&"request") => HostMode::Request,
+                            Some(_) => HostMode::Later,
+                        };
+                        out.host = Some(Host::new(args[0].to_string(), mode));
                     }
                 }
                 _ => out.deprecated = Some(args[0].to_string()),
@@ -1057,9 +1162,10 @@ impl<'a, 't> NativeResolver<'a, 't> {
         }
         if let n::ItemKind::Decl { name, .. } = &item.kind
             && out.external.is_none()
-            && !list
-                .iter()
-                .any(|a| a.module.is_none() && a.name.name == "external")
+            && !list.iter().any(|a| {
+                a.module.is_none()
+                    && matches!(a.name.name.as_str(), "external" | "import" | "runtime")
+            })
         {
             self.error(
                 code::DECLARATION_WITHOUT_EXTERNAL,
@@ -1068,6 +1174,136 @@ impl<'a, 't> NativeResolver<'a, 't> {
             );
         }
         out
+    }
+
+    /// `@import` on a service type, a raw function declaration, or a JS
+    /// value declaration.
+    fn import_attribute(
+        &mut self,
+        item: &n::Item,
+        a: &n::Attribute,
+        strings: &[(String, Span)],
+        out: &mut Attrs,
+    ) {
+        let args: Vec<&str> = strings.iter().map(|(s, _)| s.as_str()).collect();
+        let mode = |m: &str| match m {
+            "now" => Some(ImportMode::Now),
+            "later" => Some(ImportMode::Later),
+            _ => None,
+        };
+        let bad_form = |r: &mut Self| {
+            r.error(
+                code::IMPORT_ARGS,
+                a.span.0,
+                format!("this attribute is written {IMPORT_FORMS}"),
+            );
+        };
+        if !(1..=3).contains(&args.len()) {
+            return bad_form(self);
+        }
+        let namespace = args[0];
+        if namespace.is_empty() {
+            self.error(
+                code::IMPORT_ARGS,
+                strings[0].1,
+                "the namespace of `@import` is not empty",
+            );
+            return;
+        }
+        if namespace.starts_with("ilang:") || namespace.starts_with("i:compiler/") {
+            self.error(
+                code::RESERVED_ILANG,
+                strings[0].1,
+                if namespace.starts_with("ilang:") {
+                    "names that start with `ilang:` are kept for the runtime; the library uses `@runtime`"
+                } else {
+                    "names that start with `i:compiler/` are kept for the compiler"
+                },
+            );
+            return;
+        }
+        match &item.kind {
+            n::ItemKind::TypeDef(def) => {
+                if args.len() == 3 {
+                    self.error(
+                        code::IMPORT_PLACE,
+                        a.span.0,
+                        r#"`@import("namespace", "label", mode)` imports one function and is on a declaration `name: Type`; a service type is written `@import("namespace")` or `@import("namespace", "now")`"#,
+                    );
+                    return;
+                }
+                let Some(mode) = args.get(1).map_or(Some(ImportMode::Later), |m| mode(m)) else {
+                    return bad_form(self);
+                };
+                if namespace == "js" {
+                    self.error(
+                        code::IMPORT_NAMESPACE,
+                        strings[0].1,
+                        r#"the namespace `js` is kept for JS values, `@import("js", "expression")` on a declaration of an opaque type"#,
+                    );
+                    return;
+                }
+                if !matches!(def.rhs, n::TypeRhs::Data(_)) {
+                    self.error(
+                        code::IMPORT_PLACE,
+                        a.span.0,
+                        "`@import` is on a service type: one constructor whose fields have labels and function types",
+                    );
+                    return;
+                }
+                out.host = Some(Host::new(
+                    namespace.to_string(),
+                    match mode {
+                        ImportMode::Now => HostMode::Now,
+                        ImportMode::Later => HostMode::Later,
+                    },
+                ));
+                out.import = Some(Import {
+                    namespace: namespace.to_string(),
+                    mode,
+                });
+            }
+            n::ItemKind::Decl { .. } => match args.len() {
+                3 => {
+                    let Some(mode) = mode(args[2]) else {
+                        return bad_form(self);
+                    };
+                    if args[1].is_empty() {
+                        self.error(
+                            code::IMPORT_ARGS,
+                            strings[1].1,
+                            "the label of `@import` is not empty",
+                        );
+                        return;
+                    }
+                    if namespace == "js" {
+                        self.error(
+                            code::IMPORT_NAMESPACE,
+                            strings[0].1,
+                            r#"the namespace `js` is kept for JS values, `@import("js", "expression")`"#,
+                        );
+                        return;
+                    }
+                    out.external = Some((namespace.to_string(), args[1].to_string()));
+                    out.declaration = DeclForm::Import(mode);
+                }
+                2 if namespace == "js" => {
+                    out.external = Some(("js".to_string(), args[1].to_string()));
+                    out.declaration = DeclForm::JsValue;
+                }
+                2 => bad_form(self),
+                _ => self.error(
+                    code::IMPORT_PLACE,
+                    a.span.0,
+                    r#"`@import("namespace")` is on a service type; a declaration imports one function with `@import("namespace", "label", "now")` or `@import("namespace", "label", "later")`"#,
+                ),
+            },
+            _ => self.error(
+                code::IMPORT_PLACE,
+                a.span.0,
+                "`@import` may only be on a service type or a declaration `name: Type`",
+            ),
+        }
     }
 
     /// Entries bind one name to a function; compiled entries take no value parameters.
@@ -1704,6 +1940,11 @@ impl<'a, 't> NativeResolver<'a, 't> {
                 .collect(),
             Some((_, ty)) => vec![self.ty(ty)],
         };
+        if self.ty_def.is_none() {
+            for t in &types {
+                self.implicit_written(t);
+            }
+        }
         let env = match types.len() {
             0 => None,
             1 => types.into_iter().next(),
@@ -1730,14 +1971,30 @@ impl<'a, 't> NativeResolver<'a, 't> {
                     let vars = self.push_declared_frame(&type_params);
                     let t = self.ty(ty);
                     self.ty_frames.pop();
-                    // Intrinsic library operations are not host imports.
-                    let intrinsic = self.p.typed_macros.contains(&DefId {
+                    let def_id = DefId {
                         module: m,
                         index: d,
-                    }) || self.in_library()
-                        && matches!(&self.p.modules[m.0 as usize].defs[d as usize].kind,
-                            DefKind::External { module, .. } if module.starts_with("ilang:"));
-                    if !intrinsic {
+                    };
+                    // Intrinsic library operations are not host imports.
+                    let intrinsic = self.p.typed_macros.contains(&def_id)
+                        || self.in_library()
+                            && self.p.modules[m.0 as usize].defs[d as usize]
+                                .kind
+                                .foreign()
+                                .is_some_and(|(module, _)| module.starts_with("ilang:"));
+                    if self.p.js_values.contains(&def_id) {
+                        // A JS value is one opaque type.
+                        let opaque = matches!(&self.expand(&t).kind,
+                            TypeKind::Named { ty: TypeRef::Custom(id), .. }
+                                if matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty()));
+                        if !opaque && !matches!(t.kind, TypeKind::Error) {
+                            self.error(
+                                code::IMPORT_PLACE,
+                                t.span,
+                                r#"`@import("js", "expression")` is on a declaration of one opaque type, a type with no constructors"#,
+                            );
+                        }
+                    } else if !intrinsic {
                         let before = self.diags.len();
                         self.external_type(&t);
                         if self.diags.len() == before
@@ -1752,7 +2009,19 @@ impl<'a, 't> NativeResolver<'a, 't> {
                             );
                         }
                     }
+                    // A raw import that waits needs what a waiting host
+                    // field needs.
+                    let t = if self.p.import_modes.get(&def_id) == Some(&ImportMode::Later) {
+                        self.waiting_needs(t)
+                    } else {
+                        t
+                    };
                     if let DefKind::External {
+                        ty: slot_ty,
+                        ty_vars,
+                        ..
+                    }
+                    | DefKind::Runtime {
                         ty: slot_ty,
                         ty_vars,
                         ..
@@ -2719,6 +2988,7 @@ impl<'a, 't> NativeResolver<'a, 't> {
         for s in &f.envs {
             let name = id(&s.name);
             let ty = self.ty(&s.ty);
+            self.implicit_written(&ty);
             // Two environment parameters of one function may
             // not have the same type constructor.
             let own_row = matches!(ty.kind, TypeKind::Var(var) if self.ty_frames.last().is_some_and(|frame|
