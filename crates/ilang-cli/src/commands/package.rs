@@ -880,27 +880,10 @@ fn print_new_permissions(before: &Report, after: &Report) {
     }
 }
 
-/// Whether the package's own `i.toml` has the top-level switch
-/// `hostcall = true`. The library `i` and the built-in package are not asked.
-// TODO(host-boundary merge): read `Package.hostcall` from the checker lane
-// once the loader carries it, instead of reading the manifest again here.
+/// Whether the package enables hostcall. The library `i` and the built-in
+/// package are already on; they are not listed by `i deps`.
 fn package_hostcall(p: &ilang_package::Package) -> bool {
-    p.dir
-        .as_deref()
-        .is_some_and(|dir| manifest_hostcall(&dir.join("i.toml")))
-}
-
-/// Whether the manifest text at `path` has `hostcall = true` at its top
-/// level. A missing or unreadable file, or another value, is off.
-fn manifest_hostcall(path: &Path) -> bool {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|text| text.parse::<DocumentMut>().ok())
-        .is_some_and(|doc| text_hostcall(&doc))
-}
-
-fn text_hostcall(doc: &DocumentMut) -> bool {
-    doc.get("hostcall").and_then(Item::as_bool) == Some(true)
+    p.hostcall
 }
 
 /// The packages of the program in `project` (without its tests) whose
