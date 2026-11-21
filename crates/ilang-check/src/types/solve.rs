@@ -653,18 +653,20 @@ impl Solver {
     /// member of `M` with the same type constructor that satisfies it as
     /// a value. Needs compare services in reverse.
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
-        // Implicit services are ambient: they never have to be stated.
+        self.constrain_in(l, r, Mode::Env);
+    }
+
+    /// A need without its implicit services: what a written row must state.
+    pub fn ambient(&mut self, l: &Ty) -> Ty {
         if self.hidden_needs.is_empty() {
-            self.constrain_in(l, r, Mode::Env);
-            return;
+            return l.clone();
         }
         let hidden: Vec<Ty> = self
             .hidden_needs
             .iter()
             .map(|id| Ty::named(TypeRef::Custom(*id), Vec::new()))
             .collect();
-        let l = self.normalize_mode(Ty::Diff(Box::new(l.clone()), hidden), Mode::Env);
-        self.constrain_in(&l, r, Mode::Env);
+        self.normalize_mode(Ty::Diff(Box::new(l.clone()), hidden), Mode::Env)
     }
 
     /// The row parameters of a constructor, determined from its definition.
@@ -1461,7 +1463,8 @@ impl Solver {
                 // shape is a mismatch of the parameter data.
                 self.constrain(&g.param, &f.param);
                 self.constrain(&f.ret, &g.ret);
-                self.constrain_env(&f.env, &g.env);
+                let env = self.ambient(&f.env);
+                self.constrain_env(&env, &g.env);
             }
             _ => self.fail(FailKind::Mismatch, l, r),
         }

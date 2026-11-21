@@ -1612,6 +1612,48 @@ impl<'a> Lowerer<'a> {
         let mut fx = Fx::new(ModuleId(0), false);
         let mut out = Vec::new();
         let mut pending = 1;
+        // Top-level values may use the implicit services. Give them one
+        // startup root for the whole start, as an entry does.
+        if !self.program.implicit_services.is_empty() {
+            let_value(
+                &mut fx,
+                &mut out,
+                Value::Op(
+                    Op::Runtime {
+                        name: "request_entry_begin",
+                        arity: 0,
+                    },
+                    vec![],
+                ),
+                None,
+            );
+            let [root, owner, await_, runner, _] = platform::request_types(self.program);
+            let key = let_value(
+                &mut fx,
+                &mut out,
+                Value::Op(
+                    Op::Runtime {
+                        name: "request_entry_root",
+                        arity: 0,
+                    },
+                    vec![],
+                ),
+                None,
+            );
+            let env = fx.env;
+            let factory = self.library_callee("i/request", "_provider_root");
+            let value = self.stub_factory(&mut fx, &mut out, factory, vec![Atom::EmptyList, key], env);
+            fx.env = self.stub_bind(&mut fx, &mut out, env, root.expect("Root"), value);
+            let env = fx.env;
+            let factory = self.library_callee("i/request", "_provider_owner");
+            let value = self.stub_factory(&mut fx, &mut out, factory, vec![Atom::EmptyList], env);
+            fx.env = self.stub_bind(&mut fx, &mut out, env, owner.expect("Owner"), value);
+            let env = fx.env;
+            let factory = self.library_callee("i/request", "_provider_await");
+            let value = self.stub_factory(&mut fx, &mut out, factory, vec![Atom::EmptyList], env);
+            fx.env = self.stub_bind(&mut fx, &mut out, env, await_.expect("Await"), value);
+            let _ = runner;
+        }
         for &b in &self.program.order.init {
             if !self.included(b.module) {
                 continue;
