@@ -236,7 +236,7 @@ encode64 = (bits : BitArray, alphabet : String, padding : Bool) -> String {
 /// is put at the end to make the length a multiple of 4.
 ///
 /// ```i
-/// bit_array.base64_encode(<<"hi":utf8>>, True)  // "aGk="
+/// bit_array.base64_encode(<<"hi":utf8>>, True())  // "aGk="
 /// ```
 base64_encode = (input : BitArray, padding : Bool) -> String {
 	encode64(input, standard, padding)

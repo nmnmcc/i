@@ -1577,6 +1577,7 @@ i/task.observe_completion : (State, TaskState, Completion) -> State
 i/task.turn : (State, TaskState) -> Turn
 i/task.interests_tasks : (State, List(Int)) -> List(Ticket)
 i/task.interests_forward : (List(Forward)) -> List(Ticket)
+i/task.remote_busy : (State) -> Bool
 i/task.interests : (State) -> List(Ticket)
 i/task.apply_run_control : (State, RunControl) -> State
 i/task.finished_run : (State) -> Bool
