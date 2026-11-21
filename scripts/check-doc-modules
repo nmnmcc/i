@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT / 'docs' / 'scripts'))
 import library_baseline
 
 DOCS = ('README.md', 'docs/**/*.md', 'docs/**/*.mdx')
-SKIP = ('docs/content/docs/standard', 'docs/design', 'docs/spec.md')
+SKIP = ('docs/content/docs/standard', 'docs/content/docs/library/generated', 'docs/design', 'docs/spec.md')
 CLAIM = re.compile(r'(?<![\w./-])i/([a-z][a-z0-9_]*(?:/[a-z][a-z0-9_]*)*)')
 UNPUBLISHED = re.compile(r'(?m)^>\s*\*\*Unpublished\.')
 

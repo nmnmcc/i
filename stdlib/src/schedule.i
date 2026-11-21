@@ -189,7 +189,7 @@ _retry_from = <A, E, N>(
 /// 		),
 /// 		() {
 /// 			n = task.update(tries, (n : Int) { (n + 1, n + 1) })
-/// 			{ n < 3 } |> (True) { fail.raise("busy") } & (False) { n }
+/// 			{ n < 3 } |> (True()) { fail.raise("busy") } & (False()) { n }
 /// 		},
 /// 	)
 /// 	assert(value == 3)

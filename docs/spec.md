@@ -724,7 +724,7 @@ both = (a : Bool, b : Bool) -> Bool {
 }
 x = True()
 y : Bool = both(x, True())
-bad : Bool = True
+bad : Bool = True()
 ```
 
 `x` and `y` are values of `Bool`. `bad` is a compile error: `True` is the constructor, of type `() -> True`, and a function is not in `Bool`. The error is the ordinary type mismatch, with a hint to write `True()`.
