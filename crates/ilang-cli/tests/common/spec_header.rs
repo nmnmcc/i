@@ -49,6 +49,9 @@ pub fn commit(updates: &[(PathBuf, String)], ok: bool) -> std::io::Result<()> {
 /// header byte for byte and reports it on standard error; a successful run
 /// replaces it completely. `TEST` is the calling test's name: the child
 /// process runs that test alone, so `UPDATE` cannot reach another test.
+// This module is also compiled into the `spec` binary, whose `main` has no
+// `#[test]` functions; the counterexample is used by `spec_update`.
+#[allow(dead_code)]
 pub fn counterexample(test: &str) {
     if let Some(path) = std::env::var_os("ILANG_GOLDEN_CHILD") {
         // SAFETY: this test is the only one the child runs (`--exact`).
