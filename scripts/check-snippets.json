@@ -122,6 +122,9 @@
   "crates/ilang-cli/tests/commands.rs:dc52772e3779559a": {
     "not_source": "TOML manifest or manifest fragment"
   },
+  "crates/ilang-cli/tests/common/spec_header.rs:b1469d66588d8458": {
+    "not_source": "Temporary golden file name in a Rust test"
+  },
   "crates/ilang-cli/tests/fmt.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
   },
@@ -494,6 +497,9 @@
   },
   "crates/ilang-syntax/src/lib.rs:bbfcd4160a1e8674": {
     "not_source": "Token name compared by the diagnostic hint scanner"
+  },
+  "crates/ilang-syntax/tests/format.rs:201efef679a002c4": {
+    "not_source": "Temporary golden file name in a Rust test"
   },
   "crates/ilang-syntax/tests/lex.rs:bbfcd4160a1e8674": {
     "prefix": "x = ",
