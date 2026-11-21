@@ -1,3 +1,5 @@
+# spec: 9.11, 10.2
+# expect: pass
 name = "probe"
 hostcall = true
 

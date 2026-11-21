@@ -1,7 +1,7 @@
 # spec: 10.1
 # expect: pass
 # host-boundary §3.2: another module calls the exported accessor and a field
-# of its result; `test:math/v1` `add` is the host function.
+# of its result; `test:import/v1` `add` is the host function.
 name = "app"
 
 [dependencies]

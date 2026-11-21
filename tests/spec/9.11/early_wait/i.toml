@@ -1,3 +1,5 @@
+# spec: 9.11
+# expect: stop "panic: request: wait returned early"
 name = "probe"
 hostcall = true
 

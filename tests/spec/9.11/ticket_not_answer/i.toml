@@ -1,3 +1,5 @@
+# spec: 9.11
+# expect: compile-error E0501
 name = "probe"
 hostcall = true
 
