@@ -763,7 +763,11 @@ pub(crate) fn lower_tests_numeric(
     }
     let mut stubs = std::collections::BTreeMap::new();
     let mut errors = Vec::new();
-    for (entry, stub) in platform::stubs(program, typed, options.target.platform()) {
+    let mut all_stubs: Vec<_> = platform::stubs(program, typed, options.target.platform())
+        .into_iter()
+        .collect();
+    mark_later_entries(program, &mut all_stubs);
+    for (entry, stub) in all_stubs {
         if program.module(entry.module).kind == ModuleKind::Test
             && (!options.tests || options.target == ir::Target::Wasi)
         {
@@ -818,6 +822,134 @@ pub(crate) fn lower_tests_numeric(
     }
 }
 
+/// Whether `later` is reachable from the entry through HIR references,
+/// including function bodies made in an activated body.
+fn mark_later_entries(
+    program: &hir::Program,
+    stubs: &mut [(DefId, Result<platform::Stub, Vec<Diagnostic>>)],
+) {
+    let mut later = BTreeSet::new();
+    for (mi, m) in program.modules.iter().enumerate() {
+        for (di, d) in m.defs.iter().enumerate() {
+            let id = DefId {
+                module: ModuleId(mi as u32),
+                index: di as u32,
+            };
+            match &d.kind {
+                DefKind::ServiceAccessor { ty }
+                    if program
+                        .ty(*ty)
+                        .import
+                        .as_ref()
+                        .is_some_and(|i| i.mode == hir::ImportMode::Later) =>
+                {
+                    later.insert(id);
+                }
+                DefKind::External { .. }
+                    if program
+                        .import_modes
+                        .get(&id)
+                        .is_some_and(|m| *m == hir::ImportMode::Later) =>
+                {
+                    later.insert(id);
+                }
+                _ => {}
+            }
+        }
+    }
+    if later.is_empty() {
+        return;
+    }
+    let mut edges: std::collections::HashMap<DefId, BTreeSet<DefId>> =
+        std::collections::HashMap::new();
+    for m in &program.modules {
+        for b in &m.bindings {
+            let mut set = BTreeSet::new();
+            refs(&b.binding.value, &mut set);
+            for d in b.defs.iter().copied() {
+                edges.entry(d).or_default().extend(set.iter().copied());
+            }
+        }
+    }
+    for (entry, stub) in stubs.iter_mut() {
+        let Ok(stub) = stub else { continue };
+        let mut seen = BTreeSet::from([*entry]);
+        let mut queue = vec![*entry];
+        let mut found = false;
+        while let Some(d) = queue.pop() {
+            if later.contains(&d) {
+                found = true;
+                break;
+            }
+            if let Some(next) = edges.get(&d) {
+                for &n in next {
+                    if seen.insert(n) {
+                        queue.push(n);
+                    }
+                }
+            }
+        }
+        if found {
+            stub.is_async = true;
+            stub.root = true;
+            stub.owner = true;
+            stub.await_ = true;
+        }
+    }
+}
+
+fn refs_block(b: &hir::Block, out: &mut BTreeSet<DefId>) {
+    for s in &b.stmts {
+        match s {
+            hir::Stmt::Bind(b) => refs(&b.value, out),
+            hir::Stmt::Env { value, .. } | hir::Stmt::Expr(value) => refs(value, out),
+        }
+    }
+}
+
+fn refs(e: &hir::Expr, out: &mut BTreeSet<DefId>) {
+    match &e.kind {
+        hir::ExprKind::Name(hir::ValueRef::Def(d)) => {
+            out.insert(*d);
+        }
+        hir::ExprKind::Tuple(ts) | hir::ExprKind::List { items: ts, .. } => {
+            ts.iter().for_each(|t| refs(t, out))
+        }
+        hir::ExprKind::Record { base, fields } => {
+            base.iter().for_each(|b| refs(b, out));
+            fields.iter().for_each(|(_, v)| refs(v, out));
+        }
+        hir::ExprKind::BitArray(segs) => segs.iter().for_each(|s| refs(&s.value, out)),
+        hir::ExprKind::Block(b) => refs_block(b, out),
+        hir::ExprKind::Fn(f) => refs_block(&f.body, out),
+        hir::ExprKind::Multi(gs) => gs.iter().for_each(|g| refs(&g.value, out)),
+        hir::ExprKind::Case { subject, clauses } => {
+            refs(subject, out);
+            for c in clauses {
+                c.guard.iter().for_each(|g| refs(g, out));
+                refs(&c.body, out);
+            }
+        }
+        hir::ExprKind::Call { callee, args } => {
+            refs(callee, out);
+            args.iter().for_each(|a| refs(&a.value, out));
+        }
+        hir::ExprKind::Field { target, .. } | hir::ExprKind::TupleIndex { target, .. } => {
+            refs(target, out)
+        }
+        hir::ExprKind::RecordUpdate { base, fields, .. } => {
+            refs(base, out);
+            fields.iter().for_each(|(_, v)| refs(v, out));
+        }
+        hir::ExprKind::Unary { expr, .. } => refs(expr, out),
+        hir::ExprKind::Binary { lhs, rhs, .. } => {
+            refs(lhs, out);
+            refs(rhs, out);
+        }
+        _ => {}
+    }
+}
+
 /// Lower one consumer-selected collection target as the sole tool root.
 /// The target remains separate from program entries, tests and host exports.
 pub fn lower_selected_with_bindings(
@@ -861,6 +993,10 @@ pub(crate) fn lower_selected_numeric(
         Some((target, export.to_owned())),
     );
     let stub = platform::stub(program, typed, target, options.target.platform())?;
+    let mut pair = vec![(target, Ok(stub))];
+    mark_later_entries(program, &mut pair);
+    let (_, stub) = pair.pop().expect("one stub");
+    let stub = stub.expect("the stub was Ok");
     l.specialize_equality = numeric == crate::Numeric::Scalars;
     l.install_stubs(std::collections::BTreeMap::from([(target, stub)]));
     l.run();
