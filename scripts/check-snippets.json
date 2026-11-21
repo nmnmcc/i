@@ -2712,9 +2712,6 @@
   "crates/ilang-cli/tests/many_tests.rs:2df0b22640976374": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/multicore.rs:f63921b461fb9905": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/native.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
@@ -3216,5 +3213,20 @@
       "E0101: the head of a data type or an opaque type has only type parameters"
     ],
     "substitutions": []
+  },
+  "crates/ilang-cli/src/commands/package.rs:a4c19323c713246b": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/multicore.rs:3562ca42e227191e": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/package_commands.rs:e37300850c53066d": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/package_commands.rs:91053b03f4d86965": {
+    "not_source": true
+  },
+  "crates/ilang-macro/src/item_phase.rs:d942f64886578d87": {
+    "not_source": true
   }
 }
