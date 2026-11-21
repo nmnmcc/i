@@ -607,8 +607,9 @@ impl<'a> Checker<'a> {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
             let env = self.pop_effects(binding.span);
-            // A top-level binding may not need services (errors
-            // included as Fail).
+            // A top-level binding may not need services, except the
+            // implicit ones the runtime gives during start.
+            let env = self.s.ambient(&env);
             self.s.constrain(&env, &Ty::Never);
             if !self.s.failures.is_empty() {
                 let f = self.s.failures.remove(0);
@@ -1790,8 +1791,9 @@ impl<'a> Checker<'a> {
     /// `N` in `M` for two environments, with problems reported
     /// at `span`, and `other` the place of the written type.
     fn sub_env(&mut self, l: &Ty, r: &Ty, span: Span, other: Option<Span>) {
-        self.fix_notes = self.fixed_reached(l, r);
-        self.s.constrain_env(l, r);
+        let l = self.s.ambient(l);
+        self.fix_notes = self.fixed_reached(&l, r);
+        self.s.constrain_env(&l, r);
         self.flush(span, other);
     }
 
