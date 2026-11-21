@@ -7,7 +7,6 @@
 
 // A `Call` is the request cell, so a ready fake request stands in for an
 // answered start in the tests that need no host.
-
 test("with_wait_replaces_the_wait_test", () {
 	// A one-way cell: the fake wait takes it, so `Taken` proves it ran.
 	marker = request.ready(())
@@ -22,7 +21,9 @@ test("with_wait_restores_after_the_body_test", () {
 	marker = request.ready(())
 	w = hostcall.Wait(wait = (_) { request.take(marker) })
 	hostcall.with_wait(w, () { () })
-	assert(hostcall.await(request.ready(1)) == 1)
+	assert(
+		hostcall.await(request.ready(1)) == 1,
+	)
 	assert(request.state(marker) == request.Ready(()))
 	()
 })
@@ -77,7 +78,9 @@ test("in_group_routes_a_start_test", () {
 
 test("group_opens_and_closes_test", () {
 	g = hostcall.group()
-	assert(core.not(hostcall.closed(g)))
+	assert(
+		core.not(hostcall.closed(g)),
+	)
 	hostcall.close(g)
 	assert(hostcall.closed(g))
 	hostcall.close(g)
@@ -100,7 +103,12 @@ test("in_group_restores_after_the_body_test", () {
 		hostcall.in_group(inner, () { () })
 		hostcall.close(inner)
 		// The outer group is the ambient one again: adopting into it works.
-		assert(hostcall.await(hostcall.adopt(request.ready(1))) == 1)
+		assert(
+			hostcall.await(
+				hostcall.adopt(request.ready(1)),
+			) ==
+				1,
+		)
 		()
 	})
 	hostcall.close(outer)

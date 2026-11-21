@@ -1,4 +1,5 @@
 name = "io_process"
+hostcall = true
 
 [dependencies]
 i = { path = "../../stdlib" }
@@ -8,4 +9,3 @@ collection = "i/test.tests"
 
 [dev-dependencies]
 
-hostcall = true

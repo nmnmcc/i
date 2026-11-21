@@ -1394,9 +1394,5 @@ test("random_bytes_service_error", () {
 				),
 		)
 		()
-	} <- (
-		process.Entropy(
-			entropy = (_) { Error("entropy failed") },
-		),
-	)
+	} <- (process.Entropy(entropy = (_) { Error("entropy failed") }))
 })

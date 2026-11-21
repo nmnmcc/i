@@ -1551,7 +1551,7 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                     canon.insert(canonical.clone());
                     format!("@runtime(\"{module}\", \"{function}\") ")
                 }
-                // `make_<type>` is an ordinary exported value (§3.3): its
+                // `make_<type>` is an ordinary exported value: its
                 // service's imports are listed with the service type.
                 DefKind::Binding { .. } | DefKind::ServiceAccessor { .. } => String::new(),
             };

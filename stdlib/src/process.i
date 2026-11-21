@@ -122,7 +122,10 @@ Entropy = (entropy = (Int) -> Result(BitArray, String))
 
 @import("i:process/v1")
 Process = (
-	spawn_piped = (String, BitArray, String, String, String) -> Result(Int, String),
+	spawn_piped = (String, BitArray, String, String, String) -> Result(
+		Int,
+		String,
+	),
 	spawn_config = (
 		String,
 		BitArray,
@@ -255,7 +258,9 @@ entropy = (bytes) <- (raw : Entropy) {
 
 // Waits for a spawn request. A spawn that is cancelled after the host made
 // the child still closes it.
-await_spawn = (r : hostcall.Call(Result(Int, String))) <- (raw : Process) -> Child {
+await_spawn = (r : hostcall.Call(Result(Int, String))) <- (
+	raw : Process,
+) -> Child {
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -264,9 +269,7 @@ await_spawn = (r : hostcall.Call(Result(Int, String))) <- (raw : Process) -> Chi
 		},
 		() {
 			request.state(r) |>
-				(request.Ready(Ok(value))) {
-					raw.close(value)
-				}
+				(request.Ready(Ok(value))) { raw.close(value) }
 				& (_) { () }
 			hostcall.cancel(r)
 		},
@@ -359,9 +362,7 @@ terminate = (Child(number)) <- (raw : Process) {
 /// that still runs. Closing twice is fine; the scope's release closes the
 /// child as well.
 /// Needs: `Process`. Raises nothing.
-close = (Child(number)) <- (raw : Process) {
-	raw.close(number)
-}
+close = (Child(number)) <- (raw : Process) { raw.close(number) }
 
 stdio_mode =
 	(Inherit()) { "inherit" }

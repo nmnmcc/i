@@ -159,9 +159,7 @@ open_handle = (path, mode) <- (raw : Fs) {
 		},
 		() {
 			request.state(r) |>
-				(request.Ready(Ok(value))) {
-					raw.close(value)
-				}
+				(request.Ready(Ok(value))) { raw.close(value) }
 				& (_) { () }
 			hostcall.cancel(r)
 		},
@@ -240,9 +238,7 @@ flush = (file : File) <- (raw : Fs) {
 /// ```i
 /// resource.scoped(() { fs.close(fs.open(path, fs.ReadOnly)) })
 /// ```
-close = (file : File) <- (raw : Fs) {
-	raw.close(file.number)
-}
+close = (file : File) <- (raw : Fs) { raw.close(file.number) }
 
 /// Removes the file or the empty directory at `path`.
 ///

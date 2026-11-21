@@ -94,7 +94,6 @@ root_live : (Key(())) -> Bool
 move_to : <A>(Request(A), Key(())) -> Request(A)
 
 // ---- Groups ----
-
 retain = (value) { value }
 
 /// Opens a group at the ambient current Root.
@@ -115,9 +114,7 @@ close = (g : CallGroup) { req.close_owner(g) }
 closed = (g : CallGroup) -> Bool { core.not(group_live(g.key)) }
 
 open_group = (g : CallGroup) {
-	closed(g) |>
-		(True()) { panic("hostcall: group closed") }
-		& (False()) { () }
+	closed(g) |> (True()) { panic("hostcall: group closed") } & (False()) { () }
 }
 
 // ---- Scopes ----
@@ -130,9 +127,7 @@ in_group = (g : CallGroup, body) {
 }
 
 /// Runs `body` with `w` as the wait of every await in it.
-with_wait = (w : Wait, body) {
-	retain(body()) <- (req.Await(wait = w.wait))
-}
+with_wait = (w : Wait, body) { retain(body()) <- (req.Await(wait = w.wait)) }
 
 // ---- Unwaited starts ----
 
@@ -140,11 +135,19 @@ with_wait = (w : Wait, body) {
 /// ambient group, without awaiting it. A fake (a closure that is not an
 /// import field) is called now and its result is a ready Call.
 @runtime("ilang:hostcall", "call")
-call : <A, N>(() <- (..N, req.Await, req.Owner) -> A) <- (..N, req.Await, req.Owner) -> Call(A)
+call : <A, N>(() <- (..N, req.Await, req.Owner) -> A) <- (
+	..N,
+	req.Await,
+	req.Owner,
+) -> Call(A)
 
 /// `call` in the group `g`.
 @runtime("ilang:hostcall", "call_in")
-call_in : <A, N>(CallGroup, () <- (..N, req.Await, req.Owner) -> A) <- (..N, req.Await, req.Owner) -> Call(A)
+call_in : <A, N>(CallGroup, () <- (..N, req.Await, req.Owner) -> A) <- (
+	..N,
+	req.Await,
+	req.Owner,
+) -> Call(A)
 
 terminal = (state) {
 	state |>
