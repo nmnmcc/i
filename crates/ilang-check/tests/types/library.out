@@ -138,8 +138,8 @@ i/calendar.year_text : (Int) -> String
 i/calendar.fraction_text : (Int) -> String
 i/calendar.offset_text : (Offset) -> String
 i/calendar.format : (Civil, Offset) -> String
-i/calendar.now : () <- (Fail(i/clock.ClockError), i/clock.Clock, i/request.Await, i/request.Owner) -> Civil
-i/calendar.format_now : () <- (Fail(i/clock.ClockError), i/clock.Clock, i/request.Await, i/request.Owner) -> String
+i/calendar.now : () <- (Fail(i/clock.ClockError), i/clock.Clock) -> Civil
+i/calendar.format_now : () <- (Fail(i/clock.ClockError), i/clock.Clock) -> String
 i/calendar.days_in_month : (Int, Int) <- (Fail(CalendarError)) -> Int
 i/calendar.date : (Int, Int, Int) <- (Fail(CalendarError)) -> Date
 i/calendar.time_of_day : (Int, Int, Int, Int) <- (Fail(CalendarError)) -> TimeOfDay
@@ -175,14 +175,15 @@ i/cli.allocate : (List(Field), List(List(Token)), List(Token)) -> Result(List(Li
 i/cli._parse_result : (Parser(A), List(String)) -> Result(A, CliError)
 i/cli.show_field : (Field) -> String
 i/cli._help_result : (Parser(A), String) -> Result(String, DefinitionError)
-i/cli._read_result : (Parser(A)) <- (Fail(process.ProcessError), i/request.Await, i/request.Owner, process.Arguments) -> Result(A, CliError)
-i/cli.run : (Parser(A), String, (A) <- N -> ()) <- (Fail(process.ProcessError | stdio.StdioError | CliError), i/request.Await, i/request.Owner, process.Arguments, stdio.Stdio, ..N) -> ()
+i/cli._read_result : (Parser(A)) <- (Fail(process.ProcessError), process.Arguments) -> Result(A, CliError)
+i/cli.run : (Parser(A), String, (A) <- N -> ()) <- (Fail(process.ProcessError | stdio.StdioError | CliError), process.Arguments, stdio.Stdio, ..N) -> ()
 i/cli.parse : (Parser(A), List(String)) <- (Fail(CliError)) -> A
 i/cli.help : (Parser(A), String) <- (Fail(DefinitionError)) -> String
-i/cli.read : (Parser(A)) <- (Fail(process.ProcessError | CliError), i/request.Await, i/request.Owner, process.Arguments) -> A
-i/clock.monotonic_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
-i/clock.unix_ns : () <- (Clock, Fail(ClockError), request.Await, request.Owner) -> Int
-i/clock.sleep_ns : (Int) <- (Clock, Fail(ClockError), request.Await, request.Owner) -> ()
+i/cli.read : (Parser(A)) <- (Fail(process.ProcessError | CliError), process.Arguments) -> A
+i/clock.monotonic_ns : () <- (Clock, Fail(ClockError)) -> Int
+i/clock.unix_ns : () <- (Clock, Fail(ClockError)) -> Int
+i/clock.sleep_ns : (Int) <- (Clock, Fail(ClockError)) -> ()
+i/clock.make_clock : () -> Clock
 i/control.boundary : ((Boundary(A, B)) <- B -> A) <- B -> A
 i/control.suspend : (Boundary(A, B), (Continuation(C, A, B)) <- B -> A) -> C
 i/control.escape : (Boundary(A, B), A) -> Never
@@ -251,7 +252,7 @@ i/crypto._hkdf_sha512_result : (BitArray, BitArray, BitArray, Int) -> Result(Bit
 i/crypto.xor_bits : (BitArray, BitArray) -> BitArray
 i/crypto._pbkdf2_sha256_result : (BitArray, BitArray, Int, Int) -> Result(BitArray, CryptoError)
 i/crypto.constant_time_equal : (BitArray, BitArray) -> Bool
-i/crypto._random_bytes_result : (Int) <- (Fail(process.ProcessError), process.Entropy, request.Await, request.Owner) -> Result(BitArray, CryptoError)
+i/crypto._random_bytes_result : (Int) <- (Fail(process.ProcessError), process.Entropy) -> Result(BitArray, CryptoError)
 i/crypto.hmac_sha256 : (BitArray, BitArray) <- (Fail(CryptoError)) -> BitArray
 i/crypto.hmac_sha512 : (BitArray, BitArray) <- (Fail(CryptoError)) -> BitArray
 i/crypto.hkdf_extract_sha256 : (BitArray, BitArray) <- (Fail(CryptoError)) -> BitArray
@@ -261,7 +262,7 @@ i/crypto.hkdf_expand_sha512 : (BitArray, BitArray, Int) <- (Fail(CryptoError)) -
 i/crypto.hkdf_sha256 : (BitArray, BitArray, BitArray, Int) <- (Fail(CryptoError)) -> BitArray
 i/crypto.hkdf_sha512 : (BitArray, BitArray, BitArray, Int) <- (Fail(CryptoError)) -> BitArray
 i/crypto.pbkdf2_sha256 : (BitArray, BitArray, Int, Int) <- (Fail(CryptoError)) -> BitArray
-i/crypto.random_bytes : (Int) <- (Fail(process.ProcessError | CryptoError), process.Entropy, request.Await, request.Owner) -> BitArray
+i/crypto.random_bytes : (Int) <- (Fail(process.ProcessError | CryptoError), process.Entropy) -> BitArray
 i/csv.defaults : () -> Options
 i/csv._options_result : (String, Int, Bool) -> Result(Options, CsvError)
 i/csv.raw : (Cursor(A, B)) <- (Fail(A), ..B) -> (Option(Int), Cursor(A, B))
@@ -287,11 +288,11 @@ i/csv.parse : (String) <- (Fail(CsvError)) -> List(List(String))
 i/csv.parse_with : (String, Options) <- (Fail(CsvError)) -> List(List(String))
 i/csv.parse_header : (String, Options) <- (Fail(CsvError)) -> List(dict.Dict(String, String))
 i/csv.decode : (schema.Schema(A, B), dict.Dict(String, String)) <- (Fail(B)) -> A
-i/deferred.new : () <- (resource.Scope, task.Scheduler) -> Deferred(A, B)
-i/deferred.complete : (Deferred(A, B), Result(A, B)) <- (task.Scheduler) -> Bool
-i/deferred.poll : (Deferred(A, B)) <- (task.Scheduler) -> Option(Result(A, B))
-i/deferred.is_done : (Deferred(A, B)) <- (task.Scheduler) -> Bool
-i/deferred.await : (Deferred(A, B)) <- (Fail(B), task.Scheduler) -> A
+i/deferred.new : () <- (resource.Scope) -> Deferred(A, B)
+i/deferred.complete : (Deferred(A, B), Result(A, B)) -> Bool
+i/deferred.poll : (Deferred(A, B)) -> Option(Result(A, B))
+i/deferred.is_done : (Deferred(A, B)) -> Bool
+i/deferred.await : (Deferred(A, B)) <- (Fail(B)) -> A
 i/dict.new : () -> Dict(Never, Never)
 i/dict.size : (Dict(A, B)) -> Int
 i/dict.is_empty : (Dict(A, B)) -> Bool
@@ -334,11 +335,12 @@ i/fail.raise : (A) <- (Fail(A)) -> Never
 i/fail.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
 i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
 i/fail.map_error : (() <- (Fail(B), ..N) -> A, (B) <- N -> C) <- (Fail(C), ..N) -> A
-i/fetch.open : (String, String, String, BitArray) <- (Fail(String), Fetch, request.Await, request.Owner) -> Response
-i/fetch.status : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> Int
-i/fetch.headers : (Response) <- (Fail(String), Fetch, request.Await, request.Owner) -> String
-i/fetch.read : (Response, Int) <- (Fail(String), Fetch, request.Await, request.Owner) -> BitArray
-i/fetch.close : (Response) <- (Fetch, request.Await, request.Owner) -> ()
+i/fetch.open : (String, String, String, BitArray) <- (Fail(String), Fetch) -> Response
+i/fetch.status : (Response) <- (Fail(String), Fetch) -> Int
+i/fetch.headers : (Response) <- (Fail(String), Fetch) -> String
+i/fetch.read : (Response, Int) <- (Fail(String), Fetch) -> BitArray
+i/fetch.close : (Response) <- (Fetch) -> ()
+i/fetch.make_fetch : () -> Fetch
 i/float.max_finite : Float
 i/float.min_positive : Float
 i/float.pi : Float
@@ -468,32 +470,60 @@ i/float_text.digit_text : (Int) -> String
 i/fs.reason_of : (String) -> FsProblem
 i/fs.failure : (String, String, String) <- (Fail(FsError)) -> Never
 i/fs.mode_string : (OpenMode) -> "append" | "read" | "read_write" | "truncate"
-i/fs.open_handle : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner) -> File
-i/fs.open : (String, OpenMode) <- (Fail(FsError), Fs, request.Await, request.Owner, resource.Scope) -> File
-i/fs.read : (File, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-i/fs.write : (File, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.flush : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.close : (File) <- (Fs, request.Await, request.Owner) -> ()
-i/fs.remove : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.rename : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
-i/fs.mkdir : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.open_handle : (String, OpenMode) <- (Fail(FsError), Fs) -> File
+i/fs.open : (String, OpenMode) <- (Fail(FsError), Fs, resource.Scope) -> File
+i/fs.read : (File, Int) <- (Fail(FsError), Fs) -> BitArray
+i/fs.write : (File, BitArray) <- (Fail(FsError), Fs) -> ()
+i/fs.flush : (File) <- (Fail(FsError), Fs) -> ()
+i/fs.close : (File) <- (Fs) -> ()
+i/fs.remove : (String) <- (Fail(FsError), Fs) -> ()
+i/fs.rename : (String, String) <- (Fail(FsError), Fs) -> ()
+i/fs.mkdir : (String) <- (Fail(FsError), Fs) -> ()
 i/fs.slice : (String, Int, Int) -> String
 i/fs.list_parts : (String, Int) -> List(String)
-i/fs.list : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
-i/fs.metadata : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Metadata
-i/fs.temp_dir : () <- (Fail(FsError), Fs, request.Await, request.Owner) -> String
-i/fs.read_chunks : (File) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-i/fs.read_file : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> BitArray
-i/fs.write_file : (String, BitArray) <- (Fail(FsError), Fs, request.Await, request.Owner) -> ()
+i/fs.list : (String) <- (Fail(FsError), Fs) -> List(String)
+i/fs.metadata : (String) <- (Fail(FsError), Fs) -> Metadata
+i/fs.temp_dir : () <- (Fail(FsError), Fs) -> String
+i/fs.read_chunks : (File) <- (Fail(FsError), Fs) -> BitArray
+i/fs.read_file : (String) <- (Fail(FsError), Fs) -> BitArray
+i/fs.write_file : (String, BitArray) <- (Fail(FsError), Fs) -> ()
 i/fs.line_parts : (String, Int) -> List(String)
-i/fs.read_lines : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
-i/fs.copy_chunks : (File, File, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Int
-i/fs.copy : (String, String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> Int
+i/fs.read_lines : (String) <- (Fail(FsError), Fs) -> List(String)
+i/fs.copy_chunks : (File, File, Int) <- (Fail(FsError), Fs) -> Int
+i/fs.copy : (String, String) <- (Fail(FsError), Fs) -> Int
 i/fs.max_walk_depth : 32
 i/fs.child : (String, String) -> String
-i/fs.walk_from : (String, Int) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
+i/fs.walk_from : (String, Int) <- (Fail(FsError), Fs) -> List(String)
 i/fs.failure_with : (String, String, FsProblem, String) <- (Fail(FsError)) -> Never
-i/fs.walk : (String) <- (Fail(FsError), Fs, request.Await, request.Owner) -> List(String)
+i/fs.walk : (String) <- (Fail(FsError), Fs) -> List(String)
+i/fs.make_fs : () -> Fs
+i/hostcall.group_live : (Key(())) -> Bool
+i/hostcall.root_live : (Key(())) -> Bool
+i/hostcall.move_to : (Request(A), Key(())) -> Request(A)
+i/hostcall.retain : (A) -> A
+i/hostcall.group : () -> req.Owner
+i/hostcall.group_at : (req.Root) -> req.Owner
+i/hostcall.close : (req.Owner) -> ()
+i/hostcall.closed : (req.Owner) -> Bool
+i/hostcall.open_group : (req.Owner) -> ()
+i/hostcall.in_group : (req.Owner, () <- N -> A) <- N -> A
+i/hostcall.with_wait : (Wait, () <- N -> A) <- N -> A
+i/hostcall.call : (() <- N -> A) <- N -> Request(A)
+i/hostcall.call_in : (req.Owner, () <- N -> A) <- N -> Request(A)
+i/hostcall.terminal : (A) -> ()
+i/hostcall.await : (Request(A)) -> A
+i/hostcall.state : (Request(A)) -> RequestState(A)
+i/hostcall.take : (Request(A)) -> A
+i/hostcall.cancel : (Request(A)) -> ()
+i/hostcall.settled : (Request(A)) -> Bool
+i/hostcall.ticket : (Request(A)) -> Ticket
+i/hostcall.adopt : (Request(A)) -> Request(A)
+i/hostcall.request : (Request(A)) -> Request(A)
+i/hostcall.root : () -> req.Root
+i/hostcall.open_root : () -> req.Root
+i/hostcall.close_root : (req.Root) -> ()
+i/hostcall.wait_any : (List(Ticket)) -> ()
+i/hostcall.poll : () -> ()
 i/http.content_length : "Content-Length"
 i/http.content_type : "Content-Type"
 i/http.transfer_encoding : "Transfer-Encoding"
@@ -550,50 +580,50 @@ i/http.header_lines : (List((String, BitArray))) -> BitArray
 i/http.reason : (Int) -> String
 i/http.hex_string : (Int) -> String
 i/http.lowercase : (String) -> String
-i/http.serve : (net.Listener, (Request) <- (Fail(A), ..N) -> Response) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
-i/http.serve_stream : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(A), ..N) -> Response) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
-i/http.accept_loop : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(B), N & { Fail(A) | task.Scheduler | task.Runner | requests.Await | { Fail(Never) | requests.Await | task.Runner | task.Scheduler | N } & { task.Scheduler | N } }) -> Response, task.Group(A)) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> Never
-i/http.connection_loop : (net.Stream, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray, trailers = () <- (task.Scheduler) -> AnyHeaders)) <- (Fail(A), ..N) -> Response, BitArray) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler, ..N) -> ()
-i/http.write_server_reply : (net.Stream, Response, Bool) <- (Fail(net.NetError), net.Net, requests.Await, requests.Owner) -> ()
+i/http.serve : (net.Listener, (Request) <- (Fail(A), ..N) -> Response) <- (Fail(net.NetError), net.Net, ..N) -> Never
+i/http.serve_stream : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray, trailers = () -> AnyHeaders)) <- (Fail(A), ..N) -> Response) <- (Fail(net.NetError), net.Net, ..N) -> Never
+i/http.accept_loop : (net.Listener, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray, trailers = () -> AnyHeaders)) <- (Fail(B), N & { Fail(A) | { Fail(Never) | N } & N }) -> Response, task.Group(A)) <- (Fail(net.NetError), net.Net, ..N) -> Never
+i/http.connection_loop : (net.Stream, (Request, (read = (Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray, trailers = () -> AnyHeaders)) <- (Fail(A), ..N) -> Response, BitArray) <- (Fail(net.NetError), net.Net, ..N) -> ()
+i/http.write_server_reply : (net.Stream, Response, Bool) <- (Fail(net.NetError), net.Net) -> ()
 i/http.request_framing : (AnyHeaders) <- (Fail(BadMessage)) -> BodyFraming
-i/http.read_request_piece : (net.Stream, task.Ref(BodyCursor), Int) <- (Fail(BadMessage | net.NetError), net.Net, requests.Await, requests.Owner, task.Scheduler) -> BitArray
-i/http.body_more : (net.Stream, BodyCursor) <- (Fail(net.NetError | BadMessage), net.Net, requests.Await, requests.Owner) -> BodyCursor
-i/http.body_piece : (net.Stream, BodyCursor, Int) <- (Fail(net.NetError | BadMessage), net.Net, requests.Await, requests.Owner) -> (BitArray, BodyCursor)
+i/http.read_request_piece : (net.Stream, task.Ref(BodyCursor), Int) <- (Fail(BadMessage | net.NetError), net.Net) -> BitArray
+i/http.body_more : (net.Stream, BodyCursor) <- (Fail(net.NetError | BadMessage), net.Net) -> BodyCursor
+i/http.body_piece : (net.Stream, BodyCursor, Int) <- (Fail(net.NetError | BadMessage), net.Net) -> (BitArray, BodyCursor)
 i/http.split_bytes : (BitArray, Int) -> (BitArray, BitArray)
 i/http.collect_body : ((65536) <- N -> BitArray, List(BitArray)) <- N -> BitArray
 i/http.drain_body : ((65536) <- N -> BitArray) <- N -> ()
 i/http.native_client : () <- (net.Net, tls.Tls) -> Client
-i/http.client : () <- (Client, requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), send = (Request) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response, stream = (Request) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> BitArray))
-i/http.send : (Request) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
+i/http.client : () <- (Client) -> (close = () -> (), send = (Request) <- (Fail(HttpError)) -> Response, stream = (Request) <- (Fail(HttpError)) -> (close = () -> (), head = Response, read = (Int) <- (Fail(HttpError)) -> BitArray))
+i/http.send : (Request) <- (Client, Fail(HttpError)) -> Response
 i/http.fetch_error : (String) <- (Fail(Dns | Protocol | Connect)) -> Never
 i/http.fetch_reply : (() <- (Fail(String), ..N) -> A) <- (Fail(HttpError), ..N) -> A
 i/http.fetch_headers : (List(String)) -> List((String, String))
-i/http.fetch_open : (Request) <- (Fail(HttpError), fetch.Fetch, requests.Await, requests.Owner) -> fetch.Response
-i/http.fetch_stream : (Request) <- (Fail(HttpError), fetch.Fetch, requests.Await, requests.Owner) -> (close = () <- (requests.Await, requests.Owner) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner) -> BitArray)
+i/http.fetch_open : (Request) <- (Fail(HttpError), fetch.Fetch) -> fetch.Response
+i/http.fetch_stream : (Request) <- (Fail(HttpError), fetch.Fetch) -> (close = () -> (), head = Response, read = (Int) <- (Fail(HttpError)) -> BitArray)
 i/http.fetch_client : () <- (fetch.Fetch) -> Client
-i/http.send_stream : (Request) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (close = () <- (requests.Await, requests.Owner, task.Runner, task.Scheduler) -> (), head = Response, read = (Int) <- (Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> BitArray)
-i/http.network_client : () <- (task.Scheduler) -> (close = () <- (net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> (), send = (Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response)
-i/http.close_connection : (Connection) <- (net.Net, requests.Await, requests.Owner, tls.Tls) -> ()
-i/http.close_client : (task.Ref(Pool)) <- (net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> ()
+i/http.send_stream : (Request) <- (Client, Fail(HttpError)) -> (close = () -> (), head = Response, read = (Int) <- (Fail(HttpError)) -> BitArray)
+i/http.network_client : () -> (close = () <- (net.Net, tls.Tls) -> (), send = (Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, tls.Tls) -> Response)
+i/http.close_connection : (Connection) <- (net.Net, tls.Tls) -> ()
+i/http.close_client : (task.Ref(Pool)) <- (net.Net, tls.Tls) -> ()
 i/http.pool_take : (List(Idle), Bool, String, Int) -> (List(Idle), Option(Idle))
-i/http.get : (String) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
-i/http.post : (String, BitArray) <- (Client, Fail(HttpError), requests.Await, requests.Owner, task.Runner, task.Scheduler) -> Response
+i/http.get : (String) <- (Client, Fail(HttpError)) -> Response
+i/http.post : (String, BitArray) <- (Client, Fail(HttpError)) -> Response
 i/http._body_text_result : (Response) -> Result(String, ())
-i/http.follow : (task.Ref(Pool), Request, Int) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
+i/http.follow : (task.Ref(Pool), Request, Int) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, tls.Tls) -> Response
 i/http.redirect_headers : (AnyHeaders, uri.Uri, uri.Uri, Bool) -> AnyHeaders
-i/http.send_once : (task.Ref(Pool), Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
-i/http.dial : (Bool, String, Int) <- (Fail(Dns | Connect | Tls), net.Net, requests.Await, requests.Owner, tls.Tls) -> Connection
-i/http.exchange : (task.Ref(Pool), Idle, Request, BitArray) <- (Fail(Connect | Tls | Protocol | PeerClosed), net.Net, requests.Await, requests.Owner, task.Scheduler, tls.Tls) -> Response
+i/http.send_once : (task.Ref(Pool), Request) <- (Fail(Protocol | Dns | Connect | Tls), net.Net, tls.Tls) -> Response
+i/http.dial : (Bool, String, Int) <- (Fail(Dns | Connect | Tls), net.Net, tls.Tls) -> Connection
+i/http.exchange : (task.Ref(Pool), Idle, Request, BitArray) <- (Fail(Connect | Tls | Protocol | PeerClosed), net.Net, tls.Tls) -> Response
 i/http.read_reply : ((read = (65536) <- N -> BitArray, write = A), Method, BitArray) <- (Fail(Protocol | PeerClosed), ..N) -> (Response, BitArray, Bool)
 i/http.read_progress : ((read = (65536) <- N -> BitArray, write = A), Method, BitArray, B & Bool) <- (Fail(Protocol | PeerClosed), ..N) -> (Response, BitArray, B | Bool)
 i/http._body_json_result : (Response) -> Result(json.Json, BodyError)
 i/http._body_decode_result : (Response, schema.Schema(A, schema.SchemaError)) -> Result(A, BodyError)
 i/http.send_with : ((Request) <- N -> Response, Request) <- N -> Response
-i/http.send_timeout : ((Request) <- (Fail(A | HttpError), requests.Await, task.Runner, task.Scheduler, { Fail(Never) | requests.Await | task.Runner | task.Scheduler | N } & { Fail(A) | N }) -> Response, Request, Int) <- (Fail(A | HttpError | clock.ClockError), clock.Clock, requests.Owner, task.Scheduler, ..N) -> Response
+i/http.send_timeout : ((Request) <- (Fail(A | HttpError), { Fail(Never) | N } & { Fail(A) | N }) -> Response, Request, Int) <- (Fail(A | HttpError | clock.ClockError), clock.Clock, ..N) -> Response
 i/http.route : (Method, String, Request) -> Option(List((String, String)))
 i/http.match_segments : (List(String), List(String)) -> Option(List((String, String)))
-i/http.net_transport : (net.Stream) -> (read = (Int) <- (Fail(Connect), net.Net, requests.Await, requests.Owner) -> BitArray, write = (BitArray) <- (Fail(Connect), net.Net, requests.Await, requests.Owner) -> ())
-i/http.tls_transport : (tls.Stream) -> (read = (Int) <- (Fail(Tls), requests.Await, requests.Owner, tls.Tls) -> BitArray, write = (BitArray) <- (Fail(Tls), requests.Await, requests.Owner, tls.Tls) -> ())
+i/http.net_transport : (net.Stream) -> (read = (Int) <- (Fail(Connect), net.Net) -> BitArray, write = (BitArray) <- (Fail(Connect), net.Net) -> ())
+i/http.tls_transport : (tls.Stream) -> (read = (Int) <- (Fail(Tls), tls.Tls) -> BitArray, write = (BitArray) <- (Fail(Tls), tls.Tls) -> ())
 i/http.has_token : (AnyHeaders, String, String) -> Bool
 i/http.parse_query : (String) <- (Fail(uri.CodecError)) -> List((String, String))
 i/http.body_text : (Response) <- (Fail(())) -> String
@@ -652,6 +682,7 @@ i/int.divide : (Int, Int) <- (Fail(())) -> Int
 i/int.remainder : (Int, Int) <- (Fail(())) -> Int
 i/int.modulo : (Int, Int) <- (Fail(())) -> Int
 i/int.floor_divide : (Int, Int) <- (Fail(())) -> Int
+i/io.make_io : () -> Io
 i/json._parse_result : (String) -> Result(Json, JsonError)
 i/json.whitespace : (List(Int), Int) -> (List(Int), Int)
 i/json.value : (List(Int), Int) <- (Fail(JsonError)) -> (Json, List(Int), Int)
@@ -783,27 +814,28 @@ i/log.escape : (UtfCodepoint) -> String
 i/log.stderr : () -> Sink(stdio.StdioError, request.Await | request.Owner | stdio.Stdio)
 i/log.stdout : () -> Sink(stdio.StdioError, request.Await | request.Owner | stdio.Stdio)
 i/log.file : (String) -> Sink(fs.FsError, A)
-i/log.timestamped : (Entry) <- (Fail(i/clock.ClockError), i/clock.Clock, request.Await, request.Owner) -> Entry
-i/net.listen : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Listener
-i/net.connect : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
-i/net.accept : (Listener) <- (Fail(NetError), Net, request.Await, request.Owner) -> Stream
-i/net.local_port : (Listener | Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> Int
-i/net.read : (Stream, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray
-i/net.write : (Stream, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
-i/net.shutdown_write : (Stream) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
-i/net.close_stream : (Stream) <- (Net, request.Await, request.Owner) -> ()
-i/net.close_listener : (Listener) <- (Net, request.Await, request.Owner) -> ()
+i/log.timestamped : (Entry) <- (Fail(i/clock.ClockError), i/clock.Clock) -> Entry
+i/net.listen : (String, Int) <- (Fail(NetError), Net) -> Listener
+i/net.connect : (String, Int) <- (Fail(NetError), Net) -> Stream
+i/net.accept : (Listener) <- (Fail(NetError), Net) -> Stream
+i/net.local_port : (Listener | Datagram) <- (Fail(NetError), Net) -> Int
+i/net.read : (Stream, Int) <- (Fail(NetError), Net) -> BitArray
+i/net.write : (Stream, BitArray) <- (Fail(NetError), Net) -> ()
+i/net.shutdown_write : (Stream) <- (Fail(NetError), Net) -> ()
+i/net.close_stream : (Stream) <- (Net) -> ()
+i/net.close_listener : (Listener) <- (Net) -> ()
 i/net.slice : (String, Int, Int) -> String
 i/net.parts : (String, Int) -> List(String)
-i/net.resolve : (String) <- (Fail(NetError), Net, request.Await, request.Owner) -> List(String)
+i/net.resolve : (String) <- (Fail(NetError), Net) -> List(String)
 i/net.stream_number : (Stream) -> Int
-i/net.byte_stream : (Stream) -> (close = () <- (Net, request.Await, request.Owner) -> (), read = (Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(NetError), Net, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ())
-i/net.bind : (String, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> Datagram
-i/net.send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net, request.Await, request.Owner) -> ()
-i/net.receive_from : (Datagram, Int) <- (Fail(NetError), Net, request.Await, request.Owner) -> (address = String, data = BitArray, port = Int)
+i/net.byte_stream : (Stream) -> (close = () <- (Net) -> (), read = (Int) <- (Fail(NetError), Net) -> BitArray, shutdown_write = () <- (Fail(NetError), Net) -> (), write = (BitArray) <- (Fail(NetError), Net) -> ())
+i/net.bind : (String, Int) <- (Fail(NetError), Net) -> Datagram
+i/net.send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net) -> ()
+i/net.receive_from : (Datagram, Int) <- (Fail(NetError), Net) -> (address = String, data = BitArray, port = Int)
 i/net.decode_datagram : (A) -> (address = String, data = BitArray, port = Int)
-i/net.local_address : (Datagram) <- (Fail(NetError), Net, request.Await, request.Owner) -> String
-i/net.close_datagram : (Datagram) <- (Net, request.Await, request.Owner) -> ()
+i/net.local_address : (Datagram) <- (Fail(NetError), Net) -> String
+i/net.close_datagram : (Datagram) <- (Net) -> ()
+i/net.make_net : () -> Net
 i/option.is_some : (Option(A)) -> Bool
 i/option.is_none : (Option(A)) -> Bool
 i/option.map : (Option(A), (A) <- N -> B) <- N -> Option(B)
@@ -857,30 +889,35 @@ i/process.encode_items : (List(String)) <- (Fail(ProcessError)) -> BitArray
 i/process.encode_args : (List(String)) <- (Fail(ProcessError)) -> BitArray
 i/process.decode_items : (A, Int) -> List(String)
 i/process.decode_args : (A) -> List(String)
-i/process.args : () <- (Arguments, Fail(ProcessError), request.Await, request.Owner) -> List(String)
-i/process.env : (String) <- (Environment, Fail(ProcessError), request.Await, request.Owner) -> String
-i/process.cwd : () <- (Fail(ProcessError), WorkingDirectory, request.Await, request.Owner) -> String
-i/process.entropy : (Int) <- (Entropy, Fail(ProcessError), request.Await, request.Owner) -> BitArray
-i/process.await_spawn : (Request(Result(Int, String))) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Child
-i/process.release : (Child) <- (Process, request.Await, request.Owner) -> ()
-i/process.spawn : (String, List(String)) <- (Fail(ProcessError), Process, request.Await, request.Owner, resource.Scope) -> Child
-i/process.wait : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> Int
-i/process.terminate : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
-i/process.close : (Child) <- (Process, request.Await, request.Owner) -> ()
+i/process.args : () <- (Arguments, Fail(ProcessError)) -> List(String)
+i/process.env : (String) <- (Environment, Fail(ProcessError)) -> String
+i/process.cwd : () <- (Fail(ProcessError), WorkingDirectory) -> String
+i/process.entropy : (Int) <- (Entropy, Fail(ProcessError)) -> BitArray
+i/process.await_spawn : (Request(Result(Int, String))) <- (Fail(ProcessError), Process) -> Child
+i/process.release : (Child) <- (Process) -> ()
+i/process.spawn : (String, List(String)) <- (Fail(ProcessError), Process, resource.Scope) -> Child
+i/process.wait : (Child) <- (Fail(ProcessError), Process) -> Int
+i/process.terminate : (Child) <- (Fail(ProcessError), Process) -> ()
+i/process.close : (Child) <- (Process) -> ()
 i/process.stdio_mode : (Stdio) -> "inherit" | "null" | "piped"
-i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, request.Await, request.Owner, resource.Scope) -> Child
-i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, request.Await, request.Owner, resource.Scope) -> Child
-i/process.read_stdout : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.read_stderr : (Child, Int) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
-i/process.close_stdin : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> ()
+i/process.spawn_piped : (String, List(String), Stdio, Stdio, Stdio) <- (Fail(ProcessError), Process, resource.Scope) -> Child
+i/process.spawn_config : (String, List(String), Stdio, Stdio, Stdio, EnvironmentMode, DirectoryMode) <- (Fail(ProcessError), Process, resource.Scope) -> Child
+i/process.read_stdout : (Child, Int) <- (Fail(ProcessError), Process) -> BitArray
+i/process.read_stderr : (Child, Int) <- (Fail(ProcessError), Process) -> BitArray
+i/process.write_stdin : (Child, BitArray) <- (Fail(ProcessError), Process) -> ()
+i/process.close_stdin : (Child) <- (Fail(ProcessError), Process) -> ()
 i/process.chunk_size : 65536
 i/process.reverse_onto : (List(A), List(A)) -> List(A)
-i/process.drain_stdout : (Child, List(BitArray)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.drain_stderr : (Child, List(BitArray)) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.read_all_stdout : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.read_all_stderr : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner) -> BitArray
-i/process.collect : (Child) <- (Fail(ProcessError), Process, request.Await, request.Owner, resource.Scope, task.Runner, task.Scheduler) -> (stderr = BitArray, stdout = BitArray)
+i/process.drain_stdout : (Child, List(BitArray)) <- (Fail(ProcessError), Process) -> BitArray
+i/process.drain_stderr : (Child, List(BitArray)) <- (Fail(ProcessError), Process) -> BitArray
+i/process.read_all_stdout : (Child) <- (Fail(ProcessError), Process) -> BitArray
+i/process.read_all_stderr : (Child) <- (Fail(ProcessError), Process) -> BitArray
+i/process.collect : (Child) <- (Fail(ProcessError), Process, resource.Scope) -> (stderr = BitArray, stdout = BitArray)
+i/process.make_arguments : () -> Arguments
+i/process.make_environment : () -> Environment
+i/process.make_working_directory : () -> WorkingDirectory
+i/process.make_entropy : () -> Entropy
+i/process.make_process : () -> Process
 i/property.defaults : () -> Config
 i/property.make : ((Int, random.Generator) -> Option(Tree(A))) -> Gen(A)
 i/property.sample : (Gen(A), Int, random.Generator) -> Option(Tree(A))
@@ -927,32 +964,32 @@ i/queue.append_ticket : (List(Int), Int) -> List(Int)
 i/queue.is_head : (List(Int), Int) -> Bool
 i/queue.is_open : (Terminal(A)) -> Bool
 i/queue.has_room : (QueueState(A, B)) -> Bool
-i/queue.make : (Option(Int), Strategy) <- (Fail(Never), resource.Scope, task.Scheduler) -> Queue(A, B)
-i/queue.make_bounded : (Int, Strategy) <- (Fail(QueueError), resource.Scope, task.Scheduler) -> Queue(A, B)
-i/queue.bounded : (Int) <- (Fail(QueueError), resource.Scope, task.Scheduler) -> Queue(A, B)
-i/queue.dropping : (Int) <- (Fail(QueueError), resource.Scope, task.Scheduler) -> Queue(A, B)
-i/queue.sliding : (Int) <- (Fail(QueueError), resource.Scope, task.Scheduler) -> Queue(A, B)
-i/queue.unbounded : () <- (Fail(Never), resource.Scope, task.Scheduler) -> Queue(A, B)
+i/queue.make : (Option(Int), Strategy) <- (Fail(Never), resource.Scope) -> Queue(A, B)
+i/queue.make_bounded : (Int, Strategy) <- (Fail(QueueError), resource.Scope) -> Queue(A, B)
+i/queue.bounded : (Int) <- (Fail(QueueError), resource.Scope) -> Queue(A, B)
+i/queue.dropping : (Int) <- (Fail(QueueError), resource.Scope) -> Queue(A, B)
+i/queue.sliding : (Int) <- (Fail(QueueError), resource.Scope) -> Queue(A, B)
+i/queue.unbounded : () <- (Fail(Never), resource.Scope) -> Queue(A, B)
 i/queue.insert : (QueueState(A, B), Strategy, A) -> (QueueState(A, B), Bool)
 i/queue.offer_first : (QueueState(A, B), Strategy, A) -> (QueueState(A, B), OfferStep)
 i/queue.offer_again : (QueueState(A, B), Strategy, Int, A) -> (QueueState(A, B), OfferStep)
-i/queue.offer_wait : (Queue(A, B), Int, A) <- (task.Scheduler) -> OfferStep
-i/queue.forget_offer : (Queue(A, B), Int) <- (task.Scheduler) -> ()
-i/queue.offer : (Queue(A, B), A) <- (Fail(QueueError), task.Scheduler) -> Bool
+i/queue.offer_wait : (Queue(A, B), Int, A) -> OfferStep
+i/queue.forget_offer : (Queue(A, B), Int) -> ()
+i/queue.offer : (Queue(A, B), A) <- (Fail(QueueError)) -> Bool
 i/queue.empty_answer : (QueueState(A, B), Int) -> (QueueState(A, B), TakeStep(A, B))
 i/queue.take_now : (QueueState(A, B), Int) -> (QueueState(A, B), TakeStep(A, B))
 i/queue.take_first : (QueueState(A, B)) -> (QueueState(A, B), TakeStep(A, B))
 i/queue.take_again : (QueueState(A, B), Int) -> (QueueState(A, B), TakeStep(A, B))
-i/queue.take_wait : (Queue(A, B), Int) <- (task.Scheduler) -> TakeStep(A, B)
-i/queue.forget_take : (Queue(A, B), Int) <- (task.Scheduler) -> ()
+i/queue.take_wait : (Queue(A, B), Int) -> TakeStep(A, B)
+i/queue.forget_take : (Queue(A, B), Int) -> ()
 i/queue.finish_take : (TakeStep(A, B)) <- (Fail(B)) -> Option(A)
-i/queue.take : (Queue(A, B)) <- (Fail(B), task.Scheduler) -> Option(A)
-i/queue.poll : (Queue(A, B)) <- (Fail(B), task.Scheduler) -> Option(A)
+i/queue.take : (Queue(A, B)) <- (Fail(B)) -> Option(A)
+i/queue.poll : (Queue(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.nothing_to_take : (QueueState(A, B)) -> (QueueState(A, B), TakeStep(A, B))
-i/queue.size : (Queue(A, B)) <- (task.Scheduler) -> Int
-i/queue.end : (Queue(A, B)) <- (task.Scheduler) -> ()
-i/queue.fail : (Queue(A, B), B) <- (task.Scheduler) -> ()
-i/queue.shutdown : (Queue(A, B)) <- (task.Scheduler) -> ()
+i/queue.size : (Queue(A, B)) -> Int
+i/queue.end : (Queue(A, B)) -> ()
+i/queue.fail : (Queue(A, B), B) -> ()
+i/queue.shutdown : (Queue(A, B)) -> ()
 i/random.word_size : () -> Int
 i/random.mask : (Int) -> Int
 i/random.xor_shift : (Int, Int) -> Int
@@ -1056,9 +1093,9 @@ i/request.cancel_group : (Key(())) -> ()
 i/request.cancel_root : (Key(())) -> ()
 i/request.observe_owner : (Key(())) -> Request(())
 i/request.observe_root : (Key(())) -> Request(())
-i/request.open_root : () <- (Root) -> Root
+i/request.open_root : () -> Root
 i/request.close_root : (Root) -> ()
-i/request.open_owner : () <- (Root) -> Owner
+i/request.open_owner : () -> Owner
 i/request.close_owner : (Owner) -> ()
 i/request.count : (Owner) -> Int
 i/request.count_root : (Root) -> Int
@@ -1067,9 +1104,9 @@ i/request.settled_root : (Root) -> Bool
 i/request.cancel_all : (Owner) -> ()
 i/request.cancel_all_root : (Root) -> ()
 i/request.retain : (A) -> A
-i/request.within : (() <- N -> A) <- (N - Owner, Root) -> A
-i/request.wait_none : (Owner) <- (Await) -> ()
-i/request.wait_none_root : (Root) <- (Await) -> ()
+i/request.within : (() <- N -> A) <- N -> A
+i/request.wait_none : (Owner) -> ()
+i/request.wait_none_root : (Root) -> ()
 i/request.ready : (A) -> Request(A)
 i/request.ticket : (Request(A)) -> Ticket
 i/request.read_state : (Request(A)) -> Result(A, Int)
@@ -1077,15 +1114,15 @@ i/request.take : (Request(A)) -> A
 i/request.settled : (Ticket) -> Bool
 i/request.cancel : (Ticket) -> ()
 i/request.state : (Request(A)) -> RequestState(A)
-i/request.await : (Request(A)) <- (Await) -> A
-i/request.await_owned : (Request(A)) <- (Await) -> A
+i/request.await : (Request(A)) -> A
+i/request.await_owned : (Request(A)) -> A
 i/request.wait_any : (List(Ticket)) -> ()
 i/request.poll : () -> ()
 i/request.entry_root : () -> Key(())
 i/request.entry_end : () -> ()
-i/request._entry : (() <- N -> A) <- (N - Await - Owner - Root) -> A
+i/request._entry : (() <- N -> A) <- N -> A
 i/request._provider_root : (List(Root), Key(())) -> Root
-i/request._provider_owner : (List(Owner)) <- (Root) -> Owner
+i/request._provider_owner : (List(Owner)) -> Owner
 i/request._provider_await : (List(Await)) -> Await
 i/resource.ensure : (() <- N -> A, () <- N -> ()) <- N -> A
 i/resource.gate_ready : (A) -> Request(A)
@@ -1119,11 +1156,11 @@ i/schedule._grow : (Int, Int, Int, Int) -> Int
 i/schedule._base_ns : (Pattern, Int) -> Int
 i/schedule._offset_ns : (Int, Int, Int) -> Int
 i/schedule.delay_at : (Delay, Int) -> time.Duration
-i/schedule._sleep_before : (Delay, Int) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner) -> ()
-i/schedule._retry_from : (Int, Int, Delay, () <- (Fail(B), ..N) -> A) <- (Fail(B | clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> A
-i/schedule.retry : (Int, Delay, () <- (Fail(B), ..N) -> A) <- (Fail(B | clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> A
-i/schedule._repeat_from : (Int, Int, Delay, () <- N -> A) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> ()
-i/schedule.repeat : (Int, Delay, () <- N -> A) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> ()
+i/schedule._sleep_before : (Delay, Int) <- (Fail(clock.ClockError), clock.Clock) -> ()
+i/schedule._retry_from : (Int, Int, Delay, () <- (Fail(B), ..N) -> A) <- (Fail(B | clock.ClockError), clock.Clock, ..N) -> A
+i/schedule.retry : (Int, Delay, () <- (Fail(B), ..N) -> A) <- (Fail(B | clock.ClockError), clock.Clock, ..N) -> A
+i/schedule._repeat_from : (Int, Int, Delay, () <- N -> A) <- (Fail(clock.ClockError), clock.Clock, ..N) -> ()
+i/schedule.repeat : (Int, Delay, () <- N -> A) <- (Fail(clock.ClockError), clock.Clock, ..N) -> ()
 i/schema._decode_result : (Schema(A, B), json.Json) -> Result(A, B)
 i/schema.encode : (Schema(A, B), A) -> json.Json
 i/schema._parse_result : (Schema(A, SchemaError), String) -> Result(A, ParseError)
@@ -1156,12 +1193,12 @@ i/schema.read_union : (List(Schema(A, SchemaError)), json.Json) -> Result(A, Sch
 i/schema.tagged_union : (String, List((String, Schema(A, SchemaError))), (A) -> String) -> Schema(A, SchemaError)
 i/schema.decode : (Schema(A, B), json.Json) <- (Fail(B)) -> A
 i/schema.parse : (Schema(A, SchemaError), String) <- (Fail(ParseError)) -> A
-i/semaphore.new : (Int) <- (Fail(InvalidPermits), resource.Scope, task.Scheduler) -> Semaphore
-i/semaphore.with_permits : (Semaphore, Int, () <- N -> A) <- (Fail(InvalidPermits), task.Scheduler, ..N) -> A
-i/semaphore.with_permit : (Semaphore, () <- N -> A) <- (task.Scheduler, ..N) -> A
-i/semaphore.available : (Semaphore) <- (task.Scheduler) -> Int
-i/semaphore.hold : (Semaphore, Int, () <- N -> A) <- (task.Scheduler, ..N) -> A
-i/semaphore.admit : (Semaphore, Int, Int) <- (task.Scheduler) -> ()
+i/semaphore.new : (Int) <- (Fail(InvalidPermits), resource.Scope) -> Semaphore
+i/semaphore.with_permits : (Semaphore, Int, () <- N -> A) <- (Fail(InvalidPermits), ..N) -> A
+i/semaphore.with_permit : (Semaphore, () <- N -> A) <- N -> A
+i/semaphore.available : (Semaphore) -> Int
+i/semaphore.hold : (Semaphore, Int, () <- N -> A) <- N -> A
+i/semaphore.admit : (Semaphore, Int, Int) -> ()
 i/semaphore.take : (SemaphoreState, Int, Int) -> (SemaphoreState, Bool)
 i/semaphore.leave : (SemaphoreState, Int, Int) -> SemaphoreState
 i/sequence.new : () -> Sequence(Never)
@@ -1241,13 +1278,14 @@ i/set.is_subset : (Set(A), Set(B)) -> Bool
 i/set.is_disjoint : (Set(A), Set(B)) -> Bool
 i/set.same_elements : (Set(A), Set(B)) -> Bool
 i/set.by_size : (Set(A), Set(A)) -> (Set(A), Set(A))
-i/stdio.read : (Int) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> BitArray
-i/stdio.write : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.write_error : (BitArray) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.flush : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.flush_error : () <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.print : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
-i/stdio.print_error : (String) <- (Fail(StdioError), Stdio, request.Await, request.Owner) -> ()
+i/stdio.read : (Int) <- (Fail(StdioError), Stdio) -> BitArray
+i/stdio.write : (BitArray) <- (Fail(StdioError), Stdio) -> ()
+i/stdio.write_error : (BitArray) <- (Fail(StdioError), Stdio) -> ()
+i/stdio.flush : () <- (Fail(StdioError), Stdio) -> ()
+i/stdio.flush_error : () <- (Fail(StdioError), Stdio) -> ()
+i/stdio.print : (String) <- (Fail(StdioError), Stdio) -> ()
+i/stdio.print_error : (String) <- (Fail(StdioError), Stdio) -> ()
+i/stdio.make_stdio : () -> Stdio
 i/stream.new : () -> Stream(Never, Never, A)
 i/stream.wrap : (A) -> Stream(A, Never, B)
 i/stream.from_list : (List(A)) -> Stream(A, Never, B)
@@ -1472,7 +1510,7 @@ i/task.add_task : (State, TaskState) -> State
 i/task.set_scope : (State, ScopeState) -> State
 i/task.guarded : (Scheduler, Maybe(Address), () -> Completion) -> Completion
 i/task.complete : (() <- (Fail(B), ..N) -> A, Key(Result(A, B)), Key(B), Bool) <- N -> Completion
-i/task.make_start : (() <- (Fail(B), N & { Fail(Never) | request.Await | Runner | Scheduler | N2 }, Runner, Scheduler, request.Await) -> A, Key(Result(A, B)), Key(B), Bool) <- (N2 - request.Await - Runner - Scheduler, ..N) -> Start
+i/task.make_start : (() <- (Fail(B), N & { Fail(Never) | N2 }) -> A, Key(Result(A, B)), Key(B), Bool) <- (..N, ..N2) -> Start
 i/task.worker_enabled : () -> Bool
 i/task.worker_publish : (Job) -> Int
 i/task.worker_claim : (Int) -> Bool
@@ -1496,10 +1534,10 @@ i/task.frame_finals : (List(Frame)) -> List((Continuation(StepAnswer, Turn, Neve
 i/task.split_flags : (List(Frame), List(Bool)) -> (List(Bool), List(Bool))
 i/task.apply_finals : (List(Frame), List(Bool)) -> List(Frame)
 i/task.pull : (State) -> State
-i/task.path : () <- (Scheduler) -> List(Int)
-i/task.random : () <- (Scheduler) -> rng.Generator
-i/task.yield : () <- (Scheduler) -> ()
-i/task.top : (rng.Generator) <- (Runner) -> Runner
+i/task.path : () -> List(Int)
+i/task.random : () -> rng.Generator
+i/task.yield : () -> ()
+i/task.top : (rng.Generator) -> Runner
 i/task.observe_change : (Key(())) -> Request(())
 i/task.has_work : (Ticket) -> Bool
 i/task.wait_root : (Key(()), request.Root, List(Ticket)) -> ContinueRun
@@ -1587,10 +1625,10 @@ i/task.script_task : (State, List(Int)) -> Maybe(TaskState)
 i/task.choose_turn : (State) -> State
 i/task.loop : (State) -> RunReply
 i/task.scope_call_body : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
-i/task.scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), Scheduler, ..N) -> B
-i/task.local_scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), Scheduler, ..N) -> B
-i/task.go_key : (Group(A), () <- (Fail(A), N & { Fail(Never) | request.Await | Runner | Scheduler | N2 }, Runner, Scheduler, request.Await) -> B, Key(Result(B, A))) <- (N2 - request.Await - Runner - Scheduler, Scheduler, ..N) -> Task(B, A)
-i/task.go : (Group(A), () <- (Fail(A), N & { Fail(A) | Scheduler | Runner | request.Await | { Fail(Never) | request.Await | Runner | Scheduler | N } & { Scheduler | N } }) -> B) <- (Scheduler, ..N) -> Task(B, A)
+i/task.scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), ..N) -> B
+i/task.local_scope : ((Group(A)) <- (Fail(A), ..N) -> B) <- (Fail(A), ..N) -> B
+i/task.go_key : (Group(A), () <- (Fail(A), N & { Fail(Never) | N2 }) -> B, Key(Result(B, A))) <- (..N, ..N2) -> Task(B, A)
+i/task.go : (Group(A), () <- (Fail(A), N & { Fail(A) | { Fail(Never) | N } & N }) -> B) <- N -> Task(B, A)
 i/task.branch_at : (List(Branch(A, B, C)), Int) -> Branch(A, B, C)
 i/task.sync_body : (Event(A, B, C), Scheduler) <- (Fail(B), ..C) -> A
 i/task.always : (A) -> Event(A, Never, Never)
@@ -1599,31 +1637,31 @@ i/task.branches_of : (List(Event(A, B, C))) -> List(Branch(A, B, C))
 i/task.choose : (List(Event(A, B, C))) -> Event(A, B, C)
 i/task.map : (Event(A, B, C), (A) <- (Fail(F), ..N) -> D) -> Event(D, B | F, C | N)
 i/task.join_event : (Task(A, B)) -> Event(A, B, Never)
-i/task.join : (Task(A, B & C)) <- (Fail(C), Scheduler) -> A
-i/task.channel : () <- (Scheduler) -> Channel(A)
-i/task.local_channel : () <- (Scheduler) -> Channel(A)
+i/task.join : (Task(A, B & C)) <- (Fail(C)) -> A
+i/task.channel : () -> Channel(A)
+i/task.local_channel : () -> Channel(A)
 i/task.send_event : (Channel(A), A) -> Event((), Never, Never)
 i/task.receive_event : (Channel(A)) -> Event(A, Never, Never)
-i/task.send : (Channel(A), A) <- (Scheduler) -> ()
-i/task.receive : (Channel(A)) <- (Fail(Never), Scheduler) -> A
-i/task.share : (Group(A), B) <- (Scheduler) -> Shared(B)
-i/task.get : ({ Shared(A) | B - Shared(A) } & { Ref(A) | C - Ref(A) } & { Shared(A) | Ref(A) }) <- (Scheduler) -> A
-i/task.set : (Ref(A), A) <- (Scheduler) -> ()
-i/task.keep : ((A) <- (Fail(C), Runner, Scheduler, request.Await, ..N) -> B) <- (Scheduler, ..N) -> (A) <- (Fail(C), Scheduler) -> B
-i/task.ref : (A) <- (Scheduler) -> Ref(A)
-i/task.update : (Ref(A), (A) -> (A, B)) <- (Scheduler) -> B
-i/task.both : (() <- (Fail(B), ..N) -> A, () <- (Fail(B), ..N) -> C) <- (Fail(B), Scheduler, ..N) -> (A, C)
-i/task.race : (() <- (Fail(B), Runner, Scheduler, request.Await, { Fail(Never) | request.Await | Runner | Scheduler | N } & { Fail(B) | N }) -> A, () <- (Fail(B), Runner, Scheduler, request.Await, { Fail(Never) | request.Await | Runner | Scheduler | N } & { Fail(B) | N }) -> A) <- (Fail(B), Scheduler, ..N) -> A
-i/task.spawn_values : (Group(A), List(B), (B) <- (Fail(A), ..N) -> C) <- (Scheduler, ..N) -> List(Task(C, A))
-i/task.join_values : (List(Task(A, B & C))) <- (Fail(C), Scheduler) -> List(A)
-i/task.map_concurrently : (List(A), (A) <- (Fail(C), ..N) -> B) <- (Fail(C), Scheduler, ..N) -> List(B)
-i/task.execute_body : (() <- (Fail(B), N & { Fail(B) | Scheduler | Runner | request.Await | N2 & { Fail(Never) | request.Await | Runner | Scheduler | N3 } }, Runner, Scheduler, request.Await, request.Owner, request.Root) -> A, Runner, rng.Generator, Policy) <- (N2 - request.Owner - request.Root, N3 - request.Await - Runner - Scheduler - request.Owner - request.Root, ..N) -> Result(Result(A, B), NotRunnable)
-i/task.run : (() <- (Runner, Scheduler, request.Await, request.Owner, request.Root, ..N) -> A) <- (Runner, ..N) -> A
-i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(B), N & { Fail(B) | Scheduler | Runner | request.Await | request.Owner | request.Root | { Fail(B) | Scheduler | Runner | request.Await | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(Never) } } & { N2 | Fail(Never) } }, Runner, Scheduler, request.Await, request.Owner, request.Root) -> A) <- (Fail(B | NotRunnable), Runner, ..N, ..N2) -> A
-i/task._entry : (() <- (Runner, Scheduler, request.Await, request.Owner, request.Root, ..N) -> A) <- (N - Runner, request.Root) -> A
+i/task.send : (Channel(A), A) -> ()
+i/task.receive : (Channel(A)) <- (Fail(Never)) -> A
+i/task.share : (Group(A), B) -> Shared(B)
+i/task.get : ({ Shared(A) | B - Shared(A) } & { Ref(A) | C - Ref(A) } & { Shared(A) | Ref(A) }) -> A
+i/task.set : (Ref(A), A) -> ()
+i/task.keep : ((A) <- (Fail(C), ..N) -> B) <- N -> (A) <- (Fail(C)) -> B
+i/task.ref : (A) -> Ref(A)
+i/task.update : (Ref(A), (A) -> (A, B)) -> B
+i/task.both : (() <- (Fail(B), ..N) -> A, () <- (Fail(B), ..N) -> C) <- (Fail(B), ..N) -> (A, C)
+i/task.race : (() <- (Fail(B), { Fail(Never) | N } & { Fail(B) | N }) -> A, () <- (Fail(B), { Fail(Never) | N } & { Fail(B) | N }) -> A) <- (Fail(B), ..N) -> A
+i/task.spawn_values : (Group(A), List(B), (B) <- (Fail(A), ..N) -> C) <- N -> List(Task(C, A))
+i/task.join_values : (List(Task(A, B & C))) <- (Fail(C)) -> List(A)
+i/task.map_concurrently : (List(A), (A) <- (Fail(C), ..N) -> B) <- (Fail(C), ..N) -> List(B)
+i/task.execute_body : (() <- (Fail(B), N & { Fail(B) | N2 & { Fail(Never) | N3 } }) -> A, Runner, rng.Generator, Policy) <- (..N, ..N2, ..N3) -> Result(Result(A, B), NotRunnable)
+i/task.run : (() <- N -> A) <- N -> A
+i/task.test : (rng.Generator, List(List(Int)), () <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | N2 } & { N2 | Fail(Never) } } & { N2 | Fail(Never) } }) -> A) <- (Fail(B | NotRunnable), ..N, ..N2) -> A
+i/task._entry : (() <- N -> A) <- N -> A
 i/task.scope_call : ((Group(A)) <- (Fail(A), ..N) -> B, Witness, Mode, Scheduler) <- (Fail(A), ..N) -> ScopeResult(B)
-i/task.execute : (() <- (Fail(B), N & { Fail(B) | Scheduler | Runner | request.Await | request.Owner | request.Root | { Fail(B) | Scheduler | Runner | request.Await | { Fail(Never) | request.Await | Runner | Scheduler | request.Owner | request.Root | N2 } & { request.Owner | request.Root | N2 | Fail(Never) } } & { N2 | Fail(Never) } }, Runner, Scheduler, request.Await, request.Owner, request.Root) -> A, Runner, rng.Generator, Policy) <- (..N, ..N2) -> Result(Result(A, B), NotRunnable)
-i/task.sync : (Event(A, B, C | Fail(B))) <- (Fail(B), Scheduler, ..C) -> A
+i/task.execute : (() <- (Fail(B), N & { Fail(B) | { Fail(B) | { Fail(Never) | N2 } & { N2 | Fail(Never) } } & { N2 | Fail(Never) } }) -> A, Runner, rng.Generator, Policy) <- (..N, ..N2) -> Result(Result(A, B), NotRunnable)
+i/task.sync : (Event(A, B, C | Fail(B))) <- (Fail(B), ..C) -> A
 i/task.root_active : (Key(()), Active) -> ContinueRun
 i/task.cause_allowed : (State, TaskState, Cause) -> Bool
 i/task.frame_abort : (List(Frame)) -> Maybe(() -> Never)
@@ -1661,7 +1699,7 @@ i/task.pump_rows : (State, List(ActiveTask)) -> State
 i/task.pump_messages : (State) -> State
 i/task.relay_notice : (State, TaskState, Continuation(StepAnswer, Turn, Never), ForeignNotice, Keyed, Bool) -> State
 i/task.notice_hops : (ForeignNotice) -> List(Hop)
-i/task._provider_runner : (List(Runner)) <- (request.Root) -> Runner
+i/task._provider_runner : (List(Runner)) -> Runner
 i/task._provider_scheduler : (List(Scheduler)) -> Scheduler
 i/time.nanoseconds : (Int) -> Duration
 i/time.milliseconds : (Int) -> Duration
@@ -1679,27 +1717,28 @@ i/time.unix_nanoseconds : (Instant) -> Int
 i/time.shift : (Instant, Duration) -> Instant
 i/time.between : (Instant, Instant) -> Duration
 i/time.compare_instants : (Instant, Instant) -> Order
-i/time.now : () <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner) -> Instant
-i/time.sleep : (Duration) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner) -> ()
-i/time.measure : (() <- N -> A) <- (Fail(clock.ClockError), clock.Clock, i/request.Await, i/request.Owner, ..N) -> (A, Duration)
+i/time.now : () <- (Fail(clock.ClockError), clock.Clock) -> Instant
+i/time.sleep : (Duration) <- (Fail(clock.ClockError), clock.Clock) -> ()
+i/time.measure : (() <- N -> A) <- (Fail(clock.ClockError), clock.Clock, ..N) -> (A, Duration)
 i/time.divide : (Duration, Int) <- (Fail(DivisionByZero)) -> Duration
 i/time.max_timeout : 9223372036854775807
-i/time.timeout : (Duration, () <- (Fail(B), i/request.Await, task.Runner, task.Scheduler, { Fail(Never) | i/request.Await | task.Runner | task.Scheduler | N } & { Fail(B) | N }) -> A) <- (Fail(BadDeadline | Timeout | B | clock.ClockError), clock.Clock, i/request.Owner, task.Scheduler, ..N) -> A
+i/time.timeout : (Duration, () <- (Fail(B), { Fail(Never) | N } & { Fail(B) | N }) -> A) <- (Fail(BadDeadline | Timeout | B | clock.ClockError), clock.Clock, ..N) -> A
 i/tls.options : () -> (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)
 i/tls.identity : (BitArray, BitArray) -> (cert = BitArray, key = BitArray)
 i/tls.join : (List(String)) -> String
 i/tls.slice : (String, Int, Int) -> String
 i/tls.raise : (String) <- (Fail(TlsError)) -> Never
-i/tls.finish : (Request(Result(Int, String))) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
-i/tls.connect : (net.Stream, String, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
-i/tls.accept : (net.Stream, (cert = BitArray, key = BitArray), (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> Stream
-i/tls.dial : (String, Int, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(net.NetError | TlsError), Tls, net.Net, request.Await, request.Owner) -> Stream
-i/tls.alpn : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> String
-i/tls.read : (Stream, Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray
-i/tls.write : (Stream, BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ()
-i/tls.shutdown_write : (Stream) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ()
-i/tls.close : (Stream) <- (Tls, request.Await, request.Owner) -> ()
-i/tls.byte_stream : (Stream) -> (close = () <- (Tls, request.Await, request.Owner) -> (), read = (Int) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> BitArray, shutdown_write = () <- (Fail(TlsError), Tls, request.Await, request.Owner) -> (), write = (BitArray) <- (Fail(TlsError), Tls, request.Await, request.Owner) -> ())
+i/tls.finish : (Request(Result(Int, String))) <- (Fail(TlsError), Tls) -> Stream
+i/tls.connect : (net.Stream, String, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls) -> Stream
+i/tls.accept : (net.Stream, (cert = BitArray, key = BitArray), (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls) -> Stream
+i/tls.dial : (String, Int, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(net.NetError | TlsError), Tls, net.Net) -> Stream
+i/tls.alpn : (Stream) <- (Fail(TlsError), Tls) -> String
+i/tls.read : (Stream, Int) <- (Fail(TlsError), Tls) -> BitArray
+i/tls.write : (Stream, BitArray) <- (Fail(TlsError), Tls) -> ()
+i/tls.shutdown_write : (Stream) <- (Fail(TlsError), Tls) -> ()
+i/tls.close : (Stream) <- (Tls) -> ()
+i/tls.byte_stream : (Stream) -> (close = () <- (Tls) -> (), read = (Int) <- (Fail(TlsError), Tls) -> BitArray, shutdown_write = () <- (Fail(TlsError), Tls) -> (), write = (BitArray) <- (Fail(TlsError), Tls) -> ())
+i/tls.make_tls : () -> Tls
 i/uri._parse_result : (String) -> Result(Uri, UriError)
 i/uri._build_result : (Parts) -> Result(Uri, UriError)
 i/uri.parts : (Uri) -> Parts
