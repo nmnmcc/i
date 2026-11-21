@@ -1,6 +1,7 @@
 //// TCP streams, UDP datagrams and name resolution.
 (
 	i/request
+	i/hostcall
 	i/resource
 	i/fail
 	i/core
@@ -8,9 +9,9 @@
 
 (
 	Net(..)
-	Listener(..)
-	Stream(..)
-	Datagram(..)
+	Listener
+	Stream
+	Datagram
 	bind
 	send_to
 	receive_from
@@ -39,30 +40,28 @@ Datagram = (Int)
 
 NetError = (operation = String, endpoint = String, code = String)
 
-@host("i:net/v1", "request")
+@import("i:net/v1")
 Net = (
-	bind = (String, Int) -> Request(Result(Int, String)),
-	send_to = (Int, String, Int, BitArray) -> Request(Result((), String)),
-	receive_from = (Int, Int) -> Request(Result(BitArray, String)),
-	local_address = (Int) -> Request(Result(String, String)),
-	datagram_port = (Int) -> Request(Result(Int, String)),
-	close_datagram = (Int) -> Request(()),
-	listen = (String, Int) -> Request(Result(Int, String)),
-	local_port = (Int) -> Request(Result(Int, String)),
-	accept = (Int) -> Request(Result(Int, String)),
-	connect = (String, Int) -> Request(Result(Int, String)),
-	resolve = (String) -> Request(Result(String, String)),
-	read = (Int, Int) -> Request(Result(BitArray, String)),
-	write = (Int, BitArray) -> Request(Result((), String)),
-	shutdown_write = (Int) -> Request(Result((), String)),
-	close_stream = (Int) -> Request(()),
-	close_listener = (Int) -> Request(()),
+	bind = (String, Int) -> Result(Int, String),
+	send_to = (Int, String, Int, BitArray) -> Result((), String),
+	receive_from = (Int, Int) -> Result(BitArray, String),
+	local_address = (Int) -> Result(String, String),
+	datagram_port = (Int) -> Result(Int, String),
+	close_datagram = (Int) -> (),
+	listen = (String, Int) -> Result(Int, String),
+	local_port = (Int) -> Result(Int, String),
+	accept = (Int) -> Result(Int, String),
+	connect = (String, Int) -> Result(Int, String),
+	resolve = (String) -> Result(String, String),
+	read = (Int, Int) -> Result(BitArray, String),
+	write = (Int, BitArray) -> Result((), String),
+	shutdown_write = (Int) -> Result((), String),
+	close_stream = (Int) -> (),
+	close_listener = (Int) -> (),
 )
 
-// Opens a listener. A cancel while the open is in flight cancels the request
-// and closes a handle that has arrived already.
-listen_handle = (address, port) <- (raw : Net) {
-	r = raw.listen(address, port)
+listen = (address, port) <- (raw : Net) {
+	r = hostcall.call(() { raw.listen(address, port) })
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -80,32 +79,17 @@ listen_handle = (address, port) <- (raw : Net) {
 		() {
 			request.state(r) |>
 				(request.Ready(Ok(value))) {
-					request.await_owned(raw.close_listener(value))
+					raw.close_listener(value)
 				}
 				& (_) { () }
-			request.cancel(request.ticket(r))
+			hostcall.cancel(r)
 		},
 	)
 	Listener(number)
 }
 
-/// Listens on `address` and `port` and gives a `Listener` owned by the
-/// current `resource.Scope`: its close is attached to the scope before
-/// `listen` gives the listener, and runs when the scope ends. Port zero asks
-/// the OS to allocate a port.
-///
-/// Needs `resource.Scope`, `Net`, `Await` and `Fail(NetError)`.
-listen = (address, port) {
-	resource.acquire(
-		() { listen_handle(address, port) },
-		(listener) { close_listener(listener) },
-	)
-}
-
-// Opens a stream. A cancel while the open is in flight cancels the request
-// and closes a handle that has arrived already.
-connect_handle = (address, port) <- (raw : Net) {
-	r = raw.connect(address, port)
+connect = (address, port) <- (raw : Net) {
+	r = hostcall.call(() { raw.connect(address, port) })
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -123,31 +107,17 @@ connect_handle = (address, port) <- (raw : Net) {
 		() {
 			request.state(r) |>
 				(request.Ready(Ok(value))) {
-					request.await_owned(raw.close_stream(value))
+					raw.close_stream(value)
 				}
 				& (_) { () }
-			request.cancel(request.ticket(r))
+			hostcall.cancel(r)
 		},
 	)
 	Stream(number)
 }
 
-/// Connects to `address` and `port` and gives a `Stream` owned by the
-/// current `resource.Scope`: its close is attached to the scope before
-/// `connect` gives the stream, and runs when the scope ends.
-///
-/// Needs `resource.Scope`, `Net`, `Await` and `Fail(NetError)`.
-connect = (address, port) {
-	resource.acquire(
-		() { connect_handle(address, port) },
-		(stream) { close_stream(stream) },
-	)
-}
-
-// Opens a stream. A cancel while the open is in flight cancels the request
-// and closes a handle that has arrived already.
-accept_handle = (Listener(number)) <- (raw : Net) {
-	r = raw.accept(number)
+accept = (Listener(number)) <- (raw : Net) {
+	r = hostcall.call(() { raw.accept(number) })
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -165,32 +135,20 @@ accept_handle = (Listener(number)) <- (raw : Net) {
 		() {
 			request.state(r) |>
 				(request.Ready(Ok(value))) {
-					request.await_owned(raw.close_stream(value))
+					raw.close_stream(value)
 				}
 				& (_) { () }
-			request.cancel(request.ticket(r))
+			hostcall.cancel(r)
 		},
 	)
 	Stream(number)
-}
-
-/// Accepts a connection from `listener` and gives a `Stream` owned by the
-/// current `resource.Scope`: its close is attached to the scope before
-/// `accept` gives the stream, and runs when the scope ends.
-///
-/// Needs `resource.Scope`, `Net`, `Await` and `Fail(NetError)`.
-accept = (listener) {
-	resource.acquire(
-		() { accept_handle(listener) },
-		(stream) { close_stream(stream) },
-	)
 }
 
 local_port = (socket) <- (raw : Net) {
 	r = socket |>
 		(Listener(number)) { raw.local_port(number) }
 		& (Datagram(number)) { raw.datagram_port(number) }
-	request.await_owned(r) |>
+	r |>
 		(Ok(value)) { value }
 		& (Error(code)) {
 			fail.raise(
@@ -200,7 +158,7 @@ local_port = (socket) <- (raw : Net) {
 }
 
 read = (Stream(number), max_bytes) <- (raw : Net) {
-	request.await_owned(raw.read(number, max_bytes)) |>
+	raw.read(number, max_bytes) |>
 		(Ok(value)) { value }
 		& (Error(code)) {
 			fail.raise(NetError(operation = "read", endpoint = "", code = code))
@@ -208,7 +166,7 @@ read = (Stream(number), max_bytes) <- (raw : Net) {
 }
 
 write = (Stream(number), bytes) <- (raw : Net) {
-	request.await_owned(raw.write(number, bytes)) |>
+	raw.write(number, bytes) |>
 		(Ok(value)) { value }
 		& (Error(code)) {
 			fail.raise(
@@ -218,7 +176,7 @@ write = (Stream(number), bytes) <- (raw : Net) {
 }
 
 shutdown_write = (Stream(number)) <- (raw : Net) {
-	request.await_owned(raw.shutdown_write(number)) |>
+	raw.shutdown_write(number) |>
 		(Ok(value)) { value }
 		& (Error(code)) {
 			fail.raise(
@@ -231,20 +189,12 @@ shutdown_write = (Stream(number)) <- (raw : Net) {
 		}
 }
 
-/// Closes `stream`. Closing a stream that is closed already does nothing.
-/// The scope that owns the stream calls this; a program does not need to.
-///
-/// Needs `Net` and `Await`.
 close_stream = (Stream(number)) <- (raw : Net) {
-	request.await_owned(raw.close_stream(number))
+	raw.close_stream(number)
 }
 
-/// Closes `listener`. Closing a listener that is closed already does nothing.
-/// The scope that owns the listener calls this; a program does not need to.
-///
-/// Needs `Net` and `Await`.
 close_listener = (Listener(number)) <- (raw : Net) {
-	request.await_owned(raw.close_listener(number))
+	raw.close_listener(number)
 }
 
 slice = (text, start, length) {
@@ -260,7 +210,7 @@ parts = (text : String, start : Int) -> List(String) {
 }
 
 resolve = (name) <- (raw : Net) {
-	request.await_owned(raw.resolve(name)) |>
+	raw.resolve(name) |>
 		(Ok(value)) { parts(value, 0) }
 		& (Error(code)) {
 			fail.raise(
@@ -282,10 +232,9 @@ byte_stream = (stream) {
 	)
 }
 
-// Opens a datagram socket. A cancel while the open is in flight cancels the
-// request and closes a handle that has arrived already.
-bind_handle = (address, port) <- (raw : Net) {
-	r = raw.bind(address, port)
+/// Bind a UDP socket; port zero asks the OS to allocate a port.
+bind = (address, port) <- (raw : Net) {
+	r = hostcall.call(() { raw.bind(address, port) })
 	number = resource.ensure(
 		() {
 			request.await(r) |>
@@ -303,30 +252,17 @@ bind_handle = (address, port) <- (raw : Net) {
 		() {
 			request.state(r) |>
 				(request.Ready(Ok(value))) {
-					request.await_owned(raw.close_datagram(value))
+					raw.close_datagram(value)
 				}
 				& (_) { () }
-			request.cancel(request.ticket(r))
+			hostcall.cancel(r)
 		},
 	)
 	Datagram(number)
 }
 
-/// Bind a UDP socket and give a `Datagram` owned by the current
-/// `resource.Scope`: its close is attached to the scope before `bind` gives
-/// the socket, and runs when the scope ends. Port zero asks the OS to
-/// allocate a port.
-///
-/// Needs `resource.Scope`, `Net`, `Await` and `Fail(NetError)`.
-bind = (address, port) {
-	resource.acquire(
-		() { bind_handle(address, port) },
-		(socket) { close_datagram(socket) },
-	)
-}
-
 send_to = (Datagram(number), address, port, bytes) <- (raw : Net) {
-	request.await_owned(raw.send_to(number, address, port, bytes)) |>
+	raw.send_to(number, address, port, bytes) |>
 		(Ok(value)) { value }
 		& (Error(code)) {
 			fail.raise(
@@ -341,7 +277,7 @@ send_to = (Datagram(number), address, port, bytes) <- (raw : Net) {
 
 /// Receive one datagram, discarding bytes beyond max_bytes.
 receive_from = (Datagram(number), max_bytes) <- (raw : Net) {
-	request.await_owned(raw.receive_from(number, max_bytes)) |>
+	raw.receive_from(number, max_bytes) |>
 		(Ok(value)) { decode_datagram(value) }
 		& (Error(code)) {
 			fail.raise(
@@ -368,7 +304,7 @@ decode_datagram =
 	& (_) { panic("net: invalid datagram reply") }
 
 local_address = (Datagram(number)) <- (raw : Net) {
-	request.await_owned(raw.local_address(number)) |>
+	raw.local_address(number) |>
 		(Ok(value)) { value }
 		& (Error(code)) {
 			fail.raise(
@@ -381,11 +317,6 @@ local_address = (Datagram(number)) <- (raw : Net) {
 		}
 }
 
-/// Closes `socket`. Closing a datagram socket that is closed already does
-/// nothing. The scope that owns the socket calls this; a program does not
-/// need to.
-///
-/// Needs `Net` and `Await`.
 close_datagram = (Datagram(number)) <- (raw : Net) {
-	request.await_owned(raw.close_datagram(number))
+	raw.close_datagram(number)
 }
