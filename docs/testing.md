@@ -94,6 +94,14 @@ After a deliberate rewrite of the case files (a syntax conversion), `--refresh`
 records the new fingerprint of each rewritten file; it fails if a program no
 longer has its file.
 
+A change to a diagnostic message is a change to every expected diagnostic that
+quotes it. The corpus, the `// expect` lines of the spec cases and the blessed
+`.out` files are the contract: update them in the same commit, after reading
+the new sentence. A message-only change that leaves the corpus expecting the
+old text is not a test that can be made green by editing one line; the lint
+job runs the corpus and reports the disagreement, and blessing output without
+reading it is how a wrong message becomes the expected one.
+
 Measure checker workloads separately from the runtime `scripts/bench`:
 
 ```sh
