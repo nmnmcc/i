@@ -26,54 +26,54 @@
 )
 
 /// -1, 0 or 1.
-@external("ilang:big", "sign")
+@runtime("ilang:big", "sign")
 sign : (Int) -> Int
 
 /// The digits of the magnitude, in base 2^30, least significant first.
-@external("ilang:big", "digits")
+@runtime("ilang:big", "digits")
 digits : (Int) -> List(Int)
 
 /// The Int with this sign and these digits; zero digits at the end are
 /// allowed.
-@external("ilang:big", "from_digits")
+@runtime("ilang:big", "from_digits")
 from_digits : (Int, List(Int)) -> Int
 
 /// The number of digits of the magnitude, in base 2^30.
-@external("ilang:big", "size")
+@runtime("ilang:big", "size")
 size : (Int) -> Int
 
 /// The digit of the magnitude at `index`, in base 2^30; 0 past the end.
-@external("ilang:big", "limb")
+@runtime("ilang:big", "limb")
 limb : (Int, Int) -> Int
 
 /// The Int with this sign and these digits in base 2^30, most significant
 /// first; zero digits in front are allowed.
-@external("ilang:big", "from_top")
+@runtime("ilang:big", "from_top")
 from_top : (Int, List(Int)) -> Int
 
 // Private construction storage. Each digit is written once, and the storage
 // is never used again after finish; no published Int is changed.
 Digits = Opaque
 
-@external("ilang:big", "builder")
+@runtime("ilang:big", "builder")
 builder : (Int) -> Digits
 
-@external("ilang:big", "put")
+@runtime("ilang:big", "put")
 put : (Digits, Int, Int) -> Digits
 
-@external("ilang:big", "finish")
+@runtime("ilang:big", "finish")
 finish : (Int, Digits) -> Int
 
 // The two parts of one base-2^30 multiply-add. Separate scalar results
 // keep the inner loop from allocating either a product Int or a tuple.
-@external("ilang:big", "multiply_low")
+@runtime("ilang:big", "multiply_low")
 multiply_low : (Int, Int, Int) -> Int
 
-@external("ilang:big", "multiply_high")
+@runtime("ilang:big", "multiply_high")
 multiply_high : (Int, Int, Int) -> Int
 
 // Divide high * base + low by d; high < d. Quotient and remainder.
-@external("ilang:big", "divide_digit")
+@runtime("ilang:big", "divide_digit")
 divide_digit : (Int, Int, Int) -> (Int, Int)
 
 /// -1, 0 or 1, as `a` is less than, equal to or greater than `b`.
