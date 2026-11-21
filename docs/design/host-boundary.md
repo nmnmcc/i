@@ -4,7 +4,7 @@ Status: for review; P1-P7 decided 2026-11-21. Branch `design/host-boundary`,
 base `2398f0b12` (after the `stdlib/` rename). Size evidence:
 [`host-boundary-inventory.md`](host-boundary-inventory.md).
 
-No code is changed by this document. The product choices were decided on
+Fenced blocks are `text` shapes, not compiled snippets. No code is changed by this document. The product choices were decided on
 2026-11-21; §9.1 records the verdicts and the binding additions.
 
 ## 0. Summary
@@ -109,7 +109,7 @@ the manifest reader and the library-only manifests once.
 
 ### 2.1 Syntax
 
-```i
+```text
 @export
 add : (Int, Int) -> Int = (a, b) { a + b }
 
@@ -173,7 +173,7 @@ value; +1 phase).
 
 The user writes a service type in the root package and marks it:
 
-```i
+```text
 // src/log.i
 @import("app:log/v1")
 Logger = (log = (String) <- (Fail(String)) -> Nil)
@@ -214,7 +214,7 @@ An `@import` service type gets a synthesized top-level accessor in its **own
 module**, `make_<type>`, appended in memory after the source items and added to
 the module's exports:
 
-```i
+```text
 // src/log.i as written
 @import("app:log/v1")
 Logger = (log = (String) <- (Fail(String)) -> Nil)
@@ -237,7 +237,7 @@ service type and the host supplies only imports. A function that wants an
 injectable service takes it in its own `<- (logger : Logger)` pattern instead;
 callers then pass `make_logger()` or a fake.
 
-```i
+```text
 (log = app/log)
 main = () {
 	{ Nil } <- (log.make_logger())
@@ -574,7 +574,7 @@ the bare function into the ambient `Await`.
 
 ### 5.3 Surface
 
-```i
+```text
 // groups
 group : () -> CallGroup            // at the ambient current root
 group_at : (Root) -> CallGroup
@@ -1036,6 +1036,9 @@ status rule of §B.5.
 
 ## Appendix C — a complete example
 
+This example and the `i/hostcall` surface are parse-checked `i` fences;
+the rest are `text` shapes.
+
 ```i
 // library package app, src/lib.i
 @import("app:log/v1")
@@ -1058,7 +1061,7 @@ version : () -> Int = () { 1 }
 The library module export group is `(Logger(..) add add_logged version)`;
 `make_logger` is added to it synthetically. The root:
 
-```i
+```text
 (lib = app/lib)
 main = () {
 	lib.add_logged(2, 3)
