@@ -24,7 +24,7 @@ fn completed_aliases_and_projections_do_not_change_wat() {
         std::fs::write(
             dir.path().join("i.toml"),
             format!(
-                "name = \"app\"\nhostcall = true\n{}",
+                "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
                 library_dependencies()
             ),
         )

@@ -29,7 +29,7 @@ fn package(main: &str) -> tempfile::TempDir {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )

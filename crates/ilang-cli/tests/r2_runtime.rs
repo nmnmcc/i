@@ -13,7 +13,7 @@ fn library_dependencies() -> String {
         .canonicalize()
         .unwrap();
     format!(
-        "hostcall = true\nlibrary-rows = true\n[dependencies]\ni = {{ path = {:?} }}\n",
+        "[dependencies]\ni = {{ path = {:?} }}\n",
         library.to_str().unwrap()
     )
 }
@@ -23,7 +23,7 @@ fn built_program(source: &str, opt: Level) -> Program {
     std::fs::write(
         directory.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -642,7 +642,7 @@ fn task_run_discharges_scheduler_in_the_printed_entry_need() {
     std::fs::write(
         directory.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )

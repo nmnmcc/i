@@ -25,7 +25,7 @@ fn build(source: &str) -> ilang_macro::run::MacroProgram {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n[wasm]\nexports = [\"app/main.identity\"]\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n[wasm]\nexports = [\"app/main.identity\"]\n{}",
             library_dependencies()
         ),
     )
@@ -61,7 +61,7 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -179,7 +179,7 @@ fn compiler_export_is_checked_and_executed_with_syntax_services() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -209,7 +209,7 @@ fn expression_quote_is_compiled_and_keeps_unquote_identity() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -251,7 +251,7 @@ fn quote_splice_preserves_order_and_reuses_original_syntax() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -292,7 +292,7 @@ fn prepares_and_executes_a_real_macro_binding() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -332,7 +332,7 @@ fn compiler_program_selects_only_the_macro_import_closure() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -377,7 +377,7 @@ fn compiler_run_preserves_uncatchable_macro_error_position() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -423,7 +423,7 @@ fn compiler_wrapper_reports_a_macro_syntax_error_with_original_position() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -477,7 +477,7 @@ fn compiler_wrapper_returns_a_successful_macro_value() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -555,7 +555,7 @@ fn compiler_wrapper_rejects_a_macro_with_the_wrong_result_type() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -602,7 +602,7 @@ fn compiler_wrapper_buffers_items_and_notes_for_success() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -668,7 +668,7 @@ fn expression_macro_requiring_items_is_rejected_before_execution() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -712,7 +712,7 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -800,7 +800,7 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -890,7 +890,7 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -987,7 +987,7 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n[wasm]\nexports = [\"app/main.calc\"]\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n[wasm]\nexports = [\"app/main.calc\"]\n{}",
             library_dependencies()
         ),
     )
@@ -1083,7 +1083,7 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1140,7 +1140,7 @@ fn body_engine_expands_pipe_left_operand_as_first_argument() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1208,7 +1208,7 @@ fn body_engine_discards_notes_if_macro_result_is_not_an_expression() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1266,7 +1266,7 @@ fn body_engine_reports_invalid_macro_signature_at_its_definition() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1334,7 +1334,7 @@ fn unused_macro_definitions_are_checked_for_signature_and_capabilities() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1381,7 +1381,7 @@ fn macro_modules_expand_in_import_order_and_reject_cycles() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1421,7 +1421,7 @@ fn item_phase_runs_imported_calls_and_preserves_written_types() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1500,7 +1500,7 @@ fn item_phase_retries_definition_after_a_later_item() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1573,7 +1573,7 @@ fn item_phase_reports_each_unresolved_waiter_and_restores_the_module() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1651,7 +1651,7 @@ fn item_phase_rechecks_an_early_builtin_answer() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1752,7 +1752,7 @@ fn item_phase_queries_the_expanded_generated_type() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1819,7 +1819,7 @@ fn project_expands_imported_macro_and_runs_generated_program() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n[wasm]\nexports = [\"app/main.value\"]\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n[wasm]\nexports = [\"app/main.value\"]\n{}",
             library_dependencies()
         ),
     )
@@ -1884,7 +1884,7 @@ fn successful_macro_note_is_a_compiler_note_not_a_warning() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1919,7 +1919,7 @@ fn cli_check_and_run_expand_imported_macros() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1951,7 +1951,7 @@ fn cli_expands_imported_macro_with_standard_service() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -1982,7 +1982,7 @@ fn cli_expands_attribute_macros_before_checking() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2012,7 +2012,7 @@ fn cli_runs_item_macro_with_exposed_caller_name() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2042,7 +2042,7 @@ fn a_later_macro_failure_keeps_an_earlier_committed_note() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2083,7 +2083,7 @@ fn checked_collection_validates_targets_and_duplicates() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2171,7 +2171,7 @@ fn cli_retries_definition_queries_after_later_item_macros() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2201,7 +2201,7 @@ fn cli_macro_stop_reports_call_site_and_template() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2234,7 +2234,7 @@ fn cli_nested_macro_stop_preserves_outer_call_and_templates() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2267,7 +2267,7 @@ fn collection_manifest_from_a_real_item_macro() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2313,7 +2313,7 @@ fn project_check_rejects_a_private_collection_binding() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2350,7 +2350,7 @@ fn definition_query_reads_expanded_type_from_dependency() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2415,7 +2415,7 @@ fn shared_macro_code_reads_each_callers_definition_context() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2456,7 +2456,7 @@ fn cli_queries_a_dependency_type_after_its_type_macro_expands() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2491,7 +2491,7 @@ fn collection_error_from_template_points_at_call() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2528,7 +2528,7 @@ fn item_collection_resolves_qualified_import() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2575,7 +2575,7 @@ fn a_macro_cannot_be_used_in_its_defining_module() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2605,7 +2605,7 @@ fn macro_defined_by_an_expansion_is_reported_at_the_call_site() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2658,7 +2658,7 @@ fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
             std::fs::write(
                 dir.path().join("i.toml"),
                 format!(
-                    "name = \"app\"\nhostcall = true\n{}",
+                    "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
                     library_dependencies()
                 ),
             )
@@ -2706,7 +2706,7 @@ fn unused_compile_time_helper_does_not_break_a_normal_program() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2736,7 +2736,7 @@ fn cli_runs_task_scope_inside_expanded_macro_argument() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2770,7 +2770,7 @@ fn body_engine_expands_real_macro_under_deep_mixed_body() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2889,7 +2889,7 @@ fn definition_query_charges_source_before_constructing_answer() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2940,7 +2940,7 @@ fn real_macro_definition_query_stops_before_oversize_source_construction() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -2981,7 +2981,7 @@ fn definition_budget_does_not_depend_on_unrelated_source() {
         std::fs::write(
             dir.path().join("i.toml"),
             format!(
-                "name = \"app\"\nhostcall = true\n{}",
+                "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
                 library_dependencies()
             ),
         )
@@ -3047,7 +3047,7 @@ fn lisp_definition_budget_excludes_unrelated_items() {
         std::fs::write(
             dir.path().join("i.toml"),
             format!(
-                "name = \"app\"\nhostcall = true\n{}",
+                "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
                 library_dependencies()
             ),
         )
@@ -3103,7 +3103,7 @@ fn macro_output_over_frame_budget_reports_the_limit() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -3142,7 +3142,7 @@ fn definition_query_reads_a_member_exported_through_its_sum() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -3188,7 +3188,7 @@ fn definition_query_reads_an_absorbed_generated_sum_member() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -3241,7 +3241,7 @@ fn multi_shape_arguments_keep_the_written_tree_in_both_surfaces() {
         std::fs::write(
             dir.path().join("i.toml"),
             format!(
-                "name = \"app\"\nhostcall = true\n{}",
+                "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
                 library_dependencies()
             ),
         )
@@ -3273,7 +3273,7 @@ fn type_macro_does_not_reclassify_a_written_definition_head() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -3327,7 +3327,7 @@ fn type_macro_keeps_its_standalone_need_channel() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )

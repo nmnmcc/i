@@ -19,7 +19,7 @@ fn lisp_modules_are_checked_with_source_locations() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -208,7 +208,7 @@ fn interpolation_keeps_its_result_through_both_surface_conversions() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )

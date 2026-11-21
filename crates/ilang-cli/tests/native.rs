@@ -73,7 +73,7 @@ fn package(dir: &Path, main: &str) -> PathBuf {
     std::fs::write(
         project.join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
@@ -115,7 +115,7 @@ fn default_output_and_named_entries() {
     std::fs::write(
         &manifest,
         format!(
-            "name = \"app\"\nhostcall = true\n\n[entries]\nother = \"main.other\"\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n\n[entries]\nother = \"main.other\"\n{}",
             library_dependencies()
         ),
     )
@@ -566,7 +566,7 @@ fn packages_need_the_program_entry() {
     std::fs::write(
         project.join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n\n[wasm]\nexports = [\"app/main.double\"]\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n\n[wasm]\nexports = [\"app/main.double\"]\n{}",
             library_dependencies()
         ),
     )

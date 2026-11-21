@@ -19,7 +19,7 @@ fn unused_binding_warning_keeps_check_successful() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )

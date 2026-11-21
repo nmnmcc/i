@@ -28,7 +28,7 @@ fn project(path: &Path) {
     std::fs::write(
         path.join("i.toml"),
         format!(
-            "name = \"app\"\nhostcall = true\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
             library_dependencies()
         ),
     )
