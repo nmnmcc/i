@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""Counterexamples for scripts/check-doc-examples."""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+CHECK = Path(__file__).resolve().with_name('check-doc-examples')
+BINARY = os.environ.get('I_BIN', str(Path(__file__).resolve().parents[1] / 'target/release/i'))
+
+
+def run(root):
+    return subprocess.run([sys.executable, '-I', str(CHECK), '--root', str(root), '--docs'],
+                          capture_output=True, text=True, env={**os.environ, 'I_BIN': BINARY})
+
+
+def write(root, path, body):
+    target = root / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body)
+
+
+def main():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        write(root, 'stdlib/i.toml', 'name = "i"\n')
+        write(root, 'stdlib/src/foo.i', '(\n\tadd\n)\nadd = (n : Int) -> Int { n + 1 }\n')
+        write(root, 'stdlib/src/io.i', '(\n\tIo(..)\n)\nIo = (print = (String) -> ())\n')
+        (root / 'scripts').mkdir()
+        (root / 'scripts/check-doc-examples.json').write_text('{}\n')
+
+        write(root, 'docs/page.mdx', '```i\nfoo.add(1)\n```\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        # A documented example the compiler rejects fails, with its page.
+        write(root, 'docs/page.mdx', '```i\nfoo.add(missing)\n```\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+        assert 'docs/page.mdx:1' in result.stderr, result.stderr
+        assert 'missing' in result.stderr, result.stderr
+
+        # A reason suppresses a contextual example; a stale reason fails.
+        key = [line for line in result.stderr.splitlines() if '[docs/page.mdx' in line][0]
+        key = key[key.index('[docs/page.mdx'):].strip('[]')
+        (root / 'scripts/check-doc-examples.json').write_text(
+            json.dumps({key: 'context: test'}) + '\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
+
+        write(root, 'docs/page.mdx', '```i\nfoo.add(1)\n```\n')
+        result = run(root)
+        assert result.returncode == 1, result.stdout
+        assert 'stale reason' in result.stderr, result.stderr
+
+    print('check-doc-examples counterexamples pass.')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
