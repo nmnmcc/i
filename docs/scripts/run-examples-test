@@ -377,5 +377,37 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("stdout='actual\\n'", result.stderr)
 
 
+    def test_library_baseline_is_the_checkout(self):
+        """Examples use the same baseline as the generated pages: this tree.
+
+        A tag names a library that the released compiler builds. This tree
+        carries the constructor change, so the newest tag would make every
+        library example fail with E0522 while the pages document this tree.
+        """
+        tags = subprocess.run(
+            ['git', '-C', str(runner.ROOT), 'tag', '--list', 'stdlib-v*'],
+            capture_output=True, text=True).stdout.split()
+        saved = {key: os.environ.pop(key) for key in ('LIBRARY_TAG', 'LIBRARY_ROOT')
+                 if key in os.environ}
+        try:
+            self.assertEqual(runner.library_root(), runner.ROOT / 'stdlib')
+            with tempfile.TemporaryDirectory() as scratch:
+                override = Path(scratch) / 'library'
+                os.environ['LIBRARY_ROOT'] = str(override)
+                self.assertEqual(runner.library_root(), override)
+                del os.environ['LIBRARY_ROOT']
+                if not tags:
+                    self.skipTest('no stdlib-v* tag to export')
+                os.environ['LIBRARY_TAG'] = tags[0]
+                os.environ['LIBRARY_EXPORT'] = scratch
+                tagged = runner.library_root()
+                self.assertEqual(tagged, Path(scratch) / ('i-' + tags[0]) / 'stdlib')
+                self.assertTrue((tagged / 'src' / 'int.i').is_file())
+        finally:
+            for key in ('LIBRARY_TAG', 'LIBRARY_ROOT', 'LIBRARY_EXPORT'):
+                os.environ.pop(key, None)
+            os.environ.update(saved)
+
+
 if __name__ == '__main__':
     unittest.main()
