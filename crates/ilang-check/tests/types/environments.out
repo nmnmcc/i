@@ -1,4 +1,4 @@
-collect : (() <- (N & { Yield(A) | N2 }, Yield(A)) -> ()) <- (..N, ..N2) -> List(A)
+collect : (() <- (Yield(A), ..N) -> ()) <- N -> List(A)
 numbers : () -> List(Int)
 inferred : () -> List("s")
 run_never : (() <- (Yield(Never)) -> ()) -> 1
