@@ -497,12 +497,28 @@ test("base64_decode_empty_test", () {
 })
 
 test("base64_decode_invalid_test", () {
-	assert(fail.catch(() { bit_array.base64_decode(")!") }) == Error(()))
+	assert(
+		fail.catch(() { bit_array.base64_decode(")!") }) ==
+			Error(
+				bit_array.BitArrayError(
+					offset = 0,
+					reason = "invalid character",
+				),
+			),
+	)
 	()
 })
 
 test("base64_decode_invalid_padding_test", () {
-	assert(fail.catch(() { bit_array.base64_decode("=AAA") }) == Error(()))
+	assert(
+		fail.catch(() { bit_array.base64_decode("=AAA") }) ==
+			Error(
+				bit_array.BitArrayError(
+					offset = 0,
+					reason = "invalid character",
+				),
+			),
+	)
 	()
 })
 
@@ -562,7 +578,15 @@ test("base64_url_decode_empty_test", () {
 })
 
 test("base64_url_decode_invalid_test", () {
-	assert(fail.catch(() { bit_array.base64_url_decode(")!") }) == Error(()))
+	assert(
+		fail.catch(() { bit_array.base64_url_decode(")!") }) ==
+			Error(
+				bit_array.BitArrayError(
+					offset = 0,
+					reason = "invalid character",
+				),
+			),
+	)
 	()
 })
 
@@ -573,7 +597,12 @@ test("base64_decode_crash_regression_1_test", () {
 				"aGktdGhlcmU.uWUWvrAleKQ2jsWcU97H-RPJ5qRRcE_s",
 			)
 		}) ==
-			Error(()),
+			Error(
+				bit_array.BitArrayError(
+					offset = 11,
+					reason = "invalid character",
+				),
+			),
 	)
 	()
 })
@@ -700,8 +729,26 @@ test("base16_decode_binary_test", () {
 
 test("base16_decode_invalid_test", () {
 	// Not a hex string
-	assert(fail.catch(() { bit_array.base16_decode("?") }) == Error(()))
+	assert(
+		fail.catch(() { bit_array.base16_decode("?") }) ==
+			Error(
+				bit_array.BitArrayError(offset = 0, reason = "invalid digit"),
+			),
+	)
 	()
+})
+
+test("decode_error_reasons_test", () {
+	assert(
+		fail.catch(() { bit_array.base16_decode("fz") }) ==
+			Error(
+				bit_array.BitArrayError(offset = 1, reason = "invalid digit"),
+			),
+	)
+	assert(
+		fail.catch(() { bit_array.base64_decode("=") }) ==
+			Error(bit_array.BitArrayError(offset = 0, reason = "bad padding")),
+	)
 })
 
 test("base16_decode_lowercase_test", () {
@@ -976,10 +1023,37 @@ test("base64_rfc4648_test", () {
 })
 
 test("base64_invalid_test", () {
-	assert(fail.catch(() { bit_array.base64_decode("Z") }) == Error(()))
-	assert(fail.catch(() { bit_array.base64_decode("Zm9v!") }) == Error(()))
-	assert(fail.catch(() { bit_array.base64_decode("Zm=v") }) == Error(()))
-	assert(fail.catch(() { bit_array.base64_decode("-_8") }) == Error(()))
+	assert(
+		fail.catch(() { bit_array.base64_decode("Z") }) ==
+			Error(
+				bit_array.BitArrayError(
+					offset = 0,
+					reason = "incomplete group",
+				),
+			),
+	)
+	assert(
+		fail.catch(() { bit_array.base64_decode("Zm9v!") }) ==
+			Error(
+				bit_array.BitArrayError(
+					offset = 4,
+					reason = "invalid character",
+				),
+			),
+	)
+	assert(
+		fail.catch(() { bit_array.base64_decode("Zm=v") }) ==
+			Error(bit_array.BitArrayError(offset = 2, reason = "bad padding")),
+	)
+	assert(
+		fail.catch(() { bit_array.base64_decode("-_8") }) ==
+			Error(
+				bit_array.BitArrayError(
+					offset = 0,
+					reason = "invalid character",
+				),
+			),
+	)
 	assert(
 		fail.catch(() { bit_array.base64_url_decode("-_8") }) ==
 			Ok(<<251, 255>>),
@@ -999,8 +1073,18 @@ test("base16_more_test", () {
 		fail.catch(() { bit_array.base16_decode("ff01Ab") }) ==
 			Ok(<<255, 1, 171>>),
 	)
-	assert(fail.catch(() { bit_array.base16_decode("f") }) == Error(()))
-	assert(fail.catch(() { bit_array.base16_decode("zz") }) == Error(()))
+	assert(
+		fail.catch(() { bit_array.base16_decode("f") }) ==
+			Error(
+				bit_array.BitArrayError(offset = 1, reason = "missing digit"),
+			),
+	)
+	assert(
+		fail.catch(() { bit_array.base16_decode("zz") }) ==
+			Error(
+				bit_array.BitArrayError(offset = 0, reason = "invalid digit"),
+			),
+	)
 	assert(bit_array.base16_encode(<<15:u4>>) == "F0")
 })
 

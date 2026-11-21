@@ -1333,12 +1333,27 @@ remote_turn = (
 				}
 				// Requests of this worker are waited for here; the scheduler
 				// only sees a wait that a `Woken` message or a cancel ends.
+				// A ticket that settled before this step would never cause a
+				// `Woken` message, so the wait is answered here at once.
 				& (Wait(tickets)) {
-					(
-						Stepped(Wait([]), list_map(finals, (f) { f(k) })),
-						k,
-						tickets,
-					)
+					{ any(tickets, request.settled) } |>
+						(True()) {
+							remote_turn(
+								control.resume(k, Proceed(unit())),
+								finals,
+								run,
+							)
+						}
+						& (False()) {
+							(
+								Stepped(
+									Wait([]),
+									list_map(finals, (f) { f(k) }),
+								),
+								k,
+								tickets,
+							)
+						}
 				}
 				& (Register(_, _, _, _, final)) {
 					(
@@ -3346,6 +3361,23 @@ interests_forward = (rows : List(Forward)) -> List(Ticket) {
 		& ([row, ..rest]) { append(row.tickets, interests_forward(rest)) }
 }
 
+/// A task away from this scheduler that may still produce a step by itself:
+/// it is computing on another worker, or blocked in a wait that worker ends
+/// with a `Woken` message. A task parked in an event wait has no such source,
+/// so counting it would make the run wait on itself (as K does).
+remote_busy = (s : State) -> Bool {
+	any(s.active, (entry : ActiveTask) {
+		store_find(s.tasks, entry.id) |>
+			(Present(t)) {
+				t.status |>
+					(Away()) { True() }
+					& (WaitingTicket(k, _)) { worker_away(k) }
+					& (_) { False() }
+			}
+			& (Absent()) { False() }
+	})
+}
+
 interests = (s : State) {
 	all = append(interests_tasks(s, s.waiting), interests_forward(s.forwards))
 	filter(all, (ticket : Ticket) { core.not(request.settled(ticket)) })
@@ -3590,7 +3622,10 @@ loop = (state : State) -> RunReply {
 										any(tickets, has_work) ||
 										core.not(prepared.top) &&
 											worker_pending()
-									away = prepared.top && worker_pending()
+									away = prepared.top &&
+										worker_pending() &&
+										core.not(has_ready(prepared)) &&
+										remote_busy(prepared)
 									{ away } |>
 										(True()) {
 											worker_wait()

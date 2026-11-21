@@ -52,17 +52,26 @@ test("parse_scientific_negative_exponent_test", () {
 })
 
 test("parse_empty_test", () {
-	assert(fail.catch(() { float.parse("") }) == Error(()))
+	assert(
+		fail.catch(() { float.parse("") }) ==
+			Error(float.FloatError(offset = 0, reason = "empty")),
+	)
 	()
 })
 
 test("parse_invalid_test", () {
-	assert(fail.catch(() { float.parse("what") }) == Error(()))
+	assert(
+		fail.catch(() { float.parse("what") }) ==
+			Error(float.FloatError(offset = 0, reason = "invalid character")),
+	)
 	()
 })
 
 test("parse_integer_test", () {
-	assert(fail.catch(() { float.parse("1") }) == Error(()))
+	assert(
+		fail.catch(() { float.parse("1") }) ==
+			Error(float.FloatError(offset = 1, reason = "missing point")),
+	)
 	()
 })
 
@@ -935,10 +944,37 @@ test("parse_invalid_forms_test", () {
 		"0.0e99999999999999999x",
 	]
 	list.each(bad, (text) {
-		assert(fail.catch(() { float.parse(text) }) == Error(()))
+		assert(
+			fail.catch(() { float.parse(text) }) |>
+				(Error(_)) { True() }
+				& (_) { False() },
+		)
 	})
 	Ok(negative_zero) = fail.catch(() { float.parse("-0.0e99999999999999999") })
 	assert(float.to_string(negative_zero) == "-0.0")
+})
+
+test("parse_error_reasons_test", () {
+	assert(
+		fail.catch(() { float.parse("") }) ==
+			Error(float.FloatError(offset = 0, reason = "empty")),
+	)
+	assert(
+		fail.catch(() { float.parse("1e") }) ==
+			Error(float.FloatError(offset = 1, reason = "missing point")),
+	)
+	assert(
+		fail.catch(() { float.parse("1.0e") }) ==
+			Error(float.FloatError(offset = 4, reason = "missing digits")),
+	)
+	assert(
+		fail.catch(() { float.parse("1.0e400") }) ==
+			Error(float.FloatError(offset = 7, reason = "overflow")),
+	)
+	assert(
+		fail.catch(() { float.parse("1.0x") }) ==
+			Error(float.FloatError(offset = 3, reason = "invalid character")),
+	)
 })
 
 test("to_string_shortest_test", () {

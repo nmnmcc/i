@@ -3,6 +3,11 @@
 //// A bit array may have any number of bits, not only whole bytes. Functions
 //// that count bytes say so. The `base16` and `base64` functions work on
 //// whole bytes: they first fill the last byte with zero bits.
+////
+//// Decoding text raises `BitArrayError`, whose `offset` is a UTF-8 byte
+//// offset into the text. `to_string` and `slice` keep `()`, because the
+//// decoder or the bounds name the failure and there is no useful position
+//// to report.
 (
 	i/fail
 	i/core
@@ -12,6 +17,7 @@
 (
 	from_string
 	to_string
+	BitArrayError(..)
 	is_utf8
 	bit_size
 	byte_size
@@ -32,6 +38,18 @@
 
 /// The UTF-8 bytes of a string.
 from_string = (string : String) -> BitArray { <<string:utf8>> }
+
+/// A failure to read bytes from text. `offset` is a UTF-8 byte offset into
+/// the text: the first byte that cannot be used, the start of a group that
+/// cannot be completed, or the end of base 16 text with a missing digit.
+/// `reason` is one of:
+///
+/// - `"invalid digit"`: a base 16 character that is not a hex digit.
+/// - `"missing digit"`: base 16 text with an odd number of digits.
+/// - `"invalid character"`: a base 64 character outside its alphabet.
+/// - `"incomplete group"`: base 64 text that ends part-way through a group.
+/// - `"bad padding"`: base 64 `=` in the wrong place or a wrong length.
+BitArrayError = (offset = Int, reason = String)
 
 _to_string_result = (bits : BitArray) -> Result(String, ()) {
 	core.bit_array_to_string(bits)
@@ -189,20 +207,50 @@ hex_value = (byte : Int) -> Int {
 		}
 }
 
-_base16_decode_result = (input : String) -> Result(BitArray, ()) {
-	go = (rest, acc) {
+_base16_decode_result = (input : String) -> Result(BitArray, BitArrayError) {
+	go = (rest, acc, at) {
 		rest |>
 			(<<>>) { Ok(concat(reverse(acc))) }
 			& (<<a, b, more:bytes>>) {
 				x = hex_value(a)
 				y = hex_value(b)
 				{ x >= 0 && y >= 0 } |>
-					(True()) { go(more, [<<{ x * 16 + y }>>, ..acc]) }
-					& (False()) { Error(()) }
+					(True()) { go(more, [<<{ x * 16 + y }>>, ..acc], at + 2) }
+					& (False()) {
+						Error(
+							BitArrayError(
+								offset = { x < 0 } |>
+									(True()) { at }
+									& (False()) { at + 1 },
+								reason = "invalid digit",
+							),
+						)
+					}
 			}
-			& (_) { Error(()) }
+			& (<<a>>) {
+				{ hex_value(a) >= 0 } |>
+					(True()) {
+						Error(
+							BitArrayError(
+								offset = at + 1,
+								reason = "missing digit",
+							),
+						)
+					}
+					& (False()) {
+						Error(
+							BitArrayError(
+								offset = at,
+								reason = "invalid digit",
+							),
+						)
+					}
+			}
+			& (_) {
+				Error(BitArrayError(offset = at, reason = "invalid digit"))
+			}
 	}
-	go(<<input:utf8>>, [])
+	go(<<input:utf8>>, [], 0)
 }
 
 standard = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -236,7 +284,7 @@ encode64 = (bits : BitArray, alphabet : String, padding : Bool) -> String {
 /// is put at the end to make the length a multiple of 4.
 ///
 /// ```i
-/// bit_array.base64_encode(<<"hi":utf8>>, True)  // "aGk="
+/// bit_array.base64_encode(<<"hi":utf8>>, True())  // "aGk="
 /// ```
 base64_encode = (input : BitArray, padding : Bool) -> String {
 	encode64(input, standard, padding)
@@ -272,45 +320,122 @@ value64 = (byte : Int, c62 : Int, c63 : Int) -> Int {
 		}
 }
 
-decode64 = (input : String, c62 : Int, c63 : Int) -> Result(BitArray, ()) {
+// The first value that is not a base 64 digit, or `at + 3`.
+first_invalid = (a : Int, b : Int, c : Int, d : Int, at : Int) -> Int {
+	{ a < 0 } |>
+		(True()) { at }
+		& (False()) {
+			{ b < 0 } |>
+				(True()) { at + 1 }
+				& (False()) {
+					{ c < 0 } |> (True()) { at + 2 } & (False()) { at + 3 }
+				}
+		}
+}
+
+decode64 = (input : String, c62 : Int, c63 : Int) -> Result(
+	BitArray,
+	BitArrayError,
+) {
 	v = (byte) { value64(byte, c62, c63) }
 	ok = (a, b) { a >= 0 && b >= 0 }
-	go = (rest, acc) {
+	go = (rest, acc, at) {
 		rest |>
 			(<<>>) { Ok(concat(reverse(acc))) }
 			& (<<a, b, c, d, more:bytes>> ? c != 61 && d != 61) {
 				(w, x, y, z) = (v(a), v(b), v(c), v(d))
 				{ ok(w, x) && ok(y, z) } |>
-					(True()) { go(more, [<<w:u6, x:u6, y:u6, z:u6>>, ..acc]) }
-					& (False()) { Error(()) }
+					(True()) {
+						go(more, [<<w:u6, x:u6, y:u6, z:u6>>, ..acc], at + 4)
+					}
+					& (False()) {
+						Error(
+							BitArrayError(
+								offset = first_invalid(w, x, y, z, at),
+								reason = "invalid character",
+							),
+						)
+					}
 			}
 			// The end, with or without `=`: 3 or 2 characters for 2 or 1 bytes.
 			& (<<a, b, c>> | <<a, b, c, 61>> ? c != 61) {
 				(w, x, y) = (v(a), v(b), v(c))
 				{ ok(w, x) && y >= 0 } |>
-					(True()) { go(<<>>, [<<w:u6, x:u6, { y / 4 }:u4>>, ..acc]) }
-					& (False()) { Error(()) }
+					(True()) {
+						go(<<>>, [<<w:u6, x:u6, { y / 4 }:u4>>, ..acc], at + 3)
+					}
+					& (False()) {
+						Error(
+							BitArrayError(
+								offset = first_invalid(w, x, y, 0, at),
+								reason = "invalid character",
+							),
+						)
+					}
 			}
 			& (<<a, b>> | <<a, b, 61, 61>>) {
 				(w, x) = (v(a), v(b))
 				ok(w, x) |>
-					(True()) { go(<<>>, [<<w:u6, { x / 16 }:u2>>, ..acc]) }
-					& (False()) { Error(()) }
+					(True()) {
+						go(<<>>, [<<w:u6, { x / 16 }:u2>>, ..acc], at + 2)
+					}
+					& (False()) {
+						Error(
+							BitArrayError(
+								offset = first_invalid(w, x, 0, 0, at),
+								reason = "invalid character",
+							),
+						)
+					}
 			}
-			& (_) { Error(()) }
+			& (<<61, _:bytes>>) {
+				Error(BitArrayError(offset = at, reason = "bad padding"))
+			}
+			& (<<_, 61, _:bytes>>) {
+				Error(BitArrayError(offset = at + 1, reason = "bad padding"))
+			}
+			& (<<_, _, 61, _:bytes>>) {
+				Error(BitArrayError(offset = at + 2, reason = "bad padding"))
+			}
+			& (<<_, _, _, 61, _:bytes>>) {
+				Error(BitArrayError(offset = at + 3, reason = "bad padding"))
+			}
+			& (<<a>>) {
+				{ v(a) < 0 } |>
+					(True()) {
+						Error(
+							BitArrayError(
+								offset = at,
+								reason = "invalid character",
+							),
+						)
+					}
+					& (False()) {
+						Error(
+							BitArrayError(
+								offset = at,
+								reason = "incomplete group",
+							),
+						)
+					}
+			}
+			& (_) { Error(BitArrayError(offset = at, reason = "bad padding")) }
 	}
-	go(<<input:utf8>>, [])
+	go(<<input:utf8>>, [], 0)
 }
 
-_base64_decode_result = (encoded : String) -> Result(BitArray, ()) {
+_base64_decode_result = (encoded : String) -> Result(BitArray, BitArrayError) {
 	decode64(encoded, 43, 47)
 }
 
-_base64_url_decode_result = (encoded : String) -> Result(BitArray, ()) {
-	decode64(encoded, 45, 95)
-}
+_base64_url_decode_result = (encoded : String) -> Result(
+	BitArray,
+	BitArrayError,
+) { decode64(encoded, 45, 95) }
 
-/// The string, when the bits are whole bytes of correct UTF-8; otherwise raises `()`.
+/// The string, when the bits are whole bytes of correct UTF-8; otherwise
+/// raises `()`, because the UTF-8 decoder reports only success or failure
+/// and there is no position to report.
 ///
 /// ```i
 /// fail.catch(() { bit_array.to_string(<<104, 105>>) })  // Ok("hi")
@@ -324,7 +449,8 @@ to_string = (bits : BitArray) -> String {
 
 /// `take` bytes from byte `position`, counting from 0. A negative `take`
 /// takes the bytes before `position`. Raises `()` when they are not all in
-/// the bit array.
+/// the bit array, because the bounds are the whole failure and there is no
+/// text position to report.
 ///
 /// ```i
 /// fail.catch(() { bit_array.slice(<<1, 2, 3, 4>>, 1, 2) })   // Ok(<<2, 3>>)
@@ -337,33 +463,37 @@ slice = (from : BitArray, at : Int, take : Int) -> BitArray {
 }
 
 /// Reads base 16 text: two hex digits, upper or lower case, for each byte.
-/// Any other text raises `()`.
+/// Any other text raises `BitArrayError`, which gives the offset and the
+/// reason.
 ///
 /// ```i
 /// fail.catch(() { bit_array.base16_decode("ff01") })  // Ok(<<255, 1>>)
+/// fail.catch(() { bit_array.base16_decode("zz") })    // Error(BitArrayError(offset = 0, reason = "invalid digit"))
 /// ```
 ///
-/// Reports failure through `Fail(())`.
+/// Reports failure through `Fail(BitArrayError)`.
 base16_decode = (input : String) -> BitArray {
 	fail.from_result(_base16_decode_result(input))
 }
 
 /// Reads base 64 text (RFC 4648), with `+` and `/`. The `=` padding at the
-/// end may be there or not. Any other text raises `()`.
+/// end may be there or not. Any other text raises `BitArrayError`, which
+/// gives the offset and the reason.
 ///
 /// ```i
 /// fail.catch(() { bit_array.base64_decode("aGk=") })  // Ok(<<104, 105>>)
 /// fail.catch(() { bit_array.base64_decode("aGk") })   // Ok(<<104, 105>>)
+/// fail.catch(() { bit_array.base64_decode("!") })     // Error(BitArrayError(offset = 0, reason = "invalid character"))
 /// ```
 ///
-/// Reports failure through `Fail(())`.
+/// Reports failure through `Fail(BitArrayError)`.
 base64_decode = (encoded : String) -> BitArray {
 	fail.from_result(_base64_decode_result(encoded))
 }
 
 /// Like `base64_decode`, with `-` and `_` in the place of `+` and `/`.
 ///
-/// Reports failure through `Fail(())`.
+/// Reports failure through `Fail(BitArrayError)`.
 base64_url_decode = (encoded : String) -> BitArray {
 	fail.from_result(_base64_url_decode_result(encoded))
 }

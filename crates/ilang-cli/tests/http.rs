@@ -129,10 +129,17 @@ fn http_timeout() {
  i/fail
  i/task
  i/http
+ i/resource
 )
 main = () {{
  task.run(() {{
-  result = fail.catch(() {{ http.send_timeout(http.client().send, http.request(http.Method("GET"), "http://127.0.0.1:{port}/"), 100000000) }})
+  result = fail.catch(() {{
+   http.send_timeout(
+    (req) {{ resource.scoped(() {{ http.client().send(req) }}) }},
+    http.request(http.Method("GET"), "http://127.0.0.1:{port}/"),
+    100000000,
+   )
+  }})
   result |> (Error(http.Timeout())) {{ () }} & (_) {{ panic("expected timeout") }}
  }})
 }}
@@ -377,13 +384,15 @@ fn http_reuse() {
     });
     run_http_program(&format!(
         r#"
-(i/http)
+(i/http, i/resource)
 
 main = () {{
- client = http.client()
- req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
- assert(http.send_with(client.send, req).status == http.Status(200))
- assert(http.send_with(client.send, req).status == http.Status(200))
+ resource.scoped(() {{
+  client = http.client()
+  req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
+  assert(http.send_with(client.send, req).status == http.Status(200))
+  assert(http.send_with(client.send, req).status == http.Status(200))
+ }})
 }}
 "#
     ));
@@ -419,14 +428,16 @@ fn http_reuse_replaces_closed_connection() {
     });
     run_http_program(&format!(
         r#"
-(i/http)
+(i/http, i/resource)
 
 main = () {{
- client = http.client()
- req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
- assert(http.send_with(client.send, req).body == <<"first":utf8>>)
- assert(http.send_with(client.send, req).body == <<"second":utf8>>)
- client.close()
+ resource.scoped(() {{
+  client = http.client()
+  req = http.request(http.Method("GET"), "http://127.0.0.1:{port}/")
+  assert(http.send_with(client.send, req).body == <<"first":utf8>>)
+  assert(http.send_with(client.send, req).body == <<"second":utf8>>)
+  client.close()
+ }})
 }}
 "#
     ));
@@ -457,6 +468,7 @@ fn http_stream_request_body() {
 	i/bit_array
 	i/list
 	i/option
+	i/resource
 )
 read_pieces = (
 	body : (read = _, trailers = _),
@@ -492,11 +504,13 @@ echo_upload = (req : http.Request, body : (read = _, trailers = _)) {
 }
 
 main = () {
-	listener = net.listen("127.0.0.1", 0)
-	stdio.print(
-		"listening " <> core.inspect(net.local_port(listener)),
-	)
-	http.serve_stream(listener, handle)
+	resource.scoped(() {
+		listener = net.listen("127.0.0.1", 0)
+		stdio.print(
+			"listening " <> core.inspect(net.local_port(listener)),
+		)
+		http.serve_stream(listener, handle)
+	})
 }
 "#,
     )
@@ -608,18 +622,20 @@ fn http_reuse_keeps_origins_separate() {
         .collect();
     run_http_program(&format!(
         r#"
-(i/http, i/option)
+(i/http, i/option, i/resource)
 
 main = () {{
- client = http.client()
- first = http.request(http.Method("GET"), "http://127.0.0.1:{first_port}/")
- second = http.request(http.Method("GET"), "http://127.0.0.1:{second_port}/")
- a = http.send_with(client.send, first)
- assert(a.body == <<"first":utf8>>)
- assert(http.header(a.trailers, "X-End") == option.Some("yes"))
- assert(http.send_with(client.send, second).body == <<"second":utf8>>)
- assert(http.send_with(client.send, first).body == <<"first":utf8>>)
- client.close()
+ resource.scoped(() {{
+  client = http.client()
+  first = http.request(http.Method("GET"), "http://127.0.0.1:{first_port}/")
+  second = http.request(http.Method("GET"), "http://127.0.0.1:{second_port}/")
+  a = http.send_with(client.send, first)
+  assert(a.body == <<"first":utf8>>)
+  assert(http.header(a.trailers, "X-End") == option.Some("yes"))
+  assert(http.send_with(client.send, second).body == <<"second":utf8>>)
+  assert(http.send_with(client.send, first).body == <<"first":utf8>>)
+  client.close()
+ }})
 }}
 "#
     ));

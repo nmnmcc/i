@@ -31,5 +31,83 @@ class DiagnosticRequirements(unittest.TestCase):
         self.assertFalse(corpus.diagnostic_codes_match('warning[W0504]: unused', ['E0505']))
 
 
+class AtomicGoldenWrites(unittest.TestCase):
+    def test_failed_run_leaves_the_golden_and_reports(self):
+        import contextlib
+        import io
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'expected.json'
+            path.write_bytes(b'old\n')
+            errors = io.StringIO()
+            old = os.environ.get('UPDATE')
+            os.environ['UPDATE'] = '1'
+            try:
+                with contextlib.redirect_stderr(errors):
+                    corpus.commit_goldens([(path, 'new\n')], False)
+            finally:
+                if old is None:
+                    del os.environ['UPDATE']
+                else:
+                    os.environ['UPDATE'] = old
+            self.assertEqual(path.read_bytes(), b'old\n')
+            self.assertIn(f'not updated: {path}', errors.getvalue())
+
+    def test_successful_update_replaces_the_golden_completely(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'expected.json'
+            path.write_bytes(b'old\n')
+            corpus.commit_goldens([(path, 'new\n')], True)
+            self.assertEqual(path.read_bytes(), b'new\n')
+            self.assertEqual([entry.name for entry in Path(directory).iterdir()], ['expected.json'])
+
+    def test_dump_writes_the_whole_value(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'expected.json'
+            corpus.dump(path, {'outcome': {'check': {'exit': 0}}})
+            self.assertEqual(corpus.json.loads(path.read_text()), {'outcome': {'check': {'exit': 0}}})
+            self.assertEqual([entry.name for entry in Path(directory).iterdir()], ['expected.json'])
+
+
+class K4AuditGoldenWrites(unittest.TestCase):
+    def test_failed_audit_keeps_both_outputs_and_reports_them(self):
+        import contextlib
+        import io
+        import os
+        import sys
+        directory = str(Path(__file__).resolve().parent)
+        sys.path.insert(0, directory)
+        try:
+            loader = importlib.machinery.SourceFileLoader(
+                'k4_audit_under_test', str(Path(directory) / 'k4_audit.py'))
+            spec = importlib.util.spec_from_loader(loader.name, loader)
+            audit = importlib.util.module_from_spec(spec)
+            loader.exec_module(audit)
+        finally:
+            sys.path.remove(directory)
+        def fail():
+            raise RuntimeError('boom')
+        audit._audit = fail
+        errors = io.StringIO()
+        old = os.environ.get('UPDATE')
+        os.environ['UPDATE'] = '1'
+        try:
+            with contextlib.redirect_stderr(errors):
+                with self.assertRaises(RuntimeError):
+                    audit.audit()
+        finally:
+            if old is None:
+                del os.environ['UPDATE']
+            else:
+                os.environ['UPDATE'] = old
+        message = errors.getvalue()
+        self.assertIn('not updated:', message)
+        self.assertIn('k4-integration.json', message)
+        self.assertIn('k4-integration.md', message)
+
+
 if __name__ == '__main__':
     unittest.main()

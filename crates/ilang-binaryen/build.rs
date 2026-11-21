@@ -32,6 +32,10 @@ fn main() {
     let target = std::env::var("TARGET").unwrap_or_default();
     if target.contains("apple") {
         println!("cargo:rustc-link-lib=dylib=c++");
+    } else if target.contains("musl") {
+        // A musl link is static, and a shared libstdc++ would drag libc.so
+        // into it; take the C++ runtime from its `.a` as well.
+        println!("cargo:rustc-link-lib=static=stdc++");
     } else if !target.contains("msvc") {
         println!("cargo:rustc-link-lib=dylib=stdc++");
     }

@@ -3155,3 +3155,28 @@ fn legacy_int_versions_keep_limb_buffers() {
         assert_eq!(allocations(&mut instance), 0);
     }
 }
+
+/// A test instance takes the worker count that `i test --workers` asks
+/// for: above one worker the pool is attached exactly as for an entry run,
+/// and at one worker it is not.
+#[test]
+fn a_test_program_takes_the_requested_workers() {
+    let bytes = wat::parse_str(
+        r#"(module
+            (func (export "ilang_start"))
+            (func (export "ilang_mc_setup") (param i64)))"#,
+    )
+    .unwrap();
+
+    let one = Program::from_bytes_with_workers(&bytes, Some(1)).unwrap();
+    assert_eq!(one.workers, 1);
+    assert!(!one.epochs);
+    let instance = one.instantiate(HostOptions::default()).unwrap();
+    assert!(instance.store.data().workers.is_none());
+
+    let two = Program::from_bytes_with_workers(&bytes, Some(2)).unwrap();
+    assert_eq!(two.workers, 2);
+    assert!(two.epochs);
+    let instance = two.instantiate(HostOptions::default()).unwrap();
+    assert!(instance.store.data().workers.is_some());
+}

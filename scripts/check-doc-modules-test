@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Counterexamples for scripts/check-doc-modules."""
+import os
 import subprocess
 import sys
 import tempfile
@@ -13,9 +14,16 @@ def git(root, *args):
                    capture_output=True, text=True)
 
 
-def run(root):
+def run(root, tag=None):
+    env = dict(os.environ)
+    for key in ('LIBRARY_TAG', 'LIBRARY_ROOT', 'LIBRARY_EXPORT'):
+        env.pop(key, None)
+    if tag:
+        env['LIBRARY_TAG'] = tag
+        # The export is keyed by tag name; keep it away from a real checkout's.
+        env['LIBRARY_EXPORT'] = str(root / 'export')
     return subprocess.run([sys.executable, '-I', str(CHECK), '--root', str(root)],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, env=env)
 
 
 def write(root, path, body):
@@ -38,14 +46,22 @@ def main():
         git(root, 'commit', '-qm', 'library')
         git(root, 'tag', 'stdlib-v0.1.0')
 
+        # The default baseline is the working tree.
         write(root, 'docs/page.mdx', 'Use `i/known`, `i/known_test` and `i/test`.\n')
         result = run(root)
         assert result.returncode == 0, result.stderr
+        assert 'against the working tree' in result.stdout, result.stdout
 
         write(root, 'docs/page.mdx', 'Missing: `i/gone`.\n')
         result = run(root)
         assert result.returncode == 1, result.stdout
-        assert 'docs/page.mdx:1: i/gone is not in stdlib-v0.1.0' in result.stderr, result.stderr
+        assert 'docs/page.mdx:1: i/gone is not in the working tree' in result.stderr, result.stderr
+
+        # A module in the tree is in the baseline, whether or not a tag has it.
+        write(root, 'stdlib/src/next.i', '()\n')
+        write(root, 'docs/page.mdx', 'New: `i/next`.\n')
+        result = run(root)
+        assert result.returncode == 0, result.stderr
 
         # A page about the next release says so and is left out.
         write(root, 'docs/page.mdx',
@@ -58,21 +74,15 @@ def main():
         result = run(root)
         assert result.returncode == 0, result.stderr
 
-        # The newest tag is the one checked, not the first one.
-        git(root, 'tag', 'stdlib-v0.2.0')
-        write(root, 'stdlib/src/gone.i', '()\n')
-        git(root, 'add', '-A')
-        git(root, 'commit', '-qm', 'next')
-        git(root, 'tag', '-f', 'stdlib-v0.2.0')
-        write(root, 'docs/page.mdx', 'Now there: `i/gone`.\n')
-        result = run(root)
-        assert result.returncode == 0, result.stderr
-
-        # Nothing to check against is an error, not a pass.
-        git(root, 'tag', '-d', 'stdlib-v0.1.0', 'stdlib-v0.2.0')
-        result = run(root)
+        # A tag baseline reads the library of that commit, not the working tree.
+        write(root, 'docs/page.mdx', 'New: `i/next`.\n')
+        result = run(root, tag='stdlib-v0.1.0')
         assert result.returncode == 1, result.stdout
-        assert 'no stdlib-v* tag' in result.stderr, result.stderr
+        assert 'i/next is not in stdlib-v0.1.0' in result.stderr, result.stderr
+
+        write(root, 'docs/page.mdx', 'Known: `i/known`.\n')
+        result = run(root, tag='stdlib-v0.1.0')
+        assert result.returncode == 0, result.stderr
 
     print('check-doc-modules counterexamples pass.')
     return 0

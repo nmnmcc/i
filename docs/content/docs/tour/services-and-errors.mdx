@@ -121,10 +121,10 @@ main = () <- (io : Io) {
 
 ```text
 42
-Error(())
+Error(IntError(offset = 0, reason = "invalid digit"))
 ```
 
-`int.parse` returns an integer and raises `()` through `Fail(())` for invalid input. `fail.catch` turns success or failure into a built-in `Result` value.
+`int.parse` returns an integer and raises `int.IntError` through `Fail(int.IntError)` for invalid input. The error gives the byte offset and the reason. `fail.catch` turns success or failure into a built-in `Result` value.
 
 ## Missing values
 

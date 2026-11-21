@@ -4,6 +4,11 @@
 //// sign of `a`, and both are `0` when `b` is `0`. The functions `divide`,
 //// `remainder`, `modulo`, and `floor_divide` raise `()` for `0`
 //// instead.
+////
+//// `parse` and `parse_base` report a failure with `IntError`, whose `offset`
+//// is a UTF-8 byte offset into the text. The other failures keep `()`,
+//// because the operation itself names the domain and there is no input
+//// position to report.
 (
 	i/fail
 	i/core
@@ -12,6 +17,7 @@
 
 (
 	to_string
+	IntError(..)
 	parse
 	parse_base
 	to_base
@@ -50,6 +56,18 @@
 	range
 )
 
+/// A failure to read an integer. `offset` is a UTF-8 byte offset into the
+/// text: the first byte that cannot be used, or the end of the text when
+/// digits are missing. `reason` is one of:
+///
+/// - `"empty"`: the text is empty.
+/// - `"missing digits"`: a sign with no digits after it.
+/// - `"invalid digit"`: a byte that is not a digit in the base.
+/// - `"digit out of range for base"`: a digit that is valid in some base but
+///   is not less than `base`.
+/// - `"base out of range"`: `base` is not from 2 to 36; `offset` is `0`.
+IntError = (offset = Int, reason = String)
+
 /// The number in decimal digits, with `-` before a negative number.
 ///
 /// ```i
@@ -57,38 +75,67 @@
 /// ```
 to_string = (x : Int) -> String { core.inspect(x) }
 
-_parse_result = (text : String) -> Result(Int, ()) {
+_parse_result = (text : String) -> Result(Int, IntError) {
 	_parse_base_result(text, 10)
 }
 
-_parse_base_result = (text : String, base : Int) -> Result(Int, ()) {
+_parse_base_result = (text : String, base : Int) -> Result(Int, IntError) {
 	{ base >= 2 && base <= 36 } |>
-		(False()) { Error(()) }
+		(False()) { Error(IntError(offset = 0, reason = "base out of range")) }
 		& (True()) {
 			<<text:utf8>> |>
 				(<<45, rest:bytes>>) {
-					parse_digits(rest, base, 0, False()) |>
+					parse_digits(rest, base, 0, False(), 1) |>
 						(Ok(n)) { Ok(-n) }
 						& (Error(e)) { Error(e) }
 				}
-				& (<<43, rest:bytes>>) { parse_digits(rest, base, 0, False()) }
-				& (bytes) { parse_digits(bytes, base, 0, False()) }
+				& (<<43, rest:bytes>>) {
+					parse_digits(rest, base, 0, False(), 1)
+				}
+				& (bytes) { parse_digits(bytes, base, 0, False(), 0) }
 		}
 }
 
-parse_digits = (bytes : BitArray, base : Int, acc : Int, seen : Bool) -> Result(
-	Int,
-	(),
-) {
+parse_digits = (
+	bytes : BitArray,
+	base : Int,
+	acc : Int,
+	seen : Bool,
+	at : Int
+) -> Result(Int, IntError) {
 	bytes |>
-		(<<>>) { seen |> (True()) { Ok(acc) } & (False()) { Error(()) } }
+		(<<>>) {
+			seen |>
+				(True()) { Ok(acc) }
+				& (False()) {
+					Error(
+						IntError(
+							offset = at,
+							reason = { at == 0 } |>
+								(True()) { "empty" }
+								& (False()) { "missing digits" },
+						),
+					)
+				}
+		}
 		& (<<byte, rest:bytes>>) {
 			d = digit_value(byte)
 			{ d >= 0 && d < base } |>
-				(True()) { parse_digits(rest, base, acc * base + d, True()) }
-				& (False()) { Error(()) }
+				(True()) {
+					parse_digits(rest, base, acc * base + d, True(), at + 1)
+				}
+				& (False()) {
+					Error(
+						IntError(
+							offset = at,
+							reason = { d >= 0 && { byte < 58 || base > 10 } } |>
+								(True()) { "digit out of range for base" }
+								& (False()) { "invalid digit" },
+						),
+					)
+				}
 		}
-		& (_) { Error(()) }
+		& (_) { Error(IntError(offset = at, reason = "invalid digit")) }
 }
 
 // The value of one ASCII digit or letter, or -1.
@@ -340,32 +387,35 @@ range = <Acc, N>(
 }
 
 /// Reads a decimal number: an optional `-` or `+`, then one or more digits
-/// `0` to `9`. Any other text raises `()`.
+/// `0` to `9`. Any other text raises `IntError`, which gives the offset and
+/// the reason. Ints never overflow, so `"overflow"` is not a reason.
 ///
 /// ```i
 /// fail.catch(() { int.parse("-42") })  // Ok(-42)
-/// fail.catch(() { int.parse("4.2") })  // Error(())
+/// fail.catch(() { int.parse("4.2") })  // Error(IntError(offset = 1, reason = "invalid digit"))
 /// ```
 ///
-/// Reports failure through `Fail(())`.
+/// Reports failure through `Fail(IntError)`.
 parse = (text : String) -> Int { fail.from_result(_parse_result(text)) }
 
 /// Reads a number in the given base, from 2 to 36: an optional `-` or `+`,
 /// then one or more digits. Digits after `9` are the letters `a` to `z`, in
 /// lower or upper case. A base outside 2 to 36, or any other text, raises
-/// `()`.
+/// `IntError`, which gives the offset and the reason.
 ///
 /// ```i
 /// fail.catch(() { int.parse_base("ff", 16) })  // Ok(255)
+/// fail.catch(() { int.parse_base("2", 2) })    // Error(IntError(offset = 0, reason = "digit out of range for base"))
 /// ```
 ///
-/// Reports failure through `Fail(())`.
+/// Reports failure through `Fail(IntError)`.
 parse_base = (text : String, base : Int) -> Int {
 	fail.from_result(_parse_base_result(text, base))
 }
 
 /// The number in the given base, from 2 to 36, with upper-case letters for
-/// the digits after `9`. A base outside 2 to 36 raises `()`.
+/// the digits after `9`. A base outside 2 to 36 raises `()`, because the
+/// base is the whole failure and there is no text position to report.
 ///
 /// ```i
 /// fail.catch(() { int.to_base(255, 16) })  // Ok("FF")
@@ -378,7 +428,8 @@ to_base = (x : Int, base : Int) -> String {
 }
 
 /// `base` multiplied by itself `of` times. A negative exponent raises
-/// `()`, because the result would not be a whole number.
+/// `()`, because the result would not be a whole number; the exponent is the
+/// whole failure and there is no input position to report.
 ///
 /// ```i
 /// fail.catch(() { int.power(2, 10) })  // Ok(1024)
@@ -389,7 +440,9 @@ power = (base : Int, of : Int) -> Int {
 	fail.from_result(_power_result(base, of))
 }
 
-/// The square root as a Float. A negative number raises `()`.
+/// The square root as a Float. A negative number raises `()`, because the
+/// operation itself names the domain and there is no input position to
+/// report.
 ///
 /// ```i
 /// fail.catch(() { int.square_root(16) })  // Ok(4.0)
@@ -399,7 +452,8 @@ power = (base : Int, of : Int) -> Int {
 square_root = (x : Int) -> Float { fail.from_result(_square_root_result(x)) }
 
 /// The digits of a number in a base of 2 or more, highest first. The sign
-/// is not kept. A base less than 2 raises `()`.
+/// is not kept. A base less than 2 raises `()`, because the base is the
+/// whole failure and there is no input position to report.
 ///
 /// ```i
 /// fail.catch(() { int.digits(234, 10) })  // Ok([2, 3, 4])
@@ -412,7 +466,8 @@ digits = (x : Int, base : Int) -> List(Int) {
 
 /// The number made from digits in a base of 2 or more, highest first. A
 /// base less than 2, or a digit that is not from `0` to `base - 1`, raises
-/// `()`.
+/// `()`, because the digit list is the whole failure and there is no text
+/// position to report.
 ///
 /// ```i
 /// fail.catch(() { int.undigits([2, 3, 4], 10) })  // Ok(234)
@@ -423,13 +478,16 @@ undigits = (numbers : List(Int), base : Int) -> Int {
 	fail.from_result(_undigits_result(numbers, base))
 }
 
-/// `a / by`, rounded toward zero, raising `()` when `by` is `0`.
+/// `a / by`, rounded toward zero, raising `()` when `by` is `0`. A zero
+/// divisor is the whole domain failure, so there is no input position to
+/// report.
 ///
 /// Reports failure through `Fail(())`.
 divide = (a : Int, by : Int) -> Int { fail.from_result(_divide_result(a, by)) }
 
 /// The remainder of `a / by`, with the sign of `a`, raising `()` when
-/// `by` is `0`.
+/// `by` is `0`. A zero divisor is the whole domain failure, so there is no
+/// input position to report.
 ///
 /// ```i
 /// fail.catch(() { int.remainder(-13, 3) })  // Ok(-1)
@@ -441,7 +499,8 @@ remainder = (a : Int, by : Int) -> Int {
 }
 
 /// The remainder of `a` divided by `by`, rounded down, with the sign of
-/// `by`, raising `()` when `by` is `0`.
+/// `by`, raising `()` when `by` is `0`. A zero divisor is the whole domain
+/// failure, so there is no input position to report.
 ///
 /// ```i
 /// fail.catch(() { int.modulo(-13, 3) })  // Ok(2)
@@ -450,7 +509,8 @@ remainder = (a : Int, by : Int) -> Int {
 /// Reports failure through `Fail(())`.
 modulo = (a : Int, by : Int) -> Int { fail.from_result(_modulo_result(a, by)) }
 
-/// `a / by`, rounded down, raising `()` when `by` is `0`.
+/// `a / by`, rounded down, raising `()` when `by` is `0`. A zero divisor is
+/// the whole domain failure, so there is no input position to report.
 ///
 /// ```i
 /// fail.catch(() { int.floor_divide(-7, 2) })  // Ok(-4)

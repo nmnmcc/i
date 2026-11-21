@@ -23,6 +23,9 @@
   "crates/ilang-binaryen/build.rs:2032fbb8c77ca19f": {
     "not_source": "Cargo build instruction"
   },
+  "crates/ilang-binaryen/build.rs:6524d878578afb5f": {
+    "not_source": "Cargo build instruction"
+  },
   "crates/ilang-check/src/types/display.rs:e790f23ba7dd9bcd": {
     "not_source": "Rendered type variable name"
   },
@@ -121,6 +124,9 @@
   },
   "crates/ilang-cli/tests/commands.rs:dc52772e3779559a": {
     "not_source": "TOML manifest or manifest fragment"
+  },
+  "crates/ilang-cli/tests/common/spec_header.rs:b1469d66588d8458": {
+    "not_source": "Temporary golden file name in a Rust test"
   },
   "crates/ilang-cli/tests/fmt.rs:dbceb65de7aa8500": {
     "not_source": "TOML manifest or manifest fragment"
@@ -494,6 +500,9 @@
   },
   "crates/ilang-syntax/src/lib.rs:bbfcd4160a1e8674": {
     "not_source": "Token name compared by the diagnostic hint scanner"
+  },
+  "crates/ilang-syntax/tests/format.rs:201efef679a002c4": {
+    "not_source": "Temporary golden file name in a Rust test"
   },
   "crates/ilang-syntax/tests/lex.rs:bbfcd4160a1e8674": {
     "prefix": "x = ",
@@ -2206,7 +2215,7 @@
     ],
     "reason": "One assembled suspension-point binding, inside its function context; stress tests generate the full sequence"
   },
-  "crates/ilang-cli/tests/tls.rs:4c73e28c2d6baaa7": {
+  "crates/ilang-cli/tests/tls.rs:21114513b8e1a882": {
     "substitutions": [
       [
         "{server:?}",

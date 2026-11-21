@@ -67,6 +67,12 @@ Each command prints this result. Filters match substrings, with no exact-name or
 
 `--shard K/N` runs shard `K` of `N` (counted from 0): the tests are sorted by qualified name and placed into shards by the shared cost-aware algorithm (heaviest first, each to the least-loaded shard), so the union of all shards is the full set; the name filter then applies within the shard.
 
+### Workers
+
+`i test` runs on **one worker** by default. That is for reproducibility: a failure keeps the same order, and a scheduling bug does not depend on how many cores the machine has. `i run` is different: it uses `available_parallelism()`.
+
+The default is therefore not the configuration the program actually runs with. A concurrency bug that needs two workers can pass every local test and still hang under `i run`. To test the real configuration, run the same tests with `--workers auto`, the same count `i run` uses; `--workers <n>` fixes a count. In CI, run both: one deterministic pass and one `auto` pass. The repository's own gate runs the `i` and `stdlib` tests as two worker shards for this reason.
+
 ## Suites and cases
 
 ```i test stdout=exact package=guide_tests title="test/forms_test.i"

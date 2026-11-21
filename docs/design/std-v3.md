@@ -1931,9 +1931,9 @@ No new host operation or unsupported-only platform provider is added.
 | `i/stdio` | Keep public Stdio constructor and all seven functions. Stdio's existing read/write/write_error/flush/flush_error Request fields stay. StdioError gains a typed reason; raw code remains diagnostic. |
 | `i/fs` | Keep private raw Fs/File constructors, OpenMode and Metadata. Keep minimal operations below. open is scope-owned through resource.Scope. FsError carries an FsProblem reason with the host code kept. copy (chunked, gives bytes) and walk (depth first, name order, capped at depth 32) are the new operations. Move read_file/write_file/read_lines algorithms to i/fs; update spec §9.12's convenience-operation location in the migration, rather than leaving two implementations.  `Fs` is provided on `native`, `nodejs` and `wasi`; any other target rejects an entry that needs it with E0523. |
 | `i/process` | Keep Arguments/Environment/WorkingDirectory/Entropy public constructors, raw Process and Child private. Keep all fourteen operations. Directory's value constructor becomes AtDirectory, fixing the duplicate name; the union is DirectoryMode. spawn, spawn_piped and spawn_config are scope-owned through resource.Scope. ProcessError carries a ProcessProblem reason with the host code kept. collect (both piped streams drained concurrently with task.both, unbounded, no wait) is the new operation.  `Process` and `WorkingDirectory` are provided on `native` and `nodejs`; any other target rejects an entry that needs them with E0523. |
-| `i/net` | Keep private Net/Listener/Stream/Datagram, NetError and all seventeen operations. Keep specified close_stream/close_listener/close_datagram rather than prematurely merging their different contracts. byte_stream retains a low-level lib-only byte record; i/io adaptation lives above it. |
-| `i/tls` | Keep Tls/Stream, TlsError and all eleven functions. Keep options/identity as closed data. accept's identity carries cert/key; split server options to alpn only, deleting ignored roots/cert/key fields from that argument. |
-| `i/fetch` | Keep Fetch/Response and five functions. Replace Fail(String) with one FetchError. Scope-owning HTTP construction is above this raw adapter. |
+| `i/net` | Keep Net/Listener/Stream/Datagram, NetError and all seventeen operations. The service record and handle constructors are exported so a test can fake the service; the handle values remain private Int wrappers in use. bind, listen, accept and connect attach the handle's close to the current resource.Scope; close_stream/close_listener/close_datagram stay public and idempotent for the owning scope to call. byte_stream retains a low-level lib-only byte record; i/io adaptation lives above it. |
+| `i/tls` | Keep Tls/Stream, TlsError and all eleven functions. The service record and handle constructors are exported so a test can fake the service. connect, accept and dial attach the TLS stream's close to the current resource.Scope; dial attaches the underlying TCP stream to the same scope. Keep options/identity as closed data. accept's identity carries cert/key; split server options to alpn only, deleting ignored roots/cert/key fields from that argument. |
+| `i/fetch` | Keep Fetch/Response and five functions. Replace Fail(String) with one FetchError. The service record and handle constructors are exported so a test can fake the service. open attaches the Response's close to the current resource.Scope; scope-owning HTTP construction is above this raw adapter. |
 
 Native error details are never parsed by application code. Each module owns
 its own reason enum; shared case spellings below are qualified constructors.
@@ -2015,7 +2015,7 @@ collect : (Child) <- (resource.Scope,Process,task.Scheduler,task.Runner,Fail(Pro
   -> (stdout = BitArray, stderr = BitArray)
 // spawn* attach the Child's release to the current resource.Scope before returning: terminate, wait (reaps), close; terminate/wait errors are dropped so the release cannot fail.
 // i/net
-Net, Listener, Stream, Datagram = private
+Net(..), Listener(..), Stream(..), Datagram(..)
 bind : (String,Int) <- IO[Net,NetError] -> Datagram
 send_to : (Datagram,String,Int,BitArray) <- IO[Net,NetError] -> ()
 receive_from : (Datagram,Int) <- IO[Net,NetError] -> (address = String, port = Int, data = BitArray)
@@ -2035,8 +2035,9 @@ stream_number : (Stream) -> Int
 byte_stream : (Stream) -> (read = (Int) <- IO[Net,NetError] -> BitArray,
   write = (BitArray) <- IO[Net,NetError] -> (),
   shutdown_write = () <- IO[Net,NetError] -> (), close = () <- IO[Net] -> ())
+// listen, accept, connect and bind attach the handle's close to the current resource.Scope before they return; it runs on normal return, error, cancel and early return. close_* stay public, are idempotent, and the owning scope calls them.
 // i/tls
-Tls, Stream = private
+Tls(..), Stream(..)
 options : () -> (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)
 identity : (BitArray,BitArray) -> (cert = BitArray, key = BitArray)
 connect : (net.Stream,String,(alpn = List(String),cert = BitArray,key = BitArray,roots = BitArray))
@@ -2053,13 +2054,15 @@ close : (Stream) <- IO[Tls] -> ()
 byte_stream : (Stream) -> (read = (Int) <- IO[Tls,TlsError] -> BitArray,
   write = (BitArray) <- IO[Tls,TlsError] -> (),
   shutdown_write = () <- IO[Tls,TlsError] -> (), close = () <- IO[Tls] -> ())
+// connect, accept and dial attach the TLS stream's close to the current resource.Scope before they return; dial attaches the underlying TCP stream to the same scope, so both close once. close stays public, is idempotent, and the owning scope calls it.
 // i/fetch
-Fetch, Response = private
+Fetch(..), Response(..)
 open : (String,String,String,BitArray) <- IO[Fetch,FetchError] -> Response
 status : (Response) <- IO[Fetch,FetchError] -> Int
 headers : (Response) <- IO[Fetch,FetchError] -> String
 read : (Response,Int) <- IO[Fetch,FetchError] -> BitArray
 close : (Response) <- IO[Fetch] -> ()
+// open attaches the Response's close to the current resource.Scope before it returns; it runs on normal return, error, cancel and early return. close stays public, is idempotent, and the owning scope calls it.
 ```
 
 The lib-only net/TLS byte records remain different because their nominal

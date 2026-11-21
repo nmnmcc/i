@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Execute authored examples and their i, Scheme, TOML, and data files offline."""
 import argparse
+import contextlib
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -17,11 +18,9 @@ import tempfile
 import time
 import tomllib
 
-import io
-import tarfile
-
 from example_fences import fences, generated, i_info, i_options, output_info, safe_file
 from paths import ROOT
+import library_baseline
 
 KINDS = ('run', 'test', 'test-fails', 'check', 'types', 'format', 'expand', 'error', 'shown', 'shown-unchecked')
 TIMEOUT = 60
@@ -177,28 +176,15 @@ def toml_value(value):
     raise ValueError(f'unsupported manifest value: {value!r}')
 
 
-def library_root():
-    """Examples run against the library `i new` writes, not the working tree."""
-    override = os.environ.get('LIBRARY_ROOT')
-    if override:
-        return Path(override)
-    tag = os.environ.get('LIBRARY_TAG') or (subprocess.run(
-        ['git', '-C', str(ROOT), 'tag', '--list', 'stdlib-v*', '--sort=-v:refname'],
-        capture_output=True, text=True, check=True).stdout.split() or [None])[0]
-    if not tag:
-        raise SystemExit('no stdlib-v* tag; fetch tags or set LIBRARY_TAG')
-    directory = Path(os.environ.get('LIBRARY_EXPORT', '/tmp')) / ('i-' + tag) / 'stdlib'
-    if directory.is_dir():
-        return directory
-    directory.mkdir(parents=True)
-    with tarfile.open(fileobj=io.BytesIO(subprocess.run(
-            ['git', '-C', str(ROOT), 'archive', f'{tag}:stdlib'],
-            capture_output=True, check=True).stdout)) as tar:
-        tar.extractall(directory, filter='data')
-    return directory
+LIBRARY = library_baseline.current(ROOT).root
 
 
-LIBRARY = library_root()
+@contextlib.contextmanager
+def scratch_dir(prefix):
+    directory = tempfile.mkdtemp(prefix=prefix)
+    yield directory
+    if not os.environ.get('KEEP'):
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def prepare(example, project):
@@ -288,7 +274,7 @@ def host_commands(binary, opt, project, environment):
 
 def run_example(example, binary, timeout=TIMEOUT):
     failures = []
-    with tempfile.TemporaryDirectory(prefix=f'docs-{page_name(example.page)}-') as scratch:
+    with scratch_dir(f'docs-{page_name(example.page)}-') as scratch:
         project = Path(scratch)
         try:
             main = prepare(example, project)
