@@ -74,6 +74,10 @@ Product name: `The i Programming Language` when it stands alone (title, start of
 
 `CHECKS_TEST_GROUP=targets` with `CHECKS_TEST_TARGETS="ilang-check:lib ilang-cli:http"` makes `rust-test` run exactly those Cargo targets: `lib`, `bin`, `doc`, or a file of the crate's `tests/`, one `cargo test --no-fail-fast` per crate in the order given. This is how a planned test shard runs. The hand-written groups (`check-heavy`, `check`, `spec`, `spec-K/N`, `cli-heavy`, `cli`, `rest`) still work. `CHECKS_SHARD=K/N` makes the `i` part run shard K of N of the review corpus instead of all of it, and `CHECKS_SKIP_CORPUS=1` leaves the corpus out. `CHECKS_BUDGET` (seconds, default 270) is the shard budget handed to the shard tooling.
 
+## Source comments
+
+Keep a comment about the code: state the fact, and cite a rule at most as a trailing parenthetical such as `(R5)`. [testing.md](https://github.com/nmnmcc/i/blob/main/docs/testing.md#source-comments) lists the comment forms `scripts/doc-comments check` accepts and rejects.
+
 ## CI
 
 Every push to main runs the full gate. A pull request runs the same gate except for the jobs whose inputs did not change (Rust, docs, editors); `summary (required)` lists what ran and fails if a planned job did not report. The wall time of a run is in its job summary. When a run fails, open the first red job in the summary and start there.

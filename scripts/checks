@@ -167,11 +167,11 @@ rust-test() {
         name="$(basename "$file" .rs)"
         [ "$name" = value_types ] || targets+=(--test "$name")
       done
-      cargo test -p ilang-check --locked --no-fail-fast "${targets[@]}"
+      cargo test -p ilang-check --locked --no-fail-fast "${targets[@]}" -- --test-threads=1
       cargo test -p ilang-check --locked --doc
       ;;
-    spec) cargo test -p ilang-cli --locked --test spec ;;
-    spec-*/*) I_SPEC_SHARD="${CHECKS_TEST_GROUP#spec-}" cargo test -p ilang-cli --locked --test spec ;;
+    spec) cargo test -p ilang-cli --locked --test spec -- --test-threads=1 ;;
+    spec-*/*) I_SPEC_SHARD="${CHECKS_TEST_GROUP#spec-}" cargo test -p ilang-cli --locked --test spec -- --test-threads=1 ;;
     cli-heavy)
       targets=()
       for name in "${CLI_HEAVY_TESTS[@]}"; do targets+=(--test "$name"); done

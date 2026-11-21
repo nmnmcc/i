@@ -2,6 +2,9 @@
 """Regression checks for comment boundaries, replay safety and proof strength."""
 import importlib.machinery
 import importlib.util
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -65,6 +68,39 @@ class Boundaries(unittest.TestCase):
         for text in ['trace a compiler stage', 'a decision tree',
                      'the service row must retain its constructor key']:
             self.assertIsNone(doc.PROCESS.search(text), text)
+
+    def test_reference_forms_and_hints(self):
+        source = '''// R5: the final ran before the call returned
+// R5: the timeout fired before the call returned
+// The final ran before the call returned (R5).
+// See §9.5 for the ordering.
+// See §9.6 for the timeout.
+/// Example:
+/// ```rust
+/// §9.5
+/// ```
+fn main() {}
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'src').mkdir()
+            (root / 'src/lib.rs').write_text(source)
+            subprocess.run(['git', 'init', '-q'], cwd=root, check=True)
+            subprocess.run(['git', 'add', 'src/lib.rs'], cwd=root, check=True)
+            output = subprocess.run(
+                [sys.executable, str(path), 'check'],
+                cwd=root, check=False, capture_output=True, text=True)
+        self.assertNotEqual(output.returncode, 0)
+        self.assertIn('src/lib.rs:1: R5: the final ran', output.stdout)
+        self.assertIn('src/lib.rs:2: R5: the timeout fired', output.stdout)
+        self.assertNotIn('src/lib.rs:3:', output.stdout)
+        self.assertIn('src/lib.rs:4: See §9.5', output.stdout)
+        self.assertIn('src/lib.rs:5: See §9.6', output.stdout)
+        self.assertNotIn('src/lib.rs:8:', output.stdout)
+        self.assertIn('hint: a line like "R5: ..." reads as a process reference', output.stdout)
+        self.assertIn('hint: a section mark or a spec path in a source comment', output.stdout)
+        self.assertEqual(output.stdout.count('hint:'), 2)
+        self.assertIn('comment policy: 4 unapproved', output.stdout)
 
     def test_replay_refuses_stale_or_unsafe_entries(self):
         source = 'let x = 1; // old\n'
