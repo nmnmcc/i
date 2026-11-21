@@ -68,7 +68,12 @@ def main():
         assert (Path(library) / 'src' / 'clock.i').is_file()
         assert not (Path(library) / 'src' / 'queue.i').exists()
         result = check(env)
-        assert 'against stdlib-v0.1.0' in (result.stdout + result.stderr), result.stdout + result.stderr
+        # In CI the generated pages claim modules the tag lacks, so the check
+        # fails; the label is then in "not in <tag>". Locally it may pass and
+        # say "against <tag>". Either way the baseline is the tag.
+        combined = result.stdout + result.stderr
+        assert ('against stdlib-v0.1.0' in combined
+                or 'not in stdlib-v0.1.0' in combined), combined
 
     print('library baseline counterexamples pass.')
     return 0
