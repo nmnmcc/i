@@ -4337,8 +4337,6 @@ impl<'a> Lowerer<'a> {
             env = Env::Local(dst);
         }
         if group.is_none() {
-            // `call` uses the ambient group; refuse a closed one with the
-            // same text as `call_in`.
             let Some(owner) = self.out.request_owner else {
                 self.error(fx.module, span, "`hostcall.call` needs the request Owner");
                 return Some(finish(out, tail, Atom::Unit));
