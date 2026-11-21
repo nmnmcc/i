@@ -894,6 +894,10 @@ pub struct Import {
     pub request: bool,
     pub request_result: bool,
     pub awaited: bool,
+    /// The field of an `@import` service written with its answer
+    /// `Result(A, E)`: an awaited call gives that `Result` as it is, and
+    /// does not raise its error.
+    pub answer_result: bool,
 }
 
 /// A chosen host registration: each entry constructs its record of
