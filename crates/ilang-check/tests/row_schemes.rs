@@ -440,6 +440,73 @@ fn a_directed_handler_restriction_without_a_stated_entry_is_hidden() {
 }
 
 #[test]
+fn a_rigid_row_without_a_stated_entry_cannot_take_a_one_form_provide() {
+    // Row variables: in (..N, C(…)), N has no entry for C. A rigid row
+    // variable that reaches a provide of C without a stated C entry is a
+    // compile error, also when C has one form and so no same-form obligation.
+    let source = "Clock = (now = () -> Int)\nwrap : <N>(() <- N -> Int) <- N -> Int = (body) { body() <- (Clock(now = () { 1 })) }\nmain = () { wrap(() { 2 }) }\n";
+    let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+    let checked = ilang_check::check(&graph);
+    assert!(
+        checked.diags.iter().any(|d| d.code == "E0515"
+            && d.message.contains("row `N` has no entry for `Clock`")
+            && d.source
+                .is_some_and(|id| graph.sources.get(id).text == source)),
+        "{:?}",
+        graph.sources.render_all(&checked.diags)
+    );
+}
+
+#[test]
+fn a_rigid_row_with_a_stated_entry_takes_a_one_form_provide() {
+    // The same provide is correct when the callback's row states the entry.
+    let shown = types(
+        "Clock = (now = () -> Int)\nwrap : <N>(() <- (Clock, ..N) -> Int) <- N -> Int = (body) { body() <- (Clock(now = () { 1 })) }\nmain = () { wrap(() <- (c : Clock) { c.now() }) }\n",
+    );
+    assert!(!shown["app/main.main"].contains("Clock"), "{shown:?}");
+    // A function expression's own type parameter is generalized, not rigid:
+    // its inferred scheme shows the difference.
+    types(
+        "Clock = (now = () -> Int)\nwrap = <N>(body : () <- N -> Int) { body() <- (Clock(now = () { 1 })) }\n",
+    );
+    // A concrete need without a row is unchanged: an extra provided key is
+    // not an error.
+    types(
+        "Clock = (now = () -> Int)\nf = () { 1 }\nmain = () { f() <- (Clock(now = () { 1 })) }\n",
+    );
+}
+
+#[test]
+fn an_inferred_need_takes_a_one_form_provide() {
+    // Only a rigid row variable rejects a provide of a key it does not
+    // state. A function with no written need has an inferred row, which
+    // simply gains the entry from the provide. The second program reaches
+    // the row through a continuation's row argument, as in
+    // tests/spec/9/control_lazy_env_unwind.i.
+    for source in [
+        "Name = (text = String)\nread = () { 1 }\naround = (b) { { b() } <- (Name(text = \"around\")) }\nmain = () { around(read) }\n",
+        "(i/control)\nName = (text = String)\nf = (b) { control.suspend(b, (k) { { control.cancel(k)\n\"c\" } <- (Name(text = \"out\")) }) }\nmain = () { control.boundary((b) { f(b) }) }\n",
+    ] {
+        let (graph, _, _) = common::check_files(&[("src/main.i", source)]);
+        let checked = ilang_check::check(&graph);
+        let ours: Vec<_> = checked
+            .diags
+            .iter()
+            .filter(|d| {
+                d.source
+                    .is_some_and(|id| graph.sources.get(id).text == source)
+            })
+            .cloned()
+            .collect();
+        assert!(
+            ours.is_empty(),
+            "{source}: {:?}",
+            graph.sources.render_all(&ours)
+        );
+    }
+}
+
+#[test]
 fn a_closed_callback_needs_a_provider_even_for_an_unused_fail_entry() {
     // An unused Fail entry still requires its provider; choosing E = Never
     // must not erase the service key. Check both unused and raised entries.

@@ -16,7 +16,8 @@ Actions output per job: a JSON array of matrix entries
 (`index` is 0-based, `k` 1-based.) `targets` is set for the Rust test
 shards: space-separated words `<crate>:<key>`, where <key> is a key of the
 cost table (`lib`, `doc`, `bin:<name>`, `test:<name>`); scripts/checks
-runs them for CHECKS_TEST_GROUP=targets from CHECKS_TEST_TARGETS. `projects` is set for the std shards: the keys
+runs them for CHECKS_TEST_GROUP=targets from CHECKS_TEST_TARGETS. `projects` is set for the std shards (`std` and
+`std_workers`): the keys
 (`<project>@<opt>`) separated by spaces, for CHECKS_I_PROJECTS.
 
 It also writes <out>/expected.json: every job of ci.yml but the summary, by
@@ -60,6 +61,7 @@ SHARDED = [
     ('spec',          'spec-cases',        'spec',                      'test ({name})', 'rust', None),
     ('corpus',        'corpus-cases',      'review',                    'corpus ({name})', 'rust', None),
     ('std',           'std-tests',         'i, std',                    'run ({name})',  'rust', None),
+    ('std_workers',   'std-worker-tests',  'i, std, workers',           'run ({name})',  'rust', None),
 ]
 
 # Every job id of ci.yml but `summary`: the output of a sharded job above,
@@ -76,6 +78,7 @@ JOBS = {
     'spec': 'spec',
     'corpus': 'corpus',
     'std': 'std',
+    'std_workers': 'std_workers',
 }
 
 FILTERS = ('rust', 'docs', 'editors')
@@ -87,6 +90,7 @@ KINDS = {
     'ilang-check-tests': ('test name', re.compile(r'^(lib|doc|bin:[^\s]+|test:[^\s]+)$')),
     'ilang-cli-tests': ('test name', re.compile(r'^(lib|doc|bin:[^\s]+|test:[^\s]+)$')),
     'std-tests': ('project', re.compile(r'^[^\s@]+@[0-2]$')),
+    'std-worker-tests': ('project', re.compile(r'^[^\s@]+@[0-2]$')),
     'spec-cases': ('spec case path', re.compile(r'^[^:\s]+$')),
     'value-type-recovery-cases': ('spec case path', re.compile(r'^[^:\s]+$')),
     'corpus-cases': ('corpus case path', re.compile(r'^[^\s]+$')),
@@ -182,7 +186,7 @@ def matrix(costs, set_name, prefix, display, package):
             e['targets'] = ' '.join(f'{package}:{k}' for k in keys)
         elif set_name == 'value-type-recovery-cases':
             e['targets'] = f'ilang-check:{VALUE_TYPES_KEY}'
-        elif set_name == 'std-tests':
+        elif set_name in ('std-tests', 'std-worker-tests'):
             e['projects'] = ' '.join(keys)
         # Spec cases, corpus cases and pages: the shard takes the k-th of N
         # by its own rule, so only N is used; the planned keys go to the log.
