@@ -23,8 +23,8 @@
 //!
 //! Ordinary recursion that is not in tail position uses the Wasm stack. Wasm
 //! code may use up to [`WASM_STACK`] bytes of it (Wasmtime's
-//! `max_wasm_stack`, 32 MiB). A frame of a small i function takes about 60
-//! bytes, so this is about 500,000 frames of such functions, and fewer of
+//! `max_wasm_stack`, 64 MiB). A frame of a small i function takes about 60
+//! bytes, so this is about 1,000,000 frames of such functions, and fewer of
 //! bigger ones; more traps as "call stack exhausted", which is a stop with
 //! no message. Every call into the module runs on a thread with
 //! a native stack of [`THREAD_STACK`] bytes, so that the Wasm stack always
@@ -2027,7 +2027,7 @@ enum Invoked {
 
 /// The most stack, in bytes, that Wasm code may use (see the module
 /// documentation).
-pub const WASM_STACK: usize = 32 << 20;
+pub const WASM_STACK: usize = 64 << 20;
 
 /// The size, in bytes, that the GC heap of every instance starts with (see
 /// "Garbage collection" in the module docs). It is only reserved: memory is

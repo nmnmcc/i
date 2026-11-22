@@ -29,6 +29,35 @@ fn scalar_requirement(ty: &Ty) -> bool {
 
 /// The names of the custom types as the module `m` writes them: the types
 /// of other modules with the name of their module.
+/// The type of `make_<T>`, `() -> T(A…)`, and its type variables: those
+/// of the type definition.
+pub(crate) fn service_accessor_type(p: &Program, t: TypeId, span: Span) -> (Type, Vec<TyVarId>) {
+    let params = p.ty(t).params.iter().map(|(_, v)| *v).collect::<Vec<_>>();
+    let result = Type {
+        kind: TypeKind::Named {
+            ty: TypeRef::Custom(t),
+            args: params
+                .iter()
+                .map(|v| Type {
+                    kind: TypeKind::Var(*v),
+                    span,
+                })
+                .collect(),
+        },
+        span,
+    };
+    let ty = Type {
+        kind: TypeKind::Fn {
+            params: Vec::new(),
+            ret: Box::new(result),
+            err: None,
+            env: None,
+        },
+        span,
+    };
+    (ty, params)
+}
+
 pub(super) fn type_names(p: &Program, m: ModuleId) -> Vec<String> {
     let here = p.module(m);
     p.types
@@ -183,6 +212,12 @@ pub(crate) struct Checker<'a> {
 
 impl<'a> Checker<'a> {
     pub fn new(p: &'a Program, sources: &'a Sources) -> Checker<'a> {
+        Checker::with_needs(p, sources, false)
+    }
+
+    /// `keep_implicit` keeps the implicit services (`Await`, `Owner`, ...)
+    /// in the shown types instead of hiding them.
+    pub fn with_needs(p: &'a Program, sources: &'a Sources, keep_implicit: bool) -> Checker<'a> {
         let find = |name: &str| {
             p.types
                 .iter()
@@ -204,6 +239,9 @@ impl<'a> Checker<'a> {
             fail: find("Fail"),
         };
         solver.row_params = row_parameters(p);
+        if !keep_implicit {
+            solver.hidden_needs = std::sync::Arc::new(p.implicit_services.clone());
+        }
         Checker {
             p,
             sources,
@@ -283,7 +321,15 @@ impl<'a> Checker<'a> {
                 }
             }
             for (di, d) in m.defs.iter().enumerate() {
-                if let DefKind::External { ty, ty_vars, .. } = &d.kind {
+                let accessor;
+                let declared = match &d.kind {
+                    DefKind::ServiceAccessor { ty } => {
+                        accessor = service_accessor_type(p, *ty, d.span);
+                        Some((&accessor.0, accessor.1.as_slice()))
+                    }
+                    kind => kind.declared(),
+                };
+                if let Some((ty, ty_vars)) = declared {
                     self.check_places(ty, Pol::Pos, 0);
                     self.s.level = 1;
                     self.new_tyvars(ty_vars);
@@ -343,6 +389,7 @@ impl<'a> Checker<'a> {
         }
         self.report_coalescing(Span::default());
         self.entry_points(selected);
+        self.boundary_exports();
         // The shown type schemes.
         let mut typed = std::mem::take(&mut self.out);
         let artifact_schemes = p
@@ -351,12 +398,10 @@ impl<'a> Checker<'a> {
             .enumerate()
             .flat_map(|(mi, module)| {
                 module.defs.iter().enumerate().filter_map(move |(di, def)| {
-                    (def.exported || matches!(def.kind, DefKind::External { .. })).then_some(
-                        DefId {
-                            module: ModuleId(mi as u32),
-                            index: di as u32,
-                        },
-                    )
+                    (def.exported || def.kind.declared().is_some()).then_some(DefId {
+                        module: ModuleId(mi as u32),
+                        index: di as u32,
+                    })
                 })
             })
             .filter_map(|id| self.defs.get(&id).cloned())
@@ -389,7 +434,7 @@ impl<'a> Checker<'a> {
                 };
                 let opts = display::Opts {
                     mono: true,
-                    written: matches!(d.kind, DefKind::External { .. }),
+                    written: d.kind.declared().is_some(),
                 };
                 // A partial result may omit a recursive scheme only after
                 // the failure has been diagnosed.
@@ -571,8 +616,9 @@ impl<'a> Checker<'a> {
                 self.add_env(Ty::named(self.b.assert, Vec::new()));
             }
             let env = self.pop_effects(binding.span);
-            // A top-level binding may not need services (errors
-            // included as Fail).
+            // A top-level binding may not need services, except the
+            // implicit ones the runtime gives during start.
+            let env = self.s.ambient(&env);
             self.s.constrain(&env, &Ty::Never);
             if !self.s.failures.is_empty() {
                 let f = self.s.failures.remove(0);
@@ -1106,6 +1152,9 @@ impl<'a> Checker<'a> {
         if !export {
             return;
         }
+        // Host-boundary 5.5 (2) is the second pass on the shaped
+        // signature; a part it reports is not reported again as E0521.
+        let boundary = self.boundary_signature(d, span, &f, true);
         let parts = f
             .parts()
             .unwrap_or_default()
@@ -1113,6 +1162,9 @@ impl<'a> Checker<'a> {
             .map(|p| ("a parameter", p, true))
             .chain([("the value", &f.ret, false)]);
         for (what, t, input) in parts {
+            if boundary && self.boundary_bad(t, true) {
+                continue;
+            }
             if !self.host_type(t) || input && !t.values().is_all() {
                 let suffix = if input
                     && let Some(b) = t.scalar()
@@ -1226,6 +1278,142 @@ impl<'a> Checker<'a> {
                     || matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty())
             }
             _ => false,
+        }
+    }
+
+    /// The module exports of the dependencies with `hostcall = true`
+    /// (`Program::boundary_exports`): each function among them is checked
+    /// by [`Self::boundary_signature`].
+    fn boundary_exports(&mut self) {
+        let p = self.p;
+        for &d in &p.boundary_exports {
+            let Some(scheme) = self.defs.get(&d) else {
+                continue;
+            };
+            let opts = display::Opts {
+                mono: true,
+                written: false,
+            };
+            // A type that cannot be simplified is reported where it is
+            // shown.
+            let Ok(t) = display::shown(&self.s, &scheme.ty, opts) else {
+                continue;
+            };
+            if let Ty::Fn(f) = display::both(&t) {
+                self.set_module(d.module);
+                self.boundary_signature(d, p.def(d).span, &f, false);
+            }
+        }
+    }
+
+    /// Host-boundary 5.5 (2): a boundary-visible function's own row
+    /// (its need, parameters and result) may not name the hostcall
+    /// mechanics `Request` (`Call`), `Ticket`, `Wait` or `CallGroup`; in an
+    /// `@export` (`export`), a parameter or the result may not take an
+    /// implicit service either. Types are compared by identity; records and
+    /// aliases are not looked into. The library `i` is exempt. Each name is
+    /// reported once; whether one was.
+    fn boundary_signature(&mut self, d: DefId, span: Span, f: &FnTy, export: bool) -> bool {
+        let package = self.p.module(d.module).package;
+        if self.p.package_identities.get(package)
+            == Some(&crate::identity::PackageIdentity::Library)
+        {
+            return false;
+        }
+        let mut mechanics = Vec::new();
+        let mut implicit = Vec::new();
+        for t in [&f.param, &f.ret] {
+            self.mechanics_in(t, &mut mechanics);
+            if export {
+                self.implicit_in(t, &mut implicit);
+            }
+        }
+        self.mechanics_in(&f.env, &mut mechanics);
+        let reported = !mechanics.is_empty() || !implicit.is_empty();
+        for name in mechanics {
+            self.error(
+                code::MECHANICS_IN_SIGNATURE,
+                span,
+                format!(
+                    "`{name}` is hostcall mechanics; a boundary-visible signature may not name it"
+                ),
+            );
+        }
+        for name in implicit {
+            self.error(
+                code::MECHANICS_IN_SIGNATURE,
+                span,
+                format!("`{name}` is an implicit service; an `@export` signature may not take it as a value"),
+            );
+        }
+        reported
+    }
+
+    /// Whether [`Self::boundary_signature`] reports something in `t`.
+    fn boundary_bad(&self, t: &Ty, export: bool) -> bool {
+        let mut found = Vec::new();
+        self.mechanics_in(t, &mut found);
+        if export {
+            self.implicit_in(t, &mut found);
+        }
+        !found.is_empty()
+    }
+
+    /// The names of the hostcall mechanics types in `t`, each once.
+    fn mechanics_in(&self, t: &Ty, out: &mut Vec<String>) {
+        self.named_in(t, true, out, &|p, r| match r {
+            TypeRef::Builtin(b @ (BuiltinType::Request | BuiltinType::Ticket)) => {
+                Some(b.name().to_string())
+            }
+            TypeRef::Custom(id) if p.mechanics_types.contains(id) => Some(p.ty(*id).name.clone()),
+            _ => None,
+        });
+    }
+
+    /// The names of the implicit services in a value place of `t`, each
+    /// once: the need rows of function types in it are not looked into,
+    /// as inference carries them there.
+    fn implicit_in(&self, t: &Ty, out: &mut Vec<String>) {
+        self.named_in(t, false, out, &|p, r| match r {
+            TypeRef::Custom(id) if p.is_implicit_service(*id) => Some(p.ty(*id).name.clone()),
+            _ => None,
+        });
+    }
+
+    fn named_in(
+        &self,
+        t: &Ty,
+        needs: bool,
+        out: &mut Vec<String>,
+        pick: &dyn Fn(&Program, &TypeRef) -> Option<String>,
+    ) {
+        match t {
+            Ty::Con(h, _, xs) => {
+                if let Head::Named(r) = h
+                    && let Some(name) = pick(self.p, r)
+                    && !out.contains(&name)
+                {
+                    out.push(name);
+                }
+                xs.iter().for_each(|x| self.named_in(x, needs, out, pick));
+            }
+            Ty::Union(xs) | Ty::Inter(xs) => {
+                xs.iter().for_each(|x| self.named_in(x, needs, out, pick))
+            }
+            Ty::Fn(f) => {
+                self.named_in(&f.param, needs, out, pick);
+                self.named_in(&f.ret, needs, out, pick);
+                if needs {
+                    self.named_in(&f.env, needs, out, pick);
+                }
+            }
+            // The removed members of a difference are not in the row.
+            Ty::Diff(a, _) => self.named_in(a, needs, out, pick),
+            Ty::Both(a, b) => {
+                self.named_in(a, needs, out, pick);
+                self.named_in(b, needs, out, pick);
+            }
+            Ty::Var(_) | Ty::Never | Ty::Top => {}
         }
     }
 
@@ -1867,9 +2055,12 @@ impl<'a> Checker<'a> {
                     })
                     .collect();
                 let ret = self.conv(ret, local);
-                let env = env
-                    .as_ref()
-                    .map_or(Ty::Never, |e| self.conv_mode(e, local, Mode::Env));
+                let env = match env {
+                    Some(e) if !matches!(e.kind, TypeKind::Hole) => {
+                        self.conv_mode(e, local, Mode::Env)
+                    }
+                    _ => Ty::Never,
+                };
                 Ty::Fn(Box::new(FnTy::new(params, ret, env)))
             }
             TypeKind::Union(ts) => {
@@ -2121,11 +2312,15 @@ impl<'a> Checker<'a> {
                             .cloned()
                             .unwrap_or_else(Knowledge::unknown)
                     }
-                    DefKind::External { .. } => Knowledge::certain(scheme.map_or(Ty::Top, |s| {
-                        let k = display::known(&self.s, &s.ty, s.level);
-                        self.note_general(&k);
-                        k
-                    })),
+                    DefKind::External { .. }
+                    | DefKind::Runtime { .. }
+                    | DefKind::ServiceAccessor { .. } => {
+                        Knowledge::certain(scheme.map_or(Ty::Top, |s| {
+                            let k = display::known(&self.s, &s.ty, s.level);
+                            self.note_general(&k);
+                            k
+                        }))
+                    }
                 };
                 let t = match self.defs.get(d).cloned() {
                     Some(s) => self.instantiate(&s),
@@ -2965,7 +3160,9 @@ impl<'a> Checker<'a> {
             ExprKind::Name(ValueRef::Local(v)) => Some(*v),
             ExprKind::Name(ValueRef::Def(d)) => match self.p.def(*d).kind {
                 DefKind::Binding { var, .. } => Some(var),
-                DefKind::External { .. } => None,
+                DefKind::External { .. }
+                | DefKind::Runtime { .. }
+                | DefKind::ServiceAccessor { .. } => None,
             },
             _ => None,
         }
@@ -3865,6 +4062,16 @@ impl<'a> Checker<'a> {
         self.function_depth -= 1;
         let known = self.fn_known(f, &expected, body_known);
         let mut env = self.pop_effects(f.span);
+        // A written need takes the implicit services of the body as
+        // ambient (`sub_env`). When that need is open (it forwards a row
+        // of the caller), the function still needs them, so that its
+        // callers, and in the end the entry, give them. A closed written
+        // need keeps them ambient, as a closed function type does.
+        let mut implicit = self.s.implicit_part(&env);
+        for t in &env_tys {
+            implicit.extend(self.s.implicit_part(t));
+        }
+        let forwards = Solver::open_row;
         let assert = Ty::named(self.b.assert, Vec::new());
         if rest_env {
             let declared = self.env_union(env_tys.clone(), f.span);
@@ -3872,7 +4079,11 @@ impl<'a> Checker<'a> {
                 env = self.env_union(vec![env, assert.clone()], f.span);
             }
             self.sub_env(&env, &declared, f.body.span, Some(f.span));
-            env = Ty::Never;
+            env = if forwards(&declared) {
+                self.env_union(implicit.clone(), f.span)
+            } else {
+                Ty::Never
+            };
             fails = false;
         }
         let t = match (ret, &f.ret) {
@@ -3890,7 +4101,19 @@ impl<'a> Checker<'a> {
                 let env = self.env_union(envs, f.span);
                 Ty::Fn(Box::new(FnTy::new(params, value, env)))
             }
-            (Some((value, renv)), Some(written)) => {
+            (Some((value, mut renv)), Some(written)) => {
+                // A function with a written value type carries the implicit
+                // services its body may use.
+                let mut row = vec![renv];
+                if let Ty::Union(ms) = &env {
+                    for id in &self.p.implicit_services {
+                        let t = Ty::named(TypeRef::Custom(*id), Vec::new());
+                        if ms.contains(&t) {
+                            row.push(t);
+                        }
+                    }
+                }
+                renv = self.env_union(row, f.span);
                 // The written `->` part is the type after the
                 // parameters; `! N` has the environment parameters and
                 // `Assert` when a parameter may fail.
@@ -3907,6 +4130,11 @@ impl<'a> Checker<'a> {
                 }
                 if fails {
                     self.sub_env(&assert, &renv, nspan, None);
+                }
+                if !implicit.is_empty() && forwards(&renv) {
+                    let mut row = vec![renv];
+                    row.extend(implicit);
+                    renv = self.env_union(row, f.span);
                 }
                 Ty::Fn(Box::new(FnTy::new(params, value, renv)))
             }
@@ -4115,6 +4343,11 @@ impl<'a> Checker<'a> {
                 display::show(&self.s, &service)));
         }
         for (row, service) in self.s.hidden_shadows(&simple, level) {
+            if let Some(Head::Named(TypeRef::Custom(id))) = service.head()
+                && self.p.implicit_services.contains(&id)
+            {
+                continue;
+            }
             let key = display::show(&self.s, &service);
             let message = match self.s.vars[row.0 as usize].name.clone() {
                 Some(row) => format!(

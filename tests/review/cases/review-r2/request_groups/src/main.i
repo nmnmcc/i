@@ -7,8 +7,9 @@
 @host("test:async/v1", "request")
 Later = (echo = (String) -> Request(String))
 
-main = () <- (later : Later, root : request.Root) {
+main = () <- (later : Later) {
 	owner = request.open_owner()
+	root = owner.root
 	{
 		a = later.echo("a")
 		b = later.echo("b")

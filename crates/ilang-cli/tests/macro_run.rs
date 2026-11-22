@@ -25,7 +25,7 @@ fn build(source: &str) -> ilang_macro::run::MacroProgram {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\n[wasm]\nexports = [\"app/main.identity\"]\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n[wasm]\nexports = [\"app/main.identity\"]\n{}",
             library_dependencies()
         ),
     )
@@ -60,7 +60,10 @@ fn quote_pattern_selects_original_syntax_and_falls_through() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -175,7 +178,10 @@ fn compiler_export_is_checked_and_executed_with_syntax_services() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -202,7 +208,10 @@ fn expression_quote_is_compiled_and_keeps_unquote_identity() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -241,7 +250,10 @@ fn quote_splice_preserves_order_and_reuses_original_syntax() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -279,7 +291,10 @@ fn prepares_and_executes_a_real_macro_binding() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -316,7 +331,10 @@ fn compiler_program_selects_only_the_macro_import_closure() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -358,7 +376,10 @@ fn compiler_run_preserves_uncatchable_macro_error_position() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -401,7 +422,10 @@ fn compiler_wrapper_reports_a_macro_syntax_error_with_original_position() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -452,7 +476,10 @@ fn compiler_wrapper_returns_a_successful_macro_value() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -527,7 +554,10 @@ fn compiler_wrapper_rejects_a_macro_with_the_wrong_result_type() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -571,7 +601,10 @@ fn compiler_wrapper_buffers_items_and_notes_for_success() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -634,7 +667,10 @@ fn expression_macro_requiring_items_is_rejected_before_execution() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -675,7 +711,10 @@ fn expansion_preserves_sharing_between_output_and_item_request() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -760,7 +799,10 @@ fn separate_runs_get_fresh_marks_and_leave_argument_scope_unchanged() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -847,7 +889,10 @@ fn macro_registry_respects_imports_exports_and_scoped_shadowing() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -942,7 +987,7 @@ fn body_engine_expands_real_imported_macro_before_checking_arguments() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\n[wasm]\nexports = [\"app/main.calc\"]\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n[wasm]\nexports = [\"app/main.calc\"]\n{}",
             library_dependencies()
         ),
     )
@@ -1037,7 +1082,10 @@ fn body_engine_expands_type_arguments_without_evaluating_them() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1091,7 +1139,10 @@ fn body_engine_expands_pipe_left_operand_as_first_argument() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1156,7 +1207,10 @@ fn body_engine_discards_notes_if_macro_result_is_not_an_expression() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1211,7 +1265,10 @@ fn body_engine_reports_invalid_macro_signature_at_its_definition() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1276,7 +1333,10 @@ fn unused_macro_definitions_are_checked_for_signature_and_capabilities() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1320,7 +1380,10 @@ fn macro_modules_expand_in_import_order_and_reject_cycles() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1357,7 +1420,10 @@ fn item_phase_runs_imported_calls_and_preserves_written_types() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1433,7 +1499,10 @@ fn item_phase_retries_definition_after_a_later_item() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1503,7 +1572,10 @@ fn item_phase_reports_each_unresolved_waiter_and_restores_the_module() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1578,7 +1650,10 @@ fn item_phase_rechecks_an_early_builtin_answer() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1676,7 +1751,10 @@ fn item_phase_queries_the_expanded_generated_type() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1741,7 +1819,7 @@ fn project_expands_imported_macro_and_runs_generated_program() {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"app\"\n[wasm]\nexports = [\"app/main.value\"]\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n[wasm]\nexports = [\"app/main.value\"]\n{}",
             library_dependencies()
         ),
     )
@@ -1805,7 +1883,10 @@ fn successful_macro_note_is_a_compiler_note_not_a_warning() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1837,7 +1918,10 @@ fn cli_check_and_run_expand_imported_macros() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1866,7 +1950,10 @@ fn cli_expands_imported_macro_with_standard_service() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1894,7 +1981,10 @@ fn cli_expands_attribute_macros_before_checking() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1921,7 +2011,10 @@ fn cli_runs_item_macro_with_exposed_caller_name() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1948,7 +2041,10 @@ fn a_later_macro_failure_keeps_an_earlier_committed_note() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -1986,7 +2082,10 @@ fn checked_collection_validates_targets_and_duplicates() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2071,7 +2170,10 @@ fn cli_retries_definition_queries_after_later_item_macros() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2098,7 +2200,10 @@ fn cli_macro_stop_reports_call_site_and_template() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2128,7 +2233,10 @@ fn cli_nested_macro_stop_preserves_outer_call_and_templates() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2158,7 +2266,10 @@ fn collection_manifest_from_a_real_item_macro() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2201,7 +2312,10 @@ fn project_check_rejects_a_private_collection_binding() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2235,7 +2349,10 @@ fn definition_query_reads_expanded_type_from_dependency() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2297,7 +2414,10 @@ fn shared_macro_code_reads_each_callers_definition_context() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2335,7 +2455,10 @@ fn cli_queries_a_dependency_type_after_its_type_macro_expands() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2367,7 +2490,10 @@ fn collection_error_from_template_points_at_call() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2401,7 +2527,10 @@ fn item_collection_resolves_qualified_import() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2445,7 +2574,10 @@ fn a_macro_cannot_be_used_in_its_defining_module() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2472,7 +2604,10 @@ fn macro_defined_by_an_expansion_is_reported_at_the_call_site() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2522,7 +2657,10 @@ fn direct_value_detection_handles_deep_macro_output_on_a_small_stack() {
             let dir = tempfile::tempdir().unwrap();
             std::fs::write(
                 dir.path().join("i.toml"),
-                format!("name = \"app\"\n{}", library_dependencies()),
+                format!(
+                    "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+                    library_dependencies()
+                ),
             )
             .unwrap();
             std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2567,7 +2705,10 @@ fn unused_compile_time_helper_does_not_break_a_normal_program() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2594,7 +2735,10 @@ fn cli_runs_task_scope_inside_expanded_macro_argument() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2625,7 +2769,10 @@ fn body_engine_expands_real_macro_under_deep_mixed_body() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2741,7 +2888,10 @@ fn definition_query_charges_source_before_constructing_answer() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2789,7 +2939,10 @@ fn real_macro_definition_query_stops_before_oversize_source_construction() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2827,7 +2980,10 @@ fn definition_budget_does_not_depend_on_unrelated_source() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
             dir.path().join("i.toml"),
-            format!("name = \"app\"\n{}", library_dependencies()),
+            format!(
+                "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+                library_dependencies()
+            ),
         )
         .unwrap();
         std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2890,7 +3046,10 @@ fn lisp_definition_budget_excludes_unrelated_items() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
             dir.path().join("i.toml"),
-            format!("name = \"app\"\n{}", library_dependencies()),
+            format!(
+                "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+                library_dependencies()
+            ),
         )
         .unwrap();
         std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2943,7 +3102,10 @@ fn macro_output_over_frame_budget_reports_the_limit() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -2979,7 +3141,10 @@ fn definition_query_reads_a_member_exported_through_its_sum() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -3022,7 +3187,10 @@ fn definition_query_reads_an_absorbed_generated_sum_member() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -3072,7 +3240,10 @@ fn multi_shape_arguments_keep_the_written_tree_in_both_surfaces() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
             dir.path().join("i.toml"),
-            format!("name = \"app\"\n{}", library_dependencies()),
+            format!(
+                "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+                library_dependencies()
+            ),
         )
         .unwrap();
         std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -3101,7 +3272,10 @@ fn type_macro_does_not_reclassify_a_written_definition_head() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -3152,7 +3326,10 @@ fn type_macro_keeps_its_standalone_need_channel() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir(dir.path().join("src")).unwrap();
@@ -3284,7 +3461,10 @@ fn unresolved_current_module_definitions_wait_for_item_expansion_to_settle() {
         std::fs::create_dir(dir.path().join("src")).unwrap();
         std::fs::write(
             dir.path().join("i.toml"),
-            format!("name = \"probe\"\n{}", library_dependencies()),
+            format!(
+                "name = \"probe\"\nhostcall = true\n{}",
+                library_dependencies()
+            ),
         )
         .unwrap();
         std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();

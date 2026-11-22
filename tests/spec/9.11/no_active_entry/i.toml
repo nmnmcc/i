@@ -1,0 +1,7 @@
+# spec: 9.11, 10.2
+# expect: stop "panic: request: no active entry"
+name = "probe"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

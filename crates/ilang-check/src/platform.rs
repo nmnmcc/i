@@ -105,8 +105,8 @@ pub fn stub(p: &Program, t: &Typed, entry: DefId, target: Target) -> Result<Stub
         is_async: false,
     };
     let mut errors = Vec::new();
-    for id in needs {
-        let ty = p.ty(id);
+    for id in &needs {
+        let ty = p.ty(*id);
         let module = p.module(ty.module);
         let path = module.path.as_str();
         match (path, ty.name.as_str()) {
@@ -114,14 +114,14 @@ pub fn stub(p: &Program, t: &Typed, entry: DefId, target: Target) -> Result<Stub
             ("i/request", "Root") => stub.root = true,
             ("i/request", "Owner") => stub.owner = true,
             ("i/request", "Await") => stub.await_ = true,
-            ("i/task", "Runner" | "Scheduler") => stub.tasks = true,
+            ("i/task", "Runner" | "Scheduler") => {}
             _ if ty.host.is_some() => {
                 let given = HOST_SERVICES
                     .iter()
                     .find(|(m, n, _)| *m == path && *n == ty.name)
                     .is_none_or(|(_, _, targets)| targets.contains(&target));
                 if given {
-                    stub.hosts.push(id);
+                    stub.hosts.push(*id);
                     let host = ty.host.as_ref().expect("host");
                     stub.is_async |= host.is_request || host.is_async;
                 } else {
@@ -142,6 +142,15 @@ pub fn stub(p: &Program, t: &Typed, entry: DefId, target: Target) -> Result<Stub
         }
     }
     stub.is_async = target != Wasi && (stub.is_async || stub.tasks);
+    // Every start of a host service that answers later is made under the
+    // ambient `Owner`. The implicit services are ambient, so a need does not
+    // show them (a closure passed through a library function drops them):
+    // an entry that waits for the host always opens the request root.
+    if stub.is_async {
+        stub.root = true;
+        stub.owner = true;
+        stub.await_ = true;
+    }
     if errors.is_empty() {
         Ok(stub)
     } else {

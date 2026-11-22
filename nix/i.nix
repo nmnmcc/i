@@ -150,6 +150,9 @@ rustPlatform.buildRustPackage {
     runHook preInstall
     binary="target/${muslTarget}/release/i"
     if [ ! -e "$binary" ]; then
+      binary="target/${stdenv.hostPlatform.rust.cargoShortTarget}/release/i"
+    fi
+    if [ ! -e "$binary" ]; then
       binary="target/release/i"
     fi
     install -Dm755 "$binary" "$out/bin/i"

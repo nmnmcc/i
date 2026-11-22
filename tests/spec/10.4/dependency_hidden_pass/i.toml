@@ -1,0 +1,12 @@
+# spec: 10.4
+# expect: pass
+# host-boundary §5.5 rule 2: only a function's own row is checked. A
+# dependency with `hostcall = true` may module-export a function giving a
+# record that holds a `Call`, the accessor of an `@import` service, and a
+# function taking an implicit service as a value (i callers can pass it), and
+# one taking `i/http.Request`, a record that is not the mechanics `Request`.
+name = "app"
+
+[dependencies]
+i = { path = "../../../../stdlib" }
+lib = { path = "./lib" }

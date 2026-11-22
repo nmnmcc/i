@@ -180,7 +180,7 @@ fn package() -> (tempfile::TempDir, Vec<Case>) {
     fs::write(
         directory.path().join("i.toml"),
         format!(
-            "name = \"app\"\n[wasm]\nexports = [{exports}]\n{}",
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n[wasm]\nexports = [{exports}]\n{}",
             library_dependencies()
         ),
     )

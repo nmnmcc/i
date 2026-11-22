@@ -35,6 +35,7 @@ pub(super) const IMPORTS: &str = r#"
 (import "ilang:host/v1" "mc_share_put" (func $host_mc_share_put (param i64 i64 i64 i32 i32)))
 (import "ilang:host/v1" "mc_share_get" (func $host_mc_share_get (param i64 i64 i64) (result i64)))
 (import "ilang:host/v1" "mc_share_drop" (func $host_mc_share_drop (param i64 i64 i64)))
+(import "ilang:host/v1" "mc_closed" (func $host_mc_closed (param i64 i32)))
 "#;
 
 /// The WASI target always runs one worker.
@@ -50,6 +51,7 @@ pub(super) const WASI_STUBS: &str = r#"
 (func $host_mc_share_put (param i64 i64 i64 i32 i32))
 (func $host_mc_share_get (param i64 i64 i64) (result i64) (i64.const 0))
 (func $host_mc_share_drop (param i64 i64 i64))
+(func $host_mc_closed (param i64 i32))
 "#;
 
 pub(super) const WAT: &str = r#"
@@ -591,6 +593,29 @@ pub(super) const WAT: &str = r#"
   (if (global.get $mc_worker) (then
     (global.set $req_mirror (i32.const 1))
     (global.set $async_live (i32.const 1)))))
+;; A group (`root` 0) or Root (`root` 1) that this worker made has closed: the
+;; host tells the other workers, which close their mirrors of it.
+(func $mc_group_closed (param $key eqref) (param $root i32)
+  (if (i32.or (i32.eqz (global.get $mc_enabled)) (call $request_foreign (local.get $key)))
+    (then (return)))
+  (call $host_mc_closed (call $worker_key_id (local.get $key)) (local.get $root)))
+;; Another worker closed the group or Root with this key id: close the mirror
+;; of it here, which cancels the requests that tasks here started in it.
+(func (export "ilang_mc_closed") (param $id i64) (param $root i32)
+  (local $xs eqref) (local $key eqref)
+  (local.set $xs (if (result eqref) (local.get $root)
+    (then (global.get $req_roots)) (else (global.get $req_owners))))
+  (block $done (loop $each
+    (br_if $done (ref.is_null (local.get $xs)))
+    (local.set $key (if (result eqref) (local.get $root)
+      (then (struct.get $request_root 0 (ref.cast (ref $request_root) (call $list_head (local.get $xs)))))
+      (else (struct.get $request_owner 0 (ref.cast (ref $request_owner) (call $list_head (local.get $xs)))))))
+    (if (i64.eq (call $worker_key_id (local.get $key)) (local.get $id)) (then
+      (if (local.get $root)
+        (then (drop (call $request_close_root (local.get $key))))
+        (else (drop (call $request_close_owner (local.get $key)))))
+      (return)))
+    (local.set $xs (call $list_tail (local.get $xs))) (br $each))))
 (global $mc_woken (mut eqref) (ref.null eq))
 ;; Keep the continuation and the `resume` function of a task of this worker.
 (func $mc_keep (param $slot i32) (param $k eqref) (param $resume eqref) (param $tickets eqref)

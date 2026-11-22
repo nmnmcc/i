@@ -1,4 +1,5 @@
 name = "asyncprobe"
+hostcall = true
 [wasm]
 exports = ["asyncprobe/main.work"]
 

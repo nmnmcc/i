@@ -376,6 +376,10 @@ fn cmd_build(
     let Some(b) = built_entry(project, options, entry)? else {
         return Ok(ExitCode::FAILURE);
     };
+    // The packages that enabled hostcall, once, before the artifacts.
+    for key in commands::package::hostcall_packages(project, offline) {
+        outln!("hostcall: {key}");
+    }
     let native = target == Target::Native;
     // Name the artifact after the selected entry, as native packages do, so
     // that entries (and the package default) do not overwrite each other.

@@ -76,6 +76,15 @@ pub fn standard_with_args(
     process::register(&mut imports, args);
     stdio::register(&mut imports);
     tls::register(&mut imports);
+    // The native runner has no fetch transport; a program that always passes
+    // a fake still links the imports.
+    for field in ["start", "status", "headers", "read", "close"] {
+        imports
+            .async_service("i:fetch/v1", field, |_| async {
+                Ok(Err(Value::String("fetch is not available".into())))
+            })
+            .expect("one fetch field");
+    }
     imports
 }
 
@@ -111,6 +120,7 @@ pub type Log = Arc<Mutex<Vec<String>>>;
 /// | `test:io/v1` | `print: (text: String) -> ()` | logs `text` |
 /// | `test:math/v1` | external `add: (a: Int, b: Int) -> Int` | |
 /// | `test:math/v1` | external `hypot: (a: Float, b: Float) -> Float` | |
+/// | `test:import/v1` | service `add: (a: Int, b: Int) -> Int` | `a + b`; used by the `@import` service fixtures |
 /// | `test:kv/v1` | `get: (key: String) -> String ^ String` | `name` is `"i"`, `lang` is `"i language"`; other keys give the error `"no <key>"` |
 /// | `test:kv/v1` | `check: (n: Int) -> Int ^ () \| Int \| String` | `2 * n`; the error `()` for 0, `n` for more than 100, and `"negative"` for less than 0 |
 /// | `test:async/v1`, async | `double: (n: Int) -> Int ^ String` | `2 * n`, or the error `"negative"` for less than 0; logs `double <n>` |
@@ -144,6 +154,22 @@ pub fn testing(log: Log) -> HostImports {
                 bail!("hypot takes two Floats");
             };
             Ok(Value::Float(a.hypot(*b)))
+        })
+        .expect(ONE);
+    imports
+        .async_service("app:y/v1", "ping", |_| async {
+            Ok(Ok(Value::Int(9.into())))
+        })
+        .expect(ONE);
+    imports
+        .service("app:x/v1", "ping", |_| Ok(Ok(Value::Int(9.into()))))
+        .expect(ONE);
+    imports
+        .service("test:import/v1", "add", |arguments| {
+            let [Value::Int(a), Value::Int(b)] = arguments else {
+                bail!("add takes two Ints");
+            };
+            Ok(Ok(Value::Int(a + b)))
         })
         .expect(ONE);
     imports

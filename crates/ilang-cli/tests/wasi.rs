@@ -28,7 +28,10 @@ fn package(main: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::create_dir_all(dir.path().join("src")).unwrap();

@@ -201,6 +201,9 @@ pub(crate) struct Solver {
     /// The declared aliases whose expansion is a union, to show such a
     /// union by its name.
     pub alias_folds: std::sync::Arc<Vec<super::display::AliasFold>>,
+    /// The implicit services (`Program::implicit_services`): a shown need
+    /// row leaves them out.
+    pub hidden_needs: std::sync::Arc<Vec<TypeId>>,
     /// A failed coalescence is diagnostic recovery, never an unknown type
     /// that may silently make a program pass. The checker drains this at
     /// binding and artifact boundaries, including known-type conversions.
@@ -306,6 +309,7 @@ impl Solver {
         snapshot.has_need_meets = self.has_need_meets;
         snapshot.comparison_wrappers = self.comparison_wrappers.clone();
         snapshot.alias_folds = self.alias_folds.clone();
+        snapshot.hidden_needs = self.hidden_needs.clone();
         snapshot
     }
     /// Discard inference caches: a cached solved goal is not a rigid proof.
@@ -448,6 +452,7 @@ impl Solver {
             failures: Vec::new(),
             type_names,
             alias_folds: Default::default(),
+            hidden_needs: Default::default(),
             reach_marks: ReachMarks::default(),
         }
     }
@@ -457,6 +462,7 @@ impl Solver {
         let mut solver = Solver::new(self.variance.clone(), self.type_names.clone());
         solver.row_params = self.row_params.clone();
         solver.alias_folds = self.alias_folds.clone();
+        solver.hidden_needs = self.hidden_needs.clone();
         solver
     }
 
@@ -648,6 +654,58 @@ impl Solver {
     /// a value. Needs compare services in reverse.
     pub fn constrain_env(&mut self, l: &Ty, r: &Ty) {
         self.constrain_in(l, r, Mode::Env);
+    }
+
+    /// A need without its implicit services: what a written row must state.
+    pub fn ambient(&self, l: &Ty) -> Ty {
+        if self.hidden_needs.is_empty() {
+            return l.clone();
+        }
+        let hidden = |t: &Ty| {
+            matches!(t.head(), Some(Head::Named(TypeRef::Custom(id)))
+                if self.hidden_needs.contains(&id))
+        };
+        match l {
+            Ty::Union(ms) => Ty::Union(ms.iter().filter(|m| !hidden(m)).cloned().collect()),
+            Ty::Con(..) if hidden(l) => Ty::Never,
+            _ => l.clone(),
+        }
+    }
+
+    /// Implicit services are ambient: a need for one fits a closed row,
+    /// which has no variable to carry it on. An open row takes it as an
+    /// ordinary member, so that inference carries it to whoever gives the
+    /// row, and in the end to the entry, which binds it.
+    fn ambient_member(&self, l: &Ty, r: &Ty) -> bool {
+        !self.hidden_needs.is_empty()
+            && matches!(l, Ty::Con(Head::Named(TypeRef::Custom(id)), _, args)
+                if args.is_empty() && self.hidden_needs.contains(id))
+            && !Self::open_row(r)
+    }
+
+    /// The implicit services that [`ambient`](Self::ambient) takes out of
+    /// `l`.
+    pub fn implicit_part(&self, l: &Ty) -> Vec<Ty> {
+        let hidden = |t: &Ty| {
+            matches!(t.head(), Some(Head::Named(TypeRef::Custom(id)))
+                if self.hidden_needs.contains(&id))
+        };
+        match l {
+            Ty::Union(ms) => ms.iter().filter(|m| hidden(m)).cloned().collect(),
+            Ty::Con(..) if hidden(l) => vec![l.clone()],
+            _ => Vec::new(),
+        }
+    }
+
+    /// Whether a row has a variable that can still take more members.
+    pub fn open_row(t: &Ty) -> bool {
+        match t {
+            Ty::Var(_) => true,
+            Ty::Union(ms) | Ty::Inter(ms) => ms.iter().any(Self::open_row),
+            Ty::Diff(a, _) => Self::open_row(a),
+            Ty::Both(a, b) => Self::open_row(a) || Self::open_row(b),
+            _ => false,
+        }
     }
 
     /// The row parameters of a constructor, determined from its definition.
@@ -1152,6 +1210,9 @@ impl Solver {
         if l == r || matches!(l, Ty::Never) || matches!(r, Ty::Top) {
             return;
         }
+        if env == Mode::Env && self.ambient_member(l, r) {
+            return;
+        }
         if matches!(l, Ty::Inter(ms) if ms.contains(r))
             || matches!(r, Ty::Union(ms) if ms.contains(l))
         {
@@ -1444,6 +1505,8 @@ impl Solver {
                 // shape is a mismatch of the parameter data.
                 self.constrain(&g.param, &f.param);
                 self.constrain(&f.ret, &g.ret);
+                // Implicit services go on into an open row; a closed one
+                // takes them as ambient (`ambient_member`).
                 self.constrain_env(&f.env, &g.env);
             }
             _ => self.fail(FailKind::Mismatch, l, r),
@@ -2982,6 +3045,7 @@ impl Solver {
         view.vars = self.vars.clone();
         view.has_need_meets = self.has_need_meets;
         view.row_params = self.row_params.clone();
+        view.hidden_needs = self.hidden_needs.clone();
         view.normalize_type(t).then_some(view)
     }
 

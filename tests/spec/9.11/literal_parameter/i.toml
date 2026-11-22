@@ -1,0 +1,7 @@
+# spec: 9.11, 10.3
+# expect: pass
+name = "probe"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

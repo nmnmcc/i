@@ -223,7 +223,7 @@ ScopeError = (Keyed)
 
 ScopeWinner = (Keyed)
 
-@external("ilang:control", "finalizing")
+@runtime("ilang:control", "finalizing")
 finalizing : <A, R, N, B, M>(Continuation(A, R, N), Boundary(B, M)) -> Bool
 
 Frame = (
@@ -1248,46 +1248,46 @@ make_start : <A, E, N>(
 	)
 }
 
-@external("ilang:worker", "enabled")
+@runtime("ilang:worker", "enabled")
 worker_enabled : () -> Bool
 
-@external("ilang:worker", "publish")
+@runtime("ilang:worker", "publish")
 worker_publish : (Job) -> Int
 
-@external("ilang:worker", "claim")
+@runtime("ilang:worker", "claim")
 worker_claim : (Int) -> Bool
 
-@external("ilang:worker", "adopt")
+@runtime("ilang:worker", "adopt")
 worker_adopt : (Int, Int) -> ()
 
-@external("ilang:worker", "placeholder")
+@runtime("ilang:worker", "placeholder")
 worker_placeholder : () -> Continuation(StepAnswer, Turn, Never)
 
-@external("ilang:worker", "away")
+@runtime("ilang:worker", "away")
 worker_away : (Continuation(StepAnswer, Turn, Never)) -> Bool
 
-@external("ilang:worker", "send")
+@runtime("ilang:worker", "send")
 worker_send : (Int, Resume) -> ()
 
-@external("ilang:worker", "inbox")
+@runtime("ilang:worker", "inbox")
 worker_inbox : () -> Int
 
-@external("ilang:worker", "message")
+@runtime("ilang:worker", "message")
 worker_message : () -> Remote
 
-@external("ilang:worker", "pending")
+@runtime("ilang:worker", "pending")
 worker_pending : () -> Bool
 
-@external("ilang:worker", "wait")
+@runtime("ilang:worker", "wait")
 worker_wait : () -> ()
 
-@external("ilang:worker", "share_put")
+@runtime("ilang:worker", "share_put")
 worker_share_put : (Key(()), Address, Keyed) -> ()
 
-@external("ilang:worker", "share_get")
+@runtime("ilang:worker", "share_get")
 worker_share_get : (Key(()), Address) -> List(Keyed)
 
-@external("ilang:worker", "share_drop")
+@runtime("ilang:worker", "share_drop")
 worker_share_drop : (Key(()), Address) -> ()
 
 drop_shares = (s : State, ids : List(Address)) {
@@ -1535,10 +1535,10 @@ top = (seed : rng.Generator) <- (current : Runner) -> Runner {
 		}
 }
 
-@external("ilang:request", "observe_change")
+@runtime("ilang:request", "observe_change")
 observe_change : (Key(())) -> Request(())
 
-@external("ilang:request", "has_work")
+@runtime("ilang:request", "has_work")
 has_work : (Ticket) -> Bool
 
 wait_root = (_run : Key(()), root : request.Root, tickets : List(Ticket)) {

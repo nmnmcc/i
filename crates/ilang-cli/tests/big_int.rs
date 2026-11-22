@@ -30,7 +30,7 @@ fn programs() -> Vec<(u8, Program)> {
     std::fs::write(
         dir.path().join("i.toml"),
         format!(
-            "name = \"big\"\n[wasm]\nexports = {:?}\n{}",
+            "name = \"big\"\nhostcall = true\n[wasm]\nexports = {:?}\n{}",
             [
                 "apply", "bits", "float_of", "whole", "segment", "read_u", "read_i", "le72",
                 "le72_i", "le512", "le512_u"

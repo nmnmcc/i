@@ -1,0 +1,13 @@
+# spec: 10.4
+# expect: compile-error E0324
+# host-boundary §5.4 row 3, §5.5 rule 2: a host export may not give a `Call`;
+# the check is by type identity on the expanded signature (`Call(A)` is
+# `Request(A)`).
+name = "app"
+hostcall = true
+
+[wasm]
+exports = ["app/m.f"]
+
+[dependencies]
+i = { path = "../../../../stdlib" }

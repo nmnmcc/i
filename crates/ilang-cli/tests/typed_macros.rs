@@ -19,7 +19,10 @@ fn project(macros: &str, main: &str) -> tempfile::TempDir {
     std::fs::create_dir(dir.path().join("src")).unwrap();
     std::fs::write(
         dir.path().join("i.toml"),
-        format!("name = \"app\"\n{}", library_dependencies()),
+        format!(
+            "name = \"app\"\nhostcall = true\nlibrary-rows = true\n{}",
+            library_dependencies()
+        ),
     )
     .unwrap();
     std::fs::write(dir.path().join("src/macros.is"), macros).unwrap();

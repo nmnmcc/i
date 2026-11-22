@@ -649,6 +649,8 @@ struct PackageReport {
     shown: String,
     /// Only the tests of the compiled package use it.
     dev: bool,
+    /// Its `i.toml` has `hostcall = true`.
+    hostcall: bool,
     /// Each permission, as `host service "ns"` or `external "m" "f"`, and
     /// where it comes from: the names that declare it, as
     /// `module/path.Name`, and the modules that import a library module
@@ -729,6 +731,7 @@ fn report(graph: &PackageGraph) -> Result<Report> {
             PackageReport {
                 shown,
                 dev: !used.contains(&id),
+                hostcall: package_hostcall(p),
                 permissions: BTreeMap::new(),
             },
         );
@@ -800,6 +803,9 @@ fn deps(project: &Path, target: Option<ilang_wasm::Target>) -> Result<ExitCode> 
     if target.is_none() {
         for p in r.packages.values() {
             outln!("{}{}", p.shown, if p.dev { " (dev)" } else { "" });
+            if p.hostcall {
+                outln!("  hostcall");
+            }
             if p.permissions.is_empty() {
                 outln!("  no host services and no external functions");
             }
@@ -857,6 +863,9 @@ fn deps(project: &Path, target: Option<ilang_wasm::Target>) -> Result<ExitCode> 
 fn print_new_permissions(before: &Report, after: &Report) {
     for (key, p) in &after.packages {
         let old = before.packages.get(key);
+        if p.hostcall && !old.is_some_and(|o| o.hostcall) {
+            outln!("new permission: {} can use hostcall", p.shown);
+        }
         for (what, at) in &p.permissions {
             if old.is_some_and(|o| o.permissions.contains_key(what)) {
                 continue;
@@ -869,6 +878,58 @@ fn print_new_permissions(before: &Report, after: &Report) {
             );
         }
     }
+}
+
+/// Whether the package enables hostcall. The library `i` and the built-in
+/// package are already on; they are not listed by `i deps`.
+fn package_hostcall(p: &ilang_package::Package) -> bool {
+    p.hostcall
+}
+
+/// Whether the manifest text has `hostcall = true` at its top level.
+fn text_hostcall(doc: &DocumentMut) -> bool {
+    doc.get("hostcall").and_then(Item::as_bool) == Some(true)
+}
+
+/// The packages of the program in `project` (without its tests) whose
+/// manifest enables hostcall, in the order of the `i deps` report, by key:
+/// `<this package>` for the root, `location@major`, or `path <dir>` (relative
+/// to the root). The library `i` is not listed.
+pub fn hostcall_packages(project: &Path, offline: bool) -> Vec<String> {
+    let (graph, _) = ilang_package::load_with(
+        project,
+        &LoadOptions {
+            tests: false,
+            offline,
+            write_lock: false,
+            ..LoadOptions::from_env()
+        },
+    );
+    let Some(root) = graph.root else {
+        return Vec::new();
+    };
+    let root_dir = graph.packages[root].dir.clone().unwrap_or_default();
+    let mut keys = BTreeMap::new();
+    for (id, p) in graph.packages.iter().enumerate() {
+        if graph.is_language(id) || !package_hostcall(p) {
+            continue;
+        }
+        // Sorted as the report is: the root (empty key) first.
+        let (order, shown) = match (&p.location, &p.dir) {
+            _ if id == root => (String::new(), "<this package>".to_string()),
+            (Some(l), _) => {
+                let k = format!("{}@{}", l.location, l.version.major);
+                (k.clone(), k)
+            }
+            (None, Some(dir)) => (
+                format!("path {}", dir.display()),
+                format!("path {}", relative(&root_dir, dir)),
+            ),
+            (None, None) => continue,
+        };
+        keys.insert(order, shown);
+    }
+    keys.into_values().collect()
 }
 
 // ---- i publish ----
@@ -992,7 +1053,11 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
         .map_err(|e| e.context("the interface of the package could not be worked out"))?;
     match previous {
         None => println!("ok: there is no earlier version to compare with"),
-        Some(p) => compare_with(project, &format!("{prefix}v{p}"), p, version, &now)?,
+        Some(p) => {
+            let tag = format!("{prefix}v{p}");
+            compare_with(project, &tag, p, version, &now)?;
+            print_new_hostcall_since(project, &tag)?;
+        }
     }
 
     // 5. The tag. A package at the top of the repository tags `HEAD`. A
@@ -1023,6 +1088,31 @@ fn publish(project: &Path, version: &str, dry_run: bool) -> Result<ExitCode> {
     outln!("made the tag {tag}; nothing was pushed. To publish it:");
     outln!("  git push {remote} {tag}");
     Ok(ExitCode::SUCCESS)
+}
+
+/// Prints `new permission: <name> can use hostcall` when the package turns the
+/// switch on since `tag`. Turning it off, or keeping it, prints nothing.
+fn print_new_hostcall_since(project: &Path, tag: &str) -> Result<()> {
+    let manifest: DocumentMut = std::fs::read_to_string(project.join("i.toml"))?.parse()?;
+    if !text_hostcall(&manifest) {
+        return Ok(());
+    }
+    let prefix = package_dir_at(project, tag)?;
+    let top = PathBuf::from(git_in(project, &["rev-parse", "--show-toplevel"])?);
+    let at = if prefix.is_empty() {
+        format!("{tag}:i.toml")
+    } else {
+        format!("{tag}:{prefix}/i.toml")
+    };
+    let before = git_in(&top, &["show", &at])
+        .ok()
+        .and_then(|text| text.parse::<DocumentMut>().ok())
+        .is_some_and(|doc| text_hostcall(&doc));
+    if !before {
+        let name = manifest.get("name").and_then(Item::as_str).unwrap_or("?");
+        outln!("new permission: {name} can use hostcall");
+    }
+    Ok(())
 }
 
 /// Builds the package with its tests and runs them, as `i test` does.
@@ -1449,7 +1539,21 @@ fn interface_of(dir: &Path, write_lock: bool) -> Result<Result<Interface>> {
                     canon.insert(canonical.clone());
                     format!("@external(\"{module}\", \"{function}\") ")
                 }
-                DefKind::Binding { .. } => String::new(),
+                // Only the library `i` declares runtime operations; they are
+                // listed like externals if one is ever in the root.
+                DefKind::Runtime {
+                    module, function, ..
+                } => {
+                    let (shown, canon) = host
+                        .entry(format!("runtime \"{module}\" \"{function}\""))
+                        .or_default();
+                    shown.insert(ty.to_string());
+                    canon.insert(canonical.clone());
+                    format!("@runtime(\"{module}\", \"{function}\") ")
+                }
+                // `make_<type>` is an ordinary exported value: its
+                // service's imports are listed with the service type.
+                DefKind::Binding { .. } | DefKind::ServiceAccessor { .. } => String::new(),
             };
             if !d.exported {
                 continue;

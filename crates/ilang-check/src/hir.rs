@@ -107,6 +107,67 @@ pub struct Program {
     /// The external functions outside the package `i`, when their
     /// types are correct.
     pub external_fns: std::collections::HashMap<DefId, HostFn>,
+    /// The mode of each raw `@import("ns", "label", mode)` declaration.
+    pub import_modes: std::collections::HashMap<DefId, ImportMode>,
+    /// The `@import("js", "expression")` declarations: `External` with the
+    /// module `js` and the expression as the function. Not lowered yet.
+    pub js_values: std::collections::HashSet<DefId>,
+    /// The implicit services: `i/request.Await`, `Owner`, `Root` and
+    /// `i/task.Scheduler`, `Runner`, when the library has them. They are
+    /// never written in a need row outside `i`, and not shown there.
+    pub implicit_services: Vec<TypeId>,
+    /// The custom hostcall mechanics types ([`MECHANICS_TYPES`]), by type
+    /// identity. The built-in `Request` and `Ticket` are mechanics too;
+    /// `Call` and `CallGroup` are aliases and are checked as their bodies.
+    pub mechanics_types: Vec<TypeId>,
+    /// The module exports of the dependencies with `hostcall = true`, other
+    /// than the library `i`: with the host exports of the root, the
+    /// boundary-visible functions of host-boundary 5.5 (2).
+    pub boundary_exports: Vec<DefId>,
+}
+
+/// The name of the synthesized accessor of an `@import` service type:
+/// `make_` and the type name in snake case (`HttpClient` is
+/// `make_http_client`, `TCPServer` is `make_tcp_server`). A value name has
+/// no capitals, so `make_HttpClient` could not be written.
+pub fn accessor_name(type_name: &str) -> String {
+    let chars: Vec<char> = type_name.chars().collect();
+    let mut out = String::from("make_");
+    for (i, &c) in chars.iter().enumerate() {
+        if c.is_ascii_uppercase() {
+            let after_lower =
+                i > 0 && (chars[i - 1].is_ascii_lowercase() || chars[i - 1].is_ascii_digit());
+            let before_lower = i > 0
+                && chars[i - 1].is_ascii_uppercase()
+                && chars.get(i + 1).is_some_and(|n| n.is_ascii_lowercase());
+            if after_lower || before_lower {
+                out.push('_');
+            }
+            out.push(c.to_ascii_lowercase());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+/// The `(module, name)` identities of the implicit services.
+pub const IMPLICIT_SERVICES: [(&str, &str); 5] = [
+    ("i/request", "Await"),
+    ("i/request", "Owner"),
+    ("i/request", "Root"),
+    ("i/task", "Scheduler"),
+    ("i/task", "Runner"),
+];
+
+/// The `(module, name)` identities of the custom hostcall mechanics types.
+pub const MECHANICS_TYPES: [(&str, &str); 1] = [("i/hostcall", "Wait")];
+
+impl Program {
+    /// One of [`IMPLICIT_SERVICES`], by type identity.
+    pub fn is_implicit_service(&self, t: TypeId) -> bool {
+        self.implicit_services.contains(&t)
+    }
 }
 
 /// A host function retains its wire signature so callers and emitters agree.
@@ -218,6 +279,43 @@ pub enum DefKind {
         /// The type variables of `ty`.
         ty_vars: Vec<TyVarId>,
     },
+    /// `@runtime("module", "function") name: Type`: an operation of the
+    /// runtime, only in the library package `i`. Resolved like `External`.
+    Runtime {
+        module: String,
+        function: String,
+        ty: Type,
+        /// The type variables of `ty`.
+        ty_vars: Vec<TyVarId>,
+    },
+    /// `make_<Type>`, synthesized for a type with `@import`: a function
+    /// `() -> T` with no need that builds the service from its imports.
+    ServiceAccessor { ty: TypeId },
+}
+
+impl DefKind {
+    /// The written type of a declaration (`External` or `Runtime`).
+    pub fn declared(&self) -> Option<(&Type, &[TyVarId])> {
+        match self {
+            DefKind::External { ty, ty_vars, .. } | DefKind::Runtime { ty, ty_vars, .. } => {
+                Some((ty, ty_vars))
+            }
+            _ => None,
+        }
+    }
+
+    /// The host module and function of a declaration (`External` or `Runtime`).
+    pub fn foreign(&self) -> Option<(&str, &str)> {
+        match self {
+            DefKind::External {
+                module, function, ..
+            }
+            | DefKind::Runtime {
+                module, function, ..
+            } => Some((module, function)),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -240,16 +338,68 @@ pub struct TypeDef {
     pub exported: bool,
     /// Exported as `T(..)`.
     pub constructors_exported: bool,
-    /// `@host("namespace")` or `@host("namespace", "async")`.
+    /// `@host("namespace")` or `@host("namespace", "async")`, or the host
+    /// service of `@import`.
     pub host: Option<Host>,
+    /// `@import("namespace")` or `@import("namespace", "now")`.
+    pub import: Option<Import>,
     pub deprecated: Option<String>,
+}
+
+/// `@import` on a service type.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Import {
+    pub namespace: String,
+    pub mode: ImportMode,
+}
+
+/// How an imported call answers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ImportMode {
+    /// The answer is there when the call returns.
+    Now,
+    /// The host does the call; the caller waits for the answer.
+    Later,
+}
+
+/// How a host service answers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum HostMode {
+    /// `@host("ns")`, `@import("ns", "now")`.
+    Now,
+    /// `@host("ns", "async")`, `@import("ns")`.
+    Later,
+    /// `@host("ns", "request")`: fields return `Request(A)`.
+    Request,
 }
 
 #[derive(Clone, Debug)]
 pub struct Host {
     pub namespace: String,
+    pub mode: HostMode,
+    /// Derived from `mode`; kept for the readers that predate it.
     pub is_async: bool,
+    /// Derived from `mode`; kept for the readers that predate it.
     pub is_request: bool,
+}
+
+impl Host {
+    pub fn new(namespace: String, mode: HostMode) -> Host {
+        Host {
+            namespace,
+            mode,
+            is_async: mode != HostMode::Now,
+            is_request: mode == HostMode::Request,
+        }
+    }
+
+    pub fn asynchronous(&self) -> bool {
+        self.mode != HostMode::Now
+    }
+
+    pub fn request(&self) -> bool {
+        self.mode == HostMode::Request
+    }
 }
 
 #[derive(Clone, Debug)]

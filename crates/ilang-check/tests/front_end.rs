@@ -52,8 +52,9 @@ fn declared_external_variables_are_general_in_library_declarations() {
     let c = ilang_check::check(&graph);
     common::expect_unused(&c.diags, &["f"]);
     let p = c.program.as_ref().unwrap();
-    let DefKind::External { ty_vars, .. } = &common::def(p, "i/core", "inspect").kind else {
-        panic!()
+    let ty_vars = match &common::def(p, "i/core", "inspect").kind {
+        DefKind::External { ty_vars, .. } | DefKind::Runtime { ty_vars, .. } => ty_vars,
+        k => panic!("{k:?}"),
     };
     assert_eq!(ty_vars.len(), 1);
 }

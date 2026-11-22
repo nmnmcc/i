@@ -44,5 +44,7 @@ pub(crate) fn add(graph: &mut PackageGraph) {
         wasm_synchronous: Vec::new(),
         entries: Vec::new(),
         location: None,
+        hostcall: true,
+        library_rows: true,
     });
 }

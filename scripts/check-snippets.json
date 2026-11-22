@@ -919,10 +919,6 @@
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
   },
-  "crates/ilang-cli/tests/r2_runtime.rs:e545c6b927783df9": {
-    "not_source": true,
-    "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
-  },
   "crates/ilang-package/tests/manifest.rs:ec7f73fcb53109f2": {
     "not_source": true,
     "reason": "Host template, manifest, or partial assertion rather than a standalone i module."
@@ -1491,9 +1487,6 @@
     ],
     "reason": "Render Rust brace escapes and the actual SPIN helper; check the complete multicore program instead of exempting the template."
   },
-  "crates/ilang-cli/tests/r2_runtime.rs:87b5d1cf07b6351c": {
-    "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
-  },
   "crates/ilang-cli/tests/r2_runtime.rs:070b6af6019524ce": {
     "not_source": "Rust format string or source fragment of a multicore test; the program text is assembled at run time"
   },
@@ -1550,10 +1543,6 @@
   },
   "crates/ilang-check/tests/diagnostic_traps.rs:24dcfaf171c4adcd": {
     "not_source": "Search/replacement fragment used to add the expected function type to a complete regression source."
-  },
-  "bindings/javascript/test/providers.test.mjs:b89cd1ef46e15e08": {
-    "not_source": true,
-    "reason": "TOML host-export manifest data; services are provided in the i entry."
   },
   "crates/ilang-wasm/tests/codegen.rs:6694c492172dacaf": {
     "suffix": "\n  a0\n}\n",
@@ -2634,16 +2623,7 @@
   "crates/ilang-cli/tests/big_int.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/big_int.rs:b0a0bbcc287a9b11": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/collections.rs:2dfd312d59121e84": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/collections.rs:633a329ba7614ad9": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/collections.rs:ddcecc24fc1307f1": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/common/test_project.rs:050923d06170793f": {
@@ -2655,9 +2635,6 @@
   "crates/ilang-cli/tests/common/test_project.rs:87bd4b3d43f065d9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/diagnostic_repairs.rs:a7950d32ca849f59": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/entries.rs:29f9630d5e448beb": {
     "not_source": "test source fragment or expectation"
   },
@@ -2667,79 +2644,22 @@
   "crates/ilang-cli/tests/expansion_sites.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/expansion_sites.rs:ddcecc24fc1307f1": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/float_text.rs:633a329ba7614ad9": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/float_text.rs:b36f8a143331c2c8": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/http.rs:2b42a9b9cd920678": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/http.rs:ef1cbe74cb112517": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/lisp.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/lisp.rs:ddcecc24fc1307f1": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/macro_facts_boundary.rs:ffe5dd0f2352f2d1": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/macro_run.rs:2dfd312d59121e84": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/macro_run.rs:37bccbcd73fde2e0": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/macro_run.rs:53c7321253cafedb": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/macro_run.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/macro_run.rs:96e558c9febc5a48": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/macro_run.rs:ddcecc24fc1307f1": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/many_tests.rs:2df0b22640976374": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/multicore.rs:f63921b461fb9905": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/native.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/native.rs:72a860d8d6282d6f": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/native.rs:7da0a093648ba9e8": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/native.rs:ddcecc24fc1307f1": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/numeric_lowering.rs:2ab6ea65b276b93f": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/numeric_lowering.rs:5d39ca95945ef91e": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/numeric_lowering.rs:6210b2045ddbb3b2": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/numeric_lowering.rs:633a329ba7614ad9": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/numeric_lowering.rs:c9bdee2374e76c23": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/package_commands.rs:05ebbab891ecf28f": {
@@ -2787,25 +2707,10 @@
   "crates/ilang-cli/tests/package_commands.rs:d28586a4b8bd1ba5": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/r2_fixtures.rs:5d769bbd6d7d1b29": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/r2_fixtures.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/r2_performance.rs:633a329ba7614ad9": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/r2_performance.rs:741e4130ed9b18bf": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/r2_runtime.rs:633a329ba7614ad9": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/r2_runtime.rs:ddcecc24fc1307f1": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/rest_services.rs:f63921b461fb9905": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/run_pipe.rs:24af1b560303813d": {
@@ -2817,49 +2722,25 @@
   "crates/ilang-cli/tests/spec.rs:99f4a407f84ab47d": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/syn3_roundtrip_run.rs:07c820321ea00495": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/syn3_roundtrip_run.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/tls.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/tls.rs:cfe88da86bb6a53e": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/typed_macros.rs:633a329ba7614ad9": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/typed_macros.rs:ddcecc24fc1307f1": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/unused.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/unused.rs:ddcecc24fc1307f1": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/value_type_performance.rs:633a329ba7614ad9": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/value_type_performance.rs:c955069ccaa8bc0e": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-cli/tests/value_types.rs:633a329ba7614ad9": {
     "not_source": "test source fragment or expectation"
   },
-  "crates/ilang-cli/tests/value_types.rs:ddcecc24fc1307f1": {
-    "not_source": "test source fragment or expectation"
-  },
   "crates/ilang-cli/tests/wasi.rs:633a329ba7614ad9": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/wasi.rs:ddcecc24fc1307f1": {
-    "not_source": "test source fragment or expectation"
-  },
-  "crates/ilang-cli/tests/wat_dump.rs:f9db5511104a6161": {
     "not_source": "test source fragment or expectation"
   },
   "crates/ilang-lsp/src/analysis.rs:a7950d32ca849f59": {
@@ -2947,9 +2828,6 @@
     "not_source": "test source fragment or expectation"
   },
   "bindings/javascript/test/fetch.test.mjs:cede5b76faccf642": {
-    "not_source": "test source fragment or template"
-  },
-  "bindings/javascript/test/providers.test.mjs:4f37ad713716b72e": {
     "not_source": "test source fragment or template"
   },
   "bindings/javascript/test/wasi.test.mjs:4f37ad713716b72e": {
@@ -3216,5 +3094,140 @@
       "E0101: the head of a data type or an opaque type has only type parameters"
     ],
     "substitutions": []
+  },
+  "crates/ilang-cli/src/commands/package.rs:a4c19323c713246b": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/multicore.rs:3562ca42e227191e": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/package_commands.rs:e37300850c53066d": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/package_commands.rs:91053b03f4d86965": {
+    "not_source": true
+  },
+  "crates/ilang-macro/src/item_phase.rs:d942f64886578d87": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/wat_dump.rs:bacd3f3af6234d98": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:d5d932fa465cf4bc": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/http.rs:d3d9a940da52d604": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/big_int.rs:ecb5a03d85fb0c88": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_performance.rs:1dfbdf3cbf57ea96": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:0bc2aa94d1bf8986": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/value_type_performance.rs:0ffebdd0c084a84a": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/tls.rs:797d2f96c082dca9": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/http.rs:f4cb490d78aa96e5": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/collections.rs:d7c39d21bdcec997": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/macro_run.rs:d7c39d21bdcec997": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:9a245db7004a13ae": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/rest_services.rs:3562ca42e227191e": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:6596c13d0b171400": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/float_text.rs:7ac93126f04543ea": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/numeric_lowering.rs:6c893f6d24095e01": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/syn3_roundtrip_run.rs:918ee59a8a7bccc6": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:e7a0a87095d6cb79": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/macro_run.rs:94d7a5a7f650aaf7": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/wasi.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/lisp.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/macro_run.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/diagnostic_repairs.rs:fbcdee08ccf39c40": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/typed_macros.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:633a329ba7614ad9": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/value_types.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/collections.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/native.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_runtime.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/unused.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/r2_fixtures.rs:41f690846897b3dc": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/native.rs:01714d3b3411ab49": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/native.rs:fdac003e61cdf8d9": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/macro_run.rs:3286fd37acb5fe77": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/macro_run.rs:aff43d4ee754b145": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/expansion_sites.rs:951a8036fbb8b928": {
+    "not_source": true
+  },
+  "bindings/javascript/test/providers.test.mjs:06fa66930fc0137d": {
+    "not_source": true
+  },
+  "bindings/javascript/test/providers.test.mjs:956bb7b8401afdbf": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/many_tests.rs:1f5aae32d68fb8fe": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/multicore.rs:d49253b318b4c1ae": {
+    "not_source": true
   }
 }

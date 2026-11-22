@@ -1,0 +1,7 @@
+# spec: 9.11
+# expect: stop "panic: request: owner is gone"
+name = "probe"
+hostcall = true
+
+[dependencies]
+i = { path = "../../../../stdlib" }

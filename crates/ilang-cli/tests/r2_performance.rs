@@ -49,7 +49,7 @@ fn paired_inside_scope_measurements() {
     std::fs::write(
         project.path().join("i.toml"),
         format!(
-            "name = \"r2perf\"\n[wasm]\nexports = {exports:?}\n{}",
+            "name = \"r2perf\"\nhostcall = true\n[wasm]\nexports = {exports:?}\n{}",
             library_dependencies()
         ),
     )

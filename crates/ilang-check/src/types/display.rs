@@ -57,7 +57,7 @@ pub(crate) fn scheme_in(s: &Solver, t: &Ty, context: &[Ty], opts: Opts) -> Resul
     let Ty::Con(_, _, parts) = whole else {
         return Err(());
     };
-    let t = parts.last().ok_or(())?;
+    let t = &hide_implicit_needs(parts.last().ok_or(())?, &s.hidden_needs);
     if let Some(scheme) = scheme {
         namer.taken = scheme.taken;
         // The variables of `t` that stand for a variable of the scheme take
@@ -1865,6 +1865,7 @@ impl Namer {
 
     fn show(mut self, s: &Solver, t: &Ty) -> ShownType {
         let t = prepare(s, t, &mut HashMap::default());
+        let t = hide_implicit_needs(&t, &s.hidden_needs);
         self.assign(&t);
         self.tree(&t)
     }
@@ -2271,6 +2272,75 @@ pub(crate) fn tree_with(t: &Ty, name: &mut dyn FnMut(V) -> ShownType) -> ShownTy
                 tree_with(a, name)
             }
         }
+    }
+}
+
+/// `t` with the implicit services `hidden` left out of each need row
+/// (the `env` of a function). A value parameter or result keeps them: the
+/// caller passes it.
+pub(crate) fn hide_implicit_needs(t: &Ty, hidden: &[crate::hir::TypeId]) -> Ty {
+    if hidden.is_empty() {
+        return t.clone();
+    }
+    hide_needs(t, hidden, false)
+}
+
+fn hide_needs(t: &Ty, hidden: &[crate::hir::TypeId], env: bool) -> Ty {
+    let is_hidden = |m: &Ty| {
+        matches!(m, Ty::Con(Head::Named(crate::hir::TypeRef::Custom(id)), _, args)
+            if args.is_empty() && hidden.contains(id))
+    };
+    let go = |x: &Ty| hide_needs(x, hidden, false);
+    match t {
+        _ if env && is_hidden(t) => Ty::Never,
+        Ty::Union(ms) if env => {
+            let mut kept: Vec<Ty> = ms
+                .iter()
+                .filter(|m| !is_hidden(m))
+                .map(|m| hide_needs(m, hidden, true))
+                .filter(|m| *m != Ty::Never)
+                .collect();
+            match kept.len() {
+                0 => Ty::Never,
+                1 => kept.pop().unwrap(),
+                _ => Ty::Union(kept),
+            }
+        }
+        Ty::Inter(ms) if env => {
+            // A member that was only implicit services says nothing that
+            // is shown.
+            let mut kept: Vec<Ty> = ms
+                .iter()
+                .map(|m| hide_needs(m, hidden, true))
+                .filter(|m| *m != Ty::Never)
+                .collect();
+            match kept.len() {
+                0 => Ty::Never,
+                1 => kept.pop().unwrap(),
+                _ => Ty::Inter(kept),
+            }
+        }
+        Ty::Diff(a, h) if env => {
+            let a = hide_needs(a, hidden, true);
+            let h: Vec<Ty> = h.iter().filter(|m| !is_hidden(m)).map(go).collect();
+            if h.is_empty() {
+                a
+            } else {
+                Ty::Diff(Box::new(a), h)
+            }
+        }
+        Ty::Con(h, values, xs) => Ty::Con(*h, values.clone(), xs.iter().map(go).collect()),
+        Ty::Union(xs) => Ty::Union(xs.iter().map(go).collect()),
+        Ty::Inter(xs) => Ty::Inter(xs.iter().map(go).collect()),
+        Ty::Fn(f) => Ty::Fn(Box::new(FnTy {
+            param: go(&f.param),
+            labels: f.labels.clone(),
+            ret: go(&f.ret),
+            env: hide_needs(&f.env, hidden, true),
+        })),
+        Ty::Diff(a, h) => Ty::Diff(Box::new(go(a)), h.iter().map(go).collect()),
+        Ty::Both(a, b) => Ty::Both(Box::new(go(a)), Box::new(go(b))),
+        t => t.clone(),
     }
 }
 

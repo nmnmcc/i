@@ -25,7 +25,7 @@ fn project(name: &str, source: &str) -> PathBuf {
     std::fs::write(
         dir.join("i.toml"),
         format!(
-            "name = {name:?}\n[dependencies]\ni = {{ path = {:?} }}\n",
+            "name = {name:?}\nhostcall = true\n[dependencies]\ni = {{ path = {:?} }}\n",
             library.to_str().unwrap()
         ),
     )

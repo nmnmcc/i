@@ -88,6 +88,13 @@ pub mod code {
     pub const COMPILER_CAPABILITY: &str = "E0322";
     pub const HOST_TYPE: &str = "E0320";
     pub const EXPORT_NAME_TWICE: &str = "E0321";
+    pub const HOSTCALL_NEEDS_FLAG: &str = "E0323";
+    pub const MECHANICS_IN_SIGNATURE: &str = "E0324";
+    pub const IMPLICIT_SERVICE_WRITTEN: &str = "E0325";
+    pub const IMPORT_ARGS: &str = "E0326";
+    pub const IMPORT_PLACE: &str = "E0327";
+    pub const IMPORT_NAMESPACE: &str = "E0328";
+    pub const IMPORT_TYPE_EXPORT: &str = "E0329";
     pub const DEPRECATED: &str = "W0301";
     // Order.
     pub const NEEDS_ITSELF: &str = "E0401";
@@ -470,7 +477,7 @@ pub fn check_compiler_exports(
             "a macro program cannot execute an external declaration outside package i",
         ));
     }
-    let mut checked = check_resolved_inner(graph, Some(program), diags, &[], false);
+    let mut checked = check_resolved_inner(graph, Some(program), diags, &[], false, false);
     if let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
         for &entry in &program.host_exports {
             if typed
@@ -514,6 +521,13 @@ pub fn check_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
     check_resolved(graph, program, diags)
 }
 
+/// `check_parsed`, keeping the implicit services (`Await`, `Owner`, ...)
+/// in the shown types instead of hiding them (host-boundary 5.5 (5)).
+pub fn check_parsed_keeping_needs(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
+    let (program, diags) = resolve_parsed(graph, parsed);
+    check_resolved_inner(graph, program, diags, &[], true, true)
+}
+
 /// Resolve and infer a project for collection discovery, without selecting
 /// configured program entries or host exports as tool execution roots.
 pub fn check_parsed_for_tools(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
@@ -542,7 +556,7 @@ pub fn check_resolved_selected(
     diags: Vec<Diagnostic>,
     selected: &[(hir::DefId, bool)],
 ) -> Checked {
-    check_resolved_inner(graph, program, diags, selected, true)
+    check_resolved_inner(graph, program, diags, selected, true, false)
 }
 
 fn check_resolved_inner(
@@ -551,6 +565,7 @@ fn check_resolved_inner(
     mut diags: Vec<Diagnostic>,
     selected: &[(hir::DefId, bool)],
     ordinary: bool,
+    keep_implicit: bool,
 ) -> Checked {
     // Compiler wrappers are checked by macro_sandbox above. Their module
     // initializers may construct shape dispatchers from compiler functions.
@@ -560,7 +575,8 @@ fn check_resolved_inner(
     }
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
-            let (typed, more) = types::check_selected(p, &graph.sources, selected);
+            let (typed, more) =
+                types::check_selected_with_needs(p, &graph.sources, selected, keep_implicit);
             diags.extend(more);
             Some(typed)
         }
