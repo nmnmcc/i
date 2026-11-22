@@ -1,7 +1,6 @@
 //// TLS on connected byte streams.
 (
 	i/request
-	i/hostcall
 	i/resource
 	i/fail
 	i/core
@@ -29,18 +28,17 @@ Stream = (Int)
 
 TlsError = (stage = String, reason = String)
 
-@import("i:tls/v1")
+@host("i:tls/v1", "request")
 Tls = (
-	connect = (Int, String, String, BitArray, BitArray, BitArray) -> Result(
-		Int,
-		String,
+	connect = (Int, String, String, BitArray, BitArray, BitArray) -> Request(
+		Result(Int, String),
 	),
-	accept = (Int, BitArray, BitArray, String) -> Result(Int, String),
-	alpn = (Int) -> Result(String, String),
-	read = (Int, Int) -> Result(BitArray, String),
-	write = (Int, BitArray) -> Result((), String),
-	shutdown_write = (Int) -> Result((), String),
-	close = (Int) -> (),
+	accept = (Int, BitArray, BitArray, String) -> Request(Result(Int, String)),
+	alpn = (Int) -> Request(Result(String, String)),
+	read = (Int, Int) -> Request(Result(BitArray, String)),
+	write = (Int, BitArray) -> Request(Result((), String)),
+	shutdown_write = (Int) -> Request(Result((), String)),
+	close = (Int) -> Request(()),
 )
 
 options = () -> (
@@ -85,33 +83,36 @@ raise = (message) {
 		& (Error(_)) { panic("tls: invalid error") }
 }
 
-finish = (r : hostcall.Call(Result(Int, String))) <- (raw : Tls) {
-	number = resource.acquire(
+// Opens the TLS handle. A cancel while the open is in flight cancels the
+// request and closes a handle that has arrived already.
+finish_handle = (r : Request(Result(Int, String))) <- (raw : Tls) {
+	number = resource.ensure(
 		() {
-			resource.ensure(
-				() {
-					request.await(r) |>
-						(Ok(value)) { value }
-						& (Error(message)) { raise(message) }
-				},
-				() {
-					request.state(r) |>
-						(request.Ready(Ok(value))) { raw.close(value) }
-						& (_) { () }
-					hostcall.cancel(r)
-				},
-			)
+			request.await(r) |>
+				(Ok(value)) { value }
+				& (Error(message)) { raise(message) }
 		},
-		(value) { close(Stream(value)) <- (raw) },
+		() {
+			request.state(r) |>
+				(request.Ready(Ok(value))) {
+					request.await_owned(raw.close(value))
+				}
+				& (_) { () }
+			request.cancel(request.ticket(r))
+		},
 	)
 	Stream(number)
+}
+
+finish = (r : Request(Result(Int, String))) {
+	resource.acquire(() { finish_handle(r) }, (stream) { close(stream) })
 }
 
 /// Establishes client TLS on `stream` and gives a `Stream` owned by the
 /// current `resource.Scope`: its close is attached to the scope before
 /// `connect` gives the stream, and runs when the scope ends.
 ///
-/// Needs `resource.Scope`, `Tls` and `Fail(TlsError)`.
+/// Needs `resource.Scope`, `Tls`, `Await` and `Fail(TlsError)`.
 connect = (
 	stream,
 	name,
@@ -123,16 +124,14 @@ connect = (
 	)
 ) <- (raw : Tls) {
 	finish(
-		hostcall.call(() {
-			raw.connect(
-				net.stream_number(stream),
-				name,
-				join(opts.alpn),
-				opts.roots,
-				opts.cert,
-				opts.key,
-			)
-		}),
+		raw.connect(
+			net.stream_number(stream),
+			name,
+			join(opts.alpn),
+			opts.roots,
+			opts.cert,
+			opts.key,
+		),
 	)
 }
 
@@ -140,7 +139,7 @@ connect = (
 /// current `resource.Scope`: its close is attached to the scope before
 /// `accept` gives the stream, and runs when the scope ends.
 ///
-/// Needs `resource.Scope`, `Tls` and `Fail(TlsError)`.
+/// Needs `resource.Scope`, `Tls`, `Await` and `Fail(TlsError)`.
 accept = (
 	stream,
 	ident : (cert = BitArray, key = BitArray),
@@ -152,14 +151,12 @@ accept = (
 	)
 ) <- (raw : Tls) {
 	finish(
-		hostcall.call(() {
-			raw.accept(
-				net.stream_number(stream),
-				ident.cert,
-				ident.key,
-				join(opts.alpn),
-			)
-		}),
+		raw.accept(
+			net.stream_number(stream),
+			ident.cert,
+			ident.key,
+			join(opts.alpn),
+		),
 	)
 }
 
@@ -168,28 +165,30 @@ accept = (
 /// TLS stream are attached to the same scope; its close closes both, and a
 /// double close does nothing.
 ///
-/// Needs `resource.Scope`, `Tls`, `Net`, `Fail(TlsError)` and
+/// Needs `resource.Scope`, `Tls`, `Net`, `Await`, `Fail(TlsError)` and
 /// `Fail(NetError)`.
 dial = (host, port, opts) { connect(net.connect(host, port), host, opts) }
 
 alpn = (Stream(n)) <- (raw : Tls) {
-	raw.alpn(n) |> (Ok(value)) { value } & (Error(message)) { raise(message) }
+	request.await_owned(raw.alpn(n)) |>
+		(Ok(value)) { value }
+		& (Error(message)) { raise(message) }
 }
 
 read = (Stream(n), max) <- (raw : Tls) {
-	raw.read(n, max) |>
+	request.await_owned(raw.read(n, max)) |>
 		(Ok(value)) { value }
 		& (Error(message)) { raise(message) }
 }
 
 write = (Stream(n), bytes) <- (raw : Tls) {
-	raw.write(n, bytes) |>
+	request.await_owned(raw.write(n, bytes)) |>
 		(Ok(value)) { value }
 		& (Error(message)) { raise(message) }
 }
 
 shutdown_write = (Stream(n)) <- (raw : Tls) {
-	raw.shutdown_write(n) |>
+	request.await_owned(raw.shutdown_write(n)) |>
 		(Ok(value)) { value }
 		& (Error(message)) { raise(message) }
 }
@@ -199,8 +198,8 @@ shutdown_write = (Stream(n)) <- (raw : Tls) {
 /// need to. Closing the TLS stream does not close the underlying TCP stream;
 /// `tls.dial` attaches that stream to the same scope, so both close together.
 ///
-/// Needs `Tls`.
-close = (Stream(n)) <- (raw : Tls) { raw.close(n) }
+/// Needs `Tls` and `Await`.
+close = (Stream(n)) <- (raw : Tls) { request.await_owned(raw.close(n)) }
 
 byte_stream = (stream) {
 	(
