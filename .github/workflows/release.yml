@@ -244,18 +244,9 @@ jobs:
           set -euo pipefail
           i="$PWD/result-i/bin/i"
           test "$("$i" --version)" = "i $VERSION"
-          # `i new` resolves the newest `stdlib-vX.Y.Z` through git. A dry run
-          # has no such tag, and the published one lags a language change on
-          # main, so serve the library from this checkout.
-          library="$RUNNER_TEMP/library"
-          rm -rf "$library"
-          cp -a stdlib "$library"
-          chmod -R u+w "$library"
-          git -C "$library" init -q
-          git -C "$library" -c user.email=i@example.invalid -c user.name=i add -A
-          git -C "$library" -c user.email=i@example.invalid -c user.name=i commit -qm "library $VERSION"
-          git -C "$library" -c user.email=i@example.invalid -c user.name=i tag "stdlib-v$VERSION"
-          export ILANG_GIT_URLS="github.com/nmnmcc/i=file://$library"
+          # The library is prepared once, above, with the probe version; this
+          # step must not recreate it under $VERSION (that is the released
+          # tag, and the assertion below would then fail on a real tag).
           work="$RUNNER_TEMP/smoke"
           mkdir -p "$work/home"
           cd "$work"
