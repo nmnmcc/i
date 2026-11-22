@@ -3140,9 +3140,6 @@
   "crates/ilang-cli/tests/collections.rs:d7c39d21bdcec997": {
     "not_source": true
   },
-  "crates/ilang-cli/tests/many_tests.rs:b8c0d48a71dafff1": {
-    "not_source": true
-  },
   "crates/ilang-cli/tests/macro_run.rs:d7c39d21bdcec997": {
     "not_source": true
   },
@@ -3225,6 +3222,12 @@
     "not_source": true
   },
   "bindings/javascript/test/providers.test.mjs:956bb7b8401afdbf": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/many_tests.rs:1f5aae32d68fb8fe": {
+    "not_source": true
+  },
+  "crates/ilang-cli/tests/multicore.rs:1f0bd15847655deb": {
     "not_source": true
   }
 }

@@ -656,7 +656,7 @@ same as a `"now"` field; no Call is made.
 | 13 | `root()`/`poll()` with no active async entry | runtime | panic `hostcall: no active entry` (existing text family) |
 | 14 | close the group of a Call whose await is in flight | runtime | the start is cancelled; the await panics `hostcall: cancelled`; no leak |
 | 15 | `cancel` a terminal Call | runtime | idempotent; no panic |
-| 16 | `close` inside its own `in_group` | allowed | later starts in the body panic; the scope restores |
+| 16 | `close` inside its own `in_group` | allowed | later starts in the body panic `hostcall: group closed` (also via the fake fallback); the scope restores |
 | 17 | `close_root` the ambient Root inside a body | allowed | later starts panic; settled Calls are unaffected |
 | 18 | `adopt` a Request already owned by another group | allowed | the Call's group becomes the ambient one; either group's close cancels the shared ticket (idempotent) |
 | 19 | use a value whose type is a hostcall type, imported through an inferred signature | allowed; the caller can pass it on without naming it | — |

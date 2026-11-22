@@ -1,7 +1,8 @@
 # spec: 10.4
 # expect: stop "panic: hostcall: group closed"
 # host-boundary §5.4 row 16: `close` inside its own `in_group` is allowed;
-# a later `call` in the body panics.
+# a later `call` in the body panics `hostcall: group closed`; the
+# scope still restores its group.
 name = "app"
 hostcall = true
 
