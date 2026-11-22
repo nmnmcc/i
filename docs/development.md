@@ -32,6 +32,38 @@ built from source with CMake and linked into `i` as a library, so users need
 nothing else installed. Its first build takes a few minutes; later builds
 reuse it.
 
+### Keep the binary cache
+
+nixpkgs is used unmodified. An overlay that replaces a package changes the
+derivation hash of everything above it, so the official cache has none of those
+paths and every platform builds them from source. Nothing fails; it is simply
+hours instead of minutes.
+
+Measured in 2026-11, when `tzdata` was replaced to get past one clock-reading
+check of its own test suite:
+
+| | with the overlay | without it |
+| --- | --- | --- |
+| `llvm`, `clang-wrapper`, `openssl`, `python3`, `tzdata` on cache.nixos.org | 404 | 200 |
+| `build (x86_64-linux)` | 4 h+, cut | **24m46s** |
+| `build (aarch64-linux)` | 6 h, cut | **20m59s** |
+| `build (aarch64-darwin)` | 6 h, cut, never reached `i` | minutes |
+
+The ~20 minutes that remain are Binaryen and an LTO link on a 4-core runner,
+which is the real cost of a build.
+
+Check before and after touching `flake.nix`:
+
+```sh
+nix build --dry-run .#packages.x86_64-linux.i
+```
+
+It must list `i` alone. Anything else is a dependency that is no longer
+substitutable — the same question for one path is
+`nix path-info --store https://cache.nixos.org <path>`, which answers 200 when
+cached and 404 when not. Prefer bumping nixpkgs to patching a package here, and
+do not replace a whole package to satisfy one check.
+
 ## Checks
 
 `devenv test` runs `scripts/checks`, the local entry to what CI runs. It has
@@ -152,6 +184,37 @@ release would take (the package parser accepts only `X.Y.Z`), and the smoke
 asserts that `i.toml` names that version; a broken redirect resolves the newest
 real tag instead and the assertion fails loudly, instead of passing on the
 released, older library.
+
+## Platform differences
+
+The release Linux binary is built for `<arch>-unknown-linux-musl` and linked
+statically, by the same rule the native runner embedded in `i` already follows
+(`nix/i.nix`, `crates/ilang-cli/build.rs`): the archive has to start on a
+machine that has no Nix, so it must name no interpreter and no shared library.
+musl is not glibc, and two places in the tree say so:
+
+- `crates/ilang-binaryen/build.rs` links the C++ runtime from `libstdc++.a`
+  on a musl target. A shared `libstdc++` would pull `libc.so` back into a
+  static link.
+- `crates/ilang-cli/src/commands/fmt.rs` calls `renameat2` through
+  `libc::syscall`. musl does not export the glibc function.
+
+So a glibc-only symbol needs a `syscall` call, or a target-specific arm; and a
+new dependency that wants shared libraries has to be linked statically or the
+archive stops being portable. `i build` output follows the same rule, which is
+why its runner is built for musl on Linux.
+
+The release workflow checks the result instead of trusting it: on Linux the
+ELF must name no interpreter, no `NEEDED` entry and no RPATH, and the packaged
+archive must `--version`, make, run and build a package inside a
+`debian:stable-slim` container with no `/nix` (see the Linux steps of
+`release.yml`). A change that breaks either stops the release.
+
+`i new` names the newest published `stdlib-vX.Y.Z` tag. A compiler from `main`
+can be newer than that tag, so a package made that way may not check until the
+tag is published; tests and both release smoke steps build a tag from the
+checkout's `stdlib/` instead (`scripts/dev-library-repo`, and the same recipe
+inline in `release.yml`).
 
 ## Editor support
 
