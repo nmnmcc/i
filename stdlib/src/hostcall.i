@@ -219,4 +219,4 @@ close_root = (r : Root) { req.close_root(r) }
 wait_any = (tickets : List(Ticket)) { req.wait_any(tickets) }
 
 /// Gives the host a progress turn.
-poll = () { req.poll() }
+poll = () { req.poll_requests() }
