@@ -12,7 +12,7 @@ src/main.i:41:8: error[E0201]: `Some` is not defined. Import `(Some) = i/option`
 src/main.i:44:8: error[E0201]: `Some` is not defined. Import `(Some) = i/option` to use `Some`.
 src/main.i:45:6: error[E0201]: `list` is not defined. Import `i/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = i/property` to use `list`.
 src/main.i:46:8: error[E0201]: `Some` is not defined. Import `(Some) = i/option` to use `Some`.
-src/main.i:81:3: error[E0201]: `fail` is not defined. Import `i/fail` to use the module `fail`. Import `(fail) = i/queue` to use `fail`.
+src/main.i:81:3: error[E0201]: `fail` is not defined. Import `i/fail` to use the module `fail`.
 src/main.i:90:11: error[E0201]: `list` is not defined. Import `i/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = i/property` to use `list`.
 src/main.i:90:28: error[E0201]: `list` is not defined. Import `i/list` to use the module `list`. Add `list` to the names in your existing import of `i/fs`, or use `fs.list`. Import `(list) = i/property` to use `list`.
 17 errors

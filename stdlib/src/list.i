@@ -595,7 +595,7 @@ unique = <A>(list : List(A)) -> List(A) {
 		rest |>
 			([]) { reverse(acc) }
 			& ([x, ..xs]) {
-				dict.has(seen, x) |>
+				dict.contains(seen, x) |>
 					(True()) { go(xs, seen, acc) }
 					& (False()) { go(xs, dict.insert(seen, x, ()), [x, ..acc]) }
 			}
@@ -1226,7 +1226,9 @@ min = <A, N>(over : List(A), with : (A, A) <- N -> Order) -> Option(A) {
 		}
 }
 
-/// Like `zip`, but Raises `()` when the lists have different lengths.
+/// Like `zip`, but raises `()` when the lists have different lengths. The
+/// two lengths are the whole failure, so there is no position in either list
+/// to report.
 ///
 /// Reports failure through `Fail(())`.
 strict_zip = <A, B>(list : List(A), with : List(B)) -> List((A, B)) {

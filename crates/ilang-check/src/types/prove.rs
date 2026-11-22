@@ -327,3 +327,44 @@ impl Prover<'_> {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::FnTy;
+    use std::collections::HashMap;
+
+    /// A function whose parameter is the empty data is not a function with
+    /// parameters: it takes `()`, not `(Int)`. This is the rule that
+    /// `b5ee20f15` added as a subtyping escape and this branch removed, and
+    /// no expression reaches this proof (only interface comparison and an
+    /// intersection lower bound do), so the rule is pinned here.
+    #[test]
+    fn a_zero_parameter_function_is_not_a_function_with_parameters() {
+        let solver = Solver::new(HashMap::new(), Vec::new());
+        let zero = Ty::Fn(Box::new(FnTy::new(Vec::new(), Ty::Top, Ty::Never)));
+        let one = Ty::Fn(Box::new(FnTy::new(
+            vec![(None, Ty::Top)],
+            Ty::Top,
+            Ty::Never,
+        )));
+        let mut demand = Demand::new(Demand::LIMIT);
+        assert_eq!(
+            prove(&solver, &zero, &one, &mut demand),
+            Verdict::Refuted,
+            "`() -> _` must not be a subtype of `(Int) -> _`"
+        );
+        let mut demand = Demand::new(Demand::LIMIT);
+        assert_eq!(
+            prove(&solver, &one, &zero, &mut demand),
+            Verdict::Refuted,
+            "`(Int) -> _` must not be a subtype of `() -> _`"
+        );
+        let mut demand = Demand::new(Demand::LIMIT);
+        assert_eq!(
+            prove(&solver, &zero, &zero, &mut demand),
+            Verdict::Proven,
+            "the same function type is a subtype of itself"
+        );
+    }
+}

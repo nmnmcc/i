@@ -49,12 +49,14 @@
 //// yields with `task.yield()` between checks. Only `bounded` makes an
 //// `offer` wait; `dropping`, `sliding` and `unbounded` offers never wait.
 ////
-//// Terminal state. A queue is open until `end`, `fail` or `shutdown`. `end`
-//// and `fail` act only on an open queue, so the first of them wins. Both
+//// Terminal state. `end` closes and drains, `fail_with` closes, drains and
+//// then raises its error, and `shutdown` discards now and also after either.
+//// A queue is open until `end`, `fail_with` or `shutdown`. `end`
+//// and `fail_with` act only on an open queue, so the first of them wins. Both
 //// refuse new offers with `Fail(Closed)` and let takers drain the buffered
 //// values; after the last value, `take` and `poll` give `None` (after `end`)
-//// or raise the error (after `fail`), every time. `shutdown` always acts,
-//// also after `end` or `fail`: it discards the buffer, waiting and later
+//// or raise the error (after `fail_with`), every time. `shutdown` always acts,
+//// also after `end` or `fail_with`: it discards the buffer, waiting and later
 //// takes give `None`, and waiting and later offers raise `Fail(Closed)`.
 ////
 //// Cancellation. A waiting `take` or `offer` that is cancelled removes its
@@ -105,7 +107,7 @@
 	poll
 	size
 	end
-	fail
+	fail_with
 	shutdown
 )
 
@@ -405,7 +407,7 @@ forget_offer = <A, E>(q : Queue(A, E), ticket : Int) <- (
 /// `unbounded` queue always gives `True`.
 /// Needs: the task scheduler. A waiting offer that is cancelled leaves the
 /// queue without inserting its value.
-/// Errors: `Closed` after `end`, `fail` or `shutdown`, also for an offer
+/// Errors: `Closed` after `end`, `fail_with` or `shutdown`, also for an offer
 /// that was waiting when the queue closed.
 /// Example: queue.offer(q, 1) == True for an open `unbounded` queue.
 offer = <A, E>(q : Queue(A, E), value : A) <- (
@@ -632,8 +634,8 @@ end = <A, E>(q : Queue(A, E)) <- (own : task.Scheduler) -> () {
 /// buffered values and then raise `e`. Does nothing when the queue has
 /// already ended, failed or shut down.
 /// Needs: the task scheduler. Errors: none.
-/// Example: after queue.fail(q, "boom") on an empty queue, fail.catch(() { queue.take(q) }) == Error("boom").
-fail = <A, E>(q : Queue(A, E), e : E) <- (own : task.Scheduler) -> () {
+/// Example: after queue.fail_with(q, "boom") on an empty queue, fail.catch(() { queue.take(q) }) == Error("boom").
+fail_with = <A, E>(q : Queue(A, E), e : E) <- (own : task.Scheduler) -> () {
 	task.update(q.state, (state : QueueState(A, E)) {
 		{ is_open(state.terminal) } |>
 			(True()) { (QueueState(..state, terminal = Failed(e)), ()) }
@@ -641,7 +643,7 @@ fail = <A, E>(q : Queue(A, E), e : E) <- (own : task.Scheduler) -> () {
 	})
 }
 
-/// Shuts the queue down, also after `end` or `fail`: the buffered values are
+/// Shuts the queue down, also after `end` or `fail_with`: the buffered values are
 /// discarded, waiting and later takes give `None`, and waiting and later
 /// offers raise `Closed`. The end of the queue's resource scope calls this.
 /// Needs: the task scheduler. Errors: none.

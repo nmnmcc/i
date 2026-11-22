@@ -354,6 +354,14 @@ ExportItem = name | UpName [ "(" ".." ")" ] .
 
 A type bound by an alias pattern is a name with no constructors of its own; exporting it with `(..)` has the same effect as exporting it alone. An exported name or annotation that depends on a value is checked after its type is complete and must not expose a private labelled type. Its source value need not be exported. Reading from another module never fixes that source's weak type; a new permanent read requires a wholly closed completed source, or the consumer uses a closed name exported by the source module (§4.7).
 
+#### Naming rules
+
+The standard library keeps three naming rules for exported bindings:
+
+- A module must not export a binding whose name equals another standard-library module's name. `queue.fail` was the only violation and is now `queue.fail_with`, so importing `(fail) = i/queue` no longer makes the compiler offer `i/fail` for the same name.
+- `new` is the cross-module constructor convention and stays: it names the function that makes the module's main value.
+- `poll` means "read a value now", as in `queue.poll` and `deferred.poll`. A host or scheduler hook that advances or hands off work is not a read, so it is named `poll_requests` (`i/request`) or `poll_work` (`Runner.poll_work`).
+
 
 ### 2.4.1 Unused top-level bindings
 
@@ -1947,7 +1955,7 @@ is a poll point, subject to the progress-interest rule below.
 At every switch, first run cancellation bookkeeping and scan terminal ticket
 waiters. Build the progress-interest set from tasks actually suspended in
 Await.wait on Waiting tickets, including interests forwarded by nested runs.
-Root-level Runner.poll calls request.poll once only when this set is nonempty.
+Root-level Runner.poll_work calls request.poll_requests once only when this set is nonempty.
 Otherwise skip it, including before the first task turn. Pure go/yield/join/
 scope operations and merely starting an unawaited raw request do not by
 themselves return status 2. A task/run which never blocks, and makes no explicit
@@ -1965,7 +1973,7 @@ Unawaited raw work alone does not force progress hand-offs during a runnable
 loop; its caller must eventually wait/poll explicitly or let the run become
 idle. Idle accounting still counts it as specified next.
 
-A nested loop's private Runner.poll passes its current interest tickets to the
+A nested loop's private Runner.poll_work passes its current interest tickets to the
 outer Scheduler with its nested-run id, then yields only its calling outer task.
 The outer loop keeps that interest registration while the nested run lives and
 forwards it in turn if nested again. Thus an inner IO waiter alongside an inner
@@ -1975,8 +1983,8 @@ and an error-free final removes the registration on every nested-run exit.
 Cancellation removes a nested registration before completing the calling task's
 unwind; borrowed tickets themselves are not cancelled by unregistering interest.
 No new ABI operation is needed: these are private ordinary Scheduler commands.
-The root Runner's poll takes the aggregated tickets; it never scans all instance
-requests to invent a wait. Explicit low-level request.poll still intentionally
+The root Runner's poll_work takes the aggregated tickets; it never scans all instance
+requests to invent a wait. Explicit low-level request.poll_requests still intentionally
 hands off, and stops request: no active entry from a synchronous entry.
 
 When no task is runnable, scan terminal tickets first. The logical waitable set
@@ -2192,8 +2200,18 @@ RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 | `await` | `<A>(Request(A)) <- (Await) -> A` | Borrow the producer, wait, then take the Ready value |
 | `await_owned` | `<A>(Request(A)) <- (Await) -> A` | Own a non-resource-producing operation; ensure ticket cancellation on exit |
 | `wait_any` | `(List(Ticket)) -> ()` | Root wait; return when any listed ticket settles |
-| `poll` | `() -> ()` | Root hand-off with status 2, even with no requests |
+| `poll_requests` | `() -> ()` | Root hand-off with status 2, even with no requests |
 
+#### Exported surface
+
+`i/request` and `i/task` export a curated list, not every top-level binding. The
+lists are the export groups at `stdlib/src/task.i:12-53` and
+`stdlib/src/request.i:6-34`. The four `_root` helpers `count_root`,
+`settled_root`, `cancel_all_root` and `wait_none_root` stay exported as a
+**test-visible surface**: the cases under `tests/spec/9.11` and the review
+corpus use them. They are not ordinary API for new code; `open_root` and
+`close_root` are. The internal helpers (`State`, `queue`, `reply`,
+`do_command`) are private and stay private.
 
 `cancel` makes every alias observe Cancelled, even for a previously Ready cell.
 A Taken request stays Taken on cancel. It invokes ABI cancel only for a still-outstanding host id. Cancelling a Ready
@@ -2452,6 +2470,28 @@ An entry that needs a service its target does not give is the compile error
 | `shutdown_write` | Shut down the TLS stream’s write side. |
 | `close` | Close a TLS stream. Closing a closed stream does nothing; the owning scope calls this. |
 | `byte_stream` | Make a byte stream interface for a TLS stream. |
+
+#### Parsing and conversion errors
+
+`i/int`, `i/float` and `i/bit_array` are ordinary libraries, not host
+service libraries. Their text parsing and byte decoding report a failure
+with a record that names the position. Offsets are UTF-8 byte offsets into
+the input text; `reason` is one of the strings listed.
+
+| Function | Type | Reasons |
+|---|---|---|
+| `int.parse` | `(text: String) <- (Fail(int.IntError)) -> Int` | `"empty"`, `"missing digits"`, `"invalid digit"`, `"digit out of range for base"` |
+| `int.parse_base` | `(text: String, base: Int) <- (Fail(int.IntError)) -> Int` | the `int.parse` reasons and `"base out of range"` |
+| `float.parse` | `(text: String) <- (Fail(float.FloatError)) -> Float` | `"empty"`, `"missing digits"`, `"missing point"`, `"invalid character"`, `"overflow"` |
+| `bit_array.base16_decode` | `(input: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid digit"`, `"missing digit"` |
+| `bit_array.base64_decode` | `(encoded: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid character"`, `"incomplete group"`, `"bad padding"` |
+| `bit_array.base64_url_decode` | `(encoded: String) <- (Fail(bit_array.BitArrayError)) -> BitArray` | `"invalid character"`, `"incomplete group"`, `"bad padding"` |
+
+`int.IntError`, `float.FloatError` and `bit_array.BitArrayError` all have the
+data `(offset = Int, reason = String)`. Arithmetic domain failures in `int` and
+`float`, and `bit_array.to_string`, `bit_array.slice` and `list.strict_zip`,
+keep `()`: the operation itself names the domain and there is no input
+position to report.
 
 ## 10. The host boundary
 

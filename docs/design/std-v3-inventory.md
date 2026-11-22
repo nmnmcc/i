@@ -654,7 +654,7 @@ cancel : (Ticket) -> ()
 await : (Request(A)) <- (Await) -> A
 await_owned : (Request(A)) <- (Await) -> A
 wait_any : (List(Ticket)) -> ()
-poll : () -> ()
+poll_requests : () -> ()
 ```
 
 **Missing attached type/constructor docs.** `Await`, `Cancelled`, `Owner`, `Ready`, `RequestState`, `Root`, `Taken`, `Waiting`. Module prose may still describe them.
@@ -804,7 +804,7 @@ Export visibility: `Scheduler`, `DetachedScheduler`, `Runner`, `DetachedRunner`,
 Scheduler = ( run = Key(()), root = request.Root, path = Keyed, seed = () -> rng.Generator, witness = Witness, step = (Command) -> StepAnswer, runner = Runner, waiter = request.Await, )
 Scheduler = DetachedScheduler | Scheduler
 DetachedScheduler = ()
-Runner = ( seed = rng.Generator, context = request.Root, policy = Policy, allocate = () -> List(Int), active = (Key(()), Active) -> RunControl, wait = (Key(()), request.Root, List(Ticket)) -> RunControl, poll = (Key(()), List(Ticket), Bool) -> RunControl, forget = (Key(())) -> (), )
+Runner = ( seed = rng.Generator, context = request.Root, policy = Policy, allocate = () -> List(Int), active = (Key(()), Active) -> RunControl, wait = (Key(()), request.Root, List(Ticket)) -> RunControl, poll_work = (Key(()), List(Ticket), Bool) -> RunControl, forget = (Key(())) -> (), )
 Runner = DetachedRunner | Runner
 DetachedRunner = ()
 Scope(E) = (info = ScopeInfo, errors = Key(E))
@@ -1163,11 +1163,10 @@ new : <K, V>() -> Dict(K, V)
 size : <K, V>(Dict(K, V)) -> Int
 is_empty : <K, V>(Dict(K, V)) -> Bool
 get : <K, V>(Dict(K, V), K) -> Option(V)
-has : <K, V>(Dict(K, V), K) -> Bool
+contains : <K, V>(Dict(K, V), K) -> Bool
 insert : <K, V>(Dict(K, V), K, V) -> Dict(K, V)
 delete : <K, V>(Dict(K, V), K) -> Dict(K, V)
-upsert : <K, V, N>( Dict(K, V), K, (Option(V)) <- N -> V ) <- N -> Dict(K, V)
-update : <K, V, N>(Dict(K, V), K, (V) <- N -> V) <- N -> Dict(K, V)
+update : <K, V, N>( Dict(K, V), K, (Option(V)) <- N -> V ) <- N -> Dict(K, V)
 from_list : <K, V>(List((K, V))) -> Dict(K, V)
 to_list : <K, V>(Dict(K, V)) -> List((K, V))
 keys : <K, V>(Dict(K, V)) -> List(K)
@@ -1968,7 +1967,7 @@ is_disjoint : <A>(Set(A), Set(A)) -> Bool
 
 **Language use.** Uses a hidden one-constructor Set, immutable Dict, equality/hash and need-polymorphic callbacks. The thin representation layer is useful; it enforces set semantics rather than just renaming a primitive. No service machinery is needed.
 
-**Old style, overlap and thin surface.** Dict collision-order equality can leak through the Set representation. contains uses a different membership verb from dict.has. new/from_list and algebraic operations are appropriate domain functions.
+**Old style, overlap and thin surface.** Dict collision-order equality can leak through the Set representation. `contains` now agrees with `dict.contains`; new/from_list and algebraic operations are appropriate domain functions.
 
 **Tests.** 31 named tests: `stdlib/test/set_test.i` (31). 31 named tests reference every export and cover algebraic cases. Collision-history extensional equality is not guaranteed by the underlying representation. Future equality policy needs explicit tests across independently built sets.
 
@@ -2255,8 +2254,8 @@ The following groups identify the actual migration decisions in this tree.
 
 | Group | Current public surface | Audit judgement |
 |---|---|---|
-| Numeric failures | int parse/parse_base/to_base/power/square_root/digits/undigits/divide/remainder/modulo/floor_divide; float parse/power/real_power/exponential/logarithm/square_root/divide/modulo/tan/asin/acos/hypot/degrees | E4 Fail candidates. () errors hide useful distinctions among bad text, invalid radix, domain and overflow. |
-| Binary/text failures | bit_array to_string/slice/base16_decode/base64_decode/base64_url_decode; string.utf_codepoint | E4 Fail candidates. Keep is_utf8 and other predicates total. Decide whether raw core Result APIs remain private ABI helpers. |
+| Numeric failures | int parse/parse_base/to_base/power/square_root/digits/undigits/divide/remainder/modulo/floor_divide; float parse/power/real_power/exponential/logarithm/square_root/divide/modulo/tan/asin/acos/hypot/degrees | E4 Fail candidates. `int.parse`/`int.parse_base` raise `IntError(offset, reason)` and `float.parse` raises `FloatError(offset, reason)`, naming bad text, invalid radix and overflow. Arithmetic domain failures keep `()`, because the operation names the domain and there is no input position to report. |
+| Binary/text failures | bit_array to_string/slice/base16_decode/base64_decode/base64_url_decode; string.utf_codepoint | E4 Fail candidates. Base 16 and base 64 decoding raise `BitArrayError(offset, reason)`. `to_string` and `slice` keep `()`, because the decoder or the bounds name the failure and there is no useful position. Keep is_utf8 and other predicates total. Decide whether raw core Result APIs remain private ABI helpers. |
 | Parsing and validation | calendar date/time_of_day/offset/days_in_month/parse; cli parse/help/text/integer; csv options/parse/parse_with/parse_header/decode; json.parse; path.relative; property int/element/list/string; regex.compile; schema decode/parse; uri parse/build/resolve/encode_bytes/decode_component/decode_bytes/parse_query | These are computations that fail. Use Fail. Preserve validation reports and ordinary absence as data where that is the requested result. |
 | Cryptographic preconditions | hmac_sha256/512, hkdf_sha256/512, hkdf_extract_sha256/512, hkdf_expand_sha256/512, pbkdf2_sha256, random_bytes | Use Fail for invalid length, alignment and iteration count. random_bytes already raises ProcessError separately; merge the error needs. |
 | HTTP decoding | parse_query, body_text, body_json, body_decode | Share query codecs with uri. Body decoding failures should compose through Fail with transport failures. |
@@ -2426,7 +2425,6 @@ or ambiguities, not a claim that the language reserves any name.
 | http.route | Request is third, after method and pattern. | A pipeline of requests cannot feed it directly. |
 | crypto.hmac_sha256/512; hkdf_extract_sha256/512; hkdf_expand_sha256/512 | HMAC puts key first, extract puts salt first, expand puts key first; combined hkdf puts input first. | The meaning of piped bytes changes across the same family. Decide key-as-subject versus input-as-subject once. |
 | bool.xor versus exclusive_nor | Abbreviated and expanded names in one small family. | Users cannot predict the complement name. |
-| dict.has; set.contains; list.contains; regex.is_match | Different membership verbs. | Some reflect domain semantics; dict.has versus contains deserves a deliberate rule. |
 | list/sequence/stream.wrap; option.Some; pair.new | Single-element construction has several vocabularies. | Clarify constructor versus collection singleton naming. |
 | int.to_base2/8/16/36; bit_array.base16_encode/decode | Base formatting and codecs use different naming directions. | Similar tasks are hard to discover by one pattern. |
 | int.bitwise_* versus core.bit_*/shift_* | Prefix and word-order changes for the same primitives. | Public vocabulary is larger than the capability. |
