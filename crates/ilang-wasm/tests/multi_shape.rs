@@ -482,7 +482,8 @@ fn run(guest: &[u8], export: &str) -> std::process::Output {
         (func (export "mc_wait"))
         (func (export "mc_share_put") (param i64 i64 i64 i32 i32))
         (func (export "mc_share_get") (param i64 i64 i64) (result i64) (i64.const 0))
-        (func (export "mc_share_drop") (param i64 i64 i64)))"#;
+        (func (export "mc_share_drop") (param i64 i64 i64))
+        (func (export "mc_closed") (param i64 i32)))"#;
     std::fs::write(&host, wat::parse_str(host_wat).unwrap()).unwrap();
     let driver_wat = format!(
         r#"(module

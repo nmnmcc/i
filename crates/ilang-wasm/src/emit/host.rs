@@ -195,7 +195,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
       (then (return (local.get $r))))
     (local.set $xs (call $list_tail (local.get $xs))) (br $each)))
   ;; A multicore worker other than 0 mirrors the groups of the run's tasks.
-  (if (global.get $req_mirror) (then
+  (if (call $request_foreign (local.get $key)) (then
     (local.set $r (struct.new $request_root (local.get $key) (i32.const 0)))
     (global.set $req_roots (call $list_cons (local.get $r) (global.get $req_roots)))
     (return (local.get $r))))
@@ -209,7 +209,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
     (if (call $key_same (local.get $key) (struct.get $request_owner 0 (local.get $o)))
       (then (return (local.get $o))))
     (local.set $xs (call $list_tail (local.get $xs))) (br $each)))
-  (if (global.get $req_mirror) (then
+  (if (call $request_foreign (local.get $key)) (then
     (local.set $o (struct.new $request_owner (local.get $key)
       (struct.new $request_root (call $key_new) (i32.const 0)) (i32.const 0)))
     (global.set $req_owners (call $list_cons (local.get $o) (global.get $req_owners)))
@@ -220,8 +220,19 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
     (then (call $request_fail (i32.const 6)) unreachable))
   (ref.null eq))
 
+;; On a multicore worker other than 0, a group or Root made by another worker
+;; (its key has another id prefix): only its maker knows when it closes, and
+;; it stays open while a task of it runs here, so this worker mirrors it. A
+;; group made here is never mirrored: once closed, it stays closed.
+(func $request_foreign (param $key eqref) (result i32)
+  (if (i32.eqz (global.get $req_mirror)) (then (return (i32.const 0))))
+  (i64.ne
+    (i64.shr_u (struct.get $obj 2 (ref.cast (ref $obj) (local.get $key))) (i64.const 40))
+    (i64.shr_u (global.get $id_prefix) (i64.const 40))))
+
 ;; `i/hostcall`: whether a group (an Owner key) or a Root is still open. A
-;; lookup only: unlike `$request_find_*`, it never mirrors a missing group.
+;; lookup only: unlike `$request_find_*`, it never mirrors a missing group;
+;; a group of another worker counts as open, as `$request_find_*` mirror it.
 (func $request_group_live (param $key eqref) (result eqref)
   (local $xs eqref)
   (local.set $xs (global.get $req_owners))
@@ -231,7 +242,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
         (struct.get $request_owner 0 (ref.cast (ref $request_owner) (call $list_head (local.get $xs)))))
       (then (return_call $bool_new (i32.const 1))))
     (local.set $xs (call $list_tail (local.get $xs))) (br $each)))
-  (call $bool_new (i32.const 0)))
+  (call $bool_new (call $request_foreign (local.get $key))))
 (func $request_root_live (param $key eqref) (result eqref)
   (local $xs eqref)
   (local.set $xs (global.get $req_roots))
@@ -241,7 +252,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
         (struct.get $request_root 0 (ref.cast (ref $request_root) (call $list_head (local.get $xs)))))
       (then (return_call $bool_new (i32.const 1))))
     (local.set $xs (call $list_tail (local.get $xs))) (br $each)))
-  (call $bool_new (i32.const 0)))
+  (call $bool_new (call $request_foreign (local.get $key))))
 ;; `hostcall.adopt`: an outstanding request moves to the group with this key,
 ;; with its counts; a settled one only changes provenance.
 (func $request_adopt (param $value eqref) (param $key eqref) (result eqref)
@@ -513,6 +524,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
 (func $request_close_owner (param $key eqref) (result eqref)
   (local $xs eqref) (local $keep eqref) (local $o (ref $request_owner))
   (call $request_cancel_members (local.get $key) (i32.const 0))
+  (call $mc_group_closed (local.get $key) (i32.const 0))
   (local.set $xs (global.get $req_owners))
   (block $done (loop $each
     (br_if $done (ref.is_null (local.get $xs)))
@@ -531,7 +543,8 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
     (local.set $o (ref.cast (ref $request_owner) (call $list_head (local.get $xs))))
     (if (i32.eqz (ref.eq (local.get $key)
         (struct.get $request_root 0 (struct.get $request_owner 1 (local.get $o)))))
-      (then (local.set $keep (call $list_cons (local.get $o) (local.get $keep)))))
+      (then (local.set $keep (call $list_cons (local.get $o) (local.get $keep))))
+      (else (call $mc_group_closed (struct.get $request_owner 0 (local.get $o)) (i32.const 0))))
     (local.set $xs (call $list_tail (local.get $xs))) (br $each)))
   (global.set $req_owners (local.get $keep))
   (local.set $keep (ref.null eq))
@@ -543,6 +556,7 @@ const REQUESTS: &str = r#"(global $req_roots (mut eqref) (ref.null eq))
       (then (local.set $keep (call $list_cons (local.get $r) (local.get $keep)))))
     (local.set $xs (call $list_tail (local.get $xs))) (br $each)))
   (global.set $req_roots (local.get $keep))
+  (call $mc_group_closed (local.get $key) (i32.const 1))
   (ref.null eq))
 
 ;; Normal entry cleanup cancels every root, including forgotten independent

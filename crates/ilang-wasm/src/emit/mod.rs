@@ -282,6 +282,9 @@ fn wat_inner(p: &Program, metered: bool) -> String {
         }
         m.push_str(workers::WAT);
         m.push_str(&workers::closures(&e.arities, p.funcs.len(), &async_funcs));
+    } else {
+        // Without workers no other instance mirrors a group.
+        m.push_str("(func $mc_group_closed (param eqref) (param i32))\n");
     }
     m.push_str(&e.data);
     for (ctor, ty) in &e.ctors {
@@ -340,7 +343,7 @@ fn wat_inner(p: &Program, metered: bool) -> String {
             m,
             "(global $c{} (ref $clo{n}) {})",
             f.0,
-            closure(n, p.func_shape(f), f, &captures, false)
+            closure_with_id(n, p.func_shape(f), f, &captures, false, constant_id(f))
         );
     }
     m.push_str(&e.out);
@@ -373,10 +376,33 @@ fn wat_inner(p: &Program, metered: bool) -> String {
 /// A closure of the function `f`: field 2 is the id of its shape,
 /// which is its arity when it has no labels.
 fn closure(arity: u32, shape: ShapeId, f: FuncId, captures: &str, patched: bool) -> String {
+    closure_with_id(arity, shape, f, captures, patched, 0)
+}
+
+/// The identity of the constant function value of `f` (`$c{f}`). Every
+/// instance of a module makes its constants with the same id, so a copy of
+/// one decoded on another worker is the same function as that worker's own
+/// constant (multicore D6). `hostcall.call` relies on this: it tells an
+/// import field from a fake by comparing it with the field's constant.
+/// Ids made at run time are `prefix | counter` with a worker prefix in the
+/// top byte, or a small counter with prefix 0, so bit 55 with a zero top
+/// byte is never one of them.
+fn constant_id(f: FuncId) -> i64 {
+    (1i64 << 55) | (i64::from(f.0) + 1)
+}
+
+fn closure_with_id(
+    arity: u32,
+    shape: ShapeId,
+    f: FuncId,
+    captures: &str,
+    patched: bool,
+    id: i64,
+) -> String {
     let flags = u32::from(patched);
     format!(
         "(struct.new $clo{arity} (i32.const 7) (i32.const {flags}) (i64.const {shape}) (f64.const {}) \
-         (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (i64.const 0) (ref.func $f{}))",
+         (ref.null $bytes) {captures} (ref.null $limbs) (ref.null $call) (i64.const {id}) (ref.func $f{}))",
         f.0 + 3,
         f.0
     )
