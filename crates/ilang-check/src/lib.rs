@@ -522,8 +522,7 @@ pub fn check_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
 }
 
 /// `check_parsed`, keeping the implicit services (`Await`, `Owner`, ...)
-/// in the shown types instead of hiding them (design host-boundary §5.5
-/// rule 5).
+/// in the shown types instead of hiding them (host-boundary 5.5 (5)).
 pub fn check_parsed_keeping_needs(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
     let (program, diags) = resolve_parsed(graph, parsed);
     check_resolved_inner(graph, program, diags, &[], true, true)

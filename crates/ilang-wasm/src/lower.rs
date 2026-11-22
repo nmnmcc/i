@@ -4382,7 +4382,7 @@ impl<'a> Lowerer<'a> {
             env = Env::Local(dst);
         }
         // `call` starts in the ambient group, which a `close` inside its
-        // own `in_group` may have ended (§5.4 row 16): it panics like
+        // own `in_group` may have ended (host-boundary 5.4 row 16): it panics like
         // `call_in` instead of starting in a group that no close will reach.
         if group.is_none() {
             let Some(owner) = self.out.request_owner else {

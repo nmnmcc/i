@@ -1710,7 +1710,7 @@ impl<'a> Resolver<'a> {
     }
 
     /// The boundary-visible functions of the dependencies (host-boundary
-    /// §5.5 rule 2): every module export of a package with `hostcall = true`
+    /// 5.5 (2)): every module export of a package with `hostcall = true`
     /// other than the root and the library `i`. Inference keeps the
     /// functions among them.
     fn boundary_exports(&mut self) {

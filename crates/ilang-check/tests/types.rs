@@ -5,7 +5,7 @@
 //! the types of the library modules, with the implicit services hidden;
 //! `library.needs.out` has the same types with the implicit services
 //! (`Await`, `Owner`, `Root`, `Scheduler`, `Runner`) kept, so a regression
-//! in their inference shows (design host-boundary §5.5 rule 5).
+//! in their inference shows (host-boundary 5.5 (5)).
 //! `UPDATE=1` writes the files.
 //! Every package has the standard library `i` (`stdlib/`) as a path
 //! dependency.
@@ -284,8 +284,8 @@ fn library() {
     );
 }
 
-/// The library types with the implicit services kept (design host-boundary
-/// §5.5 rule 5): `library.out` hides them, so this golden is what shows a
+/// The library types with the implicit services kept (host-boundary
+/// 5.5 (5)): `library.out` hides them, so this golden is what shows a
 /// regression in the inference of `Await`, `Owner`, `Root`, `Scheduler`
 /// and `Runner`.
 #[test]

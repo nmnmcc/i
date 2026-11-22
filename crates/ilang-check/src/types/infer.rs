@@ -1152,7 +1152,7 @@ impl<'a> Checker<'a> {
         if !export {
             return;
         }
-        // Host-boundary §5.5 rule 2 is the second pass on the shaped
+        // Host-boundary 5.5 (2) is the second pass on the shaped
         // signature; a part it reports is not reported again as E0521.
         let boundary = self.boundary_signature(d, span, &f, true);
         let parts = f
@@ -1306,7 +1306,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Host-boundary §5.5 rule 2: a boundary-visible function's own row
+    /// Host-boundary 5.5 (2): a boundary-visible function's own row
     /// (its need, parameters and result) may not name the hostcall
     /// mechanics `Request` (`Call`), `Ticket`, `Wait` or `CallGroup`; in an
     /// `@export` (`export`), a parameter or the result may not take an

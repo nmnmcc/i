@@ -744,7 +744,7 @@ pub fn check_selected(
 }
 
 /// `check_selected`; `keep_implicit` keeps the implicit services in the
-/// shown types (design host-boundary §5.5 rule 5).
+/// shown types (host-boundary 5.5 (5)).
 pub fn check_selected_with_needs(
     program: &Program,
     sources: &Sources,

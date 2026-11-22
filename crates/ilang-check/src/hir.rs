@@ -122,7 +122,7 @@ pub struct Program {
     pub mechanics_types: Vec<TypeId>,
     /// The module exports of the dependencies with `hostcall = true`, other
     /// than the library `i`: with the host exports of the root, the
-    /// boundary-visible functions of host-boundary §5.5 rule 2.
+    /// boundary-visible functions of host-boundary 5.5 (2).
     pub boundary_exports: Vec<DefId>,
 }
 
