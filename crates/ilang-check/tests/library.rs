@@ -202,7 +202,7 @@ fn library_names() {
                 "to_text",
             ],
         ),
-        ("i/io", &[]),
+        ("i/io", &["make_io"]),
         (
             "i/task",
             &[
@@ -353,11 +353,14 @@ fn library_names() {
     // Every primitive of `i/core` is an external of `ilang:core` with its
     // own name.
     for d in &program.module(common::module(&program, "i/core")).defs {
-        let DefKind::External {
-            module, function, ..
-        } = &d.kind
-        else {
-            panic!("{} is not external", d.name)
+        let (module, function) = match &d.kind {
+            DefKind::External {
+                module, function, ..
+            }
+            | DefKind::Runtime {
+                module, function, ..
+            } => (module, function),
+            _ => panic!("{} is not external", d.name),
         };
         assert_eq!(
             (module.as_str(), function.as_str()),
