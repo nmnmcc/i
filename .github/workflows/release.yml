@@ -261,11 +261,12 @@ jobs:
           cd "$work"
           export HOME="$work/home"
           export ILANG_GIT_URLS="github.com/nmnmcc/i=file://$RUNNER_TEMP/library"
-          # The library is pinned to this checkout by `ILANG_GIT_URLS` and the
-          # version assertion below; the offline proof is the container step
-          # (`--network none`). A network namespace on the host is not portable
-          # (the arm64 runners refuse `unshare -n`), so the host run does not
-          # rely on one.
+          # Offline has three strengths (docs/development.md):
+          #   container (`--network none`)  — really offline; the gate's evidence
+          #   Linux/macOS host              — one source (`ILANG_GIT_URLS`) plus
+          #                                   the version assertion, no namespace
+          # A host network namespace is not portable (arm64 runners refuse
+          # `unshare -n`), so the host run does not rely on one.
           run=(env)
           "${run[@]}" "$i" new demo
           grep -qF "github.com/nmnmcc/i//stdlib@$SMOKE_VERSION" demo/i.toml

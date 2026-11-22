@@ -139,14 +139,19 @@ workflow or the docs reuses a cached archive, and with no cached archive it
 skips with a `Release archive not verified` warning in the run summary and a
 check annotation. The archive is always built and smoked on a tag.
 
-The smoke is offline. Linux runs it in an empty network namespace and the
-container with `--network none`; macOS has no `unshare -n` and relies on the
-single `ILANG_GIT_URLS` source plus an assertion on the version in `i.toml`,
-which is one step weaker. The library the smoke serves is tagged
-`stdlib-v999.999.999`, a version no release would take (the package parser
-accepts only `X.Y.Z`), and the smoke asserts that `i.toml` names that version;
-a broken redirect resolves the newest real tag instead and the assertion fails
-loudly, instead of passing on the released, older library.
+The smoke runs in three places, and only one is really offline:
+
+| where | how offline |
+| --- | --- |
+| container, `--network none` | **really offline — this is the gate's evidence** |
+| Linux host | one source (`ILANG_GIT_URLS`) plus the version assertion; no network namespace (some runners refuse `unshare -n`) |
+| macOS host | the same single source plus the assertion |
+
+The library the smoke serves is tagged `stdlib-v999.999.999`, a version no
+release would take (the package parser accepts only `X.Y.Z`), and the smoke
+asserts that `i.toml` names that version; a broken redirect resolves the newest
+real tag instead and the assertion fails loudly, instead of passing on the
+released, older library.
 
 ## Editor support
 
