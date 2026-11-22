@@ -4317,8 +4317,9 @@ impl<'a> Lowerer<'a> {
     /// at run time: the service's own import function (its import tag) is
     /// started under the ambient `Owner`, or `g`, and the request cell is the
     /// `Call`; any other value (a fake) is called now and its result is a
-    /// ready `Call`. Any other `op` is called now the same way. `call_in`
-    /// first panics `hostcall: group closed` when `g` is closed.
+    /// ready `Call`. Any other `op` is called now the same way. Both first
+    /// panic `hostcall: group closed` when their group (`g`, or the ambient
+    /// `Owner` for `call`) is closed.
     #[allow(clippy::too_many_arguments)]
     fn hostcall_call(
         &mut self,
@@ -4379,6 +4380,32 @@ impl<'a> Lowerer<'a> {
                 in_place: false,
             });
             env = Env::Local(dst);
+        }
+        // `call` starts in the ambient group, which a `close` inside its
+        // own `in_group` may have ended (§5.4 row 16): it panics like
+        // `call_in` instead of starting in a group that no close will reach.
+        if group.is_none() {
+            let Some(owner) = self.out.request_owner else {
+                self.error(fx.module, span, "`hostcall.call` needs the request Owner");
+                return Some(finish(out, tail, Atom::Unit));
+            };
+            let value = fx.local(LocalType::Value);
+            out.push(Stmt::Let {
+                dst: value,
+                value: Value::Service(fx.env, owner),
+                site,
+            });
+            let open = self.library_callee("i/hostcall", "open_group");
+            let_value(
+                fx,
+                out,
+                Value::Call {
+                    callee: open,
+                    args: vec![Atom::Local(value)],
+                    env: fx.env,
+                },
+                site,
+            );
         }
         let result = fx.local(LocalType::Value);
         let ready = |value: Atom| Stmt::Let {

@@ -948,6 +948,7 @@ export async function instantiate(source, options = {}) {
     mc_share_put: () => undefined,
     mc_share_get: () => 0n,
     mc_share_drop: () => undefined,
+    mc_closed: () => undefined,
     // The module traps right after this call.
     panic: typedFunction(bridge.admitting((_, pointer, length) => {
       let message;

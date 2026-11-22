@@ -111,6 +111,9 @@ struct PoolState {
     current: Option<Vec<u8>>,
     /// Answers for each worker: (record, bytes).
     answers: Vec<VecDeque<(u64, Vec<u8>)>>,
+    /// Closed groups (0) and Roots (1) for each worker to close in its
+    /// mirrors: (key id, kind).
+    closes: Vec<Vec<(i64, i32)>>,
     next: u64,
     threads: Vec<JoinHandle<()>>,
     spawned: usize,
@@ -166,6 +169,7 @@ impl Pool {
                 started: vec![0; workers],
                 live: vec![0; workers],
                 answers: (0..workers).map(|_| VecDeque::new()).collect(),
+                closes: vec![Vec::new(); workers],
                 ..PoolState::default()
             }),
             results: Condvar::new(),
@@ -366,6 +370,26 @@ impl Pool {
         self.wake[worker - 1].notify_one();
     }
 
+    /// A worker closed a group or Root it made. Every other worker that
+    /// ran a task may hold a mirror of it with requests of its tasks in it.
+    pub(crate) fn closed(&self, id: i64, root: i32) {
+        let mut state = self.lock();
+        if state.published == 0 {
+            return;
+        }
+        let mut woken = Vec::new();
+        for worker in 1..=state.spawned {
+            if state.started[worker] > 0 {
+                state.closes[worker].push((id, root));
+                woken.push(worker);
+            }
+        }
+        drop(state);
+        for worker in woken {
+            self.wake[worker - 1].notify_one();
+        }
+    }
+
     pub(crate) fn share_put(&self, key: ShareKey, bytes: Vec<u8>) {
         self.lock().shares.insert(key, Arc::new(bytes));
     }
@@ -443,13 +467,16 @@ impl Pool {
                 enum Job {
                     Begin(u64, Vec<u8>),
                     Resume(u64, Vec<u8>),
+                    Close(Vec<(i64, i32)>),
                 }
                 let job = {
                     let mut state = self.lock();
                     if state.shutdown || state.stop.is_some() {
                         return;
                     }
-                    if let Some((id, bytes)) = state.answers[index].pop_front() {
+                    if !state.closes[index].is_empty() {
+                        Some(Job::Close(std::mem::take(&mut state.closes[index])))
+                    } else if let Some((id, bytes)) = state.answers[index].pop_front() {
                         Some(Job::Resume(id, bytes))
                     } else if let Some(at) = state.queue.iter().position(|id| {
                         let affinity = state.ready[id].affinity;
@@ -503,33 +530,23 @@ impl Pool {
                                 continue;
                             };
                             let woken = worker.settle(slot_id, &request, reply);
-                            match woken {
-                                Ok(woken) => {
-                                    let mut state = self.lock();
-                                    for (slot, message) in woken {
-                                        let id = slots[&slot];
-                                        let away = state
-                                            .away
-                                            .get_mut(&id)
-                                            .expect("a waiting task is away");
-                                        away.messages.push_back(message);
-                                        if away.serial.is_some() && away.messages.len() == 1 {
-                                            state.inbox.push_back(id);
-                                        }
-                                    }
-                                    drop(state);
-                                    self.results.notify_all();
-                                }
-                                Err(error) => {
-                                    self.fail(&mut worker, error);
-                                    return;
-                                }
+                            if let Err(error) = self.wake_tasks(&slots, woken) {
+                                self.fail(&mut worker, error);
+                                return;
                             }
                             continue;
                         }
                     }
                 };
                 let (id, outcome) = match job {
+                    Job::Close(closes) => {
+                        let woken = worker.close(&closes);
+                        if let Err(error) = self.wake_tasks(&slots, woken) {
+                            self.fail(&mut worker, error);
+                            return;
+                        }
+                        continue;
+                    }
                     Job::Begin(id, bytes) => (id, worker.begin(&bytes)),
                     Job::Resume(id, bytes) => {
                         let slot = self.lock().away[&id]
@@ -569,6 +586,27 @@ impl Pool {
                 }
             }
         });
+    }
+
+    /// Hands the `Woken` messages of tasks of this worker to worker 0.
+    fn wake_tasks(
+        &self,
+        slots: &HashMap<i32, u64>,
+        woken: Result<Vec<(i32, Vec<u8>)>>,
+    ) -> Result<()> {
+        let woken = woken?;
+        let mut state = self.lock();
+        for (slot, message) in woken {
+            let id = slots[&slot];
+            let away = state.away.get_mut(&id).expect("a waiting task is away");
+            away.messages.push_back(message);
+            if away.serial.is_some() && away.messages.len() == 1 {
+                state.inbox.push_back(id);
+            }
+        }
+        drop(state);
+        self.results.notify_all();
+        Ok(())
     }
 
     fn fail(&self, worker: &mut Worker, error: anyhow::Error) {
@@ -730,6 +768,26 @@ impl Worker {
             "the host gave a value that is not correct"
         );
         crate::run::in_wasm(|| settle.call(&mut self.store, &values, &mut []))?;
+        self.woken()
+    }
+
+    /// Closes the mirrors of groups and Roots that another worker closed;
+    /// their requests here are cancelled.
+    fn close(&mut self, closes: &[(i64, i32)]) -> Result<Vec<(i32, Vec<u8>)>> {
+        let close = self
+            .instance
+            .get_typed_func::<(i64, i32), ()>(&mut self.store, "ilang_mc_closed")?;
+        self.store.data_mut().requests.set_accepting(true);
+        let done = closes.iter().try_for_each(|&(id, root)| {
+            crate::run::in_wasm(|| close.call(&mut self.store, (id, root)))
+        });
+        self.store.data_mut().requests.set_accepting(false);
+        done?;
+        self.woken()
+    }
+
+    /// The `Woken` messages of the tasks whose awaited requests settled.
+    fn woken(&mut self) -> Result<Vec<(i32, Vec<u8>)>> {
         let ready = self
             .instance
             .get_typed_func::<(), i32>(&mut self.store, "ilang_mc_ready")?;
@@ -829,6 +887,19 @@ fn define_remote(linker: &mut Linker<State>, pool: std::sync::Weak<Pool>) -> Res
         "mc_share_drop",
         |_: Caller<'_, State>, _: i64, _: i64, _: i64| -> wasmtime::Result<()> { Ok(()) },
     )?;
+    {
+        let pool = pool.clone();
+        linker.func_wrap(
+            HOST_MODULE,
+            "mc_closed",
+            move |_: Caller<'_, State>, id: i64, root: i32| -> wasmtime::Result<()> {
+                if let Some(pool) = pool.upgrade() {
+                    pool.closed(id, root);
+                }
+                Ok(())
+            },
+        )?;
+    }
     linker.func_wrap(
         HOST_MODULE,
         "mc_share_get",
@@ -992,6 +1063,16 @@ pub(crate) fn define_home(linker: &mut Linker<State>) -> Result<()> {
         HOST_MODULE,
         "mc_share_get",
         |_: Caller<'_, State>, _: i64, _: i64, _: i64| -> wasmtime::Result<i64> { Ok(0) },
+    )?;
+    linker.func_wrap(
+        HOST_MODULE,
+        "mc_closed",
+        |caller: Caller<'_, State>, id: i64, root: i32| -> wasmtime::Result<()> {
+            if let Some(pool) = pool(&caller) {
+                pool.closed(id, root);
+            }
+            Ok(())
+        },
     )?;
     Ok(())
 }
