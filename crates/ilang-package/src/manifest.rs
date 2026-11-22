@@ -148,7 +148,7 @@ fn parse(text: &str, compiled: bool) -> (Option<Manifest>, Vec<Diagnostic>) {
             "library-rows" => match value.get_ref() {
                 DeValue::Boolean(b) => library_rows = *b,
                 _ => diags.push(err(
-                    code::HOSTCALL_VALUE,
+                    code::LIBRARY_ROWS_VALUE,
                     span(value.span()),
                     "`library-rows` must be `true` or `false`",
                 )),

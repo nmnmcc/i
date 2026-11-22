@@ -35,6 +35,7 @@ pub mod code {
     pub const PATH_DEPENDENCY: &str = "E0609";
     pub const WASM_EXPORT: &str = "E0610";
     pub const HOSTCALL_VALUE: &str = "E0616";
+    pub const LIBRARY_ROWS_VALUE: &str = "E0618";
     // The code "E0620" is not assigned.
     pub const NO_PACKAGE: &str = "E0621";
     pub const PACKAGE_CIRCLE: &str = "E0622";

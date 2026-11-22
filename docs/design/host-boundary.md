@@ -679,6 +679,13 @@ a recoverable answer.
    stays, because the caller passes it); the export ABI encoder drops the
    need entries. One predicate in the checker (a fixed list of the five
    `(module, name)` identities) drives all three so they cannot drift.
+
+   Any other package opts out explicitly with the root key
+   `library-rows = true` in its `i.toml`. It is per package and meant for a
+   package whose source forwards the services the way library source does
+   (typically a test probe shipped with the compiler). The value must be a
+   boolean (`E0618`); the default is `false`, so a root program that does not
+   set it stays under `E0325`.
 2. **Boundary-visible signatures.** Every boundary-visible **function**'s
    expanded type is checked for the mechanics types `Call`, `CallGroup`,
    `Wait`, `Request`, `Ticket`; any is `E0324` with the name. In an `@export`
@@ -1108,6 +1115,7 @@ registration helper.
 | E0615 | program dependency |
 | E0616 | non-boolean `hostcall` |
 | E0617 | a program has no entry; the message names both fixes |
+| E0618 | non-boolean root key `library-rows` |
 
 **Existing codes.** Kept and retargeted: E0301 (unknown attribute; its message
 lists the four new built-ins), E0302, E0303, E0306, E0307, E0308, E0309, E0310,
@@ -1116,5 +1124,5 @@ with the mechanism: E0313 and E0314 (a `[wasm]` export could be unknown or
 also the entry; `@export` cannot), E0321 (`[wasm]` duplicate; `@export` twice
 is E0309). E0304 runs first; E0324 is the second pass on a shaped signature.
 
-**Numbering.** E0323–E0339 and E0612–E0617 are unused at `a21eae769`,
+**Numbering.** E0323–E0339 and E0612–E0618 are unused at `a21eae769`,
 confirmed by `git grep`.
