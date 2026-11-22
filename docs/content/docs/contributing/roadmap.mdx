@@ -82,6 +82,10 @@ Error(DivisionByZero)
 
 ## Current limitations
 
+### Host-service declarations
+
+`i/io` is the only standard service declared with `@import("i:io/v1", "now")`; the other platform services declare `@host("…", "request")` because their fields return `Request(A)`. `@import` has the modes `"now"` and `"later"` and no request mode, so the two declarations cannot be one yet. Either `@import` gains a request mode and every service moves to it, or request services stay on `@host` and the spec says that is the rule. The spec (§9.7) records `i/io` as the one exception in the meantime.
+
 ### Data-rest patterns
 
 Data-rest patterns are not available yet; list rest patterns work (P13).
