@@ -17,26 +17,26 @@ fake_net = (
 	bind_closed : Request(())
 ) -> net.Net {
 	net.Net(
-		bind = (address, port) { Ok(1) },
-		send_to = (id, address, port, bytes) { Ok(()) },
-		receive_from = (id, max) { Ok(<<>>) },
-		local_address = (id) { Ok("127.0.0.1") },
-		datagram_port = (id) { Ok(1000) },
-		close_datagram = (id) { request.take(bind_closed) },
-		listen = (address, port) { Ok(2) },
-		local_port = (id) { Ok(1001) },
-		accept = (id) { Ok(3) },
-		connect = (address, port) { Ok(4) },
-		resolve = (name) { Ok("") },
-		read = (id, max) { Ok(<<>>) },
-		write = (id, bytes) { Ok(()) },
-		shutdown_write = (id) { Ok(()) },
+		bind = (address, port) { request.ready(Ok(1)) },
+		send_to = (id, address, port, bytes) { request.ready(Ok(())) },
+		receive_from = (id, max) { request.ready(Ok(<<>>)) },
+		local_address = (id) { request.ready(Ok("127.0.0.1")) },
+		datagram_port = (id) { request.ready(Ok(1000)) },
+		close_datagram = (id) { bind_closed },
+		listen = (address, port) { request.ready(Ok(2)) },
+		local_port = (id) { request.ready(Ok(1001)) },
+		accept = (id) { request.ready(Ok(3)) },
+		connect = (address, port) { request.ready(Ok(4)) },
+		resolve = (name) { request.ready(Ok("")) },
+		read = (id, max) { request.ready(Ok(<<>>)) },
+		write = (id, bytes) { request.ready(Ok(())) },
+		shutdown_write = (id) { request.ready(Ok(())) },
 		close_stream = (id) {
 			{ id == 3 } |>
-				(True()) { request.take(accept_closed) }
-				& (False()) { request.take(connect_closed) }
+				(True()) { accept_closed }
+				& (False()) { connect_closed }
 		},
-		close_listener = (id) { request.take(listen_closed) },
+		close_listener = (id) { listen_closed },
 	)
 }
 

@@ -18,22 +18,28 @@ test("stdio_fake", () {
 	} <- (
 		stdio.Stdio(
 			read = (n) {
-				{ n > 0 } |>
-					(True()) { Ok(<<>>) }
-					& (False()) { Error("invalid") }
+				request.ready(
+					{ n > 0 } |>
+						(True()) { Ok(<<>>) }
+						& (False()) { Error("invalid") },
+				)
 			},
 			write = (bytes) {
-				{ bytes == <<"hello\n":utf8>> } |>
-					(True()) { Ok(()) }
-					& (False()) { Error("wrong_bytes") }
+				request.ready(
+					{ bytes == <<"hello\n":utf8>> } |>
+						(True()) { Ok(()) }
+						& (False()) { Error("wrong_bytes") },
+				)
 			},
 			write_error = (bytes) {
-				{ bytes == <<"error\n":utf8>> } |>
-					(True()) { Ok(()) }
-					& (False()) { Error("wrong_bytes") }
+				request.ready(
+					{ bytes == <<"error\n":utf8>> } |>
+						(True()) { Ok(()) }
+						& (False()) { Error("wrong_bytes") },
+				)
 			},
-			flush = () { Ok(()) },
-			flush_error = () { Ok(()) },
+			flush = () { request.ready(Ok(())) },
+			flush_error = () { request.ready(Ok(())) },
 		),
 	)
 })

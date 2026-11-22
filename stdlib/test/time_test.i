@@ -218,9 +218,9 @@ test("time_huge_counts", () {
 // A clock that fails if anything sleeps on it: the tests that must not sleep
 // use it to prove that no sleep happened.
 unused_clock : clock.Clock = clock.Clock(
-	monotonic_ns = () { Ok(0) },
-	unix_ns = () { Ok(0) },
-	sleep_ns = (n) { Error("unused") },
+	monotonic_ns = () { request.ready(Ok(0)) },
+	unix_ns = () { request.ready(Ok(0)) },
+	sleep_ns = (n) { request.ready(Error("unused")) },
 )
 
 late = () { task.sync(task.never()) }

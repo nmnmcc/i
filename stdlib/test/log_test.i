@@ -379,11 +379,11 @@ test("stderr_sink_reports_failures", () {
 		()
 	} <- (log.stderr()) <- (
 		stdio.Stdio(
-			read = (_) { Ok(<<>>) },
-			write = (_) { Ok(()) },
-			write_error = (_) { Error("failed") },
-			flush = () { Ok(()) },
-			flush_error = () { Ok(()) },
+			read = (_) { request.ready(Ok(<<>>)) },
+			write = (_) { request.ready(Ok(())) },
+			write_error = (_) { request.ready(Error("failed")) },
+			flush = () { request.ready(Ok(())) },
+			flush_error = () { request.ready(Ok(())) },
 		),
 	)
 })
