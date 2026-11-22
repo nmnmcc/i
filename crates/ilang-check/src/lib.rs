@@ -476,7 +476,7 @@ pub fn check_compiler_exports(
             "a macro program cannot execute an external declaration outside package i",
         ));
     }
-    let mut checked = check_resolved_inner(graph, Some(program), diags, &[], false);
+    let mut checked = check_resolved_inner(graph, Some(program), diags, &[], false, false);
     if let (Some(program), Some(typed)) = (&checked.program, &checked.types) {
         for &entry in &program.host_exports {
             if typed
@@ -520,6 +520,14 @@ pub fn check_parsed(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
     check_resolved(graph, program, diags)
 }
 
+/// `check_parsed`, keeping the implicit services (`Await`, `Owner`, ...)
+/// in the shown types instead of hiding them (design host-boundary §5.5
+/// rule 5).
+pub fn check_parsed_keeping_needs(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
+    let (program, diags) = resolve_parsed(graph, parsed);
+    check_resolved_inner(graph, program, diags, &[], true, true)
+}
+
 /// Resolve and infer a project for collection discovery, without selecting
 /// configured program entries or host exports as tool execution roots.
 pub fn check_parsed_for_tools(graph: &PackageGraph, parsed: &[Parsed]) -> Checked {
@@ -548,7 +556,7 @@ pub fn check_resolved_selected(
     diags: Vec<Diagnostic>,
     selected: &[(hir::DefId, bool)],
 ) -> Checked {
-    check_resolved_inner(graph, program, diags, selected, true)
+    check_resolved_inner(graph, program, diags, selected, true, false)
 }
 
 fn check_resolved_inner(
@@ -557,6 +565,7 @@ fn check_resolved_inner(
     mut diags: Vec<Diagnostic>,
     selected: &[(hir::DefId, bool)],
     ordinary: bool,
+    keep_implicit: bool,
 ) -> Checked {
     // Compiler wrappers are checked by macro_sandbox above. Their module
     // initializers may construct shape dispatchers from compiler functions.
@@ -566,7 +575,8 @@ fn check_resolved_inner(
     }
     let types = match &program {
         Some(p) if !diags.iter().any(Diagnostic::is_error) => {
-            let (typed, more) = types::check_selected(p, &graph.sources, selected);
+            let (typed, more) =
+                types::check_selected_with_needs(p, &graph.sources, selected, keep_implicit);
             diags.extend(more);
             Some(typed)
         }

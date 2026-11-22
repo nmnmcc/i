@@ -212,6 +212,12 @@ pub(crate) struct Checker<'a> {
 
 impl<'a> Checker<'a> {
     pub fn new(p: &'a Program, sources: &'a Sources) -> Checker<'a> {
+        Checker::with_needs(p, sources, false)
+    }
+
+    /// `keep_implicit` keeps the implicit services (`Await`, `Owner`, ...)
+    /// in the shown types instead of hiding them.
+    pub fn with_needs(p: &'a Program, sources: &'a Sources, keep_implicit: bool) -> Checker<'a> {
         let find = |name: &str| {
             p.types
                 .iter()
@@ -233,7 +239,9 @@ impl<'a> Checker<'a> {
             fail: find("Fail"),
         };
         solver.row_params = row_parameters(p);
-        solver.hidden_needs = std::sync::Arc::new(p.implicit_services.clone());
+        if !keep_implicit {
+            solver.hidden_needs = std::sync::Arc::new(p.implicit_services.clone());
+        }
         Checker {
             p,
             sources,
