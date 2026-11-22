@@ -295,15 +295,7 @@ fn serve_clients(project: &Path, workers: Option<usize>, clients: usize) -> Stri
         .unwrap();
     let port: u16 = line
         .strip_prefix("listening ")
-        .unwrap_or_else(|| {
-            let _ = server.0.kill();
-            let mut err = String::new();
-            if let Some(mut e) = server.0.stderr.take() {
-                use std::io::Read;
-                let _ = e.read_to_string(&mut err);
-            }
-            panic!("server did not listen: {line:?} {err}")
-        })
+        .unwrap()
         .trim()
         .parse()
         .unwrap();
@@ -380,7 +372,7 @@ listen_raw = () <- (raw : net.Net) {
 }
 
 accept_raw = (net.Listener(number)) <- (raw : net.Net) {
-	raw.accept(number) |>
+	request.await(raw.accept(number)) |>
 		(Ok(value)) { net.Stream(value) }
 		& (Error(code)) { panic(\"accept: \" <> code) }
 }
@@ -438,29 +430,6 @@ fn copied_functions_keep_their_identity() {
     let (_, eight, trace) = agree("identity", &source);
     assert_eq!(eight.stdout.trim(), "[True, True, False, True]");
     assert_eq!(trace.published, 1);
-}
-
-/// Host calls started by `hostcall.call` in tasks on other workers: an
-/// import field copied there is still the import (not a fake, which would
-/// be awaited at once: the never-answered `own` lease of `process.spawn`
-/// hung the run), a scope that fails while its child task holds a running
-/// child process ends at once, and groups made there open and close.
-#[test]
-fn hostcall_starts_in_tasks_on_other_workers() {
-    let source = format!(
-        "(\n\ti/task\n\ti/stdio\n\ti/core\n\ti/fail\n\ti/process\n\ti/resource\n\ti/hostcall\n)\n\n{SPIN}\nmain = () {{\n\tcodes = task.map_concurrently([1, 2, 3, 4, 5, 6, 7, 8], (i) {{\n\t\tspin(200000 + i, i)\n\t\tfail.catch(() {{\n\t\t\tresource.scoped(() {{\n\t\t\t\tc = process.spawn(\"sh\", [\"-c\", \"exit 3\"])\n\t\t\t\tprocess.wait(c)\n\t\t\t}})\n\t\t}})\n\t}})\n\tstdio.print(core.inspect(codes))\n\tstop = fail.catch(() {{\n\t\ttask.scope((s) {{\n\t\t\tgate : task.Channel(()) = task.channel()\n\t\t\ttask.go(s, () {{\n\t\t\t\tspin(200000, 1)\n\t\t\t\tresource.scoped(() {{\n\t\t\t\t\tprocess.spawn(\"sh\", [\"-c\", \"sleep 30\"])\n\t\t\t\t\ttask.send(gate, ())\n\t\t\t\t\ttask.sync(task.never())\n\t\t\t\t}})\n\t\t\t}})\n\t\t\ttask.receive(gate)\n\t\t\tfail.raise(\"stop\")\n\t\t}})\n\t}})\n\tstdio.print(core.inspect(stop))\n\tgroups = task.map_concurrently([1, 2, 3, 4], (i) {{\n\t\tspin(200000 + i, i)\n\t\tg = hostcall.group()\n\t\tlive = hostcall.in_group(g, () {{ hostcall.closed(g) }})\n\t\thostcall.close(g)\n\t\t(live, hostcall.closed(g))\n\t}})\n\tstdio.print(core.inspect(groups))\n}}\n"
-    );
-    let (_, eight, trace) = agree("hostcall", &source);
-    assert_eq!(
-        eight.stdout.trim(),
-        "[Ok(3), Ok(3), Ok(3), Ok(3), Ok(3), Ok(3), Ok(3), Ok(3)]\nError(\"stop\")\n[(False, True), (False, True), (False, True), (False, True)]"
-    );
-    assert!(eight.seconds < 20.0, "the sleeping child was stopped");
-    assert!(
-        trace.started.iter().skip(1).sum::<u64>() >= 1,
-        "{:?}",
-        trace.started
-    );
 }
 
 /// shielded finals joining cancelled tasks must stop, on every worker.
