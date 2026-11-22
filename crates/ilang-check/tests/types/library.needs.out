@@ -1797,4 +1797,3 @@ i/uri.encode_bytes : (BitArray) <- (Fail(CodecError)) -> String
 i/uri.decode_component : (String) <- (Fail(CodecError)) -> String
 i/uri.decode_bytes : (String) <- (Fail(CodecError)) -> BitArray
 i/uri.parse_query : (String) <- (Fail(CodecError)) -> List((String, String))
-

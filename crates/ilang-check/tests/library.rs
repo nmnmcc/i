@@ -145,6 +145,7 @@ fn library_names() {
                 "cancel",
                 "await",
                 "await_owned",
+                "wait",
                 "wait_any",
                 "poll_requests",
             ],
