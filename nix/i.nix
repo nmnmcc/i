@@ -115,6 +115,14 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ../Cargo.lock;
 
+  # `buildRustPackage` defaults this to true, and cargo-auditable is then built
+  # with nixpkgs' own rustc, which builds LLVM from source: a cold release
+  # build took hours for a `.dep-v0` section that `cargo audit` can read from
+  # the lockfile anyway. The lockfile audit runs in CI at release time. See
+  # docs/development.md before turning this back on, and keep the tag and PR
+  # build paths identical if you do.
+  auditable = false;
+
   nativeBuildInputs = [ cmake removeReferencesTo ];
   # `cmake` is for the Binaryen build script, not for `configurePhase`.
   dontUseCmakeConfigure = true;

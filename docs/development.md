@@ -116,6 +116,43 @@ with `--sync-keys` after adding or removing units.
 Release archives are built with `./scripts/dev-release`; see
 [release packaging](release.md).
 
+The release workflow's cold path was **the Nix store closure, not `i`**, and
+for a long time most of it was avoidable. `buildRustPackage` defaults
+`auditable = true`; that pulls `cargo-auditable`, which nixpkgs builds with its
+own **source-built rustc**, which builds **LLVM**:
+
+```
+i -> auditable-rust-minimal -> cargo-auditable -> rustc-wrapper -> rustc (source) -> llvm-23.1.3
+```
+
+`nix/i.nix` sets `auditable = false`: the closure drops from 1828 to 1583
+derivations and contains no LLVM at all, and a cold build goes from hours to
+minutes. The cost is that the binary no longer carries the `.dep-v0` section,
+so `cargo audit` cannot read dependencies out of a published archive; the
+lockfile audit at release time covers the same question for the source tree.
+A pin change can still rebuild part of the closure from source — that is the
+remaining, genuine part of the cold path — but it is no longer the norm.
+
+A pull request that changes a build input (`nix/**`, the pins, a manifest, a
+build script) builds and smokes the archive; one that only changes this
+workflow or the docs reuses a cached archive, and with no cached archive it
+skips with a `Release archive not verified` warning in the run summary and a
+check annotation. The archive is always built and smoked on a tag.
+
+The smoke runs in three places, and only one is really offline:
+
+| where | how offline |
+| --- | --- |
+| container, `--network none` | **really offline — this is the gate's evidence** |
+| Linux host | one source (`ILANG_GIT_URLS`) plus the version assertion; no network namespace (some runners refuse `unshare -n`) |
+| macOS host | the same single source plus the assertion |
+
+The library the smoke serves is tagged `stdlib-v999.999.999`, a version no
+release would take (the package parser accepts only `X.Y.Z`), and the smoke
+asserts that `i.toml` names that version; a broken redirect resolves the newest
+real tag instead and the assertion fails loudly, instead of passing on the
+released, older library.
+
 ## Editor support
 
 `i lsp` runs the language server (`crates/ilang-lsp`) on standard input and
