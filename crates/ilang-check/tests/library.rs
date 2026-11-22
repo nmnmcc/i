@@ -241,7 +241,7 @@ fn library_names() {
         ),
         (
             "i/clock",
-            &["make_clock", "monotonic_ns", "unix_ns", "sleep_ns"],
+            &["monotonic_ns", "unix_ns", "sleep_ns"],
         ),
         (
             "i/random",

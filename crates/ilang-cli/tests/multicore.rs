@@ -374,7 +374,7 @@ echo = (stream) {
 // the connection tasks, and each connection task opens the scope that owns
 // its stream.
 listen_raw = () <- (raw : net.Net) {
-	raw.listen(\"127.0.0.1\", 0) |>
+	request.await(raw.listen(\"127.0.0.1\", 0)) |>
 		(Ok(number)) { net.Listener(number) }
 		& (Error(code)) { panic(\"listen: \" <> code) }
 }

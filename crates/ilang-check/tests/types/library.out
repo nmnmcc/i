@@ -184,7 +184,6 @@ i/cli.read : (Parser(A)) <- (Fail(process.ProcessError | CliError), process.Argu
 i/clock.monotonic_ns : () <- (Clock, Fail(ClockError)) -> Int
 i/clock.unix_ns : () <- (Clock, Fail(ClockError)) -> Int
 i/clock.sleep_ns : (Int) <- (Clock, Fail(ClockError)) -> ()
-i/clock.make_clock : () -> Clock
 i/control.boundary : ((Boundary(A, B)) <- B -> A) <- B -> A
 i/control.suspend : (Boundary(A, B), (Continuation(C, A, B)) <- B -> A) -> C
 i/control.escape : (Boundary(A, B), A) -> Never
@@ -335,12 +334,12 @@ i/fail.raise : (A) <- (Fail(A)) -> Never
 i/fail.catch : (() <- (Fail(B), ..N) -> A) <- N -> Result(A, B)
 i/fail.from_result : (Result(A, B)) <- (Fail(B)) -> A
 i/fail.map_error : (() <- (Fail(B), ..N) -> A, (B) <- N -> C) <- (Fail(C), ..N) -> A
+i/fetch.open_handle : (String, String, String, BitArray) <- (Fail(String), Fetch) -> Response
 i/fetch.open : (String, String, String, BitArray) <- (Fail(String), Fetch, resource.Scope) -> Response
 i/fetch.status : (Response) <- (Fail(String), Fetch) -> Int
 i/fetch.headers : (Response) <- (Fail(String), Fetch) -> String
 i/fetch.read : (Response, Int) <- (Fail(String), Fetch) -> BitArray
 i/fetch.close : (Response) <- (Fetch) -> ()
-i/fetch.make_fetch : () -> Fetch
 i/float.max_finite : Float
 i/float.min_positive : Float
 i/float.pi : Float
@@ -497,7 +496,6 @@ i/fs.child : (String, String) -> String
 i/fs.walk_from : (String, Int) <- (Fail(FsError), Fs) -> List(String)
 i/fs.failure_with : (String, String, FsProblem, String) <- (Fail(FsError)) -> Never
 i/fs.walk : (String) <- (Fail(FsError), Fs) -> List(String)
-i/fs.make_fs : () -> Fs
 i/hostcall.group_live : (Key(())) -> Bool
 i/hostcall.root_live : (Key(())) -> Bool
 i/hostcall.move_to : (Request(A), Key(())) -> Request(A)
@@ -816,8 +814,11 @@ i/log.stderr : () -> Sink(stdio.StdioError, request.Await | request.Owner | stdi
 i/log.stdout : () -> Sink(stdio.StdioError, request.Await | request.Owner | stdio.Stdio)
 i/log.file : (String) -> Sink(fs.FsError, A)
 i/log.timestamped : (Entry) <- (Fail(i/clock.ClockError), i/clock.Clock) -> Entry
+i/net.listen_handle : (String, Int) <- (Fail(NetError), Net) -> Listener
 i/net.listen : (String, Int) <- (Fail(NetError), Net, resource.Scope) -> Listener
+i/net.connect_handle : (String, Int) <- (Fail(NetError), Net) -> Stream
 i/net.connect : (String, Int) <- (Fail(NetError), Net, resource.Scope) -> Stream
+i/net.accept_handle : (Listener) <- (Fail(NetError), Net) -> Stream
 i/net.accept : (Listener) <- (Fail(NetError), Net, resource.Scope) -> Stream
 i/net.local_port : (Listener | Datagram) <- (Fail(NetError), Net) -> Int
 i/net.read : (Stream, Int) <- (Fail(NetError), Net) -> BitArray
@@ -830,13 +831,13 @@ i/net.parts : (String, Int) -> List(String)
 i/net.resolve : (String) <- (Fail(NetError), Net) -> List(String)
 i/net.stream_number : (Stream) -> Int
 i/net.byte_stream : (Stream) -> (close = () <- (Net) -> (), read = (Int) <- (Fail(NetError), Net) -> BitArray, shutdown_write = () <- (Fail(NetError), Net) -> (), write = (BitArray) <- (Fail(NetError), Net) -> ())
+i/net.bind_handle : (String, Int) <- (Fail(NetError), Net) -> Datagram
 i/net.bind : (String, Int) <- (Fail(NetError), Net, resource.Scope) -> Datagram
 i/net.send_to : (Datagram, String, Int, BitArray) <- (Fail(NetError), Net) -> ()
 i/net.receive_from : (Datagram, Int) <- (Fail(NetError), Net) -> (address = String, data = BitArray, port = Int)
 i/net.decode_datagram : (A) -> (address = String, data = BitArray, port = Int)
 i/net.local_address : (Datagram) <- (Fail(NetError), Net) -> String
 i/net.close_datagram : (Datagram) <- (Net) -> ()
-i/net.make_net : () -> Net
 i/option.is_some : (Option(A)) -> Bool
 i/option.is_none : (Option(A)) -> Bool
 i/option.map : (Option(A), (A) <- N -> B) <- N -> Option(B)
@@ -914,11 +915,6 @@ i/process.drain_stderr : (Child, List(BitArray)) <- (Fail(ProcessError), Process
 i/process.read_all_stdout : (Child) <- (Fail(ProcessError), Process) -> BitArray
 i/process.read_all_stderr : (Child) <- (Fail(ProcessError), Process) -> BitArray
 i/process.collect : (Child) <- (Fail(ProcessError), Process, resource.Scope) -> (stderr = BitArray, stdout = BitArray)
-i/process.make_arguments : () -> Arguments
-i/process.make_environment : () -> Environment
-i/process.make_working_directory : () -> WorkingDirectory
-i/process.make_entropy : () -> Entropy
-i/process.make_process : () -> Process
 i/property.defaults : () -> Config
 i/property.make : ((Int, random.Generator) -> Option(Tree(A))) -> Gen(A)
 i/property.sample : (Gen(A), Int, random.Generator) -> Option(Tree(A))
@@ -987,10 +983,10 @@ i/queue.finish_take : (TakeStep(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.take : (Queue(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.poll : (Queue(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.nothing_to_take : (QueueState(A, B)) -> (QueueState(A, B), TakeStep(A, B))
-i/queue.size : (Queue(A, B)) <- (task.Scheduler) -> Int
-i/queue.end : (Queue(A, B)) <- (task.Scheduler) -> ()
-i/queue.fail_with : (Queue(A, B), B) <- (task.Scheduler) -> ()
-i/queue.shutdown : (Queue(A, B)) <- (task.Scheduler) -> ()
+i/queue.size : (Queue(A, B)) -> Int
+i/queue.end : (Queue(A, B)) -> ()
+i/queue.fail_with : (Queue(A, B), B) -> ()
+i/queue.shutdown : (Queue(A, B)) -> ()
 i/random.word_size : () -> Int
 i/random.mask : (Int) -> Int
 i/random.xor_shift : (Int, Int) -> Int
@@ -1094,7 +1090,7 @@ i/request.cancel_group : (Key(())) -> ()
 i/request._cancel_root : (Key(())) -> ()
 i/request.observe_owner : (Key(())) -> Request(())
 i/request._observe_root : (Key(())) -> Request(())
-i/request.open_root : () <- (Root) -> Root
+i/request.open_root : () -> Root
 i/request.close_root : (Root) -> ()
 i/request.open_owner : () -> Owner
 i/request.close_owner : (Owner) -> ()
@@ -1287,7 +1283,6 @@ i/stdio.flush : () <- (Fail(StdioError), Stdio) -> ()
 i/stdio.flush_error : () <- (Fail(StdioError), Stdio) -> ()
 i/stdio.print : (String) <- (Fail(StdioError), Stdio) -> ()
 i/stdio.print_error : (String) <- (Fail(StdioError), Stdio) -> ()
-i/stdio.make_stdio : () -> Stdio
 i/stream.new : () -> Stream(Never, Never, A)
 i/stream.wrap : (A) -> Stream(A, Never, B)
 i/stream.from_list : (List(A)) -> Stream(A, Never, B)
@@ -1730,6 +1725,7 @@ i/tls.identity : (BitArray, BitArray) -> (cert = BitArray, key = BitArray)
 i/tls.join : (List(String)) -> String
 i/tls.slice : (String, Int, Int) -> String
 i/tls.raise : (String) <- (Fail(TlsError)) -> Never
+i/tls.finish_handle : (Request(Result(Int, String))) <- (Fail(TlsError), Tls) -> Stream
 i/tls.finish : (Request(Result(Int, String))) <- (Fail(TlsError), Tls, resource.Scope) -> Stream
 i/tls.connect : (net.Stream, String, (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, resource.Scope) -> Stream
 i/tls.accept : (net.Stream, (cert = BitArray, key = BitArray), (alpn = List(String), cert = BitArray, key = BitArray, roots = BitArray)) <- (Fail(TlsError), Tls, resource.Scope) -> Stream
@@ -1740,7 +1736,6 @@ i/tls.write : (Stream, BitArray) <- (Fail(TlsError), Tls) -> ()
 i/tls.shutdown_write : (Stream) <- (Fail(TlsError), Tls) -> ()
 i/tls.close : (Stream) <- (Tls) -> ()
 i/tls.byte_stream : (Stream) -> (close = () <- (Tls) -> (), read = (Int) <- (Fail(TlsError), Tls) -> BitArray, shutdown_write = () <- (Fail(TlsError), Tls) -> (), write = (BitArray) <- (Fail(TlsError), Tls) -> ())
-i/tls.make_tls : () -> Tls
 i/uri._parse_result : (String) -> Result(Uri, UriError)
 i/uri._build_result : (Parts) -> Result(Uri, UriError)
 i/uri.parts : (Uri) -> Parts
@@ -1802,3 +1797,5 @@ i/uri.encode_bytes : (BitArray) <- (Fail(CodecError)) -> String
 i/uri.decode_component : (String) <- (Fail(CodecError)) -> String
 i/uri.decode_bytes : (String) <- (Fail(CodecError)) -> BitArray
 i/uri.parse_query : (String) <- (Fail(CodecError)) -> List((String, String))
+
+
