@@ -1433,12 +1433,12 @@ test("inspect_351_test", () {
 })
 
 test("inspect_355_test", () {
-	assert(string.inspect(Ok(True())) == "Ok(True())")
+	assert(string.inspect(Ok(True())) == "Ok(True)")
 	()
 })
 
 test("inspect_359_test", () {
-	assert(string.inspect(Ok(False())) == "Ok(False())")
+	assert(string.inspect(Ok(False())) == "Ok(False)")
 	()
 })
 
@@ -1453,12 +1453,12 @@ test("inspect_367_test", () {
 })
 
 test("inspect_371_test", () {
-	assert(string.inspect(Error(True())) == "Error(True())")
+	assert(string.inspect(Error(True())) == "Error(True)")
 	()
 })
 
 test("inspect_375_test", () {
-	assert(string.inspect(Error(False())) == "Error(False())")
+	assert(string.inspect(Error(False())) == "Error(False)")
 	()
 })
 
