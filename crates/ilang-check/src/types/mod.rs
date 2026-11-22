@@ -740,12 +740,23 @@ pub fn check_selected(
     sources: &Sources,
     selected: &[(DefId, bool)],
 ) -> (Typed, Vec<Diagnostic>) {
+    check_selected_with_needs(program, sources, selected, false)
+}
+
+/// `check_selected`; `keep_implicit` keeps the implicit services in the
+/// shown types (design host-boundary §5.5 rule 5).
+pub fn check_selected_with_needs(
+    program: &Program,
+    sources: &Sources,
+    selected: &[(DefId, bool)],
+    keep_implicit: bool,
+) -> (Typed, Vec<Diagnostic>) {
     if !program.typed_originals.is_empty() {
         let mut original = program.clone();
         crate::typed_macro::restore(&mut original);
-        infer::Checker::new(&original, sources).run_selected(selected)
+        infer::Checker::with_needs(&original, sources, keep_implicit).run_selected(selected)
     } else {
-        infer::Checker::new(program, sources).run_selected(selected)
+        infer::Checker::with_needs(program, sources, keep_implicit).run_selected(selected)
     }
 }
 

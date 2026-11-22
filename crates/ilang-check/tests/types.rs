@@ -2,7 +2,11 @@
 //! of a package; each `tests/types/<case>/` with an `i.toml` is a package.
 //! The shown type of every top-level name, then the problems, are
 //! compared with `<case>.out` or `<case>/expected.out`. `library.out` has
-//! the types of the library modules. `UPDATE=1` writes the files.
+//! the types of the library modules, with the implicit services hidden;
+//! `library.needs.out` has the same types with the implicit services
+//! (`Await`, `Owner`, `Root`, `Scheduler`, `Runner`) kept, so a regression
+//! in their inference shows (design host-boundary §5.5 rule 5).
+//! `UPDATE=1` writes the files.
 //! Every package has the standard library `i` (`stdlib/`) as a path
 //! dependency.
 
@@ -17,6 +21,11 @@ use std::fs;
 use std::path::Path;
 
 fn output(graph: &PackageGraph, short: bool, library: bool) -> String {
+    output_with(graph, short, library, false)
+}
+
+/// `output`; `keep_needs` keeps the implicit services in the library types.
+fn output_with(graph: &PackageGraph, short: bool, library: bool, keep_needs: bool) -> String {
     let checked = if graph
         .packages
         .iter()
@@ -51,7 +60,11 @@ fn output(graph: &PackageGraph, short: bool, library: bool) -> String {
         // library table covers every library module.
         let (parsed, diags) = ilang_check::parse_all(graph);
         assert!(diags.is_empty(), "{diags:?}");
-        ilang_check::check_parsed(graph, &parsed)
+        if keep_needs {
+            ilang_check::check_parsed_keeping_needs(graph, &parsed)
+        } else {
+            ilang_check::check_parsed(graph, &parsed)
+        }
     } else {
         ilang_check::check(graph)
     };
@@ -236,9 +249,9 @@ fn library_graph(reverse_modules: bool) -> PackageGraph {
     graph
 }
 
-fn library_output(reverse_modules: bool) -> String {
+fn library_output(reverse_modules: bool, keep_needs: bool) -> String {
     let graph = library_graph(reverse_modules);
-    output(&graph, false, true)
+    output_with(&graph, false, true, keep_needs)
 }
 
 /// The library modules type check with no problems, their types are those of
@@ -249,7 +262,7 @@ fn library_output(reverse_modules: bool) -> String {
 /// is shown as `(Float)`; actual data labels are still shown as `label = T`.
 #[test]
 fn library() {
-    let actual = library_output(false);
+    let actual = library_output(false, false);
     let missing: Vec<&str> = actual
         .lines()
         .filter(|l| l.ends_with(": <no type scheme>"))
@@ -271,14 +284,44 @@ fn library() {
     );
 }
 
+/// The library types with the implicit services kept (design host-boundary
+/// §5.5 rule 5): `library.out` hides them, so this golden is what shows a
+/// regression in the inference of `Await`, `Owner`, `Root`, `Scheduler`
+/// and `Runner`.
+#[test]
+fn library_needs() {
+    let actual = library_output(false, true);
+    let missing: Vec<&str> = actual
+        .lines()
+        .filter(|l| l.ends_with(": <no type scheme>"))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "definitions have no type scheme: {missing:#?}"
+    );
+    let mut failed = Vec::new();
+    let mut updates = common::golden::Staged::default();
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/types/library.needs.out");
+    compare(&path, &actual, &mut updates, &mut failed);
+    if std::env::var_os("UPDATE").is_some() {
+        updates.commit(failed.is_empty()).unwrap();
+    }
+    assert!(
+        failed.is_empty(),
+        "library types with implicit needs differ: tests/types/library.needs.out (run with UPDATE=1 to bless)"
+    );
+}
+
 /// Two runs of the same source give the same snapshot, whatever order the
 /// graph's modules are in and whatever thread does the checking. Run the
 /// binary with `--test-threads=1` and with the default once each: neither
 /// changes the file.
 #[test]
 fn library_snapshot_depends_on_the_source_only() {
-    let first = library_output(false);
-    let second = std::thread::spawn(|| library_output(true)).join().unwrap();
+    let first = library_output(false, false);
+    let second = std::thread::spawn(|| library_output(true, false))
+        .join()
+        .unwrap();
     assert_eq!(first, second);
 }
 
