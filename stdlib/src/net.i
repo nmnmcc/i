@@ -60,6 +60,12 @@ Net = (
 	close_listener = (Int) -> (),
 )
 
+/// Listens on `address` and `port` and gives a `Listener` owned by the
+/// current `resource.Scope`: its close is attached to the scope before
+/// `listen` gives the listener, and runs when the scope ends. Port zero asks
+/// the OS to allocate a port.
+///
+/// Needs `resource.Scope`, `Net` and `Fail(NetError)`.
 listen = (address, port) <- (raw : Net) {
 	number = resource.acquire(
 		() {
@@ -91,6 +97,11 @@ listen = (address, port) <- (raw : Net) {
 	Listener(number)
 }
 
+/// Connects to `address` and `port` and gives a `Stream` owned by the
+/// current `resource.Scope`: its close is attached to the scope before
+/// `connect` gives the stream, and runs when the scope ends.
+///
+/// Needs `resource.Scope`, `Net` and `Fail(NetError)`.
 connect = (address, port) <- (raw : Net) {
 	number = resource.acquire(
 		() {
@@ -122,6 +133,11 @@ connect = (address, port) <- (raw : Net) {
 	Stream(number)
 }
 
+/// Accepts a connection from `listener` and gives a `Stream` owned by the
+/// current `resource.Scope`: its close is attached to the scope before
+/// `accept` gives the stream, and runs when the scope ends.
+///
+/// Needs `resource.Scope`, `Net` and `Fail(NetError)`.
 accept = (Listener(number)) <- (raw : Net) {
 	number = resource.acquire(
 		() {
@@ -198,8 +214,16 @@ shutdown_write = (Stream(number)) <- (raw : Net) {
 		}
 }
 
+/// Closes `stream`. Closing a stream that is closed already does nothing.
+/// The scope that owns the stream calls this; a program does not need to.
+///
+/// Needs `Net`.
 close_stream = (Stream(number)) <- (raw : Net) { raw.close_stream(number) }
 
+/// Closes `listener`. Closing a listener that is closed already does nothing.
+/// The scope that owns the listener calls this; a program does not need to.
+///
+/// Needs `Net`.
 close_listener = (Listener(number)) <- (raw : Net) {
 	raw.close_listener(number)
 }
@@ -239,7 +263,12 @@ byte_stream = (stream) {
 	)
 }
 
-/// Bind a UDP socket; port zero asks the OS to allocate a port.
+/// Bind a UDP socket and give a `Datagram` owned by the current
+/// `resource.Scope`: its close is attached to the scope before `bind` gives
+/// the socket, and runs when the scope ends. Port zero asks the OS to
+/// allocate a port.
+///
+/// Needs `resource.Scope`, `Net` and `Fail(NetError)`.
 bind = (address, port) <- (raw : Net) {
 	number = resource.acquire(
 		() {
@@ -327,6 +356,11 @@ local_address = (Datagram(number)) <- (raw : Net) {
 		}
 }
 
+/// Closes `socket`. Closing a datagram socket that is closed already does
+/// nothing. The scope that owns the socket calls this; a program does not
+/// need to.
+///
+/// Needs `Net`.
 close_datagram = (Datagram(number)) <- (raw : Net) {
 	raw.close_datagram(number)
 }

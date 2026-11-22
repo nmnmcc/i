@@ -27,6 +27,11 @@ Fetch = (
 	close = (Int) -> (),
 )
 
+/// Opens a response and gives it owned by the current `resource.Scope`: its
+/// `close` is attached to the scope before `open` gives the `Response`, and
+/// runs when the scope ends.
+///
+/// Needs `resource.Scope`, `Fetch` and `Fail(String)`.
 open = (method, url, headers, body) <- (raw : Fetch) {
 	number = resource.acquire(
 		() {
@@ -66,4 +71,8 @@ read = (Response(id), max) <- (raw : Fetch) {
 		& (Error(code)) { fail.raise(code) }
 }
 
+/// Closes a response. Closing a response that is closed already does nothing.
+/// The scope that owns the response calls this; a program does not need to.
+///
+/// Needs `Fetch`.
 close = (Response(id)) <- (raw : Fetch) { raw.close(id) }
