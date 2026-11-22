@@ -191,3 +191,26 @@ records every benchmark row and changed output hash. It writes
 k4-integration.json and a readable report with the full flipped-case list.
 The semantic requirements remain the oracle; the audit does not turn
 observed acceptance or equal optimization-level outputs into a requirement.
+
+## Source comments
+
+`scripts/doc-comments check` runs with the test suite and rejects comments that
+point at the process instead of the code. A comment states a fact about the
+code or the test; it does not tell the reader to go and read a plan, a stage, a
+lane, a TODO or a rule identifier. That is why `TODO`/`FIXME`, stage/phase
+wording, lane names such as `lane/...`, and a line that starts with a rule id
+and a colon (`R5: ...`) are rejected.
+
+Citing the specification is still allowed. The checker measures these forms:
+
+| Comment | Result |
+| --- | --- |
+| `// R5: the final ran before the call returned` | rejected |
+| `// The final ran before the call returned (R5).` | accepted |
+| `// See §9.5 for the ordering.` | rejected |
+| `// See spec.md for the ordering.` | rejected |
+| `/// §9.5` inside a fenced rustdoc example | accepted |
+
+So say the fact first and put the rule id in parentheses at the end, if at all:
+"the final ran before the call returned (R5)." A section mark or a spec path in
+a source comment is a reference; restate what the code does instead.

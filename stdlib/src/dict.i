@@ -30,10 +30,9 @@
 	size
 	is_empty
 	get
-	has
+	contains
 	insert
 	delete
-	upsert
 	update
 	from_list
 	to_list
@@ -122,13 +121,13 @@ find_entry = <K, V>(entries : List((K, V)), key : K) -> Option(V) {
 		}
 }
 
-/// `True` when the key is in the dict.
-has = <K, V>(dict : Dict(K, V), key : K) -> Bool {
+/// `True` when `key` is a key of the dict.
+contains = <K, V>(dict : Dict(K, V), key : K) -> Bool {
 	get(dict, key) |> (Some(_)) { True() } & (None()) { False() }
 }
 
 /// The dict with the entry `key` → `value`. An entry with the same key is
-/// replaced.
+/// replaced. Use this when the new value is already known.
 ///
 /// ```i
 /// dict.new() |> dict.insert("a", 1) |> dict.to_list  // [("a", 1)]
@@ -326,33 +325,24 @@ remove_entry = <K, V>(
 }
 
 /// Changes the value for a key with a function, which gets `Some(value)`
-/// when the key is there and `None` when not.
+/// when the key is there and `None` when not. Adds the key when it is
+/// absent; the mapper receives `None` then. Use this when the new value
+/// depends on the old one.
 ///
 /// ```i
 /// increment = (x) { x |> (Some(n)) { n + 1 } & (None()) { 0 } }
-/// dict.upsert(counts, "a", increment)
+/// dict.update(counts, "a", increment)
 /// ```
-upsert = <K, V, N>(
+update = <K, V, N>(
 	dict : Dict(K, V),
-	in : K,
+	key : K,
 	with : (Option(V)) <- N -> V
 ) -> Dict(K, V) {
 	insert(
 		dict,
-		in,
-		with(get(dict, in)),
+		key,
+		with(get(dict, key)),
 	)
-}
-
-/// Changes the value for a key with a function, when the key is there. If
-/// not, the dict is the same.
-update = <K, V, N>(dict : Dict(K, V), in : K, with : (V) <- N -> V) -> Dict(
-	K,
-	V,
-) {
-	get(dict, in) |>
-		(Some(value)) { insert(dict, in, with(value)) }
-		& (None()) { dict }
 }
 
 /// A dict with the entries of a list of pairs. When a key is in the list
