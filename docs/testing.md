@@ -214,3 +214,28 @@ Citing the specification is still allowed. The checker measures these forms:
 So say the fact first and put the rule id in parentheses at the end, if at all:
 "the final ran before the call returned (R5)." A section mark or a spec path in
 a source comment is a reference; restate what the code does instead.
+
+## Timing, order and concurrency tests
+
+A test that asserts *when* something happens (a deadline, a cancellation, a
+final running before a call returns), *in what order*, or *concurrently* has
+two required runs before delivery:
+
+- the test **N times in sequence** (at least 10);
+- **M concurrent copies** of the same command over several rounds (for
+  example 4 copies x 2 rounds).
+
+Report both counts in the change. One green run is not evidence for this class
+of test: `timeout_body_error_test` passed 20 sequential runs and failed one of
+four when four copies ran at once, because the assertion depended on the
+scheduler's turn order rather than on the behavior it meant to pin. The fix
+was to make the test deterministic (a far deadline), not to widen the
+assertion.
+
+When a page or a doc comment says a case has no deterministic test and one is
+added later, replace that note with the test's name in the same change. A "no
+test yet" note expires; a pointer to the test does not.
+
+The heavy binaries (`ilang-check --test library`, `--test spec`) run with
+`--test-threads=1`: they are bounded by memory and by the machine, and
+parallel cases on a small machine trade throughput for timeouts.
