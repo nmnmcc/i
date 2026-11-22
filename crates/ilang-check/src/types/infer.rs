@@ -389,6 +389,7 @@ impl<'a> Checker<'a> {
         }
         self.report_coalescing(Span::default());
         self.entry_points(selected);
+        self.boundary_exports();
         // The shown type schemes.
         let mut typed = std::mem::take(&mut self.out);
         let artifact_schemes = p
@@ -1151,6 +1152,9 @@ impl<'a> Checker<'a> {
         if !export {
             return;
         }
+        // Host-boundary §5.5 rule 2 is the second pass on the shaped
+        // signature; a part it reports is not reported again as E0521.
+        let boundary = self.boundary_signature(d, span, &f, true);
         let parts = f
             .parts()
             .unwrap_or_default()
@@ -1158,6 +1162,9 @@ impl<'a> Checker<'a> {
             .map(|p| ("a parameter", p, true))
             .chain([("the value", &f.ret, false)]);
         for (what, t, input) in parts {
+            if boundary && self.boundary_bad(t, true) {
+                continue;
+            }
             if !self.host_type(t) || input && !t.values().is_all() {
                 let suffix = if input
                     && let Some(b) = t.scalar()
@@ -1271,6 +1278,142 @@ impl<'a> Checker<'a> {
                     || matches!(&self.p.ty(*id).body, TypeBody::Custom(cs) if cs.is_empty())
             }
             _ => false,
+        }
+    }
+
+    /// The module exports of the dependencies with `hostcall = true`
+    /// (`Program::boundary_exports`): each function among them is checked
+    /// by [`Self::boundary_signature`].
+    fn boundary_exports(&mut self) {
+        let p = self.p;
+        for &d in &p.boundary_exports {
+            let Some(scheme) = self.defs.get(&d) else {
+                continue;
+            };
+            let opts = display::Opts {
+                mono: true,
+                written: false,
+            };
+            // A type that cannot be simplified is reported where it is
+            // shown.
+            let Ok(t) = display::shown(&self.s, &scheme.ty, opts) else {
+                continue;
+            };
+            if let Ty::Fn(f) = display::both(&t) {
+                self.set_module(d.module);
+                self.boundary_signature(d, p.def(d).span, &f, false);
+            }
+        }
+    }
+
+    /// Host-boundary §5.5 rule 2: a boundary-visible function's own row
+    /// (its need, parameters and result) may not name the hostcall
+    /// mechanics `Request` (`Call`), `Ticket`, `Wait` or `CallGroup`; in an
+    /// `@export` (`export`), a parameter or the result may not take an
+    /// implicit service either. Types are compared by identity; records and
+    /// aliases are not looked into. The library `i` is exempt. Each name is
+    /// reported once; whether one was.
+    fn boundary_signature(&mut self, d: DefId, span: Span, f: &FnTy, export: bool) -> bool {
+        let package = self.p.module(d.module).package;
+        if self.p.package_identities.get(package)
+            == Some(&crate::identity::PackageIdentity::Library)
+        {
+            return false;
+        }
+        let mut mechanics = Vec::new();
+        let mut implicit = Vec::new();
+        for t in [&f.param, &f.ret] {
+            self.mechanics_in(t, &mut mechanics);
+            if export {
+                self.implicit_in(t, &mut implicit);
+            }
+        }
+        self.mechanics_in(&f.env, &mut mechanics);
+        let reported = !mechanics.is_empty() || !implicit.is_empty();
+        for name in mechanics {
+            self.error(
+                code::MECHANICS_IN_SIGNATURE,
+                span,
+                format!(
+                    "`{name}` is hostcall mechanics; a boundary-visible signature may not name it"
+                ),
+            );
+        }
+        for name in implicit {
+            self.error(
+                code::MECHANICS_IN_SIGNATURE,
+                span,
+                format!("`{name}` is an implicit service; an `@export` signature may not take it as a value"),
+            );
+        }
+        reported
+    }
+
+    /// Whether [`Self::boundary_signature`] reports something in `t`.
+    fn boundary_bad(&self, t: &Ty, export: bool) -> bool {
+        let mut found = Vec::new();
+        self.mechanics_in(t, &mut found);
+        if export {
+            self.implicit_in(t, &mut found);
+        }
+        !found.is_empty()
+    }
+
+    /// The names of the hostcall mechanics types in `t`, each once.
+    fn mechanics_in(&self, t: &Ty, out: &mut Vec<String>) {
+        self.named_in(t, true, out, &|p, r| match r {
+            TypeRef::Builtin(b @ (BuiltinType::Request | BuiltinType::Ticket)) => {
+                Some(b.name().to_string())
+            }
+            TypeRef::Custom(id) if p.mechanics_types.contains(id) => Some(p.ty(*id).name.clone()),
+            _ => None,
+        });
+    }
+
+    /// The names of the implicit services in a value place of `t`, each
+    /// once: the need rows of function types in it are not looked into,
+    /// as inference carries them there.
+    fn implicit_in(&self, t: &Ty, out: &mut Vec<String>) {
+        self.named_in(t, false, out, &|p, r| match r {
+            TypeRef::Custom(id) if p.is_implicit_service(*id) => Some(p.ty(*id).name.clone()),
+            _ => None,
+        });
+    }
+
+    fn named_in(
+        &self,
+        t: &Ty,
+        needs: bool,
+        out: &mut Vec<String>,
+        pick: &dyn Fn(&Program, &TypeRef) -> Option<String>,
+    ) {
+        match t {
+            Ty::Con(h, _, xs) => {
+                if let Head::Named(r) = h
+                    && let Some(name) = pick(self.p, r)
+                    && !out.contains(&name)
+                {
+                    out.push(name);
+                }
+                xs.iter().for_each(|x| self.named_in(x, needs, out, pick));
+            }
+            Ty::Union(xs) | Ty::Inter(xs) => {
+                xs.iter().for_each(|x| self.named_in(x, needs, out, pick))
+            }
+            Ty::Fn(f) => {
+                self.named_in(&f.param, needs, out, pick);
+                self.named_in(&f.ret, needs, out, pick);
+                if needs {
+                    self.named_in(&f.env, needs, out, pick);
+                }
+            }
+            // The removed members of a difference are not in the row.
+            Ty::Diff(a, _) => self.named_in(a, needs, out, pick),
+            Ty::Both(a, b) => {
+                self.named_in(a, needs, out, pick);
+                self.named_in(b, needs, out, pick);
+            }
+            Ty::Var(_) | Ty::Never | Ty::Top => {}
         }
     }
 

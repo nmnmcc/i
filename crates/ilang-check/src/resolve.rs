@@ -1690,17 +1690,51 @@ impl<'a> Resolver<'a> {
     /// type identity.
     fn implicit_services(&mut self) {
         let mut found = Vec::new();
+        let mut mechanics = Vec::new();
         for (i, t) in self.p.types.iter().enumerate() {
             let module = self.p.module(t.module);
-            if self.graph.is_standard_library(module.package)
-                && IMPLICIT_SERVICES
-                    .iter()
-                    .any(|(m, n)| *m == module.path && *n == t.name)
-            {
+            if !self.graph.is_standard_library(module.package) {
+                continue;
+            }
+            let named =
+                |list: &[(&str, &str)]| list.iter().any(|(m, n)| *m == module.path && *n == t.name);
+            if named(&IMPLICIT_SERVICES) {
                 found.push(TypeId(i as u32));
+            }
+            if named(&MECHANICS_TYPES) {
+                mechanics.push(TypeId(i as u32));
             }
         }
         self.p.implicit_services = found;
+        self.p.mechanics_types = mechanics;
+    }
+
+    /// The boundary-visible functions of the dependencies (host-boundary
+    /// §5.5 rule 2): every module export of a package with `hostcall = true`
+    /// other than the root and the library `i`. Inference keeps the
+    /// functions among them.
+    fn boundary_exports(&mut self) {
+        let root = self.graph.root;
+        let mut found = Vec::new();
+        for (m, module) in self.p.modules.iter().enumerate() {
+            let package = module.package;
+            if Some(package) == root
+                || self.graph.is_language(package)
+                || !self.graph.packages[package].hostcall
+                || module.kind != ModuleKind::Src
+            {
+                continue;
+            }
+            for (index, def) in module.defs.iter().enumerate() {
+                if def.exported && matches!(def.kind, DefKind::Binding { .. }) {
+                    found.push(DefId {
+                        module: ModuleId(m as u32),
+                        index: index as u32,
+                    });
+                }
+            }
+        }
+        self.p.boundary_exports = found;
     }
 
     /// The parts of B.2 of a written function type at the host boundary,
@@ -2696,6 +2730,7 @@ impl<'a> Resolver<'a> {
             }
         }
         self.wasm_exports();
+        self.boundary_exports();
     }
 
     /// A host export names an exported function of a module.

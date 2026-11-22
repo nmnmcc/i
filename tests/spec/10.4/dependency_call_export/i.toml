@@ -1,0 +1,10 @@
+# spec: 10.4
+# expect: compile-error E0324
+# host-boundary §5.4 row 3, §5.5 rule 2: a dependency with `hostcall = true`
+# may not module-export a function whose signature names `Call`; the error
+# is at `lib/m.f`.
+name = "app"
+
+[dependencies]
+i = { path = "../../../../stdlib" }
+lib = { path = "./lib" }

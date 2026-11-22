@@ -89,6 +89,7 @@ pub mod code {
     pub const HOST_TYPE: &str = "E0320";
     pub const EXPORT_NAME_TWICE: &str = "E0321";
     pub const HOSTCALL_NEEDS_FLAG: &str = "E0323";
+    pub const MECHANICS_IN_SIGNATURE: &str = "E0324";
     pub const IMPLICIT_SERVICE_WRITTEN: &str = "E0325";
     pub const IMPORT_ARGS: &str = "E0326";
     pub const IMPORT_PLACE: &str = "E0327";

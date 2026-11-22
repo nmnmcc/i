@@ -116,6 +116,14 @@ pub struct Program {
     /// `i/task.Scheduler`, `Runner`, when the library has them. They are
     /// never written in a need row outside `i`, and not shown there.
     pub implicit_services: Vec<TypeId>,
+    /// The custom hostcall mechanics types ([`MECHANICS_TYPES`]), by type
+    /// identity. The built-in `Request` and `Ticket` are mechanics too;
+    /// `Call` and `CallGroup` are aliases and are checked as their bodies.
+    pub mechanics_types: Vec<TypeId>,
+    /// The module exports of the dependencies with `hostcall = true`, other
+    /// than the library `i`: with the host exports of the root, the
+    /// boundary-visible functions of host-boundary §5.5 rule 2.
+    pub boundary_exports: Vec<DefId>,
 }
 
 /// The name of the synthesized accessor of an `@import` service type:
@@ -151,6 +159,9 @@ pub const IMPLICIT_SERVICES: [(&str, &str); 5] = [
     ("i/task", "Scheduler"),
     ("i/task", "Runner"),
 ];
+
+/// The `(module, name)` identities of the custom hostcall mechanics types.
+pub const MECHANICS_TYPES: [(&str, &str); 1] = [("i/hostcall", "Wait")];
 
 impl Program {
     /// One of [`IMPLICIT_SERVICES`], by type identity.
