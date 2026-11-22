@@ -200,28 +200,12 @@ Outcome(A) = Ran(A) | Expired | ClockFailed
 /// raises the clock's error once the body has unwound; it never waits for a
 /// blocked body to finish on its own.
 ///
-/// That path has no deterministic test yet. The only way to make a clock
-/// fail on demand is a fake service whose `sleep_ns` gives
-/// `Error(...)`, and awaiting such an already-failed fake
-/// request inside a child task hangs the runtime (a real host request error
-/// in a child task returns normally). The hang, without this module:
-///
-/// ```i
-/// test = () {
-///   broken = clock.Clock(
-///     monotonic_ns = () { Ok(0) },
-///     unix_ns = () { Ok(0) },
-///     sleep_ns = (n) { Error("boom") },
-///   )
-///   { task.scope((g) {
-///     t = task.go(g, () {
-///       _ = fail.catch(() { clock.sleep_ns(20) })
-///       ()
-///     })
-///     task.join(t)
-///   }) } <- (broken,)
-/// }
-/// ```
+/// That path is covered by `timeout_clock_failure_test` in `time_test`: a
+/// fake clock whose `sleep_ns` is already failed while the body blocks
+/// forever, so the clock's error is the only outcome, and the test checks
+/// that the body's `ensure` final ran before `timeout` returned. Awaiting an
+/// already-failed fake request in a child task used to hang; #65 fixed that,
+/// which is what makes the test possible.
 ///
 /// Needs `Scheduler`, `Runner` and `clock.Clock`.
 /// Errors: the body's own `E`, `Timeout(after = after)`,

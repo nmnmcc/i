@@ -301,7 +301,7 @@ i/dict.slot : (Int, Int) -> Int
 i/dict.get : (Dict(A, B), C) -> Option(B)
 i/dict.find : (Empty | One(A, B) | Many(C, B) | Branch(D, B), Int, F, Int) -> Option(B)
 i/dict.find_entry : (List((A, B)), C) -> Option(B)
-i/dict.has : (Dict(A, B), C) -> Bool
+i/dict.contains : (Dict(A, B), C) -> Bool
 i/dict.insert : (Dict(A, B), A, B) -> Dict(A, B)
 i/dict.put : (Node(A, B), Int, A, B, Int) -> (Node(A, B), Bool)
 i/dict.put_entry : (List((A, B)), A, B, List((A, B))) -> (List((A, B)), Bool)
@@ -311,8 +311,7 @@ i/dict.delete : (Dict(A, B), A) -> Dict(A, B)
 i/dict.remove : (Node(A, B), Int, A, Int) -> (Node(A, B), Bool)
 i/dict.shrink : (Node(A, B)) -> Node(A, B)
 i/dict.remove_entry : (List((A, B)), A, List((A, B))) -> Option(List((A, B)))
-i/dict.upsert : (Dict(A, B), A, (Option(B)) <- N -> B) <- N -> Dict(A, B)
-i/dict.update : (Dict(A, B), A, (B) <- N -> B) <- N -> Dict(A, B)
+i/dict.update : (Dict(A, B), A, (Option(B)) <- N -> B) <- N -> Dict(A, B)
 i/dict.from_list : (List((A, B))) -> Dict(A, B)
 i/dict.fold : (Dict(A, B), C, (C, A, B) <- N -> C) <- N -> C
 i/dict.fold_node : (Node(A, B), C, (C, A, B) <- N -> C) <- N -> C
@@ -988,10 +987,10 @@ i/queue.finish_take : (TakeStep(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.take : (Queue(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.poll : (Queue(A, B)) <- (Fail(B)) -> Option(A)
 i/queue.nothing_to_take : (QueueState(A, B)) -> (QueueState(A, B), TakeStep(A, B))
-i/queue.size : (Queue(A, B)) -> Int
-i/queue.end : (Queue(A, B)) -> ()
-i/queue.fail : (Queue(A, B), B) -> ()
-i/queue.shutdown : (Queue(A, B)) -> ()
+i/queue.size : (Queue(A, B)) <- (task.Scheduler) -> Int
+i/queue.end : (Queue(A, B)) <- (task.Scheduler) -> ()
+i/queue.fail_with : (Queue(A, B), B) <- (task.Scheduler) -> ()
+i/queue.shutdown : (Queue(A, B)) <- (task.Scheduler) -> ()
 i/random.word_size : () -> Int
 i/random.mask : (Int) -> Int
 i/random.xor_shift : (Int, Int) -> Int
@@ -1085,17 +1084,17 @@ i/regex.unicode_space : BitArray
 i/regex.fold_pairs : BitArray
 i/regex.table : (String) -> BitArray
 i/regex.compile : (String) <- (Fail(RegexError)) -> Regex
-i/request.new_root : (Key(())) -> Key(())
-i/request.end_root : (Key(())) -> ()
+i/request._new_root : (Key(())) -> Key(())
+i/request._end_root : (Key(())) -> ()
 i/request.new_owner : (Key(())) -> Key(())
 i/request.end_owner : (Key(())) -> ()
 i/request.group_count : (Key(())) -> Int
 i/request.root_count : (Key(())) -> Int
 i/request.cancel_group : (Key(())) -> ()
-i/request.cancel_root : (Key(())) -> ()
+i/request._cancel_root : (Key(())) -> ()
 i/request.observe_owner : (Key(())) -> Request(())
-i/request.observe_root : (Key(())) -> Request(())
-i/request.open_root : () -> Root
+i/request._observe_root : (Key(())) -> Request(())
+i/request.open_root : () <- (Root) -> Root
 i/request.close_root : (Root) -> ()
 i/request.open_owner : () -> Owner
 i/request.close_owner : (Owner) -> ()
@@ -1120,7 +1119,7 @@ i/request.wait : (Request(A)) -> ()
 i/request.await : (Request(A)) -> A
 i/request.await_owned : (Request(A)) -> A
 i/request.wait_any : (List(Ticket)) -> ()
-i/request.poll : () -> ()
+i/request.poll_requests : () -> ()
 i/request.entry_root : () -> Key(())
 i/request.entry_end : () -> ()
 i/request._entry : (() <- N -> A) <- N -> A

@@ -35,17 +35,23 @@
       # a copy of `America/Phoenix`, `America/Mexico_City` of
       # `America/Edmonton` and `America/Jamaica` of `America/Winnipeg` (the
       # "temporary hack" in `northamerica` ends on that date), and 2026f was
-      # cut on 2026-10-27. Its other checks do not read the clock, so run
-      # those and leave `now.ck` out until a tzdata that knows fixes it.
-      tzdataFix = _final: prev: {
-        tzdata = prev.tzdata.overrideAttrs (_old: {
-          checkTarget = "check_mild back.ck";
-        });
-      };
-
+      # cut on 2026-10-27. Its other checks do not read the clock.
+      #
+      # Do not answer that with an overlay that replaces `tzdata`: replacing a
+      # package changes the derivation hash of everything above it, the
+      # official cache has none of those paths, and every platform rebuilds
+      # LLVM, clang, OpenSSL and Python from source — the macOS CI leg went from
+      # eight minutes to six hours that way. Bump nixpkgs instead when a newer
+      # tzdata is needed.
+      #
+      # `pkgs.tzdata` is itself in the cache, so `now.ck` only ever runs when
+      # the package has to be built, which unmodified it does not.
+      #
+      # Check with `nix build --dry-run .#packages.x86_64-linux.i`: it must
+      # list `i` alone.
       pkgsFor = system: import nixpkgs {
         inherit system;
-        overlays = [ (import rust-overlay) tzdataFix ];
+        overlays = [ (import rust-overlay) ];
       };
 
       # The version in Cargo.toml is the version the compiler reports and the

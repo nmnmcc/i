@@ -94,6 +94,14 @@ After a deliberate rewrite of the case files (a syntax conversion), `--refresh`
 records the new fingerprint of each rewritten file; it fails if a program no
 longer has its file.
 
+A change to a diagnostic message is a change to every expected diagnostic that
+quotes it. The corpus, the `// expect` lines of the spec cases and the blessed
+`.out` files are the contract: update them in the same commit, after reading
+the new sentence. A message-only change that leaves the corpus expecting the
+old text is not a test that can be made green by editing one line; the lint
+job runs the corpus and reports the disagreement, and blessing output without
+reading it is how a wrong message becomes the expected one.
+
 Measure checker workloads separately from the runtime `scripts/bench`:
 
 ```sh
@@ -183,3 +191,51 @@ records every benchmark row and changed output hash. It writes
 k4-integration.json and a readable report with the full flipped-case list.
 The semantic requirements remain the oracle; the audit does not turn
 observed acceptance or equal optimization-level outputs into a requirement.
+
+## Source comments
+
+`scripts/doc-comments check` runs with the test suite and rejects comments that
+point at the process instead of the code. A comment states a fact about the
+code or the test; it does not tell the reader to go and read a plan, a stage, a
+lane, a TODO or a rule identifier. That is why `TODO`/`FIXME`, stage/phase
+wording, lane names such as `lane/...`, and a line that starts with a rule id
+and a colon (`R5: ...`) are rejected.
+
+Citing the specification is still allowed. The checker measures these forms:
+
+| Comment | Result |
+| --- | --- |
+| `// R5: the final ran before the call returned` | rejected |
+| `// The final ran before the call returned (R5).` | accepted |
+| `// See §9.5 for the ordering.` | rejected |
+| `// See spec.md for the ordering.` | rejected |
+| `/// §9.5` inside a fenced rustdoc example | accepted |
+
+So say the fact first and put the rule id in parentheses at the end, if at all:
+"the final ran before the call returned (R5)." A section mark or a spec path in
+a source comment is a reference; restate what the code does instead.
+
+## Timing, order and concurrency tests
+
+A test that asserts *when* something happens (a deadline, a cancellation, a
+final running before a call returns), *in what order*, or *concurrently* has
+two required runs before delivery:
+
+- the test **N times in sequence** (at least 10);
+- **M concurrent copies** of the same command over several rounds (for
+  example 4 copies x 2 rounds).
+
+Report both counts in the change. One green run is not evidence for this class
+of test: `timeout_body_error_test` passed 20 sequential runs and failed one of
+four when four copies ran at once, because the assertion depended on the
+scheduler's turn order rather than on the behavior it meant to pin. The fix
+was to make the test deterministic (a far deadline), not to widen the
+assertion.
+
+When a page or a doc comment says a case has no deterministic test and one is
+added later, replace that note with the test's name in the same change. A "no
+test yet" note expires; a pointer to the test does not.
+
+The heavy binaries (`ilang-check --test library`, `--test spec`) run with
+`--test-threads=1`: they are bounded by memory and by the machine, and
+parallel cases on a small machine trade throughput for timeouts.

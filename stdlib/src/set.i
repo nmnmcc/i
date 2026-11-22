@@ -70,7 +70,7 @@ delete = <A>(from : Set(A), this : A) -> Set(A) {
 /// `True` when `this` is a member.
 contains = <A>(in : Set(A), this : A) -> Bool {
 	Set(d) = in
-	dict.has(d, this)
+	dict.contains(d, this)
 }
 
 /// The members, in the order of `fold`.

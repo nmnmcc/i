@@ -51,6 +51,8 @@ A language change includes its spec text, `tests/spec` case, and an account of i
 
 ## Submission
 
+A branch must be up to date with `main` before it can merge; branch protection refuses the merge otherwise. Two branches that are each green can still fail together: one may use a form the other changed, as when a language change and a new library module written in the old form merge in either order. Sync before merging (`git merge origin/main`, or rebase) and run `i check --project stdlib`, which catches a language change that reaches the standard library.
+
 Before merging, confirm that the head commit of the pull request has one complete, successful run. Do not put `[skip ci]` on a pull request head: it starts no run, but it enters the same concurrency group and cancels the run that was still going, so the merged tree is never checked by the full gate. To add documentation, rebase it into the code commit or accept one new complete run.
 
 Do not commit acceptance reports, proofs or run logs; keep them in the pull request description or git history.
@@ -58,3 +60,24 @@ Do not commit acceptance reports, proofs or run logs; keep them in the pull requ
 Use a plain English commit subject describing the change, following recent commits. The [README](https://github.com/nmnmcc/i/blob/main/README.md) and [development guide](https://github.com/nmnmcc/i/blob/main/docs/development.md) describe checks but provide no submission procedure; ask through the [issue tracker](https://github.com/nmnmcc/i/issues) for `nmnmcc/i`.
 
 [Compiler architecture](/docs/contributing/compiler-architecture) identifies implementation entry points.
+
+## Known external flakes
+
+The Nix cache proxy sometimes answers `HTTP error 418`, or the GitHub cache API
+rate limits it (`ResourceExhausted`, `rate limit exceeded`). A run that fails
+only with one of those messages is an infrastructure failure, not a change
+failure: rerun the job, or run the same command locally.
+
+A FlakeHub authentication failure (`Cannot find netrc`, `Unauthenticated`) is
+**not** in that list: it is a missing or invalid credential, and retrying it
+only turns one clear configuration error into three slow failures. Fix the
+credential, or stop using the cache that needs it.
+
+The check steps go through `scripts/ci/retry-on`, which retries **only** those
+signatures, at most twice with a 30 s backoff. Every retry prints a warning and
+the job summary ends with the number of retries, so a gate that passes only by
+retrying is visible. Any other failure is returned unchanged and never retried.
+
+If this happens more than ten times in a month, stop retrying and change the
+dependency (for example, do not install the cache proxy in jobs that do not
+need it). The retry count in the job summary is the evidence for that decision.

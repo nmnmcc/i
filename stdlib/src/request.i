@@ -31,7 +31,7 @@
 	await
 	await_owned
 	wait_any
-	poll
+	poll_requests
 )
 
 Await = (wait = (Ticket) -> ())
@@ -47,10 +47,10 @@ Taken = ()
 RequestState(A) = Waiting | Ready(A) | Cancelled | Taken
 
 @runtime("ilang:request", "open_root")
-new_root : (Key(())) -> Key(())
+_new_root : (Key(())) -> Key(())
 
 @runtime("ilang:request", "close_root")
-end_root : (Key(())) -> ()
+_end_root : (Key(())) -> ()
 
 @runtime("ilang:request", "open_owner")
 new_owner : (Key(())) -> Key(())
@@ -68,17 +68,17 @@ root_count : (Key(())) -> Int
 cancel_group : (Key(())) -> ()
 
 @runtime("ilang:request", "cancel_all_root")
-cancel_root : (Key(())) -> ()
+_cancel_root : (Key(())) -> ()
 
 @runtime("ilang:request", "observe_owner")
 observe_owner : (Key(())) -> Request(())
 
 @runtime("ilang:request", "observe_root")
-observe_root : (Key(())) -> Request(())
+_observe_root : (Key(())) -> Request(())
 
-open_root = () <- (parent : Root) -> Root { Root(key = new_root(parent.key)) }
+open_root = () <- (parent : Root) -> Root { Root(key = _new_root(parent.key)) }
 
-close_root = (root : Root) { end_root(root.key) }
+close_root = (root : Root) { _end_root(root.key) }
 
 open_owner = () <- (root : Root) -> Owner {
 	Owner(key = new_owner(root.key), root = root)
@@ -96,7 +96,7 @@ settled_root = (root : Root) { count_root(root) == 0 }
 
 cancel_all = (owner : Owner) { cancel_group(owner.key) }
 
-cancel_all_root = (root : Root) { cancel_root(root.key) }
+cancel_all_root = (root : Root) { _cancel_root(root.key) }
 
 retain = (value) { value }
 
@@ -107,7 +107,7 @@ within = (body) {
 
 wait_none = (owner : Owner) { await_owned(observe_owner(owner.key)) }
 
-wait_none_root = (root : Root) { await_owned(observe_root(root.key)) }
+wait_none_root = (root : Root) { await_owned(_observe_root(root.key)) }
 
 /// A fresh completed fake, with no group or host id.
 @runtime("ilang:request", "ready")
@@ -157,7 +157,7 @@ wait_any : (List(Ticket)) -> ()
 
 /// Gives the host a progress turn even when no request is outstanding.
 @runtime("ilang:request", "poll")
-poll : () -> ()
+poll_requests : () -> ()
 
 // Entry provision calls these ordinary i definitions. Initial registration is
 // the narrow entry bootstrap; public open_root always requires a live Root.

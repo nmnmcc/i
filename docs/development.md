@@ -32,6 +32,38 @@ built from source with CMake and linked into `i` as a library, so users need
 nothing else installed. Its first build takes a few minutes; later builds
 reuse it.
 
+### Keep the binary cache
+
+nixpkgs is used unmodified. An overlay that replaces a package changes the
+derivation hash of everything above it, so the official cache has none of those
+paths and every platform builds them from source. Nothing fails; it is simply
+hours instead of minutes.
+
+Measured in 2026-11, when `tzdata` was replaced to get past one clock-reading
+check of its own test suite:
+
+| | with the overlay | without it |
+| --- | --- | --- |
+| `llvm`, `clang-wrapper`, `openssl`, `python3`, `tzdata` on cache.nixos.org | 404 | 200 |
+| `build (x86_64-linux)` | 4 h+, cut | **24m46s** |
+| `build (aarch64-linux)` | 6 h, cut | **20m59s** |
+| `build (aarch64-darwin)` | 6 h, cut, never reached `i` | minutes |
+
+The ~20 minutes that remain are Binaryen and an LTO link on a 4-core runner,
+which is the real cost of a build.
+
+Check before and after touching `flake.nix`:
+
+```sh
+nix build --dry-run .#packages.x86_64-linux.i
+```
+
+It must list `i` alone. Anything else is a dependency that is no longer
+substitutable — the same question for one path is
+`nix path-info --store https://cache.nixos.org <path>`, which answers 200 when
+cached and 404 when not. Prefer bumping nixpkgs to patching a package here, and
+do not replace a whole package to satisfy one check.
+
 ## Checks
 
 `devenv test` runs `scripts/checks`, the local entry to what CI runs. It has
@@ -51,7 +83,16 @@ four independent parts:
 
 `./scripts/checks rust` runs one part. CI (`.github/workflows/ci.yml`) runs
 the parts as parallel jobs, each in the Devenv shell, with Devenv installed
-from nixpkgs and the Cargo output kept between runs. Each job is named by what
+from nixpkgs and the Cargo output kept between runs.
+
+CI runs Nix with `fallback = false` (the `extra-conf` of the installer in every
+job). With the default, a substituter that answers 418 or is rate limited stops
+serving paths, Nix builds the whole closure from source, and the run dies much
+later in an unrelated place; `fallback = false` fails on the substituter error
+itself, which is what `scripts/ci/retry-on` is there to retry. A job that must
+build a path from source passes `--fallback` to that command and says why.
+Local development keeps the default: a cold store is normal there.
+ Each job is named by what
 it runs: `build (…)`, `lint (…)`, `test (…)`, `run (…)`, `corpus (…)`, and
 `docs (…)`.
 
@@ -107,6 +148,74 @@ with `--sync-keys` after adding or removing units.
 Release archives are built with `./scripts/dev-release`; see
 [release packaging](release.md).
 
+The release workflow's cold path was **the Nix store closure, not `i`**, and
+for a long time most of it was avoidable. `buildRustPackage` defaults
+`auditable = true`; that pulls `cargo-auditable`, which nixpkgs builds with its
+own **source-built rustc**, which builds **LLVM**:
+
+```
+i -> auditable-rust-minimal -> cargo-auditable -> rustc-wrapper -> rustc (source) -> llvm-23.1.3
+```
+
+`nix/i.nix` sets `auditable = false`: the closure drops from 1828 to 1583
+derivations and contains no LLVM at all, and a cold build goes from hours to
+minutes. The cost is that the binary no longer carries the `.dep-v0` section,
+so `cargo audit` cannot read dependencies out of a published archive; the
+lockfile audit at release time covers the same question for the source tree.
+A pin change can still rebuild part of the closure from source — that is the
+remaining, genuine part of the cold path — but it is no longer the norm.
+
+A pull request that changes a build input (`nix/**`, the pins, a manifest, a
+build script) builds and smokes the archive; one that only changes this
+workflow or the docs reuses a cached archive, and with no cached archive it
+skips with a `Release archive not verified` warning in the run summary and a
+check annotation. The archive is always built and smoked on a tag.
+
+The smoke runs in three places, and only one is really offline:
+
+| where | how offline |
+| --- | --- |
+| container, `--network none` | **really offline — this is the gate's evidence** |
+| Linux host | one source (`ILANG_GIT_URLS`) plus the version assertion; no network namespace (some runners refuse `unshare -n`) |
+| macOS host | the same single source plus the assertion |
+
+The library the smoke serves is tagged `stdlib-v999.999.999`, a version no
+release would take (the package parser accepts only `X.Y.Z`), and the smoke
+asserts that `i.toml` names that version; a broken redirect resolves the newest
+real tag instead and the assertion fails loudly, instead of passing on the
+released, older library.
+
+## Platform differences
+
+The release Linux binary is built for `<arch>-unknown-linux-musl` and linked
+statically, by the same rule the native runner embedded in `i` already follows
+(`nix/i.nix`, `crates/ilang-cli/build.rs`): the archive has to start on a
+machine that has no Nix, so it must name no interpreter and no shared library.
+musl is not glibc, and two places in the tree say so:
+
+- `crates/ilang-binaryen/build.rs` links the C++ runtime from `libstdc++.a`
+  on a musl target. A shared `libstdc++` would pull `libc.so` back into a
+  static link.
+- `crates/ilang-cli/src/commands/fmt.rs` calls `renameat2` through
+  `libc::syscall`. musl does not export the glibc function.
+
+So a glibc-only symbol needs a `syscall` call, or a target-specific arm; and a
+new dependency that wants shared libraries has to be linked statically or the
+archive stops being portable. `i build` output follows the same rule, which is
+why its runner is built for musl on Linux.
+
+The release workflow checks the result instead of trusting it: on Linux the
+ELF must name no interpreter, no `NEEDED` entry and no RPATH, and the packaged
+archive must `--version`, make, run and build a package inside a
+`debian:stable-slim` container with no `/nix` (see the Linux steps of
+`release.yml`). A change that breaks either stops the release.
+
+`i new` names the newest published `stdlib-vX.Y.Z` tag. A compiler from `main`
+can be newer than that tag, so a package made that way may not check until the
+tag is published; tests and both release smoke steps build a tag from the
+checkout's `stdlib/` instead (`scripts/dev-library-repo`, and the same recipe
+inline in `release.yml`).
+
 ## Editor support
 
 `i lsp` runs the language server (`crates/ilang-lsp`) on standard input and
@@ -119,6 +228,7 @@ VS Code extension: its README says how to build it and run its tests
 
 `ilang-check --test library` and `ilang-cli --test spec` keep the whole
 library graph alive. Always run them with `-- --test-threads=1`, and run only
-one at a time. Measured: `library` peaks at 6.6 GB single-threaded and about
-32 GB with the default parallel test threads. Check `free -g` for at least
-12 GB available before starting one of them.
+one at a time. Measured: `library` peaks at 6.6 GB single-threaded; the
+default test threads multiply that by about 10 and the 16 GB CI runner then
+runs on swap. CI pins `--test-threads=1` for both. Check `free -g` for at
+least 12 GB available before starting one locally.

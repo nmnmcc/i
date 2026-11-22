@@ -23,7 +23,11 @@ jobs:
   build:
     name: build and verify (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 240
+    # A cold store builds Python, CMake, LLVM and rustc from source before
+    # `i` (a change low in the closure, such as the flake's `tzdata`, reaches
+    # all of them). The store is cached between runs, so only the first run
+    # after such a change pays for it; a cold x86_64 leg took over four hours.
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:

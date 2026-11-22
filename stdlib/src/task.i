@@ -171,7 +171,7 @@ AttachedRunner = (
 	allocate = () -> List(Int),
 	active = (Key(()), Active) -> RunControl,
 	wait = (Key(()), request.Root, List(Ticket)) -> RunControl,
-	poll = (Key(()), List(Ticket), Bool) -> RunControl,
+	poll_work = (Key(()), List(Ticket), Bool) -> RunControl,
 	forget = (Key(())) -> (),
 )
 
@@ -1557,7 +1557,7 @@ wait_root = (_run : Key(()), root : request.Root, tickets : List(Ticket)) {
 root_poll = (_run : Key(()), tickets : List(Ticket), runnable : Bool) {
 	{ runnable && core.not(tickets == []) } |>
 		(False()) { () }
-		& (True()) { request.poll() }
+		& (True()) { request.poll_requests() }
 	ContinueRun()
 }
 
@@ -1574,7 +1574,7 @@ initial = (root : request.Root) -> Runner {
 			allocate = root_allocate,
 			active = root_active,
 			wait = wait_root,
-			poll = root_poll,
+			poll_work = root_poll,
 			forget = root_forget,
 		),
 	)
@@ -1649,7 +1649,7 @@ make_scheduler = (
 								)
 							}
 					},
-					poll = (
+					poll_work = (
 						id : Key(()),
 						tickets : List(Ticket),
 						_runnable : Bool
@@ -3501,7 +3501,7 @@ loop = (state : State) -> RunReply {
 						& (_) {
 							apply_run_control(
 								s,
-								attached.poll(
+								attached.poll_work(
 									s.run,
 									work,
 									s.current != Absent() || has_ready(s),
@@ -3632,7 +3632,7 @@ loop = (state : State) -> RunReply {
 											loop(
 												apply_run_control(
 													prepared,
-													attached.poll(
+													attached.poll_work(
 														prepared.run,
 														tickets,
 														True(),

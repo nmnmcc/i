@@ -147,7 +147,7 @@ fn library_names() {
                 "await",
                 "await_owned",
                 "wait_any",
-                "poll",
+                "poll_requests",
             ],
         ),
         ("i/resource", &["acquire", "ensure", "scoped"]),
