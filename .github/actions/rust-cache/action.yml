@@ -1,6 +1,16 @@
+# The wait is 45 s because the failing restores carried `Retry-After` values of
+# 8 to 42 seconds: 45 s covers the observed upper bound, it is not a guess.
+# One measurement window (~14 runs with Rust jobs) decides what happens next.
+# The 15 s version recovered 7 of 21 rate-limited restores (33 %); a window at
+# 45 s should recover more than 80 %. If it does not, stop tuning the wait:
+# the limit is the total download quota (magic-nix-cache alone keeps ~6,273
+# `*.nar.zstd` entries), not the window. The jobs that still miss are counted
+# per job; `lint and test (rust, other crates)` was 11 of the 12 misses and
+# its cache is the largest (522 MB), so the next step after a failed window is
+# a smaller or split cache range for that job, not a longer wait.
 name: Rust cache
 description: >-
-  Swatinem/rust-cache with one 15 s retry when a restore did not hit.
+  Swatinem/rust-cache with one 45 s retry when a restore did not hit.
 
   A restore can fail with HTTP 429 while the cache service is over its download
   quota. The action reports that as `cache-hit: false`, the same as a genuine
@@ -48,8 +58,8 @@ runs:
       if: steps.restore.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        echo "::warning::no cache entry restored (likely a 429); retrying once after 15 s"
-        sleep 15
+        echo "::warning::no cache entry restored (likely a 429); retrying once after 45 s"
+        sleep 45
 
     - name: Retry the restore
       id: retry
