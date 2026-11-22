@@ -241,7 +241,7 @@ cmp2 = (a : Float, b : Float) { cmp(a, b) }
 
 fake = () { without_fail(() { request.await_owned(request.ready(7)) }) }
 
-sync_poll = () { request.poll() }
+sync_poll = () { request.poll_requests() }
 
 one = () {
 	core.inspect(

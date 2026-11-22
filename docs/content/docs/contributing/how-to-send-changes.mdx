@@ -60,3 +60,20 @@ Do not commit acceptance reports, proofs or run logs; keep them in the pull requ
 Use a plain English commit subject describing the change, following recent commits. The [README](https://github.com/nmnmcc/i/blob/main/README.md) and [development guide](https://github.com/nmnmcc/i/blob/main/docs/development.md) describe checks but provide no submission procedure; ask through the [issue tracker](https://github.com/nmnmcc/i/issues) for `nmnmcc/i`.
 
 [Compiler architecture](/docs/contributing/compiler-architecture) identifies implementation entry points.
+
+## Known external flakes
+
+The Nix cache proxy sometimes answers `HTTP error 418`, or the GitHub cache API
+rate limits it (`ResourceExhausted`, `rate limit exceeded`); FlakeHub prints
+`Cannot find netrc` when it is not configured. A run that fails only with one
+of those messages is an infrastructure failure, not a change failure: rerun the
+job, or run the same command locally.
+
+The check steps go through `scripts/ci/retry-on`, which retries **only** those
+signatures, at most twice with a 30 s backoff. Every retry prints a warning and
+the job summary ends with the number of retries, so a gate that passes only by
+retrying is visible. Any other failure is returned unchanged and never retried.
+
+If this happens more than ten times in a month, stop retrying and change the
+dependency (for example, do not install the cache proxy in jobs that do not
+need it). The retry count in the job summary is the evidence for that decision.
