@@ -51,7 +51,16 @@ four independent parts:
 
 `./scripts/checks rust` runs one part. CI (`.github/workflows/ci.yml`) runs
 the parts as parallel jobs, each in the Devenv shell, with Devenv installed
-from nixpkgs and the Cargo output kept between runs. Each job is named by what
+from nixpkgs and the Cargo output kept between runs.
+
+CI runs Nix with `fallback = false` (the `extra-conf` of the installer in every
+job). With the default, a substituter that answers 418 or is rate limited stops
+serving paths, Nix builds the whole closure from source, and the run dies much
+later in an unrelated place; `fallback = false` fails on the substituter error
+itself, which is what `scripts/ci/retry-on` is there to retry. A job that must
+build a path from source passes `--fallback` to that command and says why.
+Local development keeps the default: a cold store is normal there.
+ Each job is named by what
 it runs: `build (…)`, `lint (…)`, `test (…)`, `run (…)`, `corpus (…)`, and
 `docs (…)`.
 
