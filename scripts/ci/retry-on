@@ -22,7 +22,6 @@ SIGNATURES=(
   'HTTP error 418'          # the Nix cache proxy answering "I'm a teapot"
   'ResourceExhausted'       # GitHub cache API rate limit (Twirp)
   'rate limit exceeded'     # the same, spelled by the API
-  'Cannot find netrc'       # FlakeHub authentication
 )
 
 ATTEMPTS=3   # one try and two retries

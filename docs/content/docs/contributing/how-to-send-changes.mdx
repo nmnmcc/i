@@ -64,10 +64,14 @@ Use a plain English commit subject describing the change, following recent commi
 ## Known external flakes
 
 The Nix cache proxy sometimes answers `HTTP error 418`, or the GitHub cache API
-rate limits it (`ResourceExhausted`, `rate limit exceeded`); FlakeHub prints
-`Cannot find netrc` when it is not configured. A run that fails only with one
-of those messages is an infrastructure failure, not a change failure: rerun the
-job, or run the same command locally.
+rate limits it (`ResourceExhausted`, `rate limit exceeded`). A run that fails
+only with one of those messages is an infrastructure failure, not a change
+failure: rerun the job, or run the same command locally.
+
+A FlakeHub authentication failure (`Cannot find netrc`, `Unauthenticated`) is
+**not** in that list: it is a missing or invalid credential, and retrying it
+only turns one clear configuration error into three slow failures. Fix the
+credential, or stop using the cache that needs it.
 
 The check steps go through `scripts/ci/retry-on`, which retries **only** those
 signatures, at most twice with a 30 s backoff. Every retry prints a warning and
